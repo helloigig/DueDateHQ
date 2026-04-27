@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Competitive Analysis — DueDateHQ</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --muted: #666;
+    --bg: #fafafa;
+    --card: #fff;
+    --border: #e5e5e5;
+    --accent: #2563eb;
+    --strong: #059669;
+    --adequate: #3b82f6;
+    --weak: #f59e0b;
+    --missing: #9ca3af;
+    --unknown: #d1d5db;
+    --high: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.25rem 4rem;
+    line-height: 1.6;
+    color: var(--fg);
+    background: var(--bg);
+  }
+  header { border-bottom: 2px solid var(--fg); padding-bottom: 1rem; margin-bottom: 2rem; }
+  header h1 { margin: 0 0 0.25rem; font-size: 1.75rem; }
+  header .meta { color: var(--muted); font-size: 0.9rem; }
+  nav { background: var(--card); border: 1px solid var(--border); padding: 1rem 1.25rem; margin-bottom: 2rem; border-radius: 6px; }
+  nav strong { display: block; margin-bottom: 0.5rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  nav ol { margin: 0; padding-left: 1.25rem; }
+  nav a { color: var(--accent); text-decoration: none; }
+  nav a:hover { text-decoration: underline; }
+  section { margin-bottom: 3rem; }
+  h2 { font-size: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; margin-top: 2.5rem; }
+  h3 { font-size: 1.15rem; margin-top: 1.75rem; }
+  h4 { font-size: 1rem; margin-top: 1.25rem; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; background: var(--card); font-size: 0.88rem; }
+  th, td { padding: 0.55rem 0.7rem; text-align: left; border: 1px solid var(--border); vertical-align: top; }
+  th { background: #f3f4f6; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  tbody tr:nth-child(even) { background: #fafbfc; }
+  td.feature { font-weight: 500; min-width: 220px; }
+  .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.75rem; font-weight: 600; color: #fff; white-space: nowrap; }
+  .b-strong { background: var(--strong); }
+  .b-adequate { background: var(--adequate); }
+  .b-weak { background: var(--weak); }
+  .b-missing { background: var(--missing); }
+  .b-unknown { background: var(--unknown); color: #333; }
+  .b-planned { background: #a78bfa; }
+  .threat-H { background: var(--high); color: #fff; padding: 0.1rem 0.45rem; border-radius: 3px; font-weight: 700; }
+  .threat-M { background: #f59e0b; color: #fff; padding: 0.1rem 0.45rem; border-radius: 3px; font-weight: 700; }
+  .threat-L { background: #10b981; color: #fff; padding: 0.1rem 0.45rem; border-radius: 3px; font-weight: 700; }
+  blockquote { border-left: 3px solid var(--accent); padding: 0.75rem 1rem; margin: 1rem 0; background: var(--card); }
+  .tag { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.78rem; background: #eef1f4; padding: 0.1rem 0.4rem; border-radius: 3px; color: var(--muted); }
+  .opportunity, .risk { background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--accent); padding: 1rem 1.25rem; margin: 1rem 0; border-radius: 4px; }
+  .risk { border-left-color: var(--high); }
+  .opportunity h4, .risk h4 { margin-top: 0; }
+  .opportunity p, .risk p { margin: 0.35rem 0; }
+  .exec-summary { background: #fffbeb; border: 1px solid #fde68a; padding: 1.25rem 1.5rem; border-radius: 6px; margin-bottom: 2rem; }
+  ul li { margin-bottom: 0.4rem; }
+  .caveat { color: var(--muted); font-size: 0.85rem; font-style: italic; }
+  .table-wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Competitive Analysis: Tax Deadline Tracking Software</h1>
+  <div class="meta">DueDateHQ · Solo / Small-Firm CPAs · Generated 2026-04-23</div>
+</header>
+
+<nav>
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#report">Competitive Intelligence Report</a></li>
+    <li><a href="#matrix">Feature Matrix</a></li>
+    <li><a href="#gaps">Gap Analysis &amp; Differentiation</a></li>
+  </ol>
+</nav>
+
+<section id="report">
+  <h2>1 · Competitive Intelligence Report</h2>
+
+  <div class="exec-summary">
+    <h3 style="margin-top:0">Executive Summary</h3>
+    <p>Four commercial incumbents serve tax-deadline workflows for solo and small-firm CPAs: one desktop specialist (<strong>File In Time</strong>) and three cloud-native all-in-one practice management platforms (<strong>Karbon</strong>, <strong>TaxDome</strong>, <strong>Canopy</strong>). All four treat deadlines as recurring task objects inside a generic workflow engine — <strong>none monitor state tax authorities in real time</strong> or cross-reference state announcements against a client portfolio.</p>
+    <p>The most significant 2026 development is Canopy's pricing flip from modular à-la-carte to unified flat tiers ($74 / $109 / $149 per user/month). The clearest opportunity is the structural gap around state-level deadline intelligence — no vendor has commercial or architectural reason to build it.</p>
+    <p><strong>Assessment:</strong> defensible specialist opportunity in a mature market, with a clean positioning gap below the $60/user/mo cloud-PM floor.</p>
+    <p class="caveat">Confidence: High — triangulated across vendor sites, G2/Capterra reviews (6,200+ TaxDome alone), and TaxPro Discord practitioner voices.</p>
+  </div>
+
+  <h3>Market Concentration</h3>
+  <ul>
+    <li><strong>Structure:</strong> fragmented with emerging consolidation pressure from all-in-one platforms</li>
+    <li><strong>Active players:</strong> 4 direct + 10–12 adjacent</li>
+    <li><strong>Funding concentration:</strong> Heavily imbalanced. Canopy ≈ $236.5M VC; TaxDome bootstrapped; Karbon VC-backed multi-round; TimeValue (File In Time's parent) privately held, 30 years old.</li>
+    <li><strong>Entry barriers:</strong> Medium — tax-prep integrations are defensible but not insurmountable; the harder barriers are distribution into accounting firms and the accuracy SLA required to replace manual tracking.</li>
+  </ul>
+
+  <h3>Key Players at a Glance</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Competitor</th><th>Stage</th><th>Funding</th><th>Strength</th><th>Weakness</th><th>Threat</th></tr></thead>
+    <tbody>
+      <tr><td><strong>File In Time</strong></td><td>Mature (1990s)</td><td>Private, 30-yr vendor</td><td>200+ prebuilt return types; low price</td><td>Windows-only; static deadline DB</td><td><span class="threat-H">H</span></td></tr>
+      <tr><td><strong>Karbon</strong></td><td>Growth-stage</td><td>VC-backed, multi-round</td><td>#1 G2 ranking; ecosystem depth</td><td>$708+/yr minimum; no state awareness</td><td><span class="threat-M">M</span></td></tr>
+      <tr><td><strong>TaxDome</strong></td><td>Growth-stage</td><td>Bootstrapped</td><td>Best-in-class portal; unlimited clients</td><td>10–15h setup; annual upfront only</td><td><span class="threat-M">M</span></td></tr>
+      <tr><td><strong>Canopy</strong></td><td>Growth-stage</td><td>~$236.5M VC</td><td>Tax-resolution depth; simplified 2026 pricing</td><td>Breadth dilutes depth; highest cloud entry price</td><td><span class="threat-L">L</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="caveat">File In Time is <strong>High</strong> threat — directly competes for the same solo-CPA dollar with incumbent trust. Karbon and TaxDome are <strong>Medium</strong> — users can treat DueDateHQ as an add-on rather than substitute. Canopy is <strong>Low</strong> — its ICP has self-selected into all-in-one consolidation.</p>
+
+  <h3>Adjacent Solutions &amp; Substitutes</h3>
+  <p>Real practitioner stacks (per TaxPro Discord, Jan–Mar 2026) include 10+ tools beyond the four direct competitors.</p>
+  <ul>
+    <li><strong>CCH Axcess Tax</strong> — dominant mid-market tax prep. Karbon integrates natively but requires a <em>separate CCH Axcess API license</em> — an extra cost firms discover mid-implementation.</li>
+    <li><strong>Intuit ProConnect</strong> — cloud tax prep dominant at solo/small. Karbon claims deepest ProConnect integration.</li>
+    <li><strong>Drake Tax</strong> — long-standing small-firm tax prep. TaxDome-integrated.</li>
+    <li><strong>StanfordTax</strong> — AI organizers and workpapers. Practitioner warning: <em>"Stanford's calc is horrific"</em> — @Pier0445, Mar 2026.</li>
+    <li><strong>Soraban</strong> — StanfordTax alternative for AI intake/workpapers.</li>
+    <li><strong>SafeSend</strong> — de facto returns delivery standard with e-signature.</li>
+    <li><strong>Ignition</strong> — proposal/engagement-letter specialist being displaced by Karbon's 2026 native proposals.</li>
+    <li><strong>Vinyl / VXT</strong> — AI meeting recorder + phone system, both Karbon-integrated.</li>
+    <li><strong>TaxNow</strong> — IRS transcript retrieval + alerts. Narrow specialist — a direct template for DueDateHQ's positioning.</li>
+    <li><strong>Financial Cents</strong> — sub-$50/user/mo budget PM. The "Karbon alternative for solos."</li>
+    <li><strong>QBO</strong> — bookkeeping backbone integrated across all three cloud PMs.</li>
+    <li><strong>Excel / Outlook</strong> — the unspoken incumbent. Solo CPAs who reject all four commercial tools default here.</li>
+  </ul>
+
+  <h3>Strategic Opportunities</h3>
+
+  <div class="opportunity">
+    <h4>Opportunity: State-level deadline intelligence as a standalone product</h4>
+    <p><strong>What:</strong> Real-time monitoring of 50 state tax authority announcements with automatic client-portfolio impact scoping. Built on LLM interpretation of agency press releases and bulletins.</p>
+    <p><strong>Evidence:</strong> Verified across all four vendor websites that no competitor offers this. Karbon's 2026 "Extension Management" tracks extensions <em>the user files</em> — not ones <em>states announce</em>.</p>
+    <p><strong>Confidence:</strong> High.</p>
+    <p><strong>How to exploit:</strong> Lead all positioning with state-announcement-to-SLA pitch. Ship a 24-hour SLA on extension detection. Publish a monthly "state deadline changes" bulletin as content marketing.</p>
+  </div>
+
+  <div class="opportunity">
+    <h4>Opportunity: Undercut the crowded $60–100 cloud-PM price band</h4>
+    <p><strong>What:</strong> Price below cloud-PM floor ($59 Karbon / $67 TaxDome / $74 Canopy) with a focused specialist tool at $29 Solo / $49 Pro.</p>
+    <p><strong>Evidence:</strong> Three cloud platforms cluster within 25% of each other at entry tiers. Practitioner sentiment rejects annual upfront pricing and per-client credit metering.</p>
+    <p><strong>Confidence:</strong> High.</p>
+    <p><strong>How to exploit:</strong> Monthly billing by default. 20% annual discount, never required. Unlimited clients on Pro and Team tiers. No per-action AI credit metering.</p>
+  </div>
+
+  <div class="opportunity">
+    <h4>Opportunity: Karbon integration partnership as distribution channel</h4>
+    <p><strong>What:</strong> Official Karbon marketplace integration positioning DueDateHQ as a deadline-intelligence feed into Karbon workflows.</p>
+    <p><strong>Evidence:</strong> @nikpin2720: <em>"Karbon is better at integrating other tech into its ecosystem, so you're going to maybe want to go out and get an engagement software and a tax intake software and a tax delivery software etc."</em></p>
+    <p><strong>Confidence:</strong> Medium — Karbon's partner-program economics and gatekeeping are unverified.</p>
+    <p><strong>How to exploit:</strong> Phase 2 Karbon API integration (not V1). Position to Karbon BD as value-add to their tax vertical push, not competitive overlap.</p>
+  </div>
+
+  <div class="opportunity">
+    <h4>Opportunity: File In Time migration path</h4>
+    <p><strong>What:</strong> Productized 30-minute migration from File In Time CSV exports into DueDateHQ with 50-state deadline matching.</p>
+    <p><strong>Evidence:</strong> File In Time's core data structure is client × service × due date — natively CSV-exportable. Switching cost is primarily emotional (staff training) rather than technical.</p>
+    <p><strong>Confidence:</strong> Medium — technical feasibility high, conversion rate unproven.</p>
+    <p><strong>How to exploit:</strong> Build a free File In Time import tool as a lead magnet before the main product.</p>
+  </div>
+
+  <div class="opportunity">
+    <h4>Opportunity: Vendor-roadmap-skepticism positioning</h4>
+    <p><strong>What:</strong> Differentiate by shipping live features only, with no "coming soon" marketing. Turn practitioner skepticism of TaxDome/StanfordTax promises into a trust wedge.</p>
+    <p><strong>Evidence:</strong> @Pier0445, Mar 2026: <em>"I wouldn't bank too heavily on what these tools will do tomorrow. TaxDome was promising features for a couple years that are just now coming out."</em></p>
+    <p><strong>Confidence:</strong> Medium.</p>
+    <p><strong>How to exploit:</strong> Roadmap page shows shipped features only. Public changelog with weekly cadence. Refuse to comment on unshipped features in sales calls.</p>
+  </div>
+
+  <h3>Strategic Risks</h3>
+
+  <div class="risk">
+    <h4>Risk: Karbon acquires or builds state-level deadline intelligence</h4>
+    <p><strong>What:</strong> Karbon's 2026 tax-vertical push (FIFO queues, Extension Management, StanfordTax, TaxNow) suggests continued investment in tax-specific depth.</p>
+    <p><strong>Evidence:</strong> Five new tax-specific features shipped or partnered in 2026 alone.</p>
+    <p><strong>Severity:</strong> High.</p>
+    <p><strong>Mitigation:</strong> Build the state-announcement data asset fast and make it the moat, not the feature. Publish accuracy benchmarks. If Karbon tries to replicate, they compete against a public SLA and two years of deadline-change history DueDateHQ owns.</p>
+  </div>
+
+  <div class="risk">
+    <h4>Risk: Commoditization from LLM-native startups</h4>
+    <p><strong>What:</strong> The same LLM capabilities that make DueDateHQ possible lower the barrier for others. A new entrant could replicate the core feature in months.</p>
+    <p><strong>Evidence:</strong> No specific competitor identified yet, but the gap is visible and tooling is accessible.</p>
+    <p><strong>Severity:</strong> Medium.</p>
+    <p><strong>Mitigation:</strong> Accumulate proprietary data. Build integrations that take time to replicate. Establish brand as "the state deadline specialist" before others name the category.</p>
+  </div>
+
+  <div class="risk">
+    <h4>Risk: Tax software vendors (CCH, Intuit, Drake) native deadline features</h4>
+    <p><strong>What:</strong> CCH Axcess or ProConnect could add state-deadline intelligence as a bundled feature.</p>
+    <p><strong>Evidence:</strong> No current movement observed, but these vendors have all the tax metadata needed.</p>
+    <p><strong>Severity:</strong> Medium.</p>
+    <p><strong>Mitigation:</strong> DueDateHQ's cross-vendor positioning (works with any tax prep software via CSV) is defensible as a permanent differentiator.</p>
+  </div>
+
+  <div class="risk">
+    <h4>Risk: File In Time price war</h4>
+    <p><strong>What:</strong> If TimeValue responds with a cloud version at desktop pricing, the price gap narrows substantially.</p>
+    <p><strong>Severity:</strong> Low — TimeValue's business model is one-time licenses; a subscription cloud product would cannibalize other revenue lines.</p>
+    <p><strong>Mitigation:</strong> Emphasize state-intelligence depth over price. DueDateHQ should not compete on being cheapest.</p>
+  </div>
+
+  <h3>Competitive Moat Assessment</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Moat Type</th><th>Present?</th><th>Who Has It</th><th>Strength</th></tr></thead>
+    <tbody>
+      <tr><td>Network effects</td><td>Weak</td><td>Karbon (practice marketplace); TaxDome (template marketplace)</td><td>Weak</td></tr>
+      <tr><td>Switching costs</td><td>Yes</td><td>TaxDome (pipelines + portal + client data); Canopy (integrated billing + portal)</td><td><strong>Strong</strong></td></tr>
+      <tr><td>Data moat</td><td>Limited</td><td>None in this category</td><td>Weak</td></tr>
+      <tr><td>Brand / trust</td><td>Yes</td><td>TimeValue (30 years); Karbon (#1 G2)</td><td><strong>Strong</strong></td></tr>
+      <tr><td>Economies of scale</td><td>Partial</td><td>Canopy (VC-backed velocity); Karbon (ecosystem breadth)</td><td>Medium</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <blockquote>DueDateHQ cannot out-switch-cost TaxDome or Canopy — those firms own the client portal, billing, and documents. DueDateHQ can build a <strong>data moat</strong> that none of the incumbents have: a proprietary, time-stamped database of state tax authority announcements with mapping to affected client populations. This is the only defensibility asset a specialist can realistically build against deep-pocketed all-in-ones.</blockquote>
+
+  <h3>Red Flags</h3>
+  <ul>
+    <li><strong>Canopy just flipped pricing models once (Apr 2026).</strong> Signals strategic volatility. Could flip again; don't assume today's $74 Standard is stable.</li>
+    <li><strong>StanfordTax quality problem undermines Karbon's tax narrative.</strong> Karbon's best tax features depend on this integration.</li>
+    <li><strong>TaxDome ships major updates in January</strong> — right before tax season, repeatedly causing firm stress.</li>
+    <li><strong>Karbon's 2026 tax push is aggressive.</strong> Five new tax features shipped or in partnership; they may target adjacent gaps next.</li>
+    <li><strong>File In Time pricing is cheaper than the brief claimed.</strong> $199 one-time + $100/yr, not $199/month. The argument must be modernity, not price.</li>
+  </ul>
+
+  <h3>Yellow Flags</h3>
+  <ul>
+    <li><strong>Karbon's Extension Management feature narrows Story 3 gap.</strong> Still inside-out (tracks user-filed extensions), but practitioners may not distinguish.</li>
+    <li><strong>Canopy's Bookkeeping and Smart Prep modules</strong> are in beta — if they mature, solo-firm switching becomes more attractive.</li>
+    <li><strong>CCH Axcess API licensing cost</strong> is a hidden tax on Karbon adoption. If TaxDome or Canopy bypass this cost, their positioning strengthens.</li>
+    <li><strong>Practitioner "roadmap skepticism"</strong> is burned-in. Any marketing claim about future features will be discounted.</li>
+    <li><strong>Solo CPAs heavily use Excel</strong> as baseline. The true market is "commercial software vs. Excel" more than "DueDateHQ vs. Karbon."</li>
+  </ul>
+</section>
+
+<section id="matrix">
+  <h2>2 · Feature Comparison Matrix</h2>
+
+  <p>Rating scale:
+    <span class="badge b-strong">Strong</span>
+    <span class="badge b-adequate">Adequate</span>
+    <span class="badge b-weak">Weak</span>
+    <span class="badge b-missing">Missing</span>
+    <span class="badge b-unknown">Unknown</span>
+    <span class="badge b-planned">Planned</span>
+  </p>
+  <p class="caveat">All ratings reflect standard offering. Verified against vendor websites as of Apr 2026.</p>
+
+  <h3>Deadline Intelligence <span style="color:var(--muted); font-weight: normal; font-size: 0.9rem;">(DueDateHQ core territory)</span></h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Feature</th><th>DueDateHQ</th><th>File In Time</th><th>Karbon</th><th>TaxDome</th><th>Canopy</th></tr></thead>
+    <tbody>
+      <tr><td class="feature">Built-in federal tax deadline database</td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-adequate">Adequate</span></td></tr>
+      <tr><td class="feature">Built-in state tax deadline database (50 states)</td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-weak">Weak</span></td><td><span class="badge b-weak">Weak</span></td><td><span class="badge b-weak">Weak</span></td></tr>
+      <tr><td class="feature">Real-time state authority monitoring</td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td></tr>
+      <tr><td class="feature">Disaster extension detection (24h SLA)</td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td></tr>
+      <tr><td class="feature">Client portfolio impact scoping</td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td></tr>
+      <tr><td class="feature">Announcement-to-portfolio cross-reference</td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td></tr>
+      <tr><td class="feature">Automatic rollover to next period</td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td></tr>
+      <tr><td class="feature">Return type library</td><td><span class="badge b-planned">Planned</span></td><td><span class="badge b-strong">Strong</span> (~200)</td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-adequate">Adequate</span></td></tr>
+      <tr><td class="feature">Extension form printing/filing</td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span> (new 2026)</td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-adequate">Adequate</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Workflow &amp; Triage</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Feature</th><th>DueDateHQ</th><th>File In Time</th><th>Karbon</th><th>TaxDome</th><th>Canopy</th></tr></thead>
+    <tbody>
+      <tr><td class="feature">Triage dashboard</td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-weak">Weak</span> (grid only)</td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-adequate">Adequate</span></td></tr>
+      <tr><td class="feature">Email-to-task triage</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-weak">Weak</span></td><td><span class="badge b-weak">Weak</span></td></tr>
+      <tr><td class="feature">Kanban / pipeline view</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td></tr>
+      <tr><td class="feature">FIFO work queues</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span> (new 2026)</td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-adequate">Adequate</span></td></tr>
+      <tr><td class="feature">Recurring task automation</td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td></tr>
+      <tr><td class="feature">Team assignment / reassignment</td><td><span class="badge b-adequate">Adequate</span> (Team tier)</td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td></tr>
+      <tr><td class="feature">Progress report dashboard</td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-weak">Weak</span></td><td><span class="badge b-strong">Strong</span> (new 2026)</td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-adequate">Adequate</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Client-Facing Features</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Feature</th><th>DueDateHQ</th><th>File In Time</th><th>Karbon</th><th>TaxDome</th><th>Canopy</th></tr></thead>
+    <tbody>
+      <tr><td class="feature">Client portal</td><td><span class="badge b-missing">Missing</span> (by design)</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td></tr>
+      <tr><td class="feature">Document management</td><td><span class="badge b-weak">Weak</span> (PDF/CSV only)</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td></tr>
+      <tr><td class="feature">E-signature</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span> (w/ KBA)</td><td><span class="badge b-strong">Strong</span></td></tr>
+      <tr><td class="feature">Client messaging</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-adequate">Adequate</span></td></tr>
+      <tr><td class="feature">Automated client reminders</td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-weak">Weak</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Tax Preparation Integrations</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Feature</th><th>DueDateHQ</th><th>File In Time</th><th>Karbon</th><th>TaxDome</th><th>Canopy</th></tr></thead>
+    <tbody>
+      <tr><td class="feature">CSV import from tax software</td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td></tr>
+      <tr><td class="feature">Native Intuit ProConnect integration</td><td><span class="badge b-planned">Planned</span> (P4)</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-adequate">Adequate</span></td></tr>
+      <tr><td class="feature">Native CCH Axcess integration</td><td><span class="badge b-planned">Planned</span> (P4)</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span> (w/ license)</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td></tr>
+      <tr><td class="feature">Native Drake integration</td><td><span class="badge b-planned">Planned</span> (P4)</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-missing">Missing</span></td></tr>
+      <tr><td class="feature">StanfordTax integration (organizers)</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td></tr>
+      <tr><td class="feature">TaxNow integration (IRS transcripts)</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td></tr>
+      <tr><td class="feature">Filed integration (AI tax prep)</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span> (beta)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Billing &amp; Operations</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Feature</th><th>DueDateHQ</th><th>File In Time</th><th>Karbon</th><th>TaxDome</th><th>Canopy</th></tr></thead>
+    <tbody>
+      <tr><td class="feature">Time tracking</td><td><span class="badge b-missing">Missing</span> (by design)</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td></tr>
+      <tr><td class="feature">Invoicing</td><td><span class="badge b-missing">Missing</span> (by design)</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td></tr>
+      <tr><td class="feature">Payment processing</td><td><span class="badge b-missing">Missing</span> (by design)</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span> (Stripe/CPACharge)</td><td><span class="badge b-strong">Strong</span> (ACH+cards)</td></tr>
+      <tr><td class="feature">Payment locking</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-missing">Missing</span></td></tr>
+      <tr><td class="feature">Proposals / engagement letters</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span> (new 2026)</td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td></tr>
+      <tr><td class="feature">Tax resolution tools</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-weak">Weak</span></td><td><span class="badge b-weak">Weak</span></td><td><span class="badge b-strong">Strong</span> (leader)</td></tr>
+      <tr><td class="feature">Bookkeeping</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-weak">Weak</span></td><td><span class="badge b-weak">Weak</span></td><td><span class="badge b-strong">Strong</span> (beta)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>AI Capabilities</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Feature</th><th>DueDateHQ</th><th>File In Time</th><th>Karbon</th><th>TaxDome</th><th>Canopy</th></tr></thead>
+    <tbody>
+      <tr><td class="feature">State announcement AI interpretation</td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td></tr>
+      <tr><td class="feature">Email drafting / summarization</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-strong">Strong</span></td></tr>
+      <tr><td class="feature">Form auto-fill from CRM / docs</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-strong">Strong</span></td></tr>
+      <tr><td class="feature">Meeting notetaker</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td>Via Vinyl</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span> (beta)</td></tr>
+      <tr><td class="feature">AI agents (autonomous workflows)</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span> (new 2026)</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-adequate">Adequate</span></td></tr>
+      <tr><td class="feature">AI-powered reporting</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Platform &amp; Infrastructure</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Feature</th><th>DueDateHQ</th><th>File In Time</th><th>Karbon</th><th>TaxDome</th><th>Canopy</th></tr></thead>
+    <tbody>
+      <tr><td class="feature">Cloud deployment</td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td></tr>
+      <tr><td class="feature">Mobile apps (iOS + Android)</td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td></tr>
+      <tr><td class="feature">Multi-user (cloud native)</td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-weak">Weak</span> (mapped drive)</td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-strong">Strong</span></td></tr>
+      <tr><td class="feature">SOC 2 Type II</td><td><span class="badge b-planned">Planned</span> (P2)</td><td><span class="badge b-unknown">Unknown</span></td><td><span class="badge b-adequate">Adequate</span></td><td><span class="badge b-strong">Strong</span> (certified)</td><td><span class="badge b-adequate">Adequate</span></td></tr>
+      <tr><td class="feature">Open API</td><td><span class="badge b-planned">Planned</span> (P4)</td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span></td><td><span class="badge b-adequate">Adequate</span> (Zapier)</td><td><span class="badge b-adequate">Adequate</span></td></tr>
+      <tr><td class="feature">Single sign-on (SSO)</td><td><span class="badge b-planned">Planned</span></td><td><span class="badge b-missing">Missing</span></td><td><span class="badge b-strong">Strong</span> (Business+)</td><td><span class="badge b-strong">Strong</span> (Business)</td><td><span class="badge b-strong">Strong</span> (Plus+ beta)</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="gaps">
+  <h2>3 · Gap Analysis &amp; Differentiation</h2>
+
+  <h3>Gaps Where No Competitor Excels</h3>
+  <ul>
+    <li><strong>State tax authority real-time monitoring</strong> → Single clearest gap. No competitor has architectural reason to build it.</li>
+    <li><strong>Client portfolio impact scoping on state announcements</strong> → Requires joining announcement data × client records × entity/state/county metadata.</li>
+    <li><strong>Announcement-to-affected-clients natural language interpretation</strong> → LLM-native capability newer than any of the four competitors' core stacks.</li>
+    <li><strong>Payment locking beyond TaxDome</strong> → TaxDome has it; others don't. DueDateHQ deliberately skips this.</li>
+    <li><strong>Sub-$60/user/mo specialist positioning</strong> → Market floor sits above this for cloud. File In Time is cheaper but lacks cloud.</li>
+    <li><strong>Roadmap-transparent vendor positioning</strong> → Practitioners distrust "coming soon"; no competitor commits to a ship-only policy.</li>
+  </ul>
+
+  <h3>Differentiation Opportunities (ranked by defensibility)</h3>
+  <ol>
+    <li><strong>Own state-deadline intelligence as a category.</strong> Build the proprietary data asset — historical state announcements, parsing accuracy, affected-client mapping — that no competitor can replicate in under 12 months. Pair with an accuracy SLA. <span class="tag">High confidence</span></li>
+    <li><strong>Undercut the cloud-PM floor by positioning as a layer, not a platform.</strong> DueDateHQ at $29–49 explicitly doesn't compete on portal/billing/docs. Positioning: "keep your stack, add state intelligence." <span class="tag">High confidence</span></li>
+    <li><strong>Build the File In Time migration as a product surface.</strong> A free CSV import tool that maps File In Time's ~200 return types into DueDateHQ deadlines. <span class="tag">Medium confidence</span></li>
+    <li><strong>Productize "first-week success" as differentiation from TaxDome/Canopy.</strong> Onboarding is the #1 pain point for both. 30-minute setup + 7-day opinionated adoption plan attacks directly where all-in-ones lose users. <span class="tag">Capterra data</span></li>
+    <li><strong>Content-market every state announcement.</strong> Publish "What Louisiana's Hurricane X extension means for your clients" within hours. Owns a content niche because nobody else has the source data readiness. <span class="tag">Medium confidence</span></li>
+  </ol>
+</section>
+
+<footer style="margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem;">
+  Generated 2026-04-23 · DueDateHQ project
+</footer>
+
+</body>
+</html>

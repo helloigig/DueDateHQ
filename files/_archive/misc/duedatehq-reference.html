@@ -1,0 +1,2419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DueDateHQ — Working Reference · Round 1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F0E8;
+    --paper-2: #EBE3D4;
+    --ink: #1C1814;
+    --ink-muted: #5E564F;
+    --rule: #D8CFC2;
+    --rule-strong: #B8AA96;
+    --ai-gold: #9A6E0C;
+    --ai-gold-bg: #F2E6C9;
+    --high: #8E2C1F;
+    --high-bg: #F4DFD8;
+    --med: #B8690E;
+    --med-bg: #F5E4CC;
+    --low: #5E564F;
+    --low-bg: #E8E2D4;
+    --success: #2E5E35;
+    --success-bg: #DCE8D8;
+  }
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  html { scroll-behavior: smooth; }
+  
+  body {
+    font-family: 'Geist', -apple-system, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.6;
+    font-size: 15px;
+    font-weight: 400;
+    letter-spacing: -0.005em;
+    -webkit-font-smoothing: antialiased;
+  }
+  
+  .layout {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    max-width: 1280px;
+    margin: 0 auto;
+    min-height: 100vh;
+  }
+  
+  /* ---------- TOC SIDEBAR ---------- */
+  .toc {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    padding: 48px 24px 48px 32px;
+    border-right: 1px solid var(--rule);
+    overflow-y: auto;
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    background: var(--paper);
+  }
+  
+  .toc-brand {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 18px;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+  }
+  .toc-brand em { font-style: italic; color: var(--ai-gold); }
+  
+  .toc-sub {
+    color: var(--ink-muted);
+    margin-bottom: 32px;
+    text-transform: uppercase;
+    font-size: 10px;
+  }
+  
+  .toc-group {
+    margin-bottom: 24px;
+  }
+  
+  .toc-group-title {
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    margin-bottom: 10px;
+    font-weight: 500;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+  }
+  
+  .toc-list { list-style: none; }
+  
+  .toc-list li { margin-bottom: 6px; }
+  
+  .toc-list a {
+    color: var(--ink);
+    text-decoration: none;
+    display: block;
+    padding: 3px 0;
+    transition: color 0.15s, padding 0.15s;
+    text-transform: uppercase;
+    font-size: 10.5px;
+    letter-spacing: 0.05em;
+  }
+  
+  .toc-list a:hover {
+    color: var(--ai-gold);
+    padding-left: 6px;
+  }
+  
+  .toc-list .num {
+    color: var(--ink-muted);
+    margin-right: 8px;
+    font-weight: 500;
+  }
+  
+  /* ---------- MAIN CONTENT ---------- */
+  main {
+    padding: 64px 72px 120px;
+    max-width: 880px;
+  }
+  
+  /* ---------- HERO ---------- */
+  .hero {
+    margin-bottom: 80px;
+    padding-bottom: 40px;
+    border-bottom: 2px solid var(--ink);
+  }
+  
+  .hero-meta {
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 24px;
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  
+  .hero-meta span::before { content: "◆  "; color: var(--rule-strong); }
+  
+  .hero h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+    font-size: 72px;
+    line-height: 0.95;
+    letter-spacing: -0.035em;
+    margin-bottom: 16px;
+  }
+  .hero h1 em {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--ai-gold);
+  }
+  
+  .hero-deck {
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+    font-style: italic;
+    font-size: 22px;
+    line-height: 1.4;
+    color: var(--ink-muted);
+    max-width: 600px;
+    margin-bottom: 32px;
+  }
+  
+  .hero-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+  }
+  
+  .hero-stat-label {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+  }
+  
+  .hero-stat-value {
+    font-family: 'Fraunces', serif;
+    font-size: 24px;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+  }
+  
+  /* ---------- SECTIONS ---------- */
+  section {
+    margin-bottom: 72px;
+    scroll-margin-top: 24px;
+  }
+  
+  .section-head {
+    margin-bottom: 32px;
+  }
+  
+  .section-num {
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    color: var(--ai-gold);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+    display: block;
+  }
+  
+  .section-head h2 {
+    font-family: 'Fraunces', serif;
+    font-weight: 400;
+    font-size: 40px;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+  }
+  .section-head h2 em { font-style: italic; color: var(--ai-gold); }
+  
+  .section-lede {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    line-height: 1.5;
+    color: var(--ink-muted);
+    font-weight: 300;
+    max-width: 640px;
+    margin-top: 12px;
+  }
+  
+  h3 {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 22px;
+    letter-spacing: -0.015em;
+    margin-bottom: 12px;
+    margin-top: 32px;
+  }
+  
+  h4 {
+    font-family: 'Geist', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    color: var(--ink-muted);
+  }
+  
+  p { margin-bottom: 14px; max-width: 680px; }
+  
+  /* ---------- THESIS BOX ---------- */
+  .thesis-box {
+    padding: 32px 36px;
+    background: var(--paper-2);
+    border-left: 3px solid var(--ai-gold);
+    margin: 24px 0;
+  }
+  
+  .thesis-box .label {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-muted);
+    margin-bottom: 12px;
+  }
+  
+  .thesis-box p {
+    font-family: 'Fraunces', serif;
+    font-size: 24px;
+    line-height: 1.35;
+    font-weight: 400;
+    color: var(--ink);
+    margin: 0;
+  }
+  .thesis-box p em { font-style: italic; color: var(--ai-gold); }
+  
+  /* ---------- PERSONA CARDS ---------- */
+  .persona-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+    margin-top: 24px;
+  }
+  
+  .persona {
+    padding: 28px 32px;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    position: relative;
+  }
+  
+  .persona.primary {
+    border: 1px solid var(--ink);
+    background: var(--paper-2);
+  }
+  
+  .persona-tag {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-muted);
+    margin-bottom: 6px;
+  }
+  .persona.primary .persona-tag { color: var(--ai-gold); }
+  
+  .persona-name {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 24px;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+  }
+  
+  .persona-role {
+    font-style: italic;
+    color: var(--ink-muted);
+    margin-bottom: 16px;
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+  }
+  
+  .persona-quote {
+    padding: 16px 20px;
+    background: var(--paper-2);
+    border-left: 2px solid var(--rule-strong);
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    line-height: 1.5;
+    margin: 16px 0;
+    color: var(--ink);
+  }
+  .persona.primary .persona-quote { background: var(--paper); }
+  .persona-quote cite {
+    display: block;
+    margin-top: 8px;
+    font-family: 'Geist Mono', monospace;
+    font-style: normal;
+    font-size: 10px;
+    color: var(--ink-muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  
+  .persona-attrs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  
+  .persona-attr {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10.5px;
+    padding: 4px 10px;
+    background: var(--paper-2);
+    border: 1px solid var(--rule);
+    letter-spacing: 0.02em;
+  }
+  .persona.primary .persona-attr { background: var(--paper); }
+  
+  /* ---------- PAIN POINTS ---------- */
+  .pain-grid {
+    display: grid;
+    gap: 14px;
+    margin-top: 24px;
+  }
+  
+  .pain {
+    display: grid;
+    grid-template-columns: 60px 1fr 90px;
+    gap: 20px;
+    padding: 18px 20px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    align-items: center;
+  }
+  
+  .pain-num {
+    font-family: 'Fraunces', serif;
+    font-size: 28px;
+    font-weight: 300;
+    color: var(--ink-muted);
+    letter-spacing: -0.02em;
+  }
+  
+  .pain-text {
+    font-size: 14.5px;
+    line-height: 1.5;
+  }
+  
+  .pain-severity {
+    text-align: right;
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 4px 10px;
+    justify-self: end;
+    border: 1px solid;
+  }
+  
+  .pain-severity.high {
+    color: var(--high);
+    border-color: var(--high);
+    background: var(--high-bg);
+  }
+  
+  .pain-severity.med {
+    color: var(--med);
+    border-color: var(--med);
+    background: var(--med-bg);
+  }
+  
+  .pain-severity.low {
+    color: var(--low);
+    border-color: var(--rule-strong);
+    background: var(--low-bg);
+  }
+  
+  /* ---------- TOOL COMPARISON ---------- */
+  .tool-card {
+    padding: 24px 28px;
+    margin-bottom: 14px;
+    border: 1px solid var(--rule);
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 28px;
+    align-items: start;
+  }
+  
+  .tool-name {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 22px;
+    letter-spacing: -0.015em;
+  }
+  
+  .tool-type {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-muted);
+    margin-top: 4px;
+  }
+  
+  .tool-body {
+    font-size: 14.5px;
+    line-height: 1.55;
+  }
+  
+  .tool-body strong { color: var(--ink); font-weight: 600; }
+  
+  .tool-price {
+    display: inline-block;
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    padding: 2px 8px;
+    background: var(--paper-2);
+    margin-top: 8px;
+    border: 1px solid var(--rule);
+  }
+  
+  /* Compact comparison table */
+  .compare-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 24px;
+    font-size: 13px;
+  }
+  
+  .compare-table th, .compare-table td {
+    padding: 14px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  
+  .compare-table th {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-muted);
+    font-weight: 500;
+    border-bottom: 1px solid var(--ink);
+  }
+  
+  .compare-table tr.highlight td {
+    background: var(--ai-gold-bg);
+    font-weight: 500;
+  }
+  
+  /* ---------- USER STORIES ---------- */
+  .story {
+    padding: 28px 32px;
+    margin-bottom: 20px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+  }
+  
+  .story-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 20px;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  
+  .story-title-block .story-num {
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+  }
+  
+  .story-title-block h3 { margin: 0; }
+  
+  .story-tags {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  
+  .story-tag {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 4px 10px;
+    border: 1px solid;
+  }
+  
+  .story-tag.p0 { background: var(--high-bg); color: var(--high); border-color: var(--high); }
+  .story-tag.p1 { background: var(--med-bg); color: var(--med); border-color: var(--med); }
+  .story-tag.core { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .story-tag.diff { background: var(--ai-gold); color: var(--paper); border-color: var(--ai-gold); }
+  
+  .story-statement {
+    font-family: 'Fraunces', serif;
+    font-size: 19px;
+    line-height: 1.45;
+    margin-bottom: 20px;
+    font-weight: 300;
+  }
+  .story-statement strong {
+    font-weight: 500;
+    color: var(--ai-gold);
+    font-style: italic;
+  }
+  
+  .story-criteria {
+    padding-top: 20px;
+    border-top: 1px solid var(--rule);
+  }
+  
+  .story-criteria ul {
+    list-style: none;
+    padding: 0;
+  }
+  
+  .story-criteria li {
+    padding: 8px 0 8px 24px;
+    position: relative;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  
+  .story-criteria li::before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: var(--ai-gold);
+    font-family: 'Geist Mono', monospace;
+  }
+  
+  .story-features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--rule);
+  }
+  
+  .story-feature {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    padding: 3px 9px;
+    background: var(--paper-2);
+    color: var(--ink-muted);
+    letter-spacing: 0.02em;
+    border: 1px solid var(--rule);
+  }
+  
+  .story-feature.ai {
+    background: var(--ai-gold-bg);
+    color: var(--ai-gold);
+    border-color: var(--ai-gold);
+  }
+  
+  .story-feature.ai::before { content: "✦ "; }
+  
+  /* ---------- VPC / AI LEVERS ---------- */
+  .vpc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 24px;
+  }
+  
+  .vpc-side {
+    padding: 24px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+  }
+  
+  .vpc-side-title {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 500;
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--rule);
+  }
+  
+  .vpc-category {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-muted);
+    margin-top: 18px;
+    margin-bottom: 8px;
+  }
+  
+  .vpc-item {
+    padding: 10px 0;
+    border-bottom: 1px dotted var(--rule);
+    font-size: 13.5px;
+    line-height: 1.5;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: start;
+  }
+  
+  .vpc-item:last-child { border-bottom: none; }
+  
+  .vpc-item.ai {
+    background: var(--ai-gold-bg);
+    padding: 10px 12px;
+    margin: 4px -12px;
+    border-bottom: none;
+  }
+  .vpc-item.ai::before { content: "✦ "; color: var(--ai-gold); font-weight: 600; }
+  
+  .vpc-sev {
+    font-family: 'Geist Mono', monospace;
+    font-size: 9px;
+    padding: 2px 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+    border: 1px solid;
+    height: fit-content;
+  }
+  .vpc-sev.high { color: var(--high); border-color: var(--high); }
+  .vpc-sev.med { color: var(--med); border-color: var(--med); }
+  .vpc-sev.low { color: var(--low); border-color: var(--rule-strong); }
+  
+  /* ---------- AI LEVERS SUMMARY ---------- */
+  .lever-hero {
+    padding: 40px;
+    background: var(--ink);
+    color: var(--paper);
+    margin: 24px 0;
+    position: relative;
+  }
+  
+  .lever-hero-title {
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+    font-style: italic;
+    font-size: 32px;
+    line-height: 1.25;
+    margin-bottom: 20px;
+    max-width: 600px;
+  }
+  .lever-hero-title em { color: var(--ai-gold); font-style: normal; }
+  
+  .lever-hero p { color: var(--paper-2); opacity: 0.85; }
+  
+  .lever-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(245, 240, 232, 0.2);
+  }
+  
+  .lever-metric .value {
+    font-family: 'Fraunces', serif;
+    font-size: 42px;
+    font-weight: 300;
+    color: var(--ai-gold);
+    letter-spacing: -0.02em;
+  }
+  
+  .lever-metric .label {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.7;
+    margin-top: 4px;
+  }
+  
+  /* ---------- BUSINESS MODEL ---------- */
+  .pricing-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin: 20px 0;
+  }
+  
+  .price-tier {
+    padding: 24px;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    text-align: center;
+  }
+  
+  .price-tier.recommended {
+    border: 2px solid var(--ai-gold);
+    background: var(--ai-gold-bg);
+  }
+  
+  .price-tier .tier-name {
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-muted);
+  }
+  
+  .price-tier .tier-price {
+    font-family: 'Fraunces', serif;
+    font-size: 36px;
+    font-weight: 400;
+    margin: 12px 0 4px;
+  }
+  
+  .price-tier .tier-desc {
+    font-size: 12.5px;
+    color: var(--ink-muted);
+    line-height: 1.5;
+  }
+  
+  .econ-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-top: 20px;
+  }
+  
+  .econ {
+    padding: 18px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+  }
+  
+  .econ-label {
+    font-family: 'Geist Mono', monospace;
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-muted);
+    margin-bottom: 6px;
+  }
+  
+  .econ-value {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 400;
+    letter-spacing: -0.015em;
+  }
+  
+  .scenario-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-top: 20px;
+  }
+  
+  .scenario {
+    padding: 20px;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+  }
+  .scenario.base { border: 2px solid var(--ink); }
+  
+  .scenario-label {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-muted);
+    margin-bottom: 4px;
+  }
+  
+  .scenario-arr {
+    font-family: 'Fraunces', serif;
+    font-size: 32px;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+  }
+  
+  .scenario-meta {
+    font-size: 12px;
+    color: var(--ink-muted);
+    line-height: 1.5;
+  }
+  
+  /* ---------- MARKET NUMBERS ---------- */
+  .market-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    margin-top: 24px;
+  }
+  
+  .market-stat {
+    padding: 24px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+  }
+  
+  .market-num {
+    font-family: 'Fraunces', serif;
+    font-size: 40px;
+    font-weight: 400;
+    letter-spacing: -0.025em;
+    line-height: 1;
+  }
+  
+  .market-desc {
+    font-size: 13.5px;
+    color: var(--ink-muted);
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+  
+  .sam-breakdown {
+    margin-top: 24px;
+    padding: 24px 28px;
+    background: var(--paper-2);
+    border-left: 3px solid var(--ink);
+  }
+  
+  .sam-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 8px 0;
+    border-bottom: 1px dotted var(--rule-strong);
+    gap: 16px;
+  }
+  .sam-row:last-child { border-bottom: none; padding-top: 14px; font-weight: 500; border-top: 1px solid var(--ink); margin-top: 6px; }
+  
+  .sam-label { font-size: 13.5px; }
+  .sam-value {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 400;
+    letter-spacing: -0.015em;
+  }
+  
+  /* ---------- RISKS ---------- */
+  .risk-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 24px;
+    font-size: 13px;
+  }
+  .risk-table th {
+    text-align: left;
+    padding: 10px 16px 10px 0;
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    font-weight: 500;
+    border-bottom: 1px solid var(--ink);
+  }
+  .risk-table td {
+    padding: 18px 16px 18px 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+    line-height: 1.55;
+  }
+  .risk-level {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 3px 8px;
+    border: 1px solid;
+    white-space: nowrap;
+  }
+  .risk-level.high { color: var(--high); border-color: var(--high); background: var(--high-bg); }
+  .risk-level.med { color: var(--med); border-color: var(--med); background: var(--med-bg); }
+  
+  /* ---------- PART II: THE PLAN ---------- */
+  .part-divider {
+    margin: 120px 0 60px;
+    padding-top: 48px;
+    border-top: 3px double var(--ink);
+    text-align: center;
+  }
+  
+  .part-marker {
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ai-gold);
+    margin-bottom: 12px;
+  }
+  
+  .part-title {
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+    font-style: italic;
+    font-size: 48px;
+    letter-spacing: -0.025em;
+  }
+  
+  .part-sub {
+    font-family: 'Fraunces', serif;
+    font-size: 18px;
+    font-style: italic;
+    color: var(--ink-muted);
+    margin-top: 12px;
+  }
+  
+  /* ---------- TIMELINE ---------- */
+  .timeline-wrap { margin-top: 32px; }
+  
+  .week {
+    border-left: 2px solid var(--rule);
+    padding: 0 0 40px 32px;
+    position: relative;
+    margin-left: 20px;
+  }
+  
+  .week::before {
+    content: "";
+    position: absolute;
+    left: -8px;
+    top: 6px;
+    width: 14px;
+    height: 14px;
+    background: var(--ai-gold);
+    border-radius: 50%;
+    border: 3px solid var(--paper);
+    box-shadow: 0 0 0 1px var(--ai-gold);
+  }
+  
+  .week-label {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ai-gold);
+    margin-bottom: 4px;
+  }
+  
+  .week-title {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 22px;
+    letter-spacing: -0.015em;
+    margin-bottom: 16px;
+  }
+  
+  .day-block {
+    padding: 14px 0;
+    border-bottom: 1px dotted var(--rule);
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  .day-block:last-child { border-bottom: none; }
+  
+  .day-range {
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding-top: 2px;
+  }
+  
+  .day-tasks {
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+  
+  .day-tasks strong { color: var(--ink); font-weight: 600; }
+  
+  /* ---------- OUTREACH ---------- */
+  .template {
+    margin: 20px 0;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+  }
+  
+  .template-head {
+    padding: 14px 20px;
+    background: var(--paper-2);
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  
+  .template-head-title {
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+  }
+  
+  .template-head-meta {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-muted);
+    letter-spacing: 0.04em;
+  }
+  
+  .template-body {
+    padding: 22px 24px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    background: var(--paper);
+  }
+  
+  .template-body .placeholder {
+    background: var(--ai-gold-bg);
+    color: var(--ai-gold);
+    padding: 1px 5px;
+    font-weight: 500;
+  }
+  
+  /* Search criteria box */
+  .search-box {
+    padding: 24px 28px;
+    background: var(--paper-2);
+    border-left: 3px solid var(--ai-gold);
+    margin: 20px 0;
+  }
+  
+  .search-criteria {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 12px;
+  }
+  
+  .search-col h4 { margin-top: 0; margin-bottom: 10px; }
+  
+  .search-list {
+    list-style: none;
+    padding: 0;
+  }
+  
+  .search-list li {
+    padding: 6px 0 6px 20px;
+    position: relative;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  
+  .search-list.yes li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: var(--success);
+    font-weight: 600;
+  }
+  
+  .search-list.no li::before {
+    content: "✗";
+    position: absolute;
+    left: 0;
+    color: var(--high);
+    font-weight: 600;
+  }
+  
+  /* Todos / checklist */
+  .todo-list {
+    list-style: none;
+    padding: 0;
+    margin-top: 20px;
+  }
+  
+  .todo-list li {
+    padding: 14px 16px 14px 42px;
+    margin-bottom: 8px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    position: relative;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  
+  .todo-list li::before {
+    content: "";
+    position: absolute;
+    left: 16px;
+    top: 17px;
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid var(--ink);
+    background: var(--paper);
+  }
+  
+  .todo-list li strong { color: var(--ink); font-weight: 600; }
+  
+  .todo-list li .priority {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 2px 7px;
+    margin-right: 10px;
+    border: 1px solid;
+  }
+  .todo-list li .priority.now { color: var(--high); border-color: var(--high); background: var(--high-bg); }
+  .todo-list li .priority.this-week { color: var(--med); border-color: var(--med); background: var(--med-bg); }
+  
+  /* Interview question bank */
+  .qbank-group { margin-top: 20px; }
+  
+  .qbank-title {
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ai-gold);
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--rule);
+  }
+  
+  .qbank-list {
+    list-style: none;
+    padding: 0;
+  }
+  
+  .qbank-list li {
+    padding: 10px 0 10px 28px;
+    border-bottom: 1px dotted var(--rule);
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    line-height: 1.45;
+    font-style: italic;
+    position: relative;
+    color: var(--ink);
+  }
+  
+  .qbank-list li::before {
+    content: "Q.";
+    position: absolute;
+    left: 0;
+    font-family: 'Geist Mono', monospace;
+    font-style: normal;
+    font-size: 11px;
+    color: var(--ai-gold);
+    top: 12px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+  }
+  
+  /* Vocabulary cheat sheet */
+  .vocab-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-top: 16px;
+  }
+  
+  .vocab-item {
+    padding: 12px 14px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  
+  .vocab-item strong {
+    display: inline-block;
+    font-family: 'Geist Mono', monospace;
+    font-size: 11.5px;
+    color: var(--ai-gold);
+    margin-right: 6px;
+    letter-spacing: 0.02em;
+  }
+  
+  /* footer */
+  .footer {
+    margin-top: 120px;
+    padding-top: 32px;
+    border-top: 1px solid var(--rule);
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  
+  /* Responsive */
+  @media (max-width: 960px) {
+    .layout { grid-template-columns: 1fr; }
+    .toc {
+      position: relative;
+      height: auto;
+      border-right: none;
+      border-bottom: 1px solid var(--rule);
+      padding: 24px;
+    }
+    main { padding: 32px 24px 80px; }
+    .hero h1 { font-size: 48px; }
+    .hero-stats { grid-template-columns: 1fr; gap: 20px; }
+    .section-head h2 { font-size: 32px; }
+    .persona-grid, .vpc-grid, .market-grid, .scenario-row, .pricing-row, .econ-grid, .search-criteria, .vocab-grid { grid-template-columns: 1fr; }
+    .pain { grid-template-columns: 40px 1fr; }
+    .pain-severity { grid-column: 1 / -1; justify-self: start; }
+    .tool-card { grid-template-columns: 1fr; }
+    .day-block { grid-template-columns: 1fr; gap: 4px; }
+    .lever-hero-title { font-size: 24px; }
+    .lever-metric .value { font-size: 32px; }
+    .part-title { font-size: 32px; }
+  }
+  
+  /* Print-friendly */
+  @media print {
+    .toc { display: none; }
+    .layout { grid-template-columns: 1fr; }
+    main { padding: 0; max-width: 100%; }
+    section { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- TABLE OF CONTENTS SIDEBAR -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <aside class="toc">
+    <div class="toc-brand">DueDate<em>HQ</em></div>
+    <div class="toc-sub">Working Reference · R1</div>
+    
+    <div class="toc-group">
+      <div class="toc-group-title">Part I · The Brief</div>
+      <ul class="toc-list">
+        <li><a href="#thesis"><span class="num">01</span>Thesis</a></li>
+        <li><a href="#personas"><span class="num">02</span>Personas</a></li>
+        <li><a href="#pains"><span class="num">03</span>Pain Points</a></li>
+        <li><a href="#alternatives"><span class="num">04</span>Competitors</a></li>
+        <li><a href="#stories"><span class="num">05</span>User Stories</a></li>
+        <li><a href="#vpc"><span class="num">06</span>Value Canvas</a></li>
+        <li><a href="#ai-levers"><span class="num">07</span>AI Levers</a></li>
+        <li><a href="#business"><span class="num">08</span>Business Model</a></li>
+        <li><a href="#market"><span class="num">09</span>Market</a></li>
+        <li><a href="#positioning"><span class="num">10</span>Why Now</a></li>
+        <li><a href="#risks"><span class="num">11</span>Risks</a></li>
+      </ul>
+    </div>
+    
+    <div class="toc-group">
+      <div class="toc-group-title">Part II · The Plan</div>
+      <ul class="toc-list">
+        <li><a href="#todos"><span class="num">12</span>Right Now</a></li>
+        <li><a href="#timeline"><span class="num">13</span>Timeline</a></li>
+        <li><a href="#outreach"><span class="num">14</span>Outreach</a></li>
+        <li><a href="#search-linkedin"><span class="num">15</span>LinkedIn Targets</a></li>
+        <li><a href="#interview"><span class="num">16</span>Interview Prep</a></li>
+        <li><a href="#vocab"><span class="num">17</span>Vocabulary</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- MAIN CONTENT -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <main>
+    
+    <!-- ─── HERO ─── -->
+    <header class="hero">
+      <div class="hero-meta">
+        <span>Internal · Product Engineer Bootcamp R1</span>
+        <span>LangGenius, Inc.</span>
+        <span>v1 · Consolidated Reference</span>
+      </div>
+      
+      <h1>DueDate<em>HQ</em><br>working reference.</h1>
+      
+      <p class="hero-deck">
+        Everything from the brief, the business plan and the value canvas — consolidated, cross-referenced, and paired with a concrete plan to execute Round 1.
+      </p>
+      
+      <div class="hero-stats">
+        <div>
+          <div class="hero-stat-label">Target User</div>
+          <div class="hero-stat-value">Independent + small-firm CPA</div>
+        </div>
+        <div>
+          <div class="hero-stat-label">Deliverable</div>
+          <div class="hero-stat-value">Working web app · UX + FE + BE</div>
+        </div>
+        <div>
+          <div class="hero-stat-label">Aim</div>
+          <div class="hero-stat-value">Tier 1 submission</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ─── 01 · THESIS ─── -->
+    <section id="thesis">
+      <div class="section-head">
+        <span class="section-num">01 — Thesis</span>
+        <h2>One-sentence product <em>thesis</em>.</h2>
+        <p class="section-lede">The North-Star selling point isn't technology. It's the outcome a CPA gets when your product works.</p>
+      </div>
+      
+      <div class="thesis-box">
+        <div class="label">The promise</div>
+        <p>You will never be the last CPA in your state to find out about a filing extension — and when an announcement drops, <em>you'll see the list of your affected clients within 24 hours</em>, not by reading news.</p>
+      </div>
+      
+      <h3>The weaker framings to avoid</h3>
+      <p><strong>Avoid:</strong> "A lightweight, cloud-based tax deadline tracker." (Describes File In Time equally well.)<br>
+      <strong>Avoid:</strong> "AI-powered tax compliance using Gemini/Grok." (Sells the tech, not the outcome.)<br>
+      <strong>Avoid:</strong> "Never miss a tax deadline." (Table-stakes, no defensible position.)</p>
+      
+      <h3>Why this framing wins</h3>
+      <p>Every competitor can claim "don't miss deadlines" — that's what a calendar does. What no competitor does today is <em>continuously watch 50 state tax agencies for announcements and cross-reference them against your client portfolio inside 24 hours</em>. That capability is only affordable because LLMs can read government announcement language and structurally identify impact. Without AI, this costs a human compliance team; with AI, it costs $49/month. <strong>The thesis and the economics are the same argument.</strong></p>
+    </section>
+
+    <!-- ─── 02 · PERSONAS ─── -->
+    <section id="personas">
+      <div class="section-head">
+        <span class="section-num">02 — Personas</span>
+        <h2>Who we're building <em>for</em>.</h2>
+        <p class="section-lede">Four personas cover the core use cases. The fourth — small-firm CPA — is an expansion of the brief's original three constructed personas.</p>
+      </div>
+      
+      <div class="persona-grid">
+        
+        <div class="persona primary">
+          <div class="persona-tag">Persona 01 · Primary · P0</div>
+          <div class="persona-name">Sarah Mitchell, CPA</div>
+          <div class="persona-role">Solo practitioner · 80 clients · multi-state</div>
+          <p>Serves 80 small-business clients, many with operations in multiple states. Currently runs her practice out of a 200+ row Excel deadline sheet and Outlook. Monday mornings during filing season are spent cross-referencing and re-sorting — not doing real work.</p>
+          <div class="persona-quote">
+            "I now spend more time figuring out what I have to do this week than actually doing it."
+            <cite>— User interview (brief-supplied persona · replace with real CPA)</cite>
+          </div>
+          <div class="persona-attrs">
+            <span class="persona-attr">80 clients</span>
+            <span class="persona-attr">Multi-state</span>
+            <span class="persona-attr">Excel + Outlook</span>
+            <span class="persona-attr">45 min weekly triage</span>
+            <span class="persona-attr">Pain: decision fatigue</span>
+          </div>
+        </div>
+        
+        <div class="persona">
+          <div class="persona-tag">Persona 02 · Conversion · P0</div>
+          <div class="persona-name">David Park, CPA</div>
+          <div class="persona-role">Newly switching from a competitor tool</div>
+          <p>Has tried 4 different practice-management tools during trials. Abandoned each one at the "manually enter client 3 of 30" step. Represents the trial-to-paid conversion funnel — the moment where DueDateHQ wins or loses.</p>
+          <div class="persona-quote">
+            "By the third client I'd already given up on every tool I tried."
+            <cite>— User interview (brief-supplied persona · replace with real CPA)</cite>
+          </div>
+          <div class="persona-attrs">
+            <span class="persona-attr">Migration from TaxDome/Drake</span>
+            <span class="persona-attr">30-minute onboarding bar</span>
+            <span class="persona-attr">CSV import-savvy</span>
+            <span class="persona-attr">Low patience for setup</span>
+          </div>
+        </div>
+        
+        <div class="persona">
+          <div class="persona-tag">Persona 03 · Differentiator · P1</div>
+          <div class="persona-name">Jennifer Wu, CPA</div>
+          <div class="persona-role">Multi-state practice · compliance-risk-focused</div>
+          <p>Serves clients operating in many states. Constantly worried about missing state-level extensions and disaster-relief announcements. Last year found out about an IRS LA-county extension from a client's group chat — after the fact.</p>
+          <div class="persona-quote">
+            "The IRS gave LA County an extension until October last year. I found out from a client's group chat. Turns out 6 of my clients qualified."
+            <cite>— User interview (brief-supplied persona · replace with real CPA)</cite>
+          </div>
+          <div class="persona-attrs">
+            <span class="persona-attr">Multi-state exposure</span>
+            <span class="persona-attr">Monitors 50+ state sites manually</span>
+            <span class="persona-attr">High liability anxiety</span>
+            <span class="persona-attr">Core target for 24h SLA</span>
+          </div>
+        </div>
+        
+        <div class="persona">
+          <div class="persona-tag">Persona 04 · Added · Small Firm</div>
+          <div class="persona-name">The Ortiz &amp; Associates team</div>
+          <div class="persona-role">2–3 CPAs · 200+ clients · shared workflow</div>
+          <p>Small firm (1–3 CPAs plus admin support) serving mixed individual and SMB clients. Differs from solo in that <strong>visibility across the team</strong> matters — one CPA handling an announcement, while another is on vacation, needs to hand off affected clients. The brief targets Pro ($49/mo, 1–3 users) specifically at this segment. Often, one partner is the "operations person" who picks the software; others just use it.</p>
+          <div class="persona-quote">
+            "One of us has to know everything happening with every client. If it's not in the tool, it's in someone's head — and that's the problem."
+            <cite>— Hypothetical quote · to be validated with real small-firm CPA</cite>
+          </div>
+          <div class="persona-attrs">
+            <span class="persona-attr">1–3 users</span>
+            <span class="persona-attr">Shared client list</span>
+            <span class="persona-attr">Needs assignments</span>
+            <span class="persona-attr">Needs handoff visibility</span>
+            <span class="persona-attr">Price-sensitive vs Karbon</span>
+          </div>
+        </div>
+        
+      </div>
+      
+      <h3>Who is NOT the user</h3>
+      <p>Big 4 or large-firm staff accountants (structured workflows, enterprise tools, not buyers). In-house corporate accountants (not tax-season-driven). Pure bookkeepers (don't file taxes). Enrolled Agents count as adjacent — treat them like solo CPAs for this product.</p>
+    </section>
+
+    <!-- ─── 03 · PAIN POINTS ─── -->
+    <section id="pains">
+      <div class="section-head">
+        <span class="section-num">03 — Pain Points</span>
+        <h2>What hurts today, ranked by <em>severity</em>.</h2>
+        <p class="section-lede">Eight validated pain points from the brief's VPC, ordered by severity. The top four are all in one cluster: 50-state compliance data is dispersed, arcane, and changes without warning.</p>
+      </div>
+      
+      <div class="pain-grid">
+        <div class="pain">
+          <div class="pain-num">01</div>
+          <div class="pain-text">Excel spreadsheets can't handle the combinatorial complexity of <strong>50 states × multiple tax types × client portfolio</strong>. A single sort/filter error can cost a filing.</div>
+          <div class="pain-severity high">High</div>
+        </div>
+        <div class="pain">
+          <div class="pain-num">02</div>
+          <div class="pain-text">State tax authority announcements are <strong>scattered across 50+ government websites</strong>. Staying current requires daily manual scanning that no solo CPA actually does.</div>
+          <div class="pain-severity high">High</div>
+        </div>
+        <div class="pain">
+          <div class="pain-num">03</div>
+          <div class="pain-text">Government announcement language is <strong>deliberately arcane</strong>. Deciding "does this affect my clients?" takes 10–30 minutes of reading per announcement.</div>
+          <div class="pain-severity high">High</div>
+        </div>
+        <div class="pain">
+          <div class="pain-num">04</div>
+          <div class="pain-text">When clients operate in a new state, the CPA must <strong>manually look up PTE elections, franchise tax rules, and special filing requirements</strong> per state — a research task, not a workflow task.</div>
+          <div class="pain-severity high">High</div>
+        </div>
+        <div class="pain">
+          <div class="pain-num">05</div>
+          <div class="pain-text"><strong>Penalty liability lands on the CPA</strong>, not the client. Current tools provide no accuracy SLA, no backstop, no protection.</div>
+          <div class="pain-severity high">High</div>
+        </div>
+        <div class="pain">
+          <div class="pain-num">06</div>
+          <div class="pain-text">Existing professional tools (Karbon, Canopy) are priced for mid-sized firms at <strong>$5,000+/year per firm</strong> — unaffordable for solo and 1–3 person practices.</div>
+          <div class="pain-severity med">Medium</div>
+        </div>
+        <div class="pain">
+          <div class="pain-num">07</div>
+          <div class="pain-text">Migrating from a competitor tool requires <strong>manual client re-entry over days</strong>. Most CPAs give up on the trial before finishing setup.</div>
+          <div class="pain-severity med">Medium</div>
+        </div>
+        <div class="pain">
+          <div class="pain-num">08</div>
+          <div class="pain-text">Filing season (Jan–April) means <strong>20+ hours of weekly overtime</strong>, and the CPA still goes home worried they've missed something.</div>
+          <div class="pain-severity med">Medium</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── 04 · COMPETITORS ─── -->
+    <section id="alternatives">
+      <div class="section-head">
+        <span class="section-num">04 — Competitors</span>
+        <h2>The tools solo CPAs <em>actually use</em> today.</h2>
+        <p class="section-lede">Not "competitor research" in the abstract — this is what your target user is using right now at 9am Monday.</p>
+      </div>
+      
+      <div class="tool-card">
+        <div>
+          <div class="tool-name">Excel / Google Sheets</div>
+          <div class="tool-type">DIY · Default</div>
+          <div class="tool-price">$0</div>
+        </div>
+        <div class="tool-body">
+          The most common approach. Manual entry, manual updates. When a state issues an extension due to a federal disaster declaration, there is zero automated notification — the CPA finds out by reading the news (or, more often, by a client mentioning it). Catastrophic at 80+ clients across multiple states.
+        </div>
+      </div>
+      
+      <div class="tool-card">
+        <div>
+          <div class="tool-name">Google Calendar · Outlook</div>
+          <div class="tool-type">Reminders only</div>
+          <div class="tool-price">$0</div>
+        </div>
+        <div class="tool-body">
+          Can only remind "something is due." Cannot track completion status, relate deadlines to each other, or indicate progress. 100 clients = several hundred manually created events. Extensions mean manually editing all of them.
+        </div>
+      </div>
+      
+      <div class="tool-card">
+        <div>
+          <div class="tool-name">Karbon · Canopy</div>
+          <div class="tool-type">Practice Management</div>
+          <div class="tool-price">$5,000+/yr</div>
+        </div>
+        <div class="tool-body">
+          Feature-rich but priced for 5+ person firms. Workflow-management core, not a tax deadline database — state deadlines still need manual entry. TaxDome occupies a similar slot with stronger client-portal emphasis. For our target, the price-to-value ratio is off.
+        </div>
+      </div>
+      
+      <div class="tool-card">
+        <div>
+          <div class="tool-name">File In Time</div>
+          <div class="tool-type">Most direct competitor</div>
+          <div class="tool-price">$199/mo+</div>
+        </div>
+        <div class="tool-body">
+          <strong>The incumbent to displace.</strong> Ships with ~200 federal/state deadline types built in. Functionally closest to DueDateHQ — but still a <strong>Windows desktop installer</strong>, no cloud, no auto-update, UI from 2010s. The fact that this is the market leader in 2026 is the opportunity, not the threat.
+        </div>
+      </div>
+      
+      <h3>Comparison at a glance</h3>
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Dimension</th>
+            <th>File In Time</th>
+            <th>Karbon · Jetpack</th>
+            <th>DueDateHQ</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Cloud / mobile</td>
+            <td>Desktop install</td>
+            <td>Cloud</td>
+            <td>Cloud + mobile</td>
+          </tr>
+          <tr>
+            <td>State-deadline auto-update</td>
+            <td>Manual</td>
+            <td>Manual</td>
+            <td class="highlight">Automatic (AI)</td>
+          </tr>
+          <tr>
+            <td>Solo-CPA pricing</td>
+            <td>$199+/mo</td>
+            <td>$30–79/user</td>
+            <td class="highlight">$49/mo full</td>
+          </tr>
+          <tr>
+            <td>Focus</td>
+            <td>Deadlines</td>
+            <td>Workflow</td>
+            <td>Deadlines + compliance intel</td>
+          </tr>
+          <tr>
+            <td>Onboarding</td>
+            <td>Days (install + config)</td>
+            <td>Hours</td>
+            <td class="highlight">&lt; 30 min</td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <div class="thesis-box" style="margin-top: 32px;">
+        <div class="label">The market gap in one sentence</div>
+        <p>There is no <em>lightweight, cloud-native, auto-syncing, solo-CPA-priced</em> modern product in this category. That is the gap.</p>
+      </div>
+    </section>
+
+    <!-- ─── 05 · USER STORIES ─── -->
+    <section id="stories">
+      <div class="section-head">
+        <span class="section-num">05 — User Stories</span>
+        <h2>Three stories, three <em>loops</em>.</h2>
+        <p class="section-lede">Daily use (triage), one-time use (onboarding), rare-but-defining use (state authority response). Each loop is a different product surface and a different engineering challenge.</p>
+      </div>
+      
+      <!-- Story 1 -->
+      <div class="story">
+        <div class="story-header">
+          <div class="story-title-block">
+            <div class="story-num">Story 01 · Daily loop</div>
+            <h3>Weekly triage during filing season</h3>
+          </div>
+          <div class="story-tags">
+            <span class="story-tag p0">P0</span>
+            <span class="story-tag core">Core</span>
+          </div>
+        </div>
+        <div class="story-statement">
+          <strong>As</strong> a solo CPA with 80 clients,<br>
+          <strong>I want</strong> to see all deadlines needing action this week within 30 seconds of opening my laptop,<br>
+          <strong>so that</strong> I can decide my priorities without switching between Excel, Outlook, and handwritten notes.
+        </div>
+        <div class="story-criteria">
+          <h4>Acceptance Criteria</h4>
+          <ul>
+            <li>Default dashboard groups deadlines into "Due this week / This month / Long term"</li>
+            <li>This-week items show day-level countdown</li>
+            <li>Filter by client, state, form type — response time &lt; 1 second</li>
+            <li>Every deadline supports one-click: Completed · Deferred · In-progress</li>
+            <li>Full weekly triage takes &lt; 5 minutes (vs. 45 today)</li>
+          </ul>
+        </div>
+        <div class="story-features">
+          <span class="story-feature">Main dashboard</span>
+          <span class="story-feature">Three-tier grouping</span>
+          <span class="story-feature">Status management</span>
+          <span class="story-feature">Filter</span>
+          <span class="story-feature ai">Smart priority ranking</span>
+        </div>
+      </div>
+      
+      <!-- Story 2 -->
+      <div class="story">
+        <div class="story-header">
+          <div class="story-title-block">
+            <div class="story-num">Story 02 · One-time loop</div>
+            <h3>Import 30 clients from a competitor in 30 minutes</h3>
+          </div>
+          <div class="story-tags">
+            <span class="story-tag p0">P0</span>
+            <span class="story-tag core">Core</span>
+          </div>
+        </div>
+        <div class="story-statement">
+          <strong>As</strong> a CPA just switching from TaxDome,<br>
+          <strong>I want</strong> to import 30 clients in 30 minutes and auto-generate their full-year deadline calendar,<br>
+          <strong>so that</strong> I can start using the product immediately, not spend a week on data entry.
+        </div>
+        <div class="story-criteria">
+          <h4>Acceptance Criteria</h4>
+          <ul>
+            <li>Supports CSV exports from TaxDome / Drake / Karbon / QuickBooks</li>
+            <li>Auto-detects field mappings (name, EIN, state, entity type)</li>
+            <li>For fuzzy or missing fields, offers smart suggestions — never blocks with errors</li>
+            <li>Post-import: full-year deadline calendar is ready immediately, no extra config</li>
+            <li>P95 completion ≤ 30 minutes (30-client benchmark)</li>
+          </ul>
+        </div>
+        <div class="story-features">
+          <span class="story-feature">CSV import</span>
+          <span class="story-feature">Field mapping</span>
+          <span class="story-feature">Calendar auto-generation</span>
+          <span class="story-feature ai">Entity-type auto-recognition</span>
+          <span class="story-feature ai">Field smart matching</span>
+        </div>
+      </div>
+      
+      <!-- Story 3 -->
+      <div class="story">
+        <div class="story-header">
+          <div class="story-title-block">
+            <div class="story-num">Story 03 · Rare-but-defining loop</div>
+            <h3>24-hour response to state tax authority announcement</h3>
+          </div>
+          <div class="story-tags">
+            <span class="story-tag p1">P1</span>
+            <span class="story-tag diff">Differentiator</span>
+          </div>
+        </div>
+        <div class="story-statement">
+          <strong>As</strong> a CPA with multi-state clients,<br>
+          <strong>I want</strong> to receive a list of all affected clients within 24 hours of any state extension or policy announcement,<br>
+          <strong>so that</strong> I can notify clients immediately without browsing 50 state tax websites daily.
+        </div>
+        <div class="story-criteria">
+          <h4>Acceptance Criteria</h4>
+          <ul>
+            <li>System captures state tax authority official announcements within 24h</li>
+            <li>Auto-determines which clients are affected (state + county + entity + tax type)</li>
+            <li>Top-of-dashboard banner + email notification</li>
+            <li>"View affected clients" + "Batch-adjust deadlines" one-click actions</li>
+            <li>Every announcement links to the official source for manual verification</li>
+          </ul>
+        </div>
+        <div class="story-features">
+          <span class="story-feature">Live bulletin banner</span>
+          <span class="story-feature">Affected-client matching</span>
+          <span class="story-feature">Official source link</span>
+          <span class="story-feature ai">Announcement auto-monitoring</span>
+          <span class="story-feature ai">Announcement semantic parsing</span>
+          <span class="story-feature ai">Impact-scope identification</span>
+        </div>
+      </div>
+      
+      <div class="thesis-box" style="margin-top: 32px;">
+        <div class="label">The framing question worth raising in your presentation</div>
+        <p>The brief marks Story 1 as P0/Core and Story 3 as P1/Differentiator. But Story 3 <em>is</em> the business — the thing no competitor has. A tier-1 move is to argue: Story 1 is the shell, Story 3 is the spine.</p>
+      </div>
+    </section>
+
+    <!-- ─── 06 · VPC ─── -->
+    <section id="vpc">
+      <div class="section-head">
+        <span class="section-num">06 — Value Proposition Canvas</span>
+        <h2>Strategyzer framing, <em>condensed</em>.</h2>
+        <p class="section-lede">Customer Profile (left) meets Value Map (right). Items marked ✦ are where AI unlocks capability that couldn't exist at this price without it.</p>
+      </div>
+      
+      <div class="vpc-grid">
+        
+        <!-- Customer Profile -->
+        <div class="vpc-side">
+          <div class="vpc-side-title">Customer Profile · Solo &amp; small-firm CPA</div>
+          
+          <div class="vpc-category">Jobs to be Done</div>
+          <div class="vpc-item">Track every federal + state deadline for every client</div>
+          <div class="vpc-item">Determine which taxes apply (by state + entity + industry)</div>
+          <div class="vpc-item">Plan workflow ahead to avoid gaps</div>
+          <div class="vpc-item">Respond to tax law and deadline changes</div>
+          <div class="vpc-item">Explain compliance requirements to clients</div>
+          <div class="vpc-item">Notify clients to prepare documents before penalty risk</div>
+          
+          <div class="vpc-category">Pains</div>
+          <div class="vpc-item">Excel can't scale to 50 states × multiple tax types <span class="vpc-sev high">High</span></div>
+          <div class="vpc-item">State announcements are dispersed across gov sites <span class="vpc-sev high">High</span></div>
+          <div class="vpc-item">Announcement language is arcane — time-consuming to interpret <span class="vpc-sev high">High</span></div>
+          <div class="vpc-item">Cross-state PTE / franchise tax rules require manual research <span class="vpc-sev high">High</span></div>
+          <div class="vpc-item">Penalty liability sits with CPA, no SLA from tools <span class="vpc-sev high">High</span></div>
+          <div class="vpc-item">Karbon-class tools cost $5k+/yr — unaffordable for solo <span class="vpc-sev med">Med</span></div>
+          <div class="vpc-item">Competitor migration takes days of manual entry <span class="vpc-sev med">Med</span></div>
+          <div class="vpc-item">20+ hrs/wk overtime during Jan–Apr, still worried <span class="vpc-sev med">Med</span></div>
+          
+          <div class="vpc-category">Gains</div>
+          <div class="vpc-item">5-minute weekly triage instead of 45 <span class="vpc-sev high">High</span></div>
+          <div class="vpc-item">Complete confidence that nothing was missed <span class="vpc-sev high">High</span></div>
+          <div class="vpc-item">Know about state law changes first, see affected clients <span class="vpc-sev high">High</span></div>
+          <div class="vpc-item">Onboarding ≤ 30 minutes, no training <span class="vpc-sev med">Med</span></div>
+          <div class="vpc-item">Look professional and reliable to clients <span class="vpc-sev med">Med</span></div>
+          <div class="vpc-item">Take on more multi-state clients without added risk <span class="vpc-sev low">Low</span></div>
+        </div>
+        
+        <!-- Value Map -->
+        <div class="vpc-side">
+          <div class="vpc-side-title">Value Map · DueDateHQ</div>
+          
+          <div class="vpc-category">Products &amp; Services</div>
+          <div class="vpc-item">50-state tax deadline database (federal + state + local)</div>
+          <div class="vpc-item">Multi-client cross-state deadline dashboard (web + mobile)</div>
+          <div class="vpc-item">Client profile system (state / entity / tax type bindings)</div>
+          <div class="vpc-item">Multi-channel smart alerts (in-app + email + SMS)</div>
+          <div class="vpc-item">Extension request tracking</div>
+          <div class="vpc-item">CSV import / PDF client report export</div>
+          <div class="vpc-item">Compliance calendar API (Phase 4)</div>
+          
+          <div class="vpc-category">Pain Relievers</div>
+          <div class="vpc-item">Pre-built 50-state database — no manual entry <span class="vpc-sev high">High</span></div>
+          <div class="vpc-item ai">AI auto-monitors 50+ state agency RSS and bulletin pages <span class="vpc-sev high">High</span></div>
+          <div class="vpc-item ai">LLM auto-interprets announcements and tags impact <span class="vpc-sev high">High</span></div>
+          <div class="vpc-item ai">AI auto-matches affected clients (state + county + entity + tax) <span class="vpc-sev high">High</span></div>
+          <div class="vpc-item ai">CSV import: smart field mapping + entity-type recognition <span class="vpc-sev med">Med</span></div>
+          <div class="vpc-item">$49/mo — solo-CPA-friendly <span class="vpc-sev med">Med</span></div>
+          <div class="vpc-item">"Official source" link on every announcement for manual verification <span class="vpc-sev med">Med</span></div>
+          <div class="vpc-item">Professional liability insurance + accuracy SLA <span class="vpc-sev low">Low</span></div>
+          
+          <div class="vpc-category">Gain Creators</div>
+          <div class="vpc-item">Three-tier dashboard: 45 → 5 minute triage <span class="vpc-sev high">High</span></div>
+          <div class="vpc-item ai">AI priority ranking (penalty size × client importance × history) <span class="vpc-sev high">High</span></div>
+          <div class="vpc-item">Multi-client calendar auto-generated on import <span class="vpc-sev med">Med</span></div>
+          <div class="vpc-item ai">AI assistant answers natural-language queries <span class="vpc-sev med">Med</span></div>
+          <div class="vpc-item">Professional PDF client reports <span class="vpc-sev med">Med</span></div>
+          <div class="vpc-item">Export to other tools — no lock-in anxiety <span class="vpc-sev low">Low</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── 07 · AI LEVERS ─── -->
+    <section id="ai-levers">
+      <div class="section-head">
+        <span class="section-num">07 — AI Leverage Points</span>
+        <h2>Where LLMs are the <em>business model</em>, not the bow on top.</h2>
+        <p class="section-lede">Nine ✦ items in the VPC. All solve one kind of problem: turning dispersed, obscure, high-dimensional government data into actionable intel for one specific CPA's client list.</p>
+      </div>
+      
+      <div class="lever-hero">
+        <div class="lever-hero-title">
+          Without AI, DueDateHQ doesn't exist at <em>$49/month</em>.<br>
+          With AI, it has a moat.
+        </div>
+        <p>Maintaining an accurate, real-time 50-state tax deadline database used to require a dedicated compliance team. LLM + automated monitoring reduces this by ~80%, which is what lets the unit economics work at solo-CPA pricing. <strong>The AI argument is the business-model argument.</strong></p>
+        
+        <div class="lever-metrics">
+          <div class="lever-metric">
+            <div class="value">9</div>
+            <div class="label">AI-enabled items in the VPC</div>
+          </div>
+          <div class="lever-metric">
+            <div class="value">~80%</div>
+            <div class="label">Expected maintenance cost reduction</div>
+          </div>
+          <div class="lever-metric">
+            <div class="value">24h</div>
+            <div class="label">State announcement response SLA</div>
+          </div>
+        </div>
+      </div>
+      
+      <h3>The nine ✦ items</h3>
+      <ol style="padding-left: 24px; margin-top: 12px;">
+        <li style="margin-bottom: 8px;"><strong>Announcement auto-monitoring</strong> across 50+ state tax agency websites.</li>
+        <li style="margin-bottom: 8px;"><strong>Announcement semantic parsing</strong> — reading government language and extracting structured meaning.</li>
+        <li style="margin-bottom: 8px;"><strong>Impact-scope identification</strong> — translating "disaster relief for X county" into "here are your 6 clients affected."</li>
+        <li style="margin-bottom: 8px;"><strong>Affected-client matching</strong> — state × county × entity × tax type joins.</li>
+        <li style="margin-bottom: 8px;"><strong>Entity-type auto-recognition</strong> — classifying a client from CSV context (LLC, S-Corp, sole-prop, partnership).</li>
+        <li style="margin-bottom: 8px;"><strong>Field smart-matching</strong> — mapping arbitrary CSV columns from Drake / TaxDome / QuickBooks into DueDateHQ's schema.</li>
+        <li style="margin-bottom: 8px;"><strong>Smart priority ranking</strong> — penalty size × client importance × historical delay patterns.</li>
+        <li style="margin-bottom: 8px;"><strong>Natural-language query assistant</strong> — "Which clients need to file PTE?"</li>
+        <li><strong>LLM-driven cross-referencing</strong> between announcements and client portfolios.</li>
+      </ol>
+    </section>
+
+    <!-- ─── 08 · BUSINESS MODEL ─── -->
+    <section id="business">
+      <div class="section-head">
+        <span class="section-num">08 — Business Model</span>
+        <h2>Pricing, unit economics, <em>projections</em>.</h2>
+        <p class="section-lede">SaaS subscription, three tiers, 20% annual discount. Key: churn is low because switching requires re-entering all client data, and filing season locks tools in for months.</p>
+      </div>
+      
+      <h3>Pricing tiers</h3>
+      <div class="pricing-row">
+        <div class="price-tier">
+          <div class="tier-name">Solo</div>
+          <div class="tier-price">$29/mo</div>
+          <div class="tier-desc">1 user · ≤ 50 clients</div>
+        </div>
+        <div class="price-tier recommended">
+          <div class="tier-name">Pro · Primary</div>
+          <div class="tier-price">$49/mo</div>
+          <div class="tier-desc">1–3 users · unlimited clients</div>
+        </div>
+        <div class="price-tier">
+          <div class="tier-name">Team</div>
+          <div class="tier-price">$99/mo</div>
+          <div class="tier-desc">≤ 10 users · API access</div>
+        </div>
+      </div>
+      <p style="color: var(--ink-muted); font-size: 13px;">Annual payment discount: −20% (≈ 2 months free).</p>
+      
+      <h3>Unit economics targets</h3>
+      <div class="econ-grid">
+        <div class="econ">
+          <div class="econ-label">CAC target</div>
+          <div class="econ-value">$120–180</div>
+        </div>
+        <div class="econ">
+          <div class="econ-label">ARPU (Pro)</div>
+          <div class="econ-value">$49/mo</div>
+        </div>
+        <div class="econ">
+          <div class="econ-label">Annual churn</div>
+          <div class="econ-value">8–12%</div>
+        </div>
+        <div class="econ">
+          <div class="econ-label">LTV (3-year)</div>
+          <div class="econ-value">$1,320–1,764</div>
+        </div>
+      </div>
+      <p style="margin-top: 14px; color: var(--ink-muted); font-size: 13px;">LTV/CAC ratio: 7–12x. High stickiness because switching tools mid-season is unthinkable — tax-software users are naturally season-locked Jan–Apr.</p>
+      
+      <h3>Year-3 ARR scenarios</h3>
+      <div class="scenario-row">
+        <div class="scenario">
+          <div class="scenario-label">Conservative · Y3</div>
+          <div class="scenario-arr">$720K</div>
+          <div class="scenario-meta">1,200 paying customers · $50/mo ARPU</div>
+        </div>
+        <div class="scenario base">
+          <div class="scenario-label">Base · Y3 · Target</div>
+          <div class="scenario-arr">$3.6M</div>
+          <div class="scenario-meta">6,000 paying customers · $50/mo ARPU</div>
+        </div>
+        <div class="scenario">
+          <div class="scenario-label">Optimistic · Y3</div>
+          <div class="scenario-arr">$9M</div>
+          <div class="scenario-meta">15,000 paying customers · $50/mo ARPU</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── 09 · MARKET ─── -->
+    <section id="market">
+      <div class="section-head">
+        <span class="section-num">09 — Market</span>
+        <h2>How <em>big</em> is the opportunity.</h2>
+        <p class="section-lede">400K+ US CPAs, but the addressable slice is much tighter — solo and small-firm CPAs with multi-state client exposure. That's the ~60K number that matters.</p>
+      </div>
+      
+      <div class="market-grid">
+        <div class="market-stat">
+          <div class="market-num">400K+</div>
+          <div class="market-desc">Licensed CPAs in the US (AICPA), a large share of whom are solo or small-firm</div>
+        </div>
+        <div class="market-stat">
+          <div class="market-num">34.8M</div>
+          <div class="market-desc">US small businesses — 99.9% of all businesses, the downstream clients</div>
+        </div>
+        <div class="market-stat">
+          <div class="market-num">$15.7B</div>
+          <div class="market-desc">Vertical-SaaS market size (2025), growing ~23.9% annually — 2× overall SaaS growth</div>
+        </div>
+        <div class="market-stat">
+          <div class="market-num">43.5%</div>
+          <div class="market-desc">Share of US GDP contributed by small businesses — the CPA base that serves them is large and stable</div>
+        </div>
+      </div>
+      
+      <h3>Serviceable Addressable Market (SAM) breakdown</h3>
+      <div class="sam-breakdown">
+        <div class="sam-row">
+          <span class="sam-label">Total licensed CPAs (US)</span>
+          <span class="sam-value">400,000</span>
+        </div>
+        <div class="sam-row">
+          <span class="sam-label">Solo practice + small firm (&lt; 5 people), ~40%</span>
+          <span class="sam-value">~160,000</span>
+        </div>
+        <div class="sam-row">
+          <span class="sam-label">With multi-state client needs &amp; willingness to pay</span>
+          <span class="sam-value">~60,000</span>
+        </div>
+        <div class="sam-row">
+          <span class="sam-label">Annual ARPU target (at $49/mo Pro)</span>
+          <span class="sam-value">$588</span>
+        </div>
+        <div class="sam-row">
+          <span class="sam-label"><strong>SAM ceiling (ARR at full penetration)</strong></span>
+          <span class="sam-value">~$35M</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── 10 · POSITIONING ─── -->
+    <section id="positioning">
+      <div class="section-head">
+        <span class="section-num">10 — Why Now</span>
+        <h2>Three structural forces, <em>simultaneously mature</em>.</h2>
+        <p class="section-lede">This isn't a bet on a new category — it's a modern replacement for a validated need where the incumbent is a desktop installer.</p>
+      </div>
+      
+      <h3>1. AI lowered the data-maintenance cost.</h3>
+      <p>Maintaining an accurate, real-time 50-state deadline database used to need a dedicated compliance team. LLMs plus automated monitoring reduce that cost by roughly 80% — which is exactly what makes the unit economics work at solo-CPA pricing. Five years ago, this business couldn't exist at $49/month.</p>
+      
+      <h3>2. Small-business growth keeps compounding.</h3>
+      <p>The US has added 5M+ new business applications per year since 2020. Each new small business creates downstream work for a CPA, and an increasing share operate in multiple states from day one. Demand is structurally rising.</p>
+      
+      <h3>3. Vertical SaaS pricing logic is validated.</h3>
+      <p>Toast, SimplePractice, Jobber all proved that deep solutions to narrow industry pains generate extraordinary retention. Tax compliance is the least-negotiable part of a CPA's work — a natural stickiness anchor.</p>
+      
+      <div class="thesis-box" style="margin-top: 32px;">
+        <div class="label">The framing sentence from the business plan worth memorising</div>
+        <p>"The most direct competitor, File In Time, is a desktop installer still being sold in 2026. That's not a threat — <em>it's an invitation.</em>"</p>
+      </div>
+    </section>
+
+    <!-- ─── 11 · RISKS ─── -->
+    <section id="risks">
+      <div class="section-head">
+        <span class="section-num">11 — Risks</span>
+        <h2>What could <em>go wrong</em>.</h2>
+      </div>
+      
+      <table class="risk-table">
+        <thead>
+          <tr>
+            <th>Risk</th>
+            <th>Level</th>
+            <th>Response</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Intuit / Thomson Reuters copies the feature</td>
+            <td><span class="risk-level med">Med</span></td>
+            <td>Large incumbents iterate slowly. First-mover + community credibility + data-quality moat. If acquired, it's a good exit path.</td>
+          </tr>
+          <tr>
+            <td>Tax law changes outpace database-maintenance capacity</td>
+            <td><span class="risk-level high">High</span></td>
+            <td>Core engineering investment: auto-monitoring 50-state RSS / bulletins, LLM-assisted interpretation, human review. "Accuracy SLA" is a differentiation feature.</td>
+          </tr>
+          <tr>
+            <td>Solo-CPA payment willingness / budget limits</td>
+            <td><span class="risk-level med">Med</span></td>
+            <td>$49/mo is &lt; 1/3 of industry-average CAC. ROI narrative: "one missed penalty &gt; annual fee." Annual discounts lower the psychological barrier.</td>
+          </tr>
+          <tr>
+            <td>Market education cost (existing habits hard to break)</td>
+            <td><span class="risk-level med">Med</span></td>
+            <td>Filing season (Jan–Apr) is the natural acquisition window — tool pain is maximal. Concentrate marketing in Q4/Q1.</td>
+          </tr>
+          <tr>
+            <td>Data errors cause a client to miss a real deadline</td>
+            <td><span class="risk-level high">High</span></td>
+            <td>"Official source link" surfaced in-product for manual verification. TOS clarifies reference nature. Professional liability insurance.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- PART II: THE PLAN -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="part-divider">
+      <div class="part-marker">— Part II —</div>
+      <div class="part-title">The Plan from Here</div>
+      <div class="part-sub">Execution, timeline, outreach, preparation.</div>
+    </div>
+
+    <!-- ─── 12 · TODOS ─── -->
+    <section id="todos">
+      <div class="section-head">
+        <span class="section-num">12 — Right Now</span>
+        <h2>Close tabs. Do <em>these</em>.</h2>
+        <p class="section-lede">Everything below takes roughly 2 hours and unlocks the rest of the bootcamp. Do this before any more reading or research.</p>
+      </div>
+      
+      <ul class="todo-list">
+        <li><span class="priority now">Now · 15m</span><strong>Write your one-sentence thesis.</strong> Not "AI tax tool." Something like: "Every time a state extends a filing deadline, you'll know which clients are affected within 24 hours." Save it where you'll see it.</li>
+        <li><span class="priority now">Now · 20m</span><strong>Post on r/Accounting and r/smallbusiness</strong> using the Reddit template in §14. One question, post in both, walk away.</li>
+        <li><span class="priority now">Now · 30m</span><strong>Send 10 LinkedIn messages</strong> using the template in §14. Search criteria in §15. Aim for 10 sent, expect 2–3 yes replies.</li>
+        <li><span class="priority now">Now · 10m</span><strong>Request access to the Taxpros Discord</strong> (taxprosdiscord.com). Lurk for an hour before posting.</li>
+        <li><span class="priority now">Now · 15m</span><strong>Ask in your personal network</strong> (company Slack, personal socials): "Anyone know a US-based solo or small-firm CPA? Doing user research for a product." Warm intros beat every cold channel.</li>
+        <li><span class="priority now">Now · 20m</span><strong>Email 5 small CPA firms</strong> you find on Google Maps in one US city. 20-min ask, no pitch. One reply is enough.</li>
+        <li><span class="priority this-week">This week</span><strong>Skim the vocabulary list in §17.</strong> 20 minutes on Google is enough. Goal is recognition, not mastery.</li>
+        <li><span class="priority this-week">This week</span><strong>Run 2 real interviews.</strong> Even one is a big step up. Use questions from §16.</li>
+        <li><span class="priority this-week">This week</span><strong>Pick ONE user story to build deeply.</strong> Story 1 (weekly triage) is the recommended pick — daily-use surface, craft-visible, deliverable in bootcamp timeframe.</li>
+        <li><span class="priority this-week">This week</span><strong>Decide framing:</strong> are you leading with the triage story or the 24h state-update story? This affects every screen you design next week.</li>
+      </ul>
+    </section>
+
+    <!-- ─── 13 · TIMELINE ─── -->
+    <section id="timeline">
+      <div class="section-head">
+        <span class="section-num">13 — Timeline</span>
+        <h2>A <em>three-week</em> shape.</h2>
+        <p class="section-lede">Assumes Round 1 runs ~3 weeks. Adjust dates to your actual bootcamp end. The shape stays the same: research week, build week, ship-and-present week.</p>
+      </div>
+      
+      <div class="timeline-wrap">
+        <div class="week">
+          <div class="week-label">Week 1</div>
+          <div class="week-title">Research &amp; Narrow</div>
+          <div class="day-block">
+            <div class="day-range">Day 1–2<br>Mon–Tue</div>
+            <div class="day-tasks"><strong>Outreach blitz across five channels.</strong> Reddit posts, LinkedIn DMs, Taxpros Discord, Google Maps cold email, personal network ask. Goal: 2–3 calls booked by end of Day 2. Read vocabulary in §17.</div>
+          </div>
+          <div class="day-block">
+            <div class="day-range">Day 3–5<br>Wed–Fri</div>
+            <div class="day-tasks"><strong>Run 2–3 real interviews.</strong> 20 minutes each, questions from §16. Transcribe or take notes. After each call, write 3 things you didn't know before. Then synthesize: one page, patterns across interviews.</div>
+          </div>
+          <div class="day-block">
+            <div class="day-range">Weekend</div>
+            <div class="day-tasks"><strong>Decide the slice.</strong> Which story, which screens, what you're cutting. Sketch wireframes for the 3–5 screens you'll build. Write down what you'd cut if you had half the time.</div>
+          </div>
+        </div>
+        
+        <div class="week">
+          <div class="week-label">Week 2</div>
+          <div class="week-title">Build Core</div>
+          <div class="day-block">
+            <div class="day-range">Day 6–9<br>Mon–Thu</div>
+            <div class="day-tasks"><strong>Frontend + core interactions.</strong> Build the weekly-triage dashboard. Three-tier grouping, filter, status toggle. Obsess on the 30-second "what do I do today" moment. Real data, not lorem.</div>
+          </div>
+          <div class="day-block">
+            <div class="day-range">Day 10<br>Fri</div>
+            <div class="day-tasks"><strong>Backend wired up.</strong> Data model, auth, API endpoints. Seed with a realistic deadline database (scrape IRS published deadlines, plus 2–3 states for believability). Don't build 50-state from scratch.</div>
+          </div>
+          <div class="day-block">
+            <div class="day-range">Weekend</div>
+            <div class="day-tasks"><strong>Add ONE AI feature</strong> that makes the demo land. Best options: smart priority ranking (Story 1) or announcement semantic parsing on a mock CA extension notice (Story 3). One, not two. Done beats comprehensive.</div>
+          </div>
+        </div>
+        
+        <div class="week">
+          <div class="week-label">Week 3</div>
+          <div class="week-title">Polish &amp; Present</div>
+          <div class="day-block">
+            <div class="day-range">Day 11–12<br>Mon–Tue</div>
+            <div class="day-tasks"><strong>User test with 1–2 CPAs</strong> (the ones you interviewed). 20-minute call, watch them use it, note confusion. Iterate on the 2–3 biggest issues only — not everything.</div>
+          </div>
+          <div class="day-block">
+            <div class="day-range">Day 13–14<br>Wed–Thu</div>
+            <div class="day-tasks"><strong>Polish + rehearse.</strong> Fix UI issues, tighten copy, remove anything that doesn't serve the thesis. Write your 5-minute presentation around "what I learned from [real CPA name] and how it shaped what I built." Practice out loud 3 times.</div>
+          </div>
+          <div class="day-block">
+            <div class="day-range">Day 15<br>Fri</div>
+            <div class="day-tasks"><strong>Present.</strong> Lead with the reframing move (Story 3 as spine). Show the real user quote. Demo the one AI feature live. Close with what you cut and why.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── 14 · OUTREACH ─── -->
+    <section id="outreach">
+      <div class="section-head">
+        <span class="section-num">14 — Outreach Playbook</span>
+        <h2>The messages to <em>send today</em>.</h2>
+        <p class="section-lede">Copy verbatim. Replace placeholders. Send. The goal is 10 sent in under an hour, not 2 "perfect" messages after deliberation.</p>
+      </div>
+      
+      <!-- Reddit template -->
+      <div class="template">
+        <div class="template-head">
+          <div class="template-head-title">Reddit · Post</div>
+          <div class="template-head-meta">r/Accounting · r/smallbusiness · Text post</div>
+        </div>
+        <div class="template-body">Title: Solo &amp; small-firm CPAs — what was the deadline scare that still stings from this season?
+
+Hi everyone,
+
+I'm doing research for a tool aimed at independent and small-firm CPAs handling multi-state clients. Not pitching anything today — genuinely trying to understand the real pain from people who actually live it.
+
+Three specific things I'm curious about:
+
+1. The last time you <em>almost</em> missed a deadline this season — what actually went wrong?
+2. State tax authority announcements — how do you currently find out when something changes? Has there been a time you found out late?
+3. The part of weekly triage that takes way longer than it should.
+
+Any story welcome, comments or DMs both fine. Happy to share everything I learn with anyone who contributes, and I appreciate that this is an exhausting time of year to be asked anything at all.
+
+Thanks —
+<span class="placeholder">[your name]</span></div>
+      </div>
+      
+      <!-- LinkedIn template -->
+      <div class="template">
+        <div class="template-head">
+          <div class="template-head-title">LinkedIn · Connection request + DM</div>
+          <div class="template-head-meta">Short version · under 300 chars for connection note</div>
+        </div>
+        <div class="template-body">Hi <span class="placeholder">[first name]</span> — I'm researching workflow tools for solo and small-firm CPAs handling multi-state clients. No pitch, genuinely trying to learn from practitioners before building anything.
+
+Would you be open to a 20-minute call in the next two weeks? Happy to share everything I learn from others.
+
+Thanks either way —
+<span class="placeholder">[your name]</span></div>
+      </div>
+      
+      <div class="template">
+        <div class="template-head">
+          <div class="template-head-title">LinkedIn · Longer version (after they accept)</div>
+          <div class="template-head-meta">Use when they connect but don't respond to initial note</div>
+        </div>
+        <div class="template-body">Hi <span class="placeholder">[first name]</span>, thanks for connecting.
+
+Quick context: I'm a product designer working on a compliance-tracking tool aimed at solo and small-firm CPAs — specifically around multi-state deadline visibility and state tax authority updates. Before I design anything I'm trying to talk with 5–10 CPAs actually doing this work.
+
+Would you have 20 minutes in the next two weeks for a call? Happy to work around your schedule (I know post-April is still a tough season). No sales pitch — I just want to understand how you currently handle state deadline changes and what's frustrating about it.
+
+As a thank-you, I'll share a written synthesis of what I learn across all the interviews. Happy to hear any direction, even a "no thanks" helps me calibrate.
+
+Thanks for considering it —
+<span class="placeholder">[your name]</span></div>
+      </div>
+      
+      <!-- Cold email template -->
+      <div class="template">
+        <div class="template-head">
+          <div class="template-head-title">Cold email · Small CPA firms from Google Maps</div>
+          <div class="template-head-meta">One paragraph, specific, short</div>
+        </div>
+        <div class="template-body">Subject: 20 min user research — multi-state tax deadline tooling
+
+Hi <span class="placeholder">[first name if known, else "there"]</span>,
+
+I'm researching a product for solo and small-firm CPAs who handle clients across multiple states — specifically the headache of tracking state-level deadlines and disaster extensions. I'm trying to learn from 5–10 real practitioners before building anything.
+
+Would you have 20 minutes in the next two weeks for a call? No sales pitch — just questions. I'll send you a one-page summary of what I learn as thanks.
+
+If this isn't relevant for your practice, no worries at all — would love a pointer to someone whose practice does handle multi-state work.
+
+Thanks,
+<span class="placeholder">[your name]</span>
+<span class="placeholder">[short context — "Product designer at LangGenius" or similar credibility marker]</span></div>
+      </div>
+      
+      <!-- Personal network template -->
+      <div class="template">
+        <div class="template-head">
+          <div class="template-head-title">Personal network · Slack / WeChat / socials</div>
+          <div class="template-head-meta">Most important channel — warm intros convert 10× cold outreach</div>
+        </div>
+        <div class="template-body">Hey all — a weird but specific ask:
+
+I'm designing a product for solo and small-firm CPAs in the US, and I need to talk with 3–5 real ones in the next 10 days for user research. 20-minute calls, no sales pitch.
+
+Do you happen to know any US-based independent CPAs or EAs (especially ones handling multi-state small-business clients)? An intro would be incredibly helpful and I'll owe you one.
+
+Thanks — feel free to just forward this if easier.</div>
+      </div>
+    </section>
+
+    <!-- ─── 15 · LINKEDIN SEARCH CRITERIA ─── -->
+    <section id="search-linkedin">
+      <div class="section-head">
+        <span class="section-num">15 — LinkedIn Targeting</span>
+        <h2>Who <em>exactly</em> to search for.</h2>
+        <p class="section-lede">The difference between 10 yes replies and 10 ignored messages is who you send to, not what you say.</p>
+      </div>
+      
+      <div class="search-box">
+        <h4>Search query to paste into LinkedIn</h4>
+        <p style="margin: 10px 0 0; font-family: 'Geist Mono', monospace; font-size: 13px; background: var(--paper); padding: 12px 14px; border: 1px solid var(--rule);">
+          ("Solo CPA" OR "Independent CPA" OR "Owner" OR "Founder" OR "Managing Partner") AND ("CPA" OR "EA" OR "Tax")
+        </p>
+        <p style="margin: 12px 0 0; font-size: 13px; color: var(--ink-muted);">Add filters: Location = United States · Industry = Accounting · Current company size = 1–10 employees.</p>
+      </div>
+      
+      <div class="search-criteria">
+        <div class="search-col">
+          <h4 style="color: var(--success);">Green flags (send to these)</h4>
+          <ul class="search-list yes">
+            <li>Title includes "Owner," "Founder," "Principal," or "Partner" + "CPA" or "EA"</li>
+            <li>Firm name is [LastName] CPA, PLLC · [LastName] &amp; Associates · [City] Tax &amp; Accounting</li>
+            <li>Headline mentions "small business," "multi-state," "PTE," "S-corp," or "entrepreneurs"</li>
+            <li>Posts recently about tax law changes, extensions, or state-specific issues</li>
+            <li>Firm website linked and looks active</li>
+            <li>Based in a state with heavy multi-state activity (TX, CA, FL, NY, IL)</li>
+            <li>Posted in the past 3 months (signals they're actively vocal)</li>
+          </ul>
+        </div>
+        <div class="search-col">
+          <h4 style="color: var(--high);">Red flags (skip these)</h4>
+          <ul class="search-list no">
+            <li>Big 4 employees — Deloitte, PwC, EY, KPMG (wrong workflow, not buyers)</li>
+            <li>Mid-tier national firms — RSM, BDO, Grant Thornton, Baker Tilly, CLA</li>
+            <li>"Staff Accountant" or "Senior Accountant" at a large firm (not the decision-maker)</li>
+            <li>Corporate in-house accountants ("Accountant at Microsoft")</li>
+            <li>CPA exam candidates or accounting students</li>
+            <li>Pure bookkeepers with no tax work mentioned</li>
+            <li>Profile last active more than 6 months ago</li>
+          </ul>
+        </div>
+      </div>
+      
+      <h3>The golden signal</h3>
+      <p>CPAs who <strong>publicly post content about their work</strong> on LinkedIn or Twitter/X. They're already vocal, which selects for people willing to talk to strangers. Search LinkedIn's content feed for hashtags like <code>#tax</code> <code>#CPA</code> <code>#smallbusiness</code>, pick recent posters, and DM them referring to a specific thing they wrote. Response rates here are 3–5× higher than cold.</p>
+      
+      <h3>Faster alternative: the Taxpros Discord</h3>
+      <p>The Taxpros Discord (taxprosdiscord.com) is all verified tax pros. Real-time conversation. Often faster than Reddit or LinkedIn because the friction is lower. Request an invite through the form, lurk 60 minutes to learn the register, then ask. Expect replies within hours.</p>
+    </section>
+
+    <!-- ─── 16 · INTERVIEW PREP ─── -->
+    <section id="interview">
+      <div class="section-head">
+        <span class="section-num">16 — Interview Prep</span>
+        <h2>Before the <em>call</em>.</h2>
+        <p class="section-lede">The quality difference between a wasted 20 minutes and a gold-mine 20 minutes is entirely in what you ask. Specific moments, not abstract pain.</p>
+      </div>
+      
+      <h3>Rules that matter more than questions</h3>
+      <p><strong>Never ask "what are your pain points?"</strong> — you'll get abstract, useless answers. Instead ask about specific recent moments. "Walk me through last Monday morning." "Tell me about the last time something went wrong."</p>
+      <p><strong>Shut up for 60% of the call.</strong> Silence after a question pulls out the real answer. Don't fill gaps.</p>
+      <p><strong>Don't describe the product.</strong> If they ask what you're building, keep it to one sentence and redirect. You're there to learn, not to pitch. If they ask to see the product, say "I'm earlier than that — I'm talking with people first."</p>
+      <p><strong>Record or take dense notes.</strong> You'll forget specifics within 24 hours. Verbatim quotes are gold for your presentation.</p>
+      
+      <div class="qbank-group">
+        <div class="qbank-title">Warm-up · The last real moment</div>
+        <ul class="qbank-list">
+          <li>Walk me through last Monday morning — from when you opened your laptop until lunch.</li>
+          <li>How many clients are you currently serving? Roughly how many states?</li>
+          <li>What did the last 2 weeks of filing season look like for you?</li>
+        </ul>
+      </div>
+      
+      <div class="qbank-group">
+        <div class="qbank-title">Core · Deadline pain</div>
+        <ul class="qbank-list">
+          <li>Tell me about the last time you <em>almost</em> missed a deadline. What actually went wrong?</li>
+          <li>When was the last time a client came to you and said "didn't you know about X?" — and you hadn't?</li>
+          <li>How do you currently find out when a state tax authority announces an extension or policy change?</li>
+          <li>Think of a recent state announcement — walk me through what you did when you heard about it.</li>
+        </ul>
+      </div>
+      
+      <div class="qbank-group">
+        <div class="qbank-title">Tooling reality</div>
+        <ul class="qbank-list">
+          <li>What does your current setup look like? Can you share screen and show me?</li>
+          <li>If this tool vanished tomorrow, what would break first?</li>
+          <li>Have you tried [File In Time / Karbon / Canopy]? What made you stop or not switch?</li>
+          <li>What's the most valuable thing your current tool does? What does it not do that it should?</li>
+        </ul>
+      </div>
+      
+      <div class="qbank-group">
+        <div class="qbank-title">Edges and anomalies</div>
+        <ul class="qbank-list">
+          <li>Which clients give you the most anxiety? Why?</li>
+          <li>If you had to hand off your practice for a month, what would the handoff doc need to cover?</li>
+          <li>What's the weirdest state-specific filing requirement you've run into recently?</li>
+          <li>What do you wish software built for accountants understood, that it never seems to?</li>
+        </ul>
+      </div>
+      
+      <div class="qbank-group">
+        <div class="qbank-title">Closing</div>
+        <ul class="qbank-list">
+          <li>Who else should I be talking to? Anyone come to mind?</li>
+          <li>Would you be open to a quick follow-up in 2–3 weeks to see what I build?</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ─── 17 · VOCABULARY ─── -->
+    <section id="vocab">
+      <div class="section-head">
+        <span class="section-num">17 — Vocabulary</span>
+        <h2>Terms you should <em>recognize</em>, not master.</h2>
+        <p class="section-lede">You don't need to understand these deeply — you need to not waste your interviewee's time asking what each acronym means. 20 minutes of Googling each is sufficient.</p>
+      </div>
+      
+      <h3>Forms they file</h3>
+      <div class="vocab-grid">
+        <div class="vocab-item"><strong>1040</strong> Individual income tax return. Apr 15 deadline. The thing every human in the US files.</div>
+        <div class="vocab-item"><strong>1065</strong> Partnership return. Mar 15 deadline.</div>
+        <div class="vocab-item"><strong>1120-S</strong> S-corporation return. Mar 15 deadline.</div>
+        <div class="vocab-item"><strong>1120</strong> C-corporation return. Apr 15 deadline.</div>
+        <div class="vocab-item"><strong>941</strong> Quarterly payroll tax return. Due end of month after quarter.</div>
+        <div class="vocab-item"><strong>1099</strong> Miscellaneous income reporting. Jan 31 deadline.</div>
+        <div class="vocab-item"><strong>K-1</strong> Partner / shareholder income report. Flows from 1065 / 1120-S to personal 1040.</div>
+        <div class="vocab-item"><strong>W-2</strong> Employee wage statement. Jan 31 deadline.</div>
+      </div>
+      
+      <h3>Concepts you'll hear</h3>
+      <div class="vocab-grid">
+        <div class="vocab-item"><strong>PTE</strong> Pass-Through Entity election. State-level tax workaround for SALT cap. Election deadlines vary by state — a huge pain and a key feature target.</div>
+        <div class="vocab-item"><strong>SALT</strong> State And Local Tax. Federal cap limits deduction to $10K. PTE is the workaround.</div>
+        <div class="vocab-item"><strong>Nexus</strong> When a business has enough presence in a state to owe tax there. Determines which states a client must file in.</div>
+        <div class="vocab-item"><strong>Franchise tax</strong> State-level tax for operating as an entity. Texas, California, Delaware all have different rules.</div>
+        <div class="vocab-item"><strong>Estimated tax</strong> Quarterly prepayment for self-employed and pass-through owners. Apr 15, Jun 15, Sep 15, Jan 15.</div>
+        <div class="vocab-item"><strong>Extension</strong> 6-month filing delay, not a payment delay. Sep 15 (1065/1120-S) / Oct 15 (1040).</div>
+        <div class="vocab-item"><strong>Disaster extension</strong> IRS grants automatic extension for federally declared disaster areas. This is where Story 3 lives.</div>
+        <div class="vocab-item"><strong>EA</strong> Enrolled Agent. Federally licensed tax-only practitioner. Adjacent target user.</div>
+      </div>
+      
+      <h3>Tools they use</h3>
+      <div class="vocab-grid">
+        <div class="vocab-item"><strong>Drake Tax</strong> Popular tax preparation software for small firms.</div>
+        <div class="vocab-item"><strong>Lacerte</strong> Intuit's pro tax software. Mid-sized firms.</div>
+        <div class="vocab-item"><strong>UltraTax</strong> Thomson Reuters pro tax software. Larger firms.</div>
+        <div class="vocab-item"><strong>ProConnect</strong> Intuit's cloud tax software. Solo-friendly.</div>
+        <div class="vocab-item"><strong>TaxDome</strong> Practice management platform. Client portal focus.</div>
+        <div class="vocab-item"><strong>Karbon</strong> Workflow management for accounting firms.</div>
+        <div class="vocab-item"><strong>Canopy</strong> Similar to Karbon — practice management.</div>
+        <div class="vocab-item"><strong>File In Time</strong> The desktop incumbent for deadline tracking specifically.</div>
+      </div>
+      
+      <h3>Timing they live by</h3>
+      <div class="vocab-grid">
+        <div class="vocab-item"><strong>Busy season</strong> Jan–Apr 15. 20+ hrs overtime weekly. Everyone is exhausted.</div>
+        <div class="vocab-item"><strong>Extension crunch</strong> Sep–Oct 15. Second wave of deadline stress.</div>
+        <div class="vocab-item"><strong>Shoulder season</strong> May–Aug &amp; Nov–Dec. Best window for research, sales, and education.</div>
+        <div class="vocab-item"><strong>Right now · late April 2026</strong> Just past Apr 15. Exhausted but actually more available than during season.</div>
+      </div>
+    </section>
+
+    <div class="footer">
+      <div>DueDateHQ · Internal Reference · Round 1</div>
+      <div>Built for personal use · Update as you learn</div>
+    </div>
+
+  </main>
+</div>
+
+</body>
+</html>

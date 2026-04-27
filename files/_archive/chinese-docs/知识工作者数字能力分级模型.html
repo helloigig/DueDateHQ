@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<!-- droploft:forked-from:slug=nanwav -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知识工作者数字能力分级模型</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --ink: #1a1a1a;
+    --paper: #f5f0e8;
+    --accent: #c84b31;
+    --muted: #8a8070;
+    --rule: #d4cdc0;
+    --highlight: #fdf6e3;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Noto Serif SC', serif;
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* Grain texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 100;
+    opacity: 0.5;
+  }
+
+  .journal {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 80px 48px 120px;
+  }
+
+  /* Header */
+  .header {
+    border-top: 3px solid var(--ink);
+    border-bottom: 1px solid var(--rule);
+    padding: 32px 0 28px;
+    margin-bottom: 56px;
+    position: relative;
+  }
+
+  .header::after {
+    content: '';
+    display: block;
+    height: 1px;
+    background: var(--ink);
+    margin-top: 16px;
+  }
+
+  .meta {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 20px;
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .meta span::before {
+    content: '— ';
+  }
+
+  h1 {
+    font-size: clamp(28px, 5vw, 44px);
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    margin-bottom: 16px;
+  }
+
+  .subtitle {
+    font-size: 16px;
+    color: var(--muted);
+    font-weight: 300;
+    line-height: 1.6;
+    max-width: 520px;
+    font-style: italic;
+  }
+
+  /* Decorative number */
+  .pull-number {
+    font-family: 'Space Mono', monospace;
+    font-size: 120px;
+    font-weight: 700;
+    color: var(--rule);
+    position: absolute;
+    right: -12px;
+    top: 20px;
+    line-height: 1;
+    user-select: none;
+    letter-spacing: -0.05em;
+  }
+
+  /* Intro */
+  .intro {
+    font-size: 17px;
+    line-height: 1.9;
+    color: #333;
+    margin-bottom: 56px;
+    padding-bottom: 40px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .intro p + p {
+    margin-top: 16px;
+  }
+
+  .core-thesis {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 24px 28px;
+    margin: 28px 0;
+    font-size: 16px;
+    line-height: 1.7;
+    font-style: italic;
+  }
+
+  .core-thesis strong {
+    font-style: normal;
+    font-weight: 600;
+  }
+
+  /* Level cards */
+  .levels-section h2 {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 36px;
+  }
+
+  .level {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 0 32px;
+    margin-bottom: 40px;
+    padding-bottom: 40px;
+    border-bottom: 1px solid var(--rule);
+    opacity: 0;
+    transform: translateY(16px);
+    animation: fadeUp 0.5s ease forwards;
+  }
+
+  .level:nth-child(1) { animation-delay: 0.1s; }
+  .level:nth-child(2) { animation-delay: 0.2s; }
+  .level:nth-child(3) { animation-delay: 0.3s; }
+  .level:nth-child(4) { animation-delay: 0.4s; }
+  .level:nth-child(5) { animation-delay: 0.5s; }
+  .level:nth-child(6) { animation-delay: 0.6s; }
+  .level:nth-child(7) { animation-delay: 0.7s; }
+
+  @keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .level:last-child { border-bottom: none; }
+
+  .level-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 4px;
+  }
+
+  .level-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--ink);
+  }
+
+  .level-num.top { color: var(--accent); }
+
+  .level-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 4px;
+    text-align: center;
+  }
+
+  .level-bar {
+    width: 2px;
+    flex: 1;
+    background: var(--rule);
+    margin-top: 10px;
+    min-height: 20px;
+  }
+
+  .level-bar.filled { background: var(--ink); }
+  .level-bar.accent { background: var(--accent); }
+
+  .level-content {}
+
+  .level-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    letter-spacing: -0.01em;
+  }
+
+  .level-archetype {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+
+  .level-desc {
+    font-size: 15px;
+    line-height: 1.8;
+    color: #444;
+    margin-bottom: 14px;
+  }
+
+  .level-core {
+    background: var(--highlight);
+    border-left: 2px solid var(--accent);
+    padding: 10px 14px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #555;
+  }
+
+  .level-core strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .level-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border: 1px solid var(--rule);
+    padding: 3px 8px;
+    color: var(--muted);
+  }
+
+  /* Implications */
+  .implications {
+    margin-top: 64px;
+    padding-top: 48px;
+    border-top: 3px solid var(--ink);
+  }
+
+  .implications h2 {
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .implications .section-sub {
+    font-size: 14px;
+    color: var(--muted);
+    font-style: italic;
+    margin-bottom: 36px;
+  }
+
+  .implication-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    margin-bottom: 40px;
+  }
+
+  .implication-cell {
+    background: var(--paper);
+    padding: 24px;
+  }
+
+  .implication-cell h3 {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .implication-cell p {
+    font-size: 14px;
+    line-height: 1.75;
+    color: #444;
+  }
+
+  /* Footer rule */
+  .footer {
+    margin-top: 80px;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .footer-text {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .footer-mark {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--rule);
+  }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .journal { padding: 40px 24px 80px; }
+    .level { grid-template-columns: 60px 1fr; gap: 0 20px; }
+    .pull-number { display: none; }
+    .implication-grid { grid-template-columns: 1fr; }
+  }
+</style>
+<meta name="droploft:fork-origin" content="https://stage-a.droploft.ai/d/nanwav">
+</head>
+<body>
+<div class="journal">
+
+  <header class="header">
+    <div class="meta">
+      <span>用户画像参考标准</span>
+      <span>SaaS 产品设计</span>
+      <span>2026</span>
+    </div>
+    <h1>知识工作者<br>数字能力分级模型</h1>
+    <p class="subtitle">一套基于"思维外化能力"的七级分类框架，用于 SaaS 产品的用户画像与功能设计决策。</p>
+    <div class="pull-number">7</div>
+  </header>
+
+  <div class="intro">
+    <p>在构建 SaaS 产品时，"目标用户是谁"这个问题往往被简化为职位或行业。但真正影响产品设计的，是用户能否将自己的思维逻辑转化为系统——能否<strong>用工具表达和放大自己的思考</strong>。</p>
+
+    <div class="core-thesis">
+      核心分级逻辑：<strong>能否将思维外化为系统。</strong><br>
+      越高级的用户，越能把自己的逻辑转化为可复用的工具或流程。这个维度，比职位、年龄、行业都更能预测用户行为。
+    </div>
+
+    <p>以下七个级别，从顶端的"系统构建者"到底端的"数字消费者"，描绘了知识工作者在数字工具使用上的完整能力谱系。每个级别对应不同的产品设计假设、功能优先级和引导策略。</p>
+  </div>
+
+  <section class="levels-section">
+    <h2>// 七级能力谱系</h2>
+
+    <div class="level">
+      <div class="level-badge">
+        <div class="level-num top">L7</div>
+        <div class="level-label">顶级</div>
+        <div class="level-bar accent"></div>
+      </div>
+      <div class="level-content">
+        <div class="level-archetype">System Builder · 系统构建者</div>
+        <div class="level-title">不只用工具，更造工具</div>
+        <p class="level-desc">能编程，能设计数据结构和 API，把思维直接变成软件。理解抽象、封装和接口的概念，能够设计他人使用的系统。</p>
+        <div class="level-core"><strong>核心能力：</strong>将业务逻辑编码为可运行的程序，在任意领域创造"从无到有"的工具。</div>
+        <div class="level-tags">
+          <span class="tag">编程语言</span>
+          <span class="tag">API 设计</span>
+          <span class="tag">数据结构</span>
+          <span class="tag">工程师</span>
+          <span class="tag">技术创始人</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="level">
+      <div class="level-badge">
+        <div class="level-num">L6</div>
+        <div class="level-label">高级</div>
+        <div class="level-bar filled"></div>
+      </div>
+      <div class="level-content">
+        <div class="level-archetype">Automation Architect · 流程自动化者</div>
+        <div class="level-title">把多个系统串联成管道</div>
+        <p class="level-desc">不一定写代码，但能用 Zapier、Make、Power Automate 等工具设计跨系统的自动化流程。理解触发器、条件分支和数据流的逻辑，能把重复的手工操作变成自动运行的机器。</p>
+        <div class="level-core"><strong>核心能力：</strong>用"低代码"方式表达流程逻辑，将多个工具的能力组合成超越任何单一工具的系统。</div>
+        <div class="level-tags">
+          <span class="tag">Zapier / Make</span>
+          <span class="tag">Webhook</span>
+          <span class="tag">流程设计</span>
+          <span class="tag">运营负责人</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="level">
+      <div class="level-badge">
+        <div class="level-num">L5</div>
+        <div class="level-label">中高级</div>
+        <div class="level-bar filled"></div>
+      </div>
+      <div class="level-content">
+        <div class="level-archetype">Data Modeler · 数据建模者</div>
+        <div class="level-title">用结构来表达逻辑</div>
+        <p class="level-desc">Excel / Sheets 高手，能写复杂公式、透视表、搭建财务模型；或者熟练使用 SQL 查询数据库；或者能用 Notion / Airtable 搭建有关联关系的结构化数据库。</p>
+        <div class="level-core"><strong>核心能力：</strong>将现实世界的关系和规则，转化为表格结构或查询语言来描述和计算。</div>
+        <div class="level-tags">
+          <span class="tag">Excel / SQL</span>
+          <span class="tag">数据透视表</span>
+          <span class="tag">Airtable</span>
+          <span class="tag">分析师</span>
+          <span class="tag">财务</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="level">
+      <div class="level-badge">
+        <div class="level-num">L4</div>
+        <div class="level-label">中级</div>
+        <div class="level-bar"></div>
+      </div>
+      <div class="level-content">
+        <div class="level-archetype">Power User · 工具深度用户</div>
+        <div class="level-title">某一工具的高段位玩家</div>
+        <p class="level-desc">在某一类专业工具上达到深度掌握——设计师精通 Figma 的组件系统，运营熟悉 GA / Mixpanel 的漏斗分析，产品经理精通 Jira 的自定义工作流。能挖掘出大多数人不知道的高级功能，但能力局限在单一工具内。</p>
+        <div class="level-core"><strong>核心能力：</strong>在垂直领域内最大化单一工具的价值，能够定制和延伸，但缺乏跨工具整合的意识。</div>
+        <div class="level-tags">
+          <span class="tag">Figma</span>
+          <span class="tag">Mixpanel</span>
+          <span class="tag">Jira</span>
+          <span class="tag">专业领域</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="level">
+      <div class="level-badge">
+        <div class="level-num">L3</div>
+        <div class="level-label">中级</div>
+        <div class="level-bar"></div>
+      </div>
+      <div class="level-content">
+        <div class="level-archetype">Information Synthesizer · 信息整合者</div>
+        <div class="level-title">流畅使用，但不定制</div>
+        <p class="level-desc">能流畅使用多个日常工具——文档、表格、邮件、协作平台。能搜索、筛选、整理信息，产出清晰的报告或沟通内容。但依赖工具的默认用法，遇到需要定制或延伸时会停下来。</p>
+        <div class="level-core"><strong>核心能力：</strong>在既有工具框架内高效完成任务，信息处理能力强，但工具延伸能力弱。</div>
+        <div class="level-tags">
+          <span class="tag">飞书 / 钉钉</span>
+          <span class="tag">Office 套件</span>
+          <span class="tag">信息整理</span>
+          <span class="tag">大多数白领</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="level">
+      <div class="level-badge">
+        <div class="level-num">L2</div>
+        <div class="level-label">初级</div>
+        <div class="level-bar"></div>
+      </div>
+      <div class="level-content">
+        <div class="level-archetype">Task Executor · 任务执行者</div>
+        <div class="level-title">按指引操作，遇变化易卡</div>
+        <p class="level-desc">能完成明确指派的数字化任务——填表、上传文件、基础文字处理。但对工具的理解是操作层面的，而非概念层面的。一旦遇到界面变化或非常规情况，需要逐步指引才能继续。</p>
+        <div class="level-core"><strong>核心能力：</strong>执行既定操作步骤的能力，缺乏对工具底层逻辑的理解，难以举一反三。</div>
+        <div class="level-tags">
+          <span class="tag">表单填写</span>
+          <span class="tag">需要 SOP</span>
+          <span class="tag">传统行业</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="level">
+      <div class="level-badge">
+        <div class="level-num">L1</div>
+        <div class="level-label">入门</div>
+        <div class="level-bar"></div>
+      </div>
+      <div class="level-content">
+        <div class="level-archetype">Digital Consumer · 数字消费者</div>
+        <div class="level-title">以消费为主，生产为辅</div>
+        <p class="level-desc">主要使用手机 App，以消费内容为主。工作场景中的电脑使用和专业软件对他们有一定认知门槛。数字工具在他们的工作场景中扮演辅助角色，而非核心角色。</p>
+        <div class="level-core"><strong>核心能力：</strong>消费数字内容和服务，生产能力有限。SaaS 产品若以此为目标用户，需要极强的手把手引导设计。</div>
+        <div class="level-tags">
+          <span class="tag">手机原生</span>
+          <span class="tag">内容消费</span>
+          <span class="tag">非知识工作者</span>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <section class="implications">
+    <h2>对 SaaS 产品设计的含义</h2>
+    <p class="section-sub">不同级别的用户，需要根本不同的"能动性假设"。</p>
+
+    <div class="implication-grid">
+      <div class="implication-cell">
+        <h3>产品定位</h3>
+        <p>在设计功能之前，先确认你的核心用户在 L 几。给 L3 用户设计 L5 的产品，他们会觉得复杂和焦虑；给 L6 用户设计 L3 的产品，他们会觉得这是个"死胡同"，无法延伸。</p>
+      </div>
+      <div class="implication-cell">
+        <h3>API 与开放性</h3>
+        <p>L6+ 用户的标志性需求：API、Webhook、自定义集成。如果产品缺少这些，高级用户会将其定性为"玩具"，而非生产工具。反之，对 L3 用户强推 API 文档则是一种骚扰。</p>
+      </div>
+      <div class="implication-cell">
+        <h3>新用户引导</h3>
+        <p>L2 用户需要线性、逐步的操作指引（SOP 化的 Onboarding）。L4+ 用户则厌恶被手把手带着走，他们更需要的是"探索空间"和清晰的文档。</p>
+      </div>
+      <div class="implication-cell">
+        <h3>功能命名与抽象层次</h3>
+        <p>L3 用户需要贴近业务语言的功能名称（"发送报告"），L5+ 用户可以接受更抽象的技术名词（"触发器"、"变量"、"数据关联"）。混用会让两类用户都感到困惑。</p>
+      </div>
+    </div>
+
+    <p style="font-size:15px; line-height:1.85; color:#444;">
+      这个模型不是在评价用户的"优劣"，而是描述不同用户对工具的期望和使用方式。同一个人在不同工具领域可能处于不同级别——一个 L7 的工程师，在使用会计软件时可能只是 L3。<br><br>
+      在用户画像中标注目标用户的 Level，可以帮助团队在产品决策时，快速对齐一个关键前提：<strong>我们假设用户有多大能力自己掌舵？</strong>
+    </p>
+  </section>
+
+  <footer class="footer">
+    <span class="footer-text">Knowledge Worker Digital Literacy Model · v1.0</span>
+    <span class="footer-mark">▪ ▪ ▪</span>
+  </footer>
+
+</div>
+</body>
+</html>

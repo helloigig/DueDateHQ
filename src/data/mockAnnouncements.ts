@@ -1,0 +1,102 @@
+import type { Announcement } from "../types";
+
+// Detection times anchor to 2026-04-23T11:00:00Z ("now" for the demo):
+// · ~20h ago  = FRESH      (LA Hurricane)
+// · ~30h ago  = REMINDER   (CA PTE)
+// · ~55h ago  = ESCALATED  (NY nexus)
+// · ~90h ago  = BLOCKING   (TX penalty relief)
+
+export const announcements: Announcement[] = [
+  {
+    id: "ann-la-2026-hurricane-delta",
+    stateCode: "LA",
+    authority: "Louisiana Department of Revenue",
+    title: "Hurricane Delta disaster extension",
+    summary:
+      "Louisiana has granted an automatic filing and payment extension for taxpayers in federally declared disaster areas. Orleans, Jefferson, and St. Bernard parishes qualify. Affected filings due Oct 15, 2026 are postponed to Feb 15, 2027.",
+    publishedDate: "2026-04-22",
+    detectedAt: "2026-04-22T15:00:00Z",
+    type: "disaster_extension",
+    confidence: "high",
+    counties: ["Orleans", "Jefferson", "St. Bernard"],
+    entityTypes: ["LLC", "S-Corp", "Individual", "Partnership"],
+    taxTypes: ["State income", "PTE election", "Quarterly estimates"],
+    oldDeadline: "2026-10-15",
+    newDeadline: "2027-02-15",
+    sourceUrl: "https://revenue.louisiana.gov/newsroom/hurricane-delta-2026",
+    affectedClientIds: [
+      "c-la-01",
+      "c-la-02",
+      "c-la-03",
+      "c-la-04",
+      "c-la-05",
+      "c-la-06",
+    ],
+    read: false,
+    dismissed: false,
+  },
+  {
+    id: "ann-ca-2026-pte-election",
+    stateCode: "CA",
+    authority: "California Franchise Tax Board",
+    title: "PTE election deadline extended to July 31",
+    summary:
+      "California FTB has extended the 2026 Pass-Through Entity (PTE) election deadline from June 15 to July 31 for qualifying S-Corps, LLCs taxed as partnerships, and partnerships. No separate application required; payment postmark controls.",
+    publishedDate: "2026-04-22",
+    detectedAt: "2026-04-22T05:00:00Z",
+    type: "pte_change",
+    confidence: "high",
+    counties: [],
+    entityTypes: ["S-Corp", "LLC", "Partnership"],
+    taxTypes: ["PTE election"],
+    oldDeadline: "2026-06-15",
+    newDeadline: "2026-07-31",
+    sourceUrl: "https://www.ftb.ca.gov/about-ftb/newsroom/pte-2026",
+    affectedClientIds: ["c-ca-01", "c-ca-02", "c-ca-04", "c-ca-07", "c-ca-10"],
+    read: false,
+    dismissed: false,
+  },
+  {
+    id: "ann-ny-2026-nexus-rule",
+    stateCode: "NY",
+    authority: "New York Department of Taxation and Finance",
+    title: "Economic nexus threshold lowered to $300,000",
+    summary:
+      "New York has lowered its economic nexus threshold from $500,000 to $300,000 in receipts for sales tax purposes, effective Q3 2026. LLCs and partnerships with receipts over the new threshold must register for NY sales tax.",
+    publishedDate: "2026-04-21",
+    detectedAt: "2026-04-21T04:00:00Z",
+    type: "nexus_change",
+    confidence: "high",
+    counties: [],
+    entityTypes: ["LLC", "Partnership", "S-Corp"],
+    taxTypes: ["Sales tax nexus"],
+    oldDeadline: undefined,
+    newDeadline: undefined,
+    sourceUrl: "https://www.tax.ny.gov/pit/file/nexus-2026.htm",
+    affectedClientIds: ["c-ny-01", "c-ny-03", "c-ny-08"],
+    read: false,
+    dismissed: false,
+  },
+  {
+    id: "ann-tx-2026-penalty-relief",
+    stateCode: "TX",
+    authority: "Texas Comptroller of Public Accounts",
+    title: "Late-filing penalty waiver for May 15 Franchise filings",
+    summary:
+      "Texas Comptroller is offering a one-time penalty waiver for Franchise Tax filings due May 15, 2026. Penalties automatically waived on returns filed by May 31. No separate application required.",
+    publishedDate: "2026-04-19",
+    detectedAt: "2026-04-19T17:00:00Z",
+    type: "penalty_relief",
+    confidence: "high",
+    counties: [],
+    entityTypes: ["LLC", "S-Corp", "C-Corp", "Partnership"],
+    taxTypes: ["Franchise Tax"],
+    oldDeadline: "2026-05-15",
+    newDeadline: "2026-05-31",
+    sourceUrl:
+      "https://comptroller.texas.gov/taxes/franchise/penalty-waiver-2026.php",
+    affectedClientIds: ["c-tx-01", "c-tx-06", "c-tx-08"],
+    read: false,
+    dismissed: false,
+  },
+];
