@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  AlertTriangle,
   ChevronRight,
   Clock,
-  History,
+  Info,
   X,
 } from "lucide-react";
 import type { Announcement } from "../types";
@@ -13,11 +14,6 @@ import {
   escalationTier,
   type EscalationTier,
 } from "../data/dateHelpers";
-import {
-  TOPIC_LABEL,
-  TAX_TYPE_LABEL,
-  CONFIDENCE_LABEL,
-} from "../data/announcementLabels";
 import { actions } from "../data/store";
 
 type Tone = "danger" | "warn" | "info";
@@ -31,25 +27,23 @@ function toneFor(type: Announcement["type"], tier: EscalationTier): Tone {
   return "info";
 }
 
-const TIER_BG: Record<EscalationTier, string> = {
-  fresh: "bg-info-bg/40",
-  reminder: "bg-warn-bg/40",
-  escalated: "bg-danger-bg/40",
-  blocking: "bg-danger-bg/60",
+const TONE_CLASSES: Record<Tone, string> = {
+  danger: "border-danger-border bg-danger-bg/40 text-ink-900",
+  warn: "border-warn-border bg-warn-bg/40 text-ink-900",
+  info: "border-info-border bg-info-bg/40 text-ink-900",
 };
 
-const TIER_ESCALATION_INK: Record<EscalationTier, string> = {
-  fresh: "text-ink-500",
-  reminder: "text-warn-ink",
-  escalated: "text-danger-ink",
-  blocking: "text-danger-ink",
+const TONE_SUB_CLASSES: Record<Tone, string> = {
+  danger: "text-danger-ink",
+  warn: "text-warn-ink",
+  info: "text-info-ink",
 };
 
-const CONFIDENCE_TONE = {
-  high: "bg-ok-bg text-ok-ink",
-  medium: "bg-sunken text-ink-700",
-  low: "bg-warn-bg text-warn-ink",
-} as const;
+const TONE_ICONS: Record<Tone, typeof AlertTriangle> = {
+  danger: AlertTriangle,
+  warn: Clock,
+  info: Info,
+};
 
 function escalationCopy(tier: EscalationTier, hours: number): string | null {
   if (tier === "fresh") return null;
@@ -121,6 +115,8 @@ function BannerCard({ ann }: { ann: Announcement }) {
   // Build the AI-match reason — explains *why* DDHQ thinks these clients are
   // affected, so the CPA isn't trusting an opaque count.
   const matchReason = matchReasonFor(ann);
+  const tone = toneFor(ann.type, tier);
+  const Icon = TONE_ICONS[tone];
 
   return (
     <div className={`border rounded-md px-4 py-3 transition-colors ${TONE_CLASSES[tone]}`}>
