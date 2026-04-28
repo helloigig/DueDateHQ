@@ -6,6 +6,8 @@ import { useImportHistory } from "../hooks/useImports";
 import { signOut, updateSession, useSession } from "../data/session";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ErrorState } from "../components/ErrorState";
+import { UpgradePrompt } from "../components/UpgradePrompt";
+import { useFeatureFlags } from "../hooks/useFeatureFlags";
 import type { FirmSession } from "../data/session";
 
 const NAV = [
@@ -356,26 +358,23 @@ function ImportsPanel() {
 }
 
 function TeamPanel() {
-  const session = useSession();
-  const isSolo = session?.tier === "solo";
+  const flags = useFeatureFlags();
+  if (!flags.canInviteTeammates) {
+    return (
+      <UpgradePrompt feature="Team invites" requiredTier="pro" />
+    );
+  }
   return (
     <Card
       title="Team members"
-      description={
-        isSolo
-          ? "Team collaboration unlocks on the Team tier."
-          : "Invite teammates and assign client ownership."
-      }
+      description={`Invite up to ${flags.maxTeammates} teammate${
+        flags.maxTeammates === 1 ? "" : "s"
+      } and assign client ownership.`}
     >
-      {isSolo ? (
-        <p className="text-sm text-ink-500">
-          You're on the Solo plan. Upgrade to Team to invite coworkers.
-        </p>
-      ) : (
-        <p className="text-sm text-ink-500">
-          Team invite flow ships with the Team tier release.
-        </p>
-      )}
+      <p className="text-sm text-ink-500">
+        Team invite flow ships with the {flags.tier === "team" ? "Team" : "Pro"}{" "}
+        tier release. You're on {flags.tier}.
+      </p>
     </Card>
   );
 }

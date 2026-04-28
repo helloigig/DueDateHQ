@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { BottomTabBar } from "./BottomTabBar";
+import { OfflineBanner } from "./OfflineBanner";
 
 export function AppShell() {
   return (
@@ -12,6 +13,7 @@ export function AppShell() {
       >
         Skip to main content
       </a>
+      <OfflineBanner />
       <div className="hidden md:flex">
         <Sidebar />
       </div>

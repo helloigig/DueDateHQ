@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { actions } from "../data/store";
+import { useCommitImport } from "../hooks/useImports";
 import {
   DETECTED_ROWS,
   DETECTED_SOURCE,
@@ -706,6 +706,9 @@ function CommittingStep({
     [rows]
   );
 
+  const commit = useCommitImport();
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     let pct = 0;
@@ -714,13 +717,24 @@ function CommittingStep({
       pct += 12 + Math.random() * 8;
       if (pct >= 100) {
         setProgress(100);
-        const { ids } = actions.addClientsBulk(payload, {
-          source: "CSV",
-          skippedCount: skippedTotal,
-        });
-        setTimeout(() => {
-          if (!cancelled) onDone(ids, skippedTotal);
-        }, 250);
+        commit.mutate(
+          {
+            rows: payload,
+            source: "CSV",
+            skippedCount: skippedTotal,
+          },
+          {
+            onSuccess: ({ ids }) => {
+              setTimeout(() => {
+                if (!cancelled) onDone(ids, skippedTotal);
+              }, 250);
+            },
+            onError: (err) => {
+              if (cancelled) return;
+              setError(err.message);
+            },
+          }
+        );
       } else {
         setProgress(pct);
         setTimeout(tick, 220);
@@ -821,6 +835,12 @@ function CommittingStep({
           );
         })}
       </ul>
+
+      {error && (
+        <div className="mt-4 text-sm text-danger-ink bg-danger-bg border border-danger-border rounded px-3 py-2">
+          Import failed: {error}
+        </div>
+      )}
     </div>
   );
 }

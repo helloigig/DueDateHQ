@@ -9,16 +9,34 @@ import { Import } from "./pages/Import";
 import { Placeholder } from "./pages/Placeholder";
 import { Settings } from "./pages/Settings";
 import { Login } from "./pages/Login";
+import { Signup } from "./pages/auth/Signup";
+import { AcceptInvite } from "./pages/auth/AcceptInvite";
+import { ForgotPassword } from "./pages/auth/ForgotPassword";
+import { ResetPassword } from "./pages/auth/ResetPassword";
+import { SessionProvider } from "./lib/session-provider";
 import { useSession } from "./data/session";
 
 export default function App() {
-  const session = useSession();
+  const localSession = useSession();
 
   return (
     <Routes>
+      {/* Public auth routes — outside the AppShell */}
       <Route path="/login" element={<Login />} />
-      {session ? (
-        <Route element={<AppShell />}>
+      <Route path="/signup" element={<Signup />} />
+      <Route path="/accept-invite" element={<AcceptInvite />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+
+      {/* Protected app routes */}
+      {localSession ? (
+        <Route
+          element={
+            <SessionProvider>
+              <AppShell />
+            </SessionProvider>
+          }
+        >
           <Route index element={<Dashboard />} />
           <Route path="clients" element={<Clients />} />
           <Route path="clients/:id" element={<ClientDetail />} />

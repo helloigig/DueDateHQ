@@ -3,10 +3,8 @@ import { ChevronRight, ChevronDown, AlertCircle, Filter, Download } from "lucide
 import { useShortcuts } from "../hooks/useKeyboard";
 import { useClients } from "../hooks/useClients";
 import { useTriageDeadlines } from "../hooks/useDeadlines";
-import {
-  useAnnouncements,
-  useDetectAnnouncements,
-} from "../hooks/useAnnouncements";
+import { useDetectAnnouncements } from "../hooks/useAnnouncements";
+import { useRealtimeAnnouncements } from "../hooks/useRealtimeAnnouncements";
 import { ShortcutsModal } from "../components/ShortcutsModal";
 import { DashboardSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
@@ -35,7 +33,7 @@ const HIDE_STATUSES = new Set(["completed", "filed_extension"]);
 export function Dashboard() {
   const clientsQuery = useClients();
   const triageQuery = useTriageDeadlines();
-  const announcementsQuery = useAnnouncements({ activeOnly: false });
+  const announcementsQuery = useRealtimeAnnouncements();
   const detectMutation = useDetectAnnouncements();
 
   // One-shot: run the detector on mount (simulates 24h SLA scrape)

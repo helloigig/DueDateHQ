@@ -6,6 +6,8 @@ import { PageSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
 import { useClients } from "../hooks/useClients";
 import { useTriageDeadlines } from "../hooks/useDeadlines";
+import { useFeatureFlags } from "../hooks/useFeatureFlags";
+import { UpgradePrompt } from "../components/UpgradePrompt";
 import { countdownLabel, parseDate, TODAY, daysBetween } from "../data/dateHelpers";
 
 export function Clients() {
@@ -20,6 +22,11 @@ export function Clients() {
   const [query, setQuery] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const navigate = useNavigate();
+  const flags = useFeatureFlags();
+  const atLimit =
+    flags.hasClientLimit &&
+    flags.clientLimit !== null &&
+    clients.length >= flags.clientLimit;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -124,11 +131,23 @@ export function Clients() {
         </button>
         <button
           onClick={() => setAddOpen(true)}
-          className="text-sm px-3 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover"
+          disabled={atLimit}
+          title={atLimit ? `Solo plan limit (${flags.clientLimit}) reached` : undefined}
+          className="text-sm px-3 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed"
         >
           + Add client
         </button>
       </div>
+
+      {atLimit && (
+        <div className="mb-4">
+          <UpgradePrompt
+            feature={`Adding more than ${flags.clientLimit} clients`}
+            requiredTier="pro"
+            inline
+          />
+        </div>
+      )}
 
       <AddClientModal open={addOpen} onClose={() => setAddOpen(false)} />
 
