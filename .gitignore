@@ -8,6 +8,9 @@ dist/
 # Vite
 .vite/
 
+# Vercel
+.vercel/
+
 # Environment
 .env
 .env.local
