@@ -1,13 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  AlertTriangle,
-  AlertCircle,
-  Megaphone,
   ChevronRight,
   Clock,
+  History,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import type { Announcement } from "../types";
 import {
@@ -16,6 +13,11 @@ import {
   escalationTier,
   type EscalationTier,
 } from "../data/dateHelpers";
+import {
+  TOPIC_LABEL,
+  TAX_TYPE_LABEL,
+  CONFIDENCE_LABEL,
+} from "../data/announcementLabels";
 import { actions } from "../data/store";
 
 type Tone = "danger" | "warn" | "info";
@@ -29,32 +31,33 @@ function toneFor(type: Announcement["type"], tier: EscalationTier): Tone {
   return "info";
 }
 
-const TONE_CLASSES: Record<Tone, string> = {
-  danger: "bg-danger-bg border-danger-border text-danger-ink",
-  warn: "bg-warn-bg border-warn-border text-warn-ink",
-  info: "bg-info-bg border-info-border text-info-ink",
+const TIER_BG: Record<EscalationTier, string> = {
+  fresh: "bg-info-bg/40",
+  reminder: "bg-warn-bg/40",
+  escalated: "bg-danger-bg/40",
+  blocking: "bg-danger-bg/60",
 };
 
-const TONE_SUB_CLASSES: Record<Tone, string> = {
-  danger: "text-danger-ink",
-  warn: "text-warn-ink",
-  info: "text-info-ink",
+const TIER_ESCALATION_INK: Record<EscalationTier, string> = {
+  fresh: "text-ink-500",
+  reminder: "text-warn-ink",
+  escalated: "text-danger-ink",
+  blocking: "text-danger-ink",
 };
 
-function iconFor(type: Announcement["type"]): LucideIcon {
-  if (type === "disaster_extension") return AlertTriangle;
-  if (type === "pte_change" || type === "penalty_relief") return AlertCircle;
-  return Megaphone;
-}
+const CONFIDENCE_TONE = {
+  high: "bg-ok-bg text-ok-ink",
+  medium: "bg-sunken text-ink-700",
+  low: "bg-warn-bg text-warn-ink",
+} as const;
 
 function escalationCopy(tier: EscalationTier, hours: number): string | null {
   if (tier === "fresh") return null;
-  const hoursRounded = Math.round(hours);
-  if (tier === "reminder")
-    return `Still unactioned · detected ${hoursRounded}h ago`;
+  const h = Math.round(hours);
+  if (tier === "reminder") return `Still unactioned · detected ${h}h ago`;
   if (tier === "escalated")
-    return `Still unactioned after ${hoursRounded}h — affecting live deadlines`;
-  return `${hoursRounded}h unactioned — review required`;
+    return `Still unactioned after ${h}h — affecting live deadlines`;
+  return `${h}h unactioned — review required`;
 }
 
 export function AnnouncementBanner({
@@ -98,9 +101,7 @@ function BannerCard({ ann }: { ann: Announcement }) {
   const [dismissing, setDismissing] = useState(false);
   const hours = hoursSince(ann.detectedAt);
   const tier = escalationTier(hours);
-  const tone = toneFor(ann.type, tier);
   const escCopy = escalationCopy(tier, hours);
-  const Icon = iconFor(ann.type);
 
   const onDismiss = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -111,8 +112,8 @@ function BannerCard({ ann }: { ann: Announcement }) {
 
   if (dismissing) {
     return (
-      <div className="border border-line rounded-md px-4 py-3 text-xs text-ink-400 flex items-center gap-2 transition-opacity">
-        <span>Dismissed · {ann.stateCode}: {ann.title}</span>
+      <div className="border border-line rounded-md px-4 py-3 text-xs text-ink-400">
+        Dismissed · {ann.stateCode}: {ann.title}
       </div>
     );
   }

@@ -49,7 +49,7 @@ function announcementAsNotification(a: Announcement): Notification {
     detail: `${a.affectedClientIds.length} client${
       a.affectedClientIds.length === 1 ? "" : "s"
     } affected · ${a.authority}`,
-    href: `/announcements/${a.id}`,
+    href: `/alerts/${a.id}`,
     read: a.read,
     announcementId: a.id,
   };
@@ -122,16 +122,21 @@ export function BellDropdown() {
 
       {open && (
         <div className="absolute right-0 top-full mt-1 w-96 bg-surface border border-line rounded-md shadow-overlay z-40 overflow-hidden">
-          <div className="flex items-center px-3 py-2 border-b border-line">
-            <h3 className="text-sm font-semibold text-ink-900">Notifications</h3>
-            <span className="ml-2 text-xs text-ink-500">{unreadCount} unread</span>
-            <button
-              onClick={() => markAllRead.mutate()}
-              disabled={unreadCount === 0}
-              className="ml-auto text-xs text-ink-500 hover:text-ink-900 disabled:opacity-40"
-            >
-              Mark all read
-            </button>
+          <div className="px-3 py-2 border-b border-line">
+            <div className="flex items-center">
+              <h3 className="text-sm font-semibold text-ink-900">Notifications</h3>
+              <span className="ml-2 text-xs text-ink-500">{unreadCount} unread</span>
+              <button
+                onClick={() => markAllRead.mutate()}
+                disabled={unreadCount === 0}
+                className="ml-auto text-xs text-ink-500 hover:text-ink-900 disabled:opacity-40"
+              >
+                Mark all read
+              </button>
+            </div>
+            <p className="text-2xs text-ink-400 mt-0.5">
+              alerts · bounces · invites · extensions
+            </p>
           </div>
 
           <div className="flex gap-1 px-3 py-2 border-b border-line overflow-x-auto">
@@ -176,7 +181,7 @@ export function BellDropdown() {
 
           <div className="border-t border-line px-3 py-2">
             <Link
-              to="/announcements"
+              to="/alerts"
               onClick={() => setOpen(false)}
               className="text-xs text-ink-500 hover:text-ink-900"
             >

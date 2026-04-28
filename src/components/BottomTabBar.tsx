@@ -5,7 +5,7 @@ import { useAnnouncements } from "../hooks/useAnnouncements";
 const TABS = [
   { to: "/", label: "Dashboard", Icon: LayoutDashboard, end: true },
   { to: "/clients", label: "Clients", Icon: Users, end: false },
-  { to: "/announcements", label: "Alerts", Icon: Bell, end: false },
+  { to: "/alerts", label: "Alerts", Icon: Bell, end: false },
   { to: "/settings", label: "Settings", Icon: Settings, end: false },
 ];
 
@@ -36,7 +36,7 @@ export function BottomTabBar() {
             <>
               <div className="relative">
                 <Icon className="w-5 h-5" aria-hidden />
-                {to === "/announcements" && unread > 0 && (
+                {to === "/alerts" && unread > 0 && (
                   <span
                     aria-label={`${unread} unread`}
                     className="absolute -top-1 -right-2 bg-danger-solid text-white text-[10px] leading-none rounded-full min-w-[1rem] h-4 px-1 flex items-center justify-center tabular-nums"

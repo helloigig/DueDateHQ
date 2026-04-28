@@ -17,7 +17,7 @@ const primary = [
   { to: "/", label: "Dashboard", Icon: LayoutDashboard, end: true },
   { to: "/inbox", label: "Inbox", Icon: Inbox, end: false },
   { to: "/clients", label: "Clients", Icon: Users, end: false },
-  { to: "/announcements", label: "Alerts", Icon: Bell, end: false },
+  { to: "/alerts", label: "Alerts", Icon: Bell, end: false },
 ];
 
 const COLLAPSED_KEY = "duedatehq.sidebar_collapsed.v1";
