@@ -315,22 +315,47 @@ export function Clients() {
     );
   }
 
+  const activeCount = clients.filter((c) => c.status === "active").length;
+  const openTaskCount = deadlines.filter(
+    (d) => d.status !== "completed" && d.status !== "filed_extension"
+  ).length;
+  const dueSoonCount = deadlines.filter((d) => {
+    const diff = daysBetween(TODAY, parseDate(d.officialDueDate));
+    return diff >= 0 && diff <= 7 && d.status !== "completed" && d.status !== "filed_extension";
+  }).length;
+
   return (
-    <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-4">
+    <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-6">
+      <header>
+        <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
+          Clients
+        </p>
+        <h1 className="text-2xl font-semibold text-ink-900 mt-1">
+          Firm roster and work surface
+        </h1>
+        <p className="text-sm text-ink-500 mt-2 max-w-2xl">
+          Each client carries entity, jurisdictions, service packages, and a
+          per-task forwarding address. Click a row to open the client view; the
+          open-task count tells you what's still moving.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <StatCard label="Active clients" value={activeCount} helper="Excludes archived and inactive" />
+          <StatCard label="Open tasks" value={openTaskCount} helper="Across the entire roster" />
+          <StatCard label="Due in 7 days" value={dueSoonCount} helper="Urgency window" />
+        </div>
+      </header>
+
       <div className="flex items-center gap-3 flex-wrap">
-        <h1 className="text-lg font-semibold text-ink-900">Clients</h1>
-        <span className="text-ink-400 text-sm tabular-nums">
-          {clients.length === allClients.length
-            ? `(${allClients.length})`
-            : `(${clients.length} of ${allClients.length})`}
-        </span>
         <input
           type="text"
-          placeholder="Filter clients…"
+          placeholder="Search by name, email, state, or entity…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="flex-1 md:flex-none md:ml-auto md:w-64 text-sm px-3 py-1.5 rounded-md border border-line bg-surface text-ink-900 placeholder:text-ink-400"
+          className="flex-1 md:w-80 text-sm px-3 py-2 rounded-md border border-line bg-surface text-ink-900 placeholder:text-ink-400"
         />
+        <span className="text-xs text-ink-500 ml-auto">
+          {filtered.length} of {clients.length}
+        </span>
         <button
           onClick={() => navigate("/import")}
           className="hidden md:inline-flex text-sm px-3 py-1.5 rounded-md border border-line text-ink-700 hover:bg-sunken"
@@ -504,60 +529,27 @@ export function Clients() {
   );
 }
 
-function SortableTh({
-  col,
-  sortCol,
-  sortDir,
-  onClick,
-  align,
-  children,
+function StatCard({
+  label,
+  value,
+  helper,
 }: {
-  col: SortColumn;
-  sortCol: SortColumn;
-  sortDir: SortDir;
-  onClick: (col: SortColumn) => void;
-  align: "left" | "right";
-  children: React.ReactNode;
+  label: string;
+  value: number;
+  helper?: string;
 }) {
-  const active = sortCol === col;
-  const Icon = !active ? ArrowUpDown : sortDir === "asc" ? ArrowUp : ArrowDown;
   return (
-    <th
-      className={`px-4 py-2 font-semibold ${
-        align === "right" ? "text-right" : "text-left"
-      }`}
-      aria-sort={
-        active ? (sortDir === "asc" ? "ascending" : "descending") : "none"
-      }
-    >
-      <button
-        type="button"
-        onClick={() => onClick(col)}
-        className={`inline-flex items-center gap-1 uppercase tracking-wider hover:text-ink-900 ${
-          active ? "text-ink-900" : "text-ink-700"
-        } ${align === "right" ? "flex-row-reverse" : ""}`}
-      >
-        <span>{children}</span>
-        <Icon className="w-3 h-3" aria-hidden />
-      </button>
-    </th>
-  );
-}
-
-function TierPill({ tier }: { tier: ClientTier | undefined }) {
-  if (!tier) return <span className="text-ink-500">—</span>;
-  const tone =
-    tier === "premium"
-      ? "bg-accent/10 text-accent border-accent/30"
-      : tier === "custom"
-        ? "bg-warn-bg text-warn-ink border-warn-border"
-        : "bg-sunken text-ink-700 border-line";
-  return (
-    <span
-      className={`inline-flex items-center text-2xs font-medium px-1.5 py-0.5 rounded border ${tone}`}
-    >
-      {TIER_LABEL[tier]}
-    </span>
+    <div className="border border-line rounded-md p-3 bg-surface">
+      <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
+        {label}
+      </p>
+      <p className="text-xl font-semibold text-ink-900 mt-1 tabular-nums">
+        {value}
+      </p>
+      {helper && (
+        <p className="text-2xs text-ink-500 mt-0.5">{helper}</p>
+      )}
+    </div>
   );
 }
 

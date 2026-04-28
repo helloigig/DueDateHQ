@@ -8,6 +8,10 @@ export interface FirmSession {
   tier: "solo" | "pro" | "team";
   digestMode: "digest_8am" | "per_alert";
   signedInAt: string;
+  /** Onboarding Layer 1 completion (PRD §8.4 / IA §3.8). */
+  onboardingComplete?: boolean;
+  /** Primary states served (collected in Onboarding step "firm setup"). */
+  primaryStates?: string[];
 }
 
 const KEY = "duedatehq.session.v1";

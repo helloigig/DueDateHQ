@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, UserPlus, Upload, LogOut } from "lucide-react";
+import { Search, UserPlus, Upload, LogOut, FilePlus } from "lucide-react";
 import { AddClientModal } from "./AddClientModal";
 import { BellDropdown } from "./BellDropdown";
 import { CommandPaletteStub } from "./CommandPaletteStub";
@@ -91,16 +91,28 @@ export function TopBar() {
             <button
               onClick={() => {
                 setMenuOpen(false);
+                navigate("/clients");
+              }}
+              className="w-full text-left px-3 py-2 text-sm text-ink-700 hover:bg-sunken flex items-center gap-2"
+              title="Pick a client first, then add a task on their page"
+            >
+              <FilePlus className="w-4 h-4 text-ink-500" aria-hidden />
+              <span className="flex-1">New task</span>
+              <span className="text-2xs text-ink-400">via client</span>
+            </button>
+            <button
+              onClick={() => {
+                setMenuOpen(false);
                 navigate("/import");
               }}
               className="w-full text-left px-3 py-2 text-sm text-ink-700 hover:bg-sunken flex items-center gap-2"
             >
               <Upload className="w-4 h-4 text-ink-500" aria-hidden />
-              <span className="flex-1">Import clients (CSV)</span>
+              <span className="flex-1">Upload clients (CSV)</span>
             </button>
             <div className="border-t border-line my-1" />
             <p className="px-3 py-1.5 text-2xs text-ink-400">
-              Add a deadline from a client's page.
+              Tasks belong to a client. Open the client first, then add a deadline.
             </p>
           </div>
         )}

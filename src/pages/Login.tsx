@@ -1,31 +1,41 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Sparkles, ArrowRight } from "lucide-react";
 import { trpc } from "../lib/api/client";
 import { loginSchema } from "../types/schemas";
-import { signIn, type FirmSession } from "../data/session";
-import { AuthShell, AuthField, authInputClass } from "./auth/AuthShell";
+import { signIn } from "../data/session";
+import { actions } from "../data/store";
+import { authInputClass } from "./auth/AuthShell";
+import { SsoButton } from "../components/SsoButton";
 
-const TIERS: Array<{ id: FirmSession["tier"]; label: string; hint: string }> = [
-  { id: "solo", label: "Solo", hint: "1 user · up to 80 clients" },
-  { id: "pro", label: "Pro", hint: "1 user · unlimited clients" },
-  { id: "team", label: "Team", hint: "Up to 5 users · assignment" },
-];
-
+/**
+ * Sign-in — simplified to email + password (the firm is implicit from the
+ * account, not a field).
+ *
+ * Two untraditional affordances kept prominent:
+ *  - "Try the demo workspace" — for prospects who don't want to commit. Loads
+ *    the seed data (49 clients + alerts + prior facts) under a demo session.
+ *    PRD §3.17 onboarding option C.
+ *  - "Create a firm" CTA — first-class, not buried.
+ *
+ * SSO is intentionally absent (Phase 2 for Team tier per PRD §7.3 SOC 2 path).
+ */
 export function Login() {
   const navigate = useNavigate();
-  const [firmName, setFirmName] = useState("Mitchell CPA");
-  const [userName, setUserName] = useState("Sarah Mitchell");
   const [email, setEmail] = useState("sarah@mitchellcpa.com");
   const [password, setPassword] = useState("demo");
-  const [tier, setTier] = useState<FirmSession["tier"]>("solo");
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const login = trpc.auth.login.useMutation({
     onSuccess: () => {
-      // Mock-mode: persist locally so AppShell sees a session.
-      // Real backend will set HttpOnly cookies and the session hook refetches.
-      signIn({ firmName, userName, userEmail: email, tier });
+      // Wireframe: persist a demo session locally; production sets cookies.
+      signIn({
+        firmName: "Mitchell CPA",
+        userName: "Sarah Mitchell",
+        userEmail: email,
+        tier: "pro",
+      });
       navigate("/", { replace: true });
     },
     onError: (err) => setSubmitError(err.message),
@@ -47,100 +57,164 @@ export function Login() {
     login.mutate(parsed.data);
   };
 
+  const tryDemo = () => {
+    // Reset to seeds + sign in as Sarah with onboarding pre-completed,
+    // so the prospect lands directly on the dashboard.
+    actions.resetToSeeds();
+    signIn({
+      firmName: "Mitchell CPA (demo)",
+      userName: "Sarah Mitchell",
+      userEmail: "demo@duedatehq.com",
+      tier: "pro",
+    });
+    // Persist the onboardingComplete flag so they skip the wizard.
+    const raw = localStorage.getItem("duedatehq.session.v1");
+    if (raw) {
+      try {
+        const s = JSON.parse(raw);
+        s.onboardingComplete = true;
+        s.primaryStates = ["CA"];
+        localStorage.setItem("duedatehq.session.v1", JSON.stringify(s));
+      } catch {
+        /* ignore */
+      }
+    }
+    navigate("/", { replace: true });
+  };
+
   return (
-    <AuthShell
-      title="Sign in"
-      subtitle="Data persists to this browser only in the demo build."
-      footer={
-        <span>
-          New here?{" "}
+    <div className="min-h-screen bg-canvas flex items-center justify-center p-6">
+      <div className="w-full max-w-md">
+        <div className="bg-surface border border-line rounded-md p-8">
+          <Link to="/login" className="text-sm font-semibold text-ink-900">
+            DueDateHQ
+          </Link>
+          <h1 className="text-2xl font-semibold text-ink-900 mt-6">Sign in</h1>
+          <p className="text-sm text-ink-500 mt-1">
+            Welcome back. Wireframe build — credentials are pre-filled.
+          </p>
+
+          {/* SSO providers — wireframe shows the Phase 2 plan honestly.
+              The same OAuth surface that powers Method B inbound (PRD §7.4)
+              becomes the login. SAML SSO is Team-tier-only per PRD §7.3. */}
+          <div className="mt-6 grid grid-cols-2 gap-2">
+            <SsoButton provider="google" disabled />
+            <SsoButton provider="microsoft" disabled />
+          </div>
+          <p className="text-2xs text-ink-400 mt-2">
+            Sign-in with Google · Microsoft — Phase 2. Same OAuth that powers
+            Method B inbound mail routing.
+          </p>
+
+          <div className="my-5 flex items-center gap-3">
+            <span className="flex-1 h-px bg-line" />
+            <span className="text-2xs uppercase tracking-wider text-ink-400">
+              or with email
+            </span>
+            <span className="flex-1 h-px bg-line" />
+          </div>
+
+          <form onSubmit={onSubmit} className="space-y-3 text-sm">
+            <Field label="Email" error={errors.email}>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={authInputClass}
+                autoFocus
+              />
+            </Field>
+            <Field label="Password" error={errors.password}>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={authInputClass}
+              />
+            </Field>
+
+            {submitError && (
+              <div className="text-xs text-danger-ink bg-danger-bg border border-danger-border rounded px-3 py-2">
+                {submitError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <Link
+                to="/forgot-password"
+                className="text-xs text-ink-500 hover:text-ink-900"
+              >
+                Forgot password?
+              </Link>
+              <button
+                type="submit"
+                disabled={login.isPending}
+                className="text-sm px-4 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40"
+              >
+                {login.isPending ? "Signing in…" : "Sign in"}
+              </button>
+            </div>
+          </form>
+
+          <p className="text-2xs text-ink-400 mt-4 pt-4 border-t border-line">
+            <span className="font-medium text-ink-500">SAML SSO</span> ships with
+            Team tier (Phase 2, gated on SOC 2 Type II).
+          </p>
+        </div>
+
+        {/* Demo workspace — separate card, intentionally distinct from sign-in */}
+        <button
+          onClick={tryDemo}
+          className="w-full mt-3 bg-surface border border-line hover:border-accent rounded-md p-4 text-left transition-colors group"
+        >
+          <div className="flex items-start gap-3">
+            <span className="w-8 h-8 rounded-full bg-info-bg border border-info-border text-info-ink flex items-center justify-center shrink-0">
+              <Sparkles className="w-3.5 h-3.5" aria-hidden />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-ink-900">
+                Try the demo workspace
+              </p>
+              <p className="text-xs text-ink-500 mt-0.5">
+                49 fake clients, live state alert, 3 years of prior history.
+                No account, no email — just see how it works.
+              </p>
+            </div>
+            <ArrowRight
+              className="w-4 h-4 text-ink-400 mt-2 group-hover:text-ink-900 transition-colors"
+              aria-hidden
+            />
+          </div>
+        </button>
+
+        <p className="text-xs text-ink-500 mt-6 text-center">
+          New to DueDateHQ?{" "}
           <Link to="/signup" className="text-ink-900 underline">
             Create a firm
           </Link>
-        </span>
-      }
-    >
-      <form onSubmit={onSubmit} className="space-y-3 text-sm">
-        <AuthField label="Firm name">
-          <input
-            value={firmName}
-            onChange={(e) => setFirmName(e.target.value)}
-            className={authInputClass}
-            autoFocus
-          />
-        </AuthField>
-        <AuthField label="Your name">
-          <input
-            value={userName}
-            onChange={(e) => setUserName(e.target.value)}
-            className={authInputClass}
-          />
-        </AuthField>
-        <AuthField label="Email" error={errors.email}>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className={authInputClass}
-          />
-        </AuthField>
-        <AuthField label="Password" error={errors.password}>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className={authInputClass}
-          />
-        </AuthField>
-        <div>
-          <span className="text-xs font-medium text-ink-700 mb-1 block">
-            Plan tier
-          </span>
-          <div className="grid grid-cols-3 gap-2">
-            {TIERS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTier(t.id)}
-                className={`text-left px-3 py-2 rounded border text-xs ${
-                  tier === t.id
-                    ? "bg-accent text-canvas border-accent"
-                    : "bg-surface text-ink-700 border-line hover:bg-sunken"
-                }`}
-              >
-                <div className="font-medium">{t.label}</div>
-                <div
-                  className={tier === t.id ? "text-canvas/80" : "text-ink-500"}
-                >
-                  {t.hint}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
+          {" "}— 30-day trial, no credit card.
+        </p>
+      </div>
+    </div>
+  );
+}
 
-        {submitError && (
-          <div className="text-xs text-danger-ink bg-danger-bg border border-danger-border rounded px-3 py-2">
-            {submitError}
-          </div>
-        )}
-
-        <div className="flex items-center justify-between gap-2 pt-1">
-          <Link
-            to="/forgot-password"
-            className="text-xs text-ink-500 hover:text-ink-900"
-          >
-            Forgot password?
-          </Link>
-          <button
-            type="submit"
-            disabled={login.isPending}
-            className="text-sm px-3 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40"
-          >
-            {login.isPending ? "Signing in…" : "Continue"}
-          </button>
-        </div>
-      </form>
-    </AuthShell>
+function Field({
+  label,
+  children,
+  error,
+}: {
+  label: string;
+  children: React.ReactNode;
+  error?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs font-medium text-ink-700 mb-1 block">{label}</span>
+      {children}
+      {error && (
+        <span className="text-2xs text-danger-ink mt-1 block">{error}</span>
+      )}
+    </label>
   );
 }

@@ -8,8 +8,11 @@ export interface DashboardPreferences {
 }
 
 const DEFAULTS: DashboardPreferences = {
-  collapsed_sections: ["later"],
-  heatmap_visible: true,
+  // All calendar sections collapsed by default — the dashboard hero is now
+  // the focus + roll-ups. Users expand the calendar context when they want
+  // the wide view, not by default.
+  collapsed_sections: ["overdue", "this_month", "later"],
+  heatmap_visible: false,
 };
 
 const KEY = "duedatehq.dashboard_preferences.v1";

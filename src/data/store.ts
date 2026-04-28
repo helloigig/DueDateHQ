@@ -2,15 +2,23 @@ import { useSyncExternalStore } from "react";
 import type {
   ActivityEntry,
   ActivityType,
+  AiInsight,
   Announcement,
+  ChecklistItem,
   Client,
   ClientNote,
   Deadline,
   DeadlineStatus,
+  DocumentState,
+  EmailDraft,
   EntityType,
   ImportRecord,
+  ImportedFact,
   Notification,
+  ReminderTemplate,
   StateCode,
+  Task,
+  TaskStatus,
 } from "../types";
 import { clients as seedClients } from "./mockClients";
 import { deadlines as seedDeadlines } from "./mockDeadlines";
@@ -24,6 +32,12 @@ import {
   generateDeadlinesFromBundle,
   suggestBundleForEntity,
 } from "./bundles";
+import { buildTasksFromDeadlines } from "./mockTasks";
+import { buildChecklistsFromTasks } from "./mockChecklistItems";
+import { reminderTemplates as seedReminderTemplates } from "./mockReminderTemplates";
+import { importedFacts as seedImportedFacts } from "./mockImportedFacts";
+import { aiInsights as seedAiInsights } from "./mockAiInsights";
+import { emailDrafts as seedEmailDrafts } from "./mockEmailDrafts";
 
 interface State {
   clients: Client[];
@@ -31,17 +45,31 @@ interface State {
   announcements: Announcement[];
   notifications: Notification[];
   imports: ImportRecord[];
+  tasks: Task[];
+  checklistItems: ChecklistItem[];
+  reminderTemplates: ReminderTemplate[];
+  importedFacts: ImportedFact[];
+  aiInsights: AiInsight[];
+  emailDrafts: EmailDraft[];
 }
 
 const STORAGE_KEY = "duedatehq.store.v2";
 
 function seedState(): State {
+  const tasks = buildTasksFromDeadlines(seedDeadlines);
+  const checklistItems = buildChecklistsFromTasks(tasks);
   return {
     clients: seedClients,
     deadlines: seedDeadlines,
     announcements: seedAnnouncements,
     notifications: extraNotifications,
     imports: [],
+    tasks,
+    checklistItems,
+    reminderTemplates: seedReminderTemplates,
+    importedFacts: seedImportedFacts,
+    aiInsights: seedAiInsights,
+    emailDrafts: seedEmailDrafts,
   };
 }
 
@@ -58,6 +86,13 @@ function hydrate(): State {
       announcements: parsed.announcements ?? seeded.announcements,
       notifications: parsed.notifications ?? seeded.notifications,
       imports: parsed.imports ?? seeded.imports,
+      tasks: parsed.tasks ?? seeded.tasks,
+      checklistItems: parsed.checklistItems ?? seeded.checklistItems,
+      reminderTemplates:
+        parsed.reminderTemplates ?? seeded.reminderTemplates,
+      importedFacts: parsed.importedFacts ?? seeded.importedFacts,
+      aiInsights: parsed.aiInsights ?? seeded.aiInsights,
+      emailDrafts: parsed.emailDrafts ?? seeded.emailDrafts,
     };
   } catch {
     return seedState();
@@ -319,7 +354,14 @@ export const actions = {
       officialDueDate,
       status: "not_started",
     };
-    state = { ...state, deadlines: [...state.deadlines, newDeadline] };
+    const tasks = buildTasksFromDeadlines([newDeadline]);
+    const checklists = buildChecklistsFromTasks(tasks);
+    state = {
+      ...state,
+      deadlines: [...state.deadlines, newDeadline],
+      tasks: [...state.tasks, ...tasks],
+      checklistItems: [...state.checklistItems, ...checklists],
+    };
     appendActivity(
       clientId,
       "deadline_added",
@@ -438,12 +480,26 @@ export const actions = {
   },
 
   markAnnouncementRead(id: string) {
+    const ann = state.announcements.find((a) => a.id === id);
+    const wasUnread = ann && !ann.read;
     state = {
       ...state,
       announcements: state.announcements.map((a) =>
         a.id === id ? { ...a, read: true } : a
       ),
     };
+    // Audit-trail integration: when the CPA opens an alert that affects
+    // their clients, log it on each affected client's activity timeline.
+    // Liability follows the paper trail (the graduated must-read model).
+    if (wasUnread && ann && ann.affectedClientIds.length > 0) {
+      for (const clientId of ann.affectedClientIds) {
+        appendActivity(
+          clientId,
+          "ai_inferred",
+          `📖 ${currentUserName()} reviewed state alert: ${ann.stateCode}: ${ann.title}`
+        );
+      }
+    }
     emit();
   },
 
@@ -553,11 +609,15 @@ export const actions = {
       primaryState: client.primaryState,
       nexusStates,
     }).map((d) => ({ ...d, id: makeId("d") }));
+    const newTasks = buildTasksFromDeadlines(generated);
+    const newChecklists = buildChecklistsFromTasks(newTasks);
 
     state = {
       ...state,
       clients: [...state.clients, newClient],
       deadlines: [...state.deadlines, ...generated],
+      tasks: [...state.tasks, ...newTasks],
+      checklistItems: [...state.checklistItems, ...newChecklists],
     };
     emit();
     return id;
@@ -634,11 +694,15 @@ export const actions = {
       skippedCount: meta?.skippedCount ?? 0,
       undone: false,
     };
+    const bulkTasks = buildTasksFromDeadlines(generatedDeadlines);
+    const bulkChecklists = buildChecklistsFromTasks(bulkTasks);
     state = {
       ...state,
       clients: [...state.clients, ...newClients],
       deadlines: [...state.deadlines, ...generatedDeadlines],
       imports: [importRecord, ...state.imports],
+      tasks: [...state.tasks, ...bulkTasks],
+      checklistItems: [...state.checklistItems, ...bulkChecklists],
     };
     // Record real generated count for the import record
     importRecord.deadlineCount = generatedDeadlines.length;
@@ -745,6 +809,302 @@ export const actions = {
     };
     emit();
     return newOnes.length;
+  },
+
+  // -------- Layer 2-4 actions (Task / ChecklistItem / Email / AI insights) --------
+
+  /** Update a Task's status. Mirrored to the underlying Deadline. */
+  updateTaskStatus(taskId: string, status: TaskStatus) {
+    const t = state.tasks.find((x) => x.id === taskId);
+    if (!t) return;
+    state = {
+      ...state,
+      tasks: state.tasks.map((x) =>
+        x.id === taskId
+          ? {
+              ...x,
+              status,
+              completedAt: status === "completed" ? nowIso() : x.completedAt,
+              completedBy:
+                status === "completed" ? currentUserName() : x.completedBy,
+            }
+          : x
+      ),
+      deadlines: state.deadlines.map((d) =>
+        d.id === t.deadlineId ? { ...d, status: status as DeadlineStatus } : d
+      ),
+    };
+    appendActivity(
+      t.clientId,
+      "status_change",
+      `Task ${t.formType}: ${statusLabel(status as DeadlineStatus)}`,
+      t.deadlineId
+    );
+    emit();
+  },
+
+  /** Set a checklist item's state. Enforces PRD §5.3: only "cpa" actor may
+   *  promote to `received_confirmed`. AI/system writes silently fail. */
+  setChecklistItemState(
+    itemId: string,
+    next: DocumentState,
+    actor: "cpa" | "ai" | "system" = "cpa"
+  ) {
+    const item = state.checklistItems.find((c) => c.id === itemId);
+    if (!item) return;
+    if (next === "received_confirmed" && actor !== "cpa") {
+      // PRD §5.3 invariant: AI never auto-promotes to received_confirmed.
+      console.warn(
+        "[ddhq] §5.3 invariant: rejected non-CPA promotion to received_confirmed",
+        { itemId, actor }
+      );
+      return;
+    }
+    const task = state.tasks.find((t) => t.id === item.taskId);
+    state = {
+      ...state,
+      checklistItems: state.checklistItems.map((c) =>
+        c.id === itemId
+          ? {
+              ...c,
+              state: next,
+              confirmedAt:
+                next === "received_confirmed" ? nowIso() : c.confirmedAt,
+              confirmedBy:
+                next === "received_confirmed" ? currentUserName() : c.confirmedBy,
+              receivedAt:
+                next.startsWith("received_") && !c.receivedAt
+                  ? nowIso()
+                  : c.receivedAt,
+              flagReason: next === "received_issue" ? c.flagReason : undefined,
+            }
+          : c
+      ),
+    };
+    if (task) {
+      const summary =
+        next === "received_confirmed"
+          ? `Confirmed ${item.label}`
+          : next === "received_issue"
+          ? `Flagged ${item.label}`
+          : next === "requested_waiting"
+          ? `Sent reminder for ${item.label}`
+          : next === "received_unreviewed"
+          ? `Received ${item.label}`
+          : next === "not_applicable"
+          ? `Marked ${item.label} not applicable`
+          : `Reset ${item.label}`;
+      appendActivity(
+        task.clientId,
+        next === "received_confirmed"
+          ? "document_confirmed"
+          : next === "received_issue"
+          ? "document_flagged"
+          : next === "received_unreviewed"
+          ? "document_received"
+          : "checklist_state_change",
+        summary,
+        task.deadlineId
+      );
+    }
+    emit();
+  },
+
+  /** Simulate an inbound document arriving via Method A forwarding (PRD §5.7
+   *  Stage 3-4). AI classifies (Mode A) and runs anomaly check (Mode C).
+   *  State moves to `received_unreviewed` (or `received_issue` for severe
+   *  anomalies). Activity timeline records the inbound + AI inferences. */
+  receiveDocument(
+    itemId: string,
+    payload: {
+      filename: string;
+      aiClassification: string;
+      aiConfidence: "high" | "medium" | "low";
+      flagReason?: string;
+      flagSeverity?: "low" | "medium" | "high";
+    }
+  ) {
+    const item = state.checklistItems.find((c) => c.id === itemId);
+    if (!item) return;
+    const task = state.tasks.find((t) => t.id === item.taskId);
+    const next =
+      payload.flagSeverity === "high" ? "received_issue" : "received_unreviewed";
+    state = {
+      ...state,
+      checklistItems: state.checklistItems.map((c) =>
+        c.id === itemId
+          ? {
+              ...c,
+              state: next,
+              receivedAt: nowIso(),
+              receivedFilename: payload.filename,
+              aiClassification: payload.aiClassification,
+              aiConfidence: payload.aiConfidence,
+              flagReason: payload.flagReason,
+              flagSeverity: payload.flagSeverity,
+            }
+          : c
+      ),
+    };
+    if (task) {
+      appendActivity(
+        task.clientId,
+        "document_received",
+        `📄 Received: ${payload.filename} — AI classified as ${payload.aiClassification} (${payload.aiConfidence})`,
+        task.deadlineId
+      );
+      if (payload.flagReason) {
+        appendActivity(
+          task.clientId,
+          "document_flagged",
+          `⚠️ Mode C flag: ${payload.flagReason}`,
+          task.deadlineId
+        );
+      }
+    }
+    emit();
+  },
+
+  /** Append a custom checklist item to a Task. */
+  addChecklistItem(taskId: string, label: string, itemType: string) {
+    const task = state.tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const order =
+      Math.max(
+        0,
+        ...state.checklistItems
+          .filter((c) => c.taskId === taskId)
+          .map((c) => c.order)
+      ) + 1;
+    const newItem: ChecklistItem = {
+      id: makeId("ci"),
+      taskId,
+      label,
+      itemType,
+      state: "not_requested",
+      order,
+      custom: true,
+    };
+    state = {
+      ...state,
+      checklistItems: [...state.checklistItems, newItem],
+    };
+    appendActivity(
+      task.clientId,
+      "checklist_state_change",
+      `Added custom item: ${label}`,
+      task.deadlineId
+    );
+    emit();
+    return newItem.id;
+  },
+
+  /** Persist an email draft (status="draft"). */
+  saveEmailDraft(d: Omit<EmailDraft, "id" | "createdAt" | "status"> & {
+    id?: string;
+    status?: EmailDraft["status"];
+  }) {
+    const id = d.id ?? makeId("ed");
+    const draft: EmailDraft = {
+      ...d,
+      id,
+      createdAt: nowIso(),
+      status: d.status ?? "draft",
+    };
+    state = {
+      ...state,
+      emailDrafts: [draft, ...state.emailDrafts.filter((x) => x.id !== id)],
+    };
+    emit();
+    return id;
+  },
+
+  /** Mark a draft sent. Appends an activity entry on the linked client. */
+  sendEmail(draftId: string) {
+    const draft = state.emailDrafts.find((d) => d.id === draftId);
+    if (!draft) return;
+    state = {
+      ...state,
+      emailDrafts: state.emailDrafts.map((d) =>
+        d.id === draftId
+          ? { ...d, status: "sent" as const, sentAt: nowIso() }
+          : d
+      ),
+    };
+    const task = state.tasks.find((t) => t.id === draft.taskId);
+    if (task) {
+      // If this email was tied to a checklist item, flip that item to
+      // requested_waiting (Mode D send → state transition).
+      if (draft.checklistItemId) {
+        state = {
+          ...state,
+          checklistItems: state.checklistItems.map((c) =>
+            c.id === draft.checklistItemId
+              ? {
+                  ...c,
+                  state:
+                    c.state === "not_requested" ? "requested_waiting" : c.state,
+                  lastReminderAt: nowIso(),
+                }
+              : c
+          ),
+        };
+      }
+      appendActivity(
+        task.clientId,
+        "email_sent",
+        `Sent: ${draft.subject}`,
+        task.deadlineId
+      );
+    }
+    emit();
+  },
+
+  /** Discard an unsent draft. */
+  discardEmailDraft(draftId: string) {
+    state = {
+      ...state,
+      emailDrafts: state.emailDrafts.map((d) =>
+        d.id === draftId ? { ...d, status: "discarded" as const } : d
+      ),
+    };
+    emit();
+  },
+
+  /** Resolve a Mode E AI insight. */
+  resolveInsight(
+    insightId: string,
+    action: "ask_client" | "schedule_advisory" | "mark_known" | "snooze"
+  ) {
+    const insight = state.aiInsights.find((i) => i.id === insightId);
+    if (!insight) return;
+    const next =
+      action === "snooze" ? ("snoozed" as const) : ("resolved" as const);
+    state = {
+      ...state,
+      aiInsights: state.aiInsights.map((i) =>
+        i.id === insightId ? { ...i, status: next } : i
+      ),
+    };
+    appendActivity(
+      insight.clientId,
+      "ai_inferred",
+      `Mode E insight: ${action.replace(/_/g, " ")} — "${insight.title}"`
+    );
+    emit();
+  },
+
+  /** Update a reminder template (custom only — system templates can be
+   *  cloned, never directly edited). Wireframe simplification: we let
+   *  edits proceed and just log the change. */
+  updateReminderTemplate(id: string, patch: Partial<ReminderTemplate>) {
+    state = {
+      ...state,
+      reminderTemplates: state.reminderTemplates.map((t) =>
+        t.id === id ? { ...t, ...patch } : t
+      ),
+    };
+    emit();
   },
 
   unassignBundle(clientId: string, bundleId: string) {
