@@ -56,6 +56,8 @@ export interface ActivityEntry {
   relatedDeadlineId?: string;
 }
 
+export type ClientTier = "premium" | "standard" | "custom";
+
 export interface Client {
   id: string;
   name: string;
@@ -65,6 +67,7 @@ export interface Client {
   contactEmail: string;
   contactPhone?: string;
   status: ClientStatus;
+  tier: ClientTier;
   addedAt: string;
   servicePackages: string[];
   county?: string;

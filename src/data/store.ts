@@ -506,6 +506,7 @@ export const actions = {
       | "id"
       | "addedAt"
       | "status"
+      | "tier"
       | "servicePackages"
       | "nexusStates"
       | "noteEntries"
@@ -513,6 +514,7 @@ export const actions = {
     > & {
       nexusStates?: Client["nexusStates"];
       servicePackage?: string;
+      tier?: Client["tier"];
     }
   ) {
     const id = makeId("c-new");
@@ -532,6 +534,7 @@ export const actions = {
       contactEmail: client.contactEmail,
       contactPhone: client.contactPhone,
       status: "active",
+      tier: client.tier ?? "standard",
       addedAt: now,
       servicePackages: [packageName],
       noteEntries: [],
@@ -567,6 +570,7 @@ export const actions = {
         | "id"
         | "addedAt"
         | "status"
+        | "tier"
         | "servicePackages"
         | "nexusStates"
         | "noteEntries"
@@ -574,6 +578,7 @@ export const actions = {
       > & {
         nexusStates?: Client["nexusStates"];
         servicePackage?: string;
+        tier?: Client["tier"];
       }
     >,
     meta?: { source?: string; skippedCount?: number }
@@ -605,6 +610,7 @@ export const actions = {
         contactEmail: c.contactEmail,
         contactPhone: c.contactPhone,
         status: "active" as const,
+        tier: c.tier ?? "standard",
         addedAt: now,
         servicePackages: [packageName],
         noteEntries: [],

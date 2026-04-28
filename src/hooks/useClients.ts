@@ -6,6 +6,8 @@ export interface ClientFilters {
   state?: string[];
   entityType?: string[];
   status?: string[];
+  tier?: string[];
+  servicePackage?: string[];
   hasDeadlineThisWeek?: boolean;
 }
 
