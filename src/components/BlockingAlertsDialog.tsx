@@ -69,7 +69,7 @@ export function BlockingAlertsDialog({
                   </div>
                 </div>
                 <Link
-                  to={`/announcements/${a.id}`}
+                  to={`/alerts/${a.id}`}
                   onClick={onClose}
                   className="text-sm px-3 py-1.5 rounded bg-slate-900 text-white hover:bg-slate-800 shrink-0"
                 >

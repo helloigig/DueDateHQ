@@ -107,22 +107,47 @@ export type AnnouncementType =
   | "rate_change"
   | "nexus_change";
 
+export type TaxType =
+  | "income"
+  | "sales_use"
+  | "franchise"
+  | "payroll"
+  | "property"
+  | "excise"
+  | "multiple";
+
+export type SourceAuthority = "primary" | "editorial" | "briefing";
+
+export type AIConfidence = "high" | "medium" | "low";
+
 export interface Announcement {
   id: string;
   stateCode: StateCode;
   authority: string;
   title: string;
   summary: string;
-  publishedDate: string;
+
+  issuanceDate: string;
+  effectiveDate?: string;
   detectedAt: string;
+
   type: AnnouncementType;
-  confidence: "high" | "medium" | "low";
+  taxType: TaxType;
+  retroactive: boolean;
+
   counties: string[];
   entityTypes: EntityType[];
   taxTypes: string[];
   oldDeadline?: string;
   newDeadline?: string;
+
   sourceUrl: string;
+  sourceAuthority: SourceAuthority;
+  relatedAnnouncementIds: string[];
+
+  parseConfidence: AIConfidence;
+  matchConfidence: AIConfidence;
+
   affectedClientIds: string[];
   read: boolean;
   dismissed: boolean;

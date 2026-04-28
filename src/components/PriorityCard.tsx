@@ -151,7 +151,7 @@ export function PriorityCard({
                 </div>
               </div>
               <Link
-                to={`/announcements/${item.alert.id}`}
+                to={`/alerts/${item.alert.id}`}
                 className="text-sm font-medium px-2.5 py-1 rounded-md bg-accent text-canvas hover:bg-accent-hover flex items-center gap-1"
               >
                 Review

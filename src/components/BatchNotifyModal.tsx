@@ -34,7 +34,7 @@ export function BatchNotifyModal({
     return (
       `Hi {client_name},\n\n` +
       `${announcement.authority} issued "${announcement.title}" on ${formatLongDate(
-        announcement.publishedDate
+        announcement.issuanceDate
       )} and it affects your filings.\n\n` +
       `${newLine}\n\n` +
       `No action is required from you right now — we're adjusting your calendar automatically. Reply if you have questions.\n\n` +

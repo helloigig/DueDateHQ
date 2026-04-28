@@ -433,7 +433,7 @@ export const mockAdapter = {
           detail: `${a.affectedClientIds.length} client${
             a.affectedClientIds.length === 1 ? "" : "s"
           } affected · ${a.authority}`,
-          href: `/announcements/${a.id}`,
+          href: `/alerts/${a.id}`,
           read: a.read,
           announcementId: a.id,
         }));
