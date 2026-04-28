@@ -5,8 +5,6 @@ import {
   AlertCircle,
   Megaphone,
   ChevronRight,
-  ChevronDown,
-  ChevronUp,
   Clock,
   X,
   type LucideIcon,
@@ -23,9 +21,11 @@ import { actions } from "../data/store";
 type Tone = "danger" | "warn" | "info";
 
 function toneFor(type: Announcement["type"], tier: EscalationTier): Tone {
+  // Reserve danger only for escalated (>72h unactioned). Fresh state alerts
+  // are info — they're news, not crises. PRD §1.6 calm-framing principle.
   if (tier === "escalated") return "danger";
-  if (type === "disaster_extension") return "danger";
-  if (type === "pte_change" || type === "penalty_relief") return "warn";
+  if (type === "disaster_extension" && tier !== "fresh") return "warn";
+  if (type === "pte_change" || type === "penalty_relief") return "info";
   return "info";
 }
 
@@ -62,34 +62,33 @@ export function AnnouncementBanner({
 }: {
   announcements: Announcement[];
 }) {
-  const [expanded, setExpanded] = useState(false);
+  // Show ONLY the most-urgent unread alert as a banner. The rest live in the
+  // bell dropdown + /announcements page. Multi-alert in a banner is noise —
+  // research suggests CPAs want one anchor, not a stack.
   if (announcements.length === 0) return null;
-  const [head, ...rest] = announcements;
+  // Sort by escalation tier first, then by detectedAt (newest first)
+  const sorted = [...announcements].sort((a, b) => {
+    const aTier = escalationTier(hoursSince(a.detectedAt));
+    const bTier = escalationTier(hoursSince(b.detectedAt));
+    const order = ["blocking", "escalated", "reminder", "fresh"];
+    const aRank = order.indexOf(aTier);
+    const bRank = order.indexOf(bTier);
+    if (aRank !== bRank) return aRank - bRank;
+    return b.detectedAt.localeCompare(a.detectedAt);
+  });
+  const [head] = sorted;
+  const restCount = sorted.length - 1;
 
   return (
     <div className="space-y-2">
       <BannerCard ann={head} />
-
-      {rest.length > 0 && !expanded && (
-        <button
-          onClick={() => setExpanded(true)}
-          className="w-full text-left text-xs text-ink-500 hover:text-ink-900 px-2 flex items-center gap-1"
+      {restCount > 0 && (
+        <Link
+          to="/announcements"
+          className="block text-2xs text-ink-500 hover:text-ink-900 px-1 flex items-center gap-1"
         >
-          <ChevronDown className="w-3 h-3" aria-hidden />
-          {rest.length} more alert{rest.length === 1 ? "" : "s"}
-        </button>
-      )}
-
-      {expanded && rest.map((a) => <BannerCard key={a.id} ann={a} />)}
-
-      {expanded && (
-        <button
-          onClick={() => setExpanded(false)}
-          className="w-full text-left text-xs text-ink-500 hover:text-ink-900 px-2 flex items-center gap-1"
-        >
-          <ChevronUp className="w-3 h-3" aria-hidden />
-          Collapse
-        </button>
+          + {restCount} more state {restCount === 1 ? "alert" : "alerts"} in the bell + Alerts feed
+        </Link>
       )}
     </div>
   );
@@ -118,39 +117,56 @@ function BannerCard({ ann }: { ann: Announcement }) {
     );
   }
 
+  // Build the AI-match reason — explains *why* DDHQ thinks these clients are
+  // affected, so the CPA isn't trusting an opaque count.
+  const matchReason = matchReasonFor(ann);
+
   return (
     <div className={`border rounded-md px-4 py-3 transition-colors ${TONE_CLASSES[tone]}`}>
-      <div className="flex items-center gap-3">
-        <Icon className="w-4 h-4 shrink-0" aria-hidden />
+      <div className="flex items-start gap-3">
+        <Icon className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
         <div className="flex-1 min-w-0">
           <Link
             to={`/announcements/${ann.id}`}
             className="block hover:underline"
           >
             <div className="text-sm font-medium">
-              {ann.affectedClientIds.length} client
-              {ann.affectedClientIds.length === 1 ? "" : "s"} affected ·{" "}
               {ann.stateCode}: {ann.title}
             </div>
           </Link>
-          {escCopy ? (
-            <div className={`text-xs mt-0.5 font-medium flex items-center gap-1 ${TONE_SUB_CLASSES[tone]}`}>
+          <div className={`text-xs mt-1 flex items-center flex-wrap gap-x-2 gap-y-0.5 ${TONE_SUB_CLASSES[tone]}`}>
+            <span>
+              <span className="font-semibold">
+                {ann.affectedClientIds.length} of yours
+              </span>
+              {" "}affected
+            </span>
+            {matchReason && (
+              <>
+                <span className="opacity-50">·</span>
+                <span className="opacity-80">{matchReason}</span>
+              </>
+            )}
+            {ann.newDeadline && (
+              <>
+                <span className="opacity-50">·</span>
+                <span>new deadline {formatLongDate(ann.newDeadline)}</span>
+              </>
+            )}
+          </div>
+          {escCopy && (
+            <div className={`text-xs mt-1 font-medium flex items-center gap-1 ${TONE_SUB_CLASSES[tone]}`}>
               <Clock className="w-3 h-3" aria-hidden />
               {escCopy}
             </div>
-          ) : (
-            ann.newDeadline && (
-              <div className={`text-xs mt-0.5 ${TONE_SUB_CLASSES[tone]}`}>
-                New deadline: {formatLongDate(ann.newDeadline)}
-              </div>
-            )
           )}
         </div>
         <Link
           to={`/announcements/${ann.id}`}
-          className={`text-sm font-medium flex items-center gap-1 shrink-0 px-2 py-1 rounded hover:bg-surface/60 ${TONE_SUB_CLASSES[tone]}`}
+          className={`text-sm font-medium flex items-center gap-1 shrink-0 px-2.5 py-1 rounded hover:bg-surface/60 ${TONE_SUB_CLASSES[tone]}`}
+          title="Review affected clients and apply the new deadline"
         >
-          Review
+          Review affected
           <ChevronRight className="w-4 h-4" aria-hidden />
         </Link>
         <button
@@ -163,4 +179,19 @@ function BannerCard({ ann }: { ann: Announcement }) {
       </div>
     </div>
   );
+}
+
+/** Build a short "why these clients" explanation for the banner. Sources
+ *  the announcement's parsed-impact (county / entity / tax filters) so the
+ *  CPA sees the AI's reasoning, not an opaque match count. */
+function matchReasonFor(ann: Announcement): string | null {
+  const parts: string[] = [];
+  if (ann.counties.length === 1) parts.push(`${ann.counties[0]} County`);
+  else if (ann.counties.length > 1)
+    parts.push(`${ann.counties.length} counties`);
+  if (ann.entityTypes.length === 1) parts.push(ann.entityTypes[0]);
+  else if (ann.entityTypes.length > 1)
+    parts.push(`${ann.entityTypes.length} entity types`);
+  if (parts.length === 0) return null;
+  return `matched on ${parts.join(" + ")}`;
 }

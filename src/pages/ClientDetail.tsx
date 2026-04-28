@@ -5,9 +5,14 @@ import {
   useParams,
   useSearchParams,
 } from "react-router-dom";
-import { actions } from "../data/store";
+import { actions, useStore } from "../data/store";
 import { useClient } from "../hooks/useClients";
 import { useDeadlinesForClient } from "../hooks/useDeadlines";
+import { useTasksForClient } from "../hooks/useTasks";
+import {
+  useAiInsightsForClient,
+  useImportedFactsForClient,
+} from "../hooks/useAiInsights";
 import { PageSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
 import { bucketOf, formatLongDate, parseDate, TODAY } from "../data/dateHelpers";
@@ -30,7 +35,7 @@ import type {
   Deadline,
 } from "../types";
 
-type Tab = "deadlines" | "notes" | "contacts" | "activity";
+type Tab = "deadlines" | "documents" | "history" | "notes" | "contacts" | "activity";
 
 export function ClientDetail() {
   const { id } = useParams<{ id: string }>();
@@ -197,10 +202,14 @@ export function ClientDetail() {
         </button>
       </div>
 
-      <div className="mt-5 border-b border-slate-200 flex gap-1">
+      <ClientAiInsightsCard clientId={client.id} />
+
+      <div className="mt-5 border-b border-slate-200 flex gap-1 flex-wrap">
         {(
           [
-            ["deadlines", `Deadlines (${clientDeadlines.length})`],
+            ["deadlines", `Tasks (${clientDeadlines.filter((d) => d.status !== "completed" && d.status !== "filed_extension").length})`],
+            ["documents", "Documents"],
+            ["history", `History (${clientDeadlines.filter((d) => d.status === "completed" || d.status === "filed_extension").length})`],
             ["notes", `Notes${client.noteEntries?.length ? ` (${client.noteEntries.length})` : ""}`],
             ["contacts", "Contacts"],
             ["activity", `Activity${client.activity?.length ? ` (${client.activity.length})` : ""}`],
@@ -231,6 +240,10 @@ export function ClientDetail() {
             allDeadlines={clientDeadlines}
             onAddDeadline={() => setAddDeadlineOpen(true)}
           />
+        )}
+        {tab === "documents" && <DocumentsTab client={client} />}
+        {tab === "history" && (
+          <HistoryTab client={client} deadlines={clientDeadlines} />
         )}
         {tab === "notes" && <NotesTab client={client} />}
         {tab === "contacts" && <ContactsTab client={client} />}
@@ -670,6 +683,13 @@ const ACTIVITY_ICONS: Record<ActivityType, string> = {
   batch_adjust: "⇄",
   note_added: "📝",
   bundle_assigned: "🏷",
+  email_sent: "📤",
+  email_received: "📥",
+  document_received: "📄",
+  document_confirmed: "✔",
+  document_flagged: "⚠",
+  ai_inferred: "🤖",
+  checklist_state_change: "•",
 };
 
 function ActivityTab({ client }: { client: Client }) {
@@ -884,5 +904,307 @@ function BundleManager({ client }: { client: Client }) {
         }}
       />
     </>
+  );
+}
+
+/**
+ * Compact Mode B/E summary card on the client header. Click to expand
+ * for the full insights panel. Cold-start fallback per PRD §4.2.
+ */
+function ClientAiInsightsCard({ clientId }: { clientId: string }) {
+  const insights = useAiInsightsForClient(clientId);
+  const facts = useImportedFactsForClient(clientId);
+  const open = insights.filter((i) => i.status === "open");
+
+  // Layer B advisory triggers — derive from Mode E. Tag insights by
+  // category for visual grouping. PRD §4.4 Layer B.
+  const advisoryTriggers = open.filter((i) => i.mode === "E");
+  // Churn-risk early warning — derive from heuristics on response patterns
+  // and declined-advisory flags. Wireframe-grade: a stub heuristic that
+  // counts as "at risk" when the client has open insights AND no recent
+  // confirmed activity. Real implementation reads ImportedFact + activity.
+  const churnRiskScore = computeChurnRiskScore(clientId, open.length);
+  const showChurnRisk = churnRiskScore >= 2;
+
+  if (open.length === 0 && facts.length === 0 && !showChurnRisk) {
+    return (
+      <div className="mt-4 bg-blue-50 border border-blue-200 rounded-md px-4 py-2 text-xs text-blue-900">
+        AI insights unlock once you import a prior-year return for this client.
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 space-y-2">
+      {/* Layer B: advisory triggers (Mode E) — these are the "wages doubled
+          → 401k convo" / "Schedule E disappeared → did the property sell?"
+          surfaces. The lever for moving from preparer to advisor (Pattern 4). */}
+      {advisoryTriggers.length > 0 && (
+        <div className="bg-info-bg/40 border border-info-border rounded-md overflow-hidden">
+          <header className="px-4 py-2 border-b border-info-border bg-info-bg/60 flex items-center gap-2">
+            <span className="text-2xs uppercase tracking-wider text-info-ink font-semibold">
+              Advisory opportunities
+            </span>
+            <span className="text-2xs text-info-ink/70">
+              Mode E · {advisoryTriggers.length} open · Layer B
+            </span>
+          </header>
+          <ul className="divide-y divide-info-border/40">
+            {advisoryTriggers.slice(0, 4).map((i) => (
+              <li key={i.id} className="px-4 py-2.5">
+                <p className="text-sm text-ink-900 font-medium">{i.title}</p>
+                <p className="text-xs text-ink-700 mt-0.5">{i.detail}</p>
+                <p className="text-2xs italic text-info-ink/80 mt-1">
+                  This is the kind of opportunity advisory work is built on.
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Layer B: churn risk — early-warning surface so the partner can
+          schedule a check-in BEFORE the client leaves quietly. */}
+      {showChurnRisk && (
+        <div className="bg-warn-bg/40 border border-warn-border rounded-md px-4 py-3">
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xs uppercase tracking-wider text-warn-ink font-semibold">
+              Churn risk
+            </span>
+            <span className="text-2xs text-warn-ink/70">
+              {churnRiskScore >= 4 ? "high" : "elevated"} · Layer B
+            </span>
+          </div>
+          <p className="text-sm text-ink-900 font-medium mt-1">
+            Schedule a check-in
+          </p>
+          <p className="text-xs text-ink-700 mt-0.5">
+            {churnRiskSignals(churnRiskScore)}
+          </p>
+        </div>
+      )}
+
+      {/* Mode B / aggregated facts — shown only if no advisory items, since
+          they're more ambient than actionable. */}
+      {advisoryTriggers.length === 0 && facts.length > 0 && (
+        <div className="bg-surface border border-line rounded-md px-4 py-2 text-xs text-ink-500">
+          {facts.length} prior-year facts imported · personalised AI active.
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Wireframe heuristic for churn risk. Real implementation per PRD §4.4
+ *  Layer B uses response-time trends + declined-advisory count + reduced
+ *  service-package count. Here we stub it deterministically off clientId. */
+function computeChurnRiskScore(clientId: string, openInsightCount: number): number {
+  // Use a deterministic per-client seed so demo is stable.
+  const seed = clientId
+    .split("")
+    .reduce((a, c) => a + c.charCodeAt(0), 0);
+  const base = seed % 5; // 0..4
+  return base + (openInsightCount > 1 ? 1 : 0);
+}
+
+function churnRiskSignals(score: number): string {
+  if (score >= 4)
+    return "Response time slowed 60% over 3 months · declined last 2 advisory suggestions · dropped 2 services last year. Strong signal — reach out this week.";
+  if (score >= 3)
+    return "Response time slowed · declined a recent advisory suggestion. Soft signal — worth a quick check-in.";
+  return "Slight pattern change in engagement. Keep an eye on it.";
+}
+
+/**
+ * Documents tab — IA §3.3. Longitudinal table: rows = document types,
+ * columns = tax years. Each cell shows whether the doc was received in
+ * that year. Powers the "did we have this last year" Mode E surface.
+ */
+function DocumentsTab({ client }: { client: Client }) {
+  const facts = useImportedFactsForClient(client.id);
+  const tasks = useTasksForClient(client.id);
+  const checklistsByTaskId = useStore().checklistItems;
+  const currentYear = new Date().getFullYear();
+
+  // Collect all item types seen across prior facts + current checklists
+  const allTypes = new Map<string, string>(); // itemType -> nice label
+  for (const f of facts) {
+    if (!allTypes.has(f.itemType)) {
+      allTypes.set(f.itemType, f.itemType.replace(/_/g, " "));
+    }
+  }
+  for (const ci of checklistsByTaskId) {
+    if (!tasks.some((t) => t.id === ci.taskId)) continue;
+    if (!allTypes.has(ci.itemType)) {
+      allTypes.set(ci.itemType, ci.label);
+    }
+  }
+  const types = Array.from(allTypes.entries());
+
+  // Years: current + 3 priors
+  const years = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3];
+
+  if (types.length === 0) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-lg p-6 text-center text-sm text-slate-500">
+        No document history yet.
+        <p className="mt-1 text-xs">
+          Connect QuickBooks or import a prior-year return to populate this view.
+        </p>
+      </div>
+    );
+  }
+
+  function cellFor(itemType: string, year: number): "received" | "missing" | "current" {
+    if (year === currentYear) {
+      // From current task checklists
+      const current = checklistsByTaskId.find(
+        (ci) =>
+          ci.itemType === itemType &&
+          tasks.some((t) => t.id === ci.taskId) &&
+          (ci.state === "received_confirmed" ||
+            ci.state === "received_unreviewed" ||
+            ci.state === "received_issue")
+      );
+      return current ? "current" : "missing";
+    }
+    const had = facts.some((f) => f.itemType === itemType && f.year === year);
+    return had ? "received" : "missing";
+  }
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-200">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-700">
+          Documents · longitudinal view
+        </h3>
+        <p className="text-xs text-slate-500 mt-1">
+          Rows are document types. Columns are tax years. Highlights gaps where
+          last year had a doc and this year doesn't (Mode E).
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="text-left px-4 py-2 text-xs uppercase tracking-wider text-slate-500 font-semibold w-1/3">
+                Document
+              </th>
+              {years.map((y) => (
+                <th
+                  key={y}
+                  className="text-center px-4 py-2 text-xs uppercase tracking-wider text-slate-500 font-semibold"
+                >
+                  {y === currentYear ? `${y} (current)` : y}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {types.map(([itemType, label]) => (
+              <tr key={itemType}>
+                <td className="px-4 py-2 text-slate-900 capitalize">{label}</td>
+                {years.map((y) => {
+                  const c = cellFor(itemType, y);
+                  return (
+                    <td key={y} className="px-4 py-2 text-center">
+                      {c === "received" && (
+                        <span className="text-emerald-700">●</span>
+                      )}
+                      {c === "current" && (
+                        <span className="text-blue-600">●</span>
+                      )}
+                      {c === "missing" && (
+                        <span className="text-slate-300">○</span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="px-4 py-2 text-2xs text-slate-400 border-t border-slate-200 flex items-center gap-3">
+        <span>
+          <span className="text-emerald-700">●</span> received (prior)
+        </span>
+        <span>
+          <span className="text-blue-600">●</span> received (this year)
+        </span>
+        <span>
+          <span className="text-slate-300">○</span> missing
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * History tab — completed deadlines and prior-year deliverables. Closed
+ * tasks listed by date.
+ */
+function HistoryTab({
+  client,
+  deadlines,
+}: {
+  client: Client;
+  deadlines: Deadline[];
+}) {
+  const closed = deadlines
+    .filter((d) => d.status === "completed" || d.status === "filed_extension")
+    .sort((a, b) => b.officialDueDate.localeCompare(a.officialDueDate));
+
+  if (closed.length === 0) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-lg p-6 text-center text-sm text-slate-500">
+        No closed tasks for {client.name} yet.
+      </div>
+    );
+  }
+
+  // Group by year
+  const byYear = new Map<number, Deadline[]>();
+  for (const d of closed) {
+    const y = parseDate(d.officialDueDate).getFullYear();
+    if (!byYear.has(y)) byYear.set(y, []);
+    byYear.get(y)!.push(d);
+  }
+  const years = Array.from(byYear.keys()).sort((a, b) => b - a);
+
+  return (
+    <div className="space-y-4">
+      {years.map((year) => (
+        <div
+          key={year}
+          className="bg-white border border-slate-200 rounded-lg overflow-hidden"
+        >
+          <header className="px-4 py-2 border-b border-slate-200 bg-slate-50">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-700">
+              {year} ({byYear.get(year)!.length})
+            </h3>
+          </header>
+          <ul className="divide-y divide-slate-100">
+            {byYear.get(year)!.map((d) => (
+              <li
+                key={d.id}
+                className="px-4 py-2.5 flex items-center justify-between text-sm"
+              >
+                <Link
+                  to={`/clients/${client.id}/tasks/t-${d.id}`}
+                  className="text-slate-900 hover:underline"
+                >
+                  {d.form}
+                </Link>
+                <div className="flex items-center gap-3 text-xs text-slate-500">
+                  <span>{d.officialDueDate}</span>
+                  <span className="capitalize">{d.status.replace(/_/g, " ")}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
   );
 }

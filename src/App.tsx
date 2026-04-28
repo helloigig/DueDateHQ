@@ -3,6 +3,8 @@ import { AppShell } from "./components/AppShell";
 import { Dashboard } from "./pages/Dashboard";
 import { Clients } from "./pages/Clients";
 import { ClientDetail } from "./pages/ClientDetail";
+import { TaskDetail } from "./pages/TaskDetail";
+import { Inbox } from "./pages/Inbox";
 import { AnnouncementList } from "./pages/AnnouncementList";
 import { AnnouncementDetail } from "./pages/AnnouncementDetail";
 import { Import } from "./pages/Import";
@@ -13,6 +15,13 @@ import { Signup } from "./pages/auth/Signup";
 import { AcceptInvite } from "./pages/auth/AcceptInvite";
 import { ForgotPassword } from "./pages/auth/ForgotPassword";
 import { ResetPassword } from "./pages/auth/ResetPassword";
+import { OnboardingFirm } from "./pages/onboarding/OnboardingFirm";
+import { OnboardingChoosePath } from "./pages/onboarding/OnboardingChoosePath";
+import { OnboardingManual } from "./pages/onboarding/OnboardingManual";
+import { OnboardingDemo } from "./pages/onboarding/OnboardingDemo";
+import { OnboardingImport } from "./pages/onboarding/OnboardingImport";
+import { OnboardingPackages } from "./pages/onboarding/OnboardingPackages";
+import { OnboardingDone } from "./pages/onboarding/OnboardingDone";
 import { SessionProvider } from "./lib/session-provider";
 import { useSession } from "./data/session";
 
@@ -28,6 +37,22 @@ export default function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
 
+      {/* Onboarding wizard — wizard chrome, no sidebar (IA §3.8) */}
+      {localSession && (
+        <>
+          <Route path="/onboarding/firm" element={<OnboardingFirm />} />
+          <Route
+            path="/onboarding/choose-path"
+            element={<OnboardingChoosePath />}
+          />
+          <Route path="/onboarding/import" element={<OnboardingImport />} />
+          <Route path="/onboarding/manual" element={<OnboardingManual />} />
+          <Route path="/onboarding/demo" element={<OnboardingDemo />} />
+          <Route path="/onboarding/packages" element={<OnboardingPackages />} />
+          <Route path="/onboarding/done" element={<OnboardingDone />} />
+        </>
+      )}
+
       {/* Protected app routes */}
       {localSession ? (
         <Route
@@ -38,8 +63,10 @@ export default function App() {
           }
         >
           <Route index element={<Dashboard />} />
+          <Route path="inbox" element={<Inbox />} />
           <Route path="clients" element={<Clients />} />
           <Route path="clients/:id" element={<ClientDetail />} />
+          <Route path="clients/:id/tasks/:taskId" element={<TaskDetail />} />
           <Route path="announcements" element={<AnnouncementList />} />
           <Route path="announcements/:id" element={<AnnouncementDetail />} />
           <Route path="import" element={<Import />} />
