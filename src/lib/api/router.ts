@@ -74,6 +74,8 @@ export const appRouter = t.router({
           state: z.array(z.string()).optional(),
           entityType: z.array(z.string()).optional(),
           status: z.array(z.string()).optional(),
+          tier: z.array(z.string()).optional(),
+          servicePackage: z.array(z.string()).optional(),
           hasDeadlineThisWeek: z.boolean().optional(),
           assigneeId: z.string().optional(),
           cursor: z.string().optional(),

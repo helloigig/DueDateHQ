@@ -135,6 +135,8 @@ export const mockAdapter = {
       state?: string[];
       entityType?: string[];
       status?: string[];
+      tier?: string[];
+      servicePackage?: string[];
       hasDeadlineThisWeek?: boolean;
     } = {}) => {
       await delay();
@@ -143,6 +145,8 @@ export const mockAdapter = {
       const stateSet = input.state ? new Set(input.state) : null;
       const entitySet = input.entityType ? new Set(input.entityType) : null;
       const statusSet = input.status ? new Set(input.status) : null;
+      const tierSet = input.tier ? new Set(input.tier) : null;
+      const packageSet = input.servicePackage ? new Set(input.servicePackage) : null;
 
       const weekEnd = toIso(addDays(TODAY, 7));
       const hasThisWeek = (cid: string) =>
@@ -160,9 +164,18 @@ export const mockAdapter = {
           const hay = `${c.name} ${c.contactEmail} ${c.primaryState} ${c.entityType}`.toLowerCase();
           if (!hay.includes(q)) return false;
         }
-        if (stateSet && !stateSet.has(c.primaryState)) return false;
+        // State filter matches primary OR any nexus state.
+        if (stateSet) {
+          const matches = stateSet.has(c.primaryState) || c.nexusStates.some((s) => stateSet.has(s));
+          if (!matches) return false;
+        }
         if (entitySet && !entitySet.has(c.entityType)) return false;
         if (statusSet && !statusSet.has(c.status)) return false;
+        if (tierSet && !tierSet.has(c.tier)) return false;
+        if (packageSet) {
+          const matches = c.servicePackages.some((p) => packageSet.has(p));
+          if (!matches) return false;
+        }
         if (input.hasDeadlineThisWeek && !hasThisWeek(c.id)) return false;
         return true;
       });
