@@ -354,7 +354,7 @@ export function Clients() {
           className="flex-1 md:w-80 text-sm px-3 py-2 rounded-md border border-line bg-surface text-ink-900 placeholder:text-ink-400"
         />
         <span className="text-xs text-ink-500 ml-auto">
-          {filtered.length} of {clients.length}
+          {clients.length} of {allClients.length}
         </span>
         <button
           onClick={() => navigate("/import")}
@@ -550,6 +550,63 @@ function StatCard({
         <p className="text-2xs text-ink-500 mt-0.5">{helper}</p>
       )}
     </div>
+  );
+}
+
+function SortableTh({
+  col,
+  sortCol,
+  sortDir,
+  onClick,
+  align,
+  children,
+}: {
+  col: SortColumn;
+  sortCol: SortColumn;
+  sortDir: SortDir;
+  onClick: (col: SortColumn) => void;
+  align: "left" | "right";
+  children: React.ReactNode;
+}) {
+  const active = sortCol === col;
+  const Icon = !active ? ArrowUpDown : sortDir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <th
+      className={`px-4 py-2 font-semibold ${
+        align === "right" ? "text-right" : "text-left"
+      }`}
+      aria-sort={
+        active ? (sortDir === "asc" ? "ascending" : "descending") : "none"
+      }
+    >
+      <button
+        type="button"
+        onClick={() => onClick(col)}
+        className={`inline-flex items-center gap-1 uppercase tracking-wider hover:text-ink-900 ${
+          active ? "text-ink-900" : "text-ink-700"
+        } ${align === "right" ? "flex-row-reverse" : ""}`}
+      >
+        <span>{children}</span>
+        <Icon className="w-3 h-3" aria-hidden />
+      </button>
+    </th>
+  );
+}
+
+function TierPill({ tier }: { tier: ClientTier | undefined }) {
+  if (!tier) return <span className="text-ink-500">—</span>;
+  const tone =
+    tier === "premium"
+      ? "bg-accent/10 text-accent border-accent/30"
+      : tier === "custom"
+        ? "bg-warn-bg text-warn-ink border-warn-border"
+        : "bg-sunken text-ink-700 border-line";
+  return (
+    <span
+      className={`inline-flex items-center text-2xs font-medium px-1.5 py-0.5 rounded border ${tone}`}
+    >
+      {TIER_LABEL[tier]}
+    </span>
   );
 }
 
