@@ -39,18 +39,22 @@ These NEVER reach the browser. The backend session owns them.
 
 ## Incident: 2026-04-28
 
-User pasted the full credential set in chat. The following must be considered
-exposed and were instructed to be rotated:
+User pasted the full credential set in chat. The following were rotated the
+same day:
 
-- Supabase service_role JWT
-- Supabase secret key
-- Fly.io org API token
-- Cloudflare API token
-- Google Studio API key
-- Sentry auth token
+- Supabase service_role JWT — rotated
+- Supabase secret key — rotated
+- Fly.io org API token — rotated
+- Cloudflare API token — rotated
+- Google Studio API key — rotated
+- Sentry auth token — rotated
 
 The Supabase anon + publishable keys + project URL are public by design and
-do not need rotation.
+were not rotated. The anon key in `.env.local` was verified against the live
+Supabase auth endpoint after rotation and still authenticates correctly,
+which confirms the underlying JWT secret was not reset.
 
-After rotation, fresh values go into `.env.local` (frontend only — anon key
-and URL) and `fly secrets set` (backend only — everything else).
+For future credential drops: never paste in chat. See "Pattern 1" in
+[FRONTEND-INTEGRATION-PREP.md](./FRONTEND-INTEGRATION-PREP.md) §11 — let the
+backend session prompt for `fly secrets set` and paste values into your own
+terminal.
