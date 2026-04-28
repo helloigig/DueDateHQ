@@ -1,4 +1,5 @@
 import type { EntityType, StateCode } from "../types";
+import { STATE_NAMES } from "../types";
 import type { DetectedRow, FieldMapping } from "./mockImportData";
 
 export interface ParsedCsv {
@@ -72,18 +73,16 @@ const ENTITY_ALIASES: Record<string, EntityType> = {
   trust: "Trust",
 };
 
-const STATE_ALIASES: Record<string, StateCode> = {
-  ca: "CA",
-  california: "CA",
-  ny: "NY",
-  "new york": "NY",
-  tx: "TX",
-  texas: "TX",
-  la: "LA",
-  louisiana: "LA",
-  fl: "FL",
-  florida: "FL",
-};
+// Build STATE_ALIASES from the canonical STATE_NAMES map. Each state has at
+// least two aliases: the lowercased 2-letter code and the lowercased full name.
+const STATE_ALIASES: Record<string, StateCode> = (() => {
+  const map: Record<string, StateCode> = {};
+  for (const code of Object.keys(STATE_NAMES) as StateCode[]) {
+    map[code.toLowerCase()] = code;
+    map[STATE_NAMES[code].toLowerCase()] = code;
+  }
+  return map;
+})();
 
 function pickEntity(raw: string): EntityType | null {
   const k = raw.trim().toLowerCase();

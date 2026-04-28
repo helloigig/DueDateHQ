@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import {
   BadgeDollarSign,
@@ -24,17 +24,17 @@ import { useReminderTemplates, useUpdateReminderTemplate } from "../hooks/useRem
 import { useServicePackages } from "../hooks/useServicePackages";
 import { signOut, updateSession, useSession, type FirmSession } from "../data/session";
 import { useRemoteSession } from "../hooks/useSession";
-import type { ReminderTemplate } from "../types";
+import { STATE_CODES, type ReminderTemplate, type ServicePackage, type StateCode } from "../types";
 
 const NAV = [
-  { to: "firm", label: "Firm", icon: Building2 },
-  { to: "team", label: "Team", icon: Users2 },
-  { to: "packages", label: "Service Packages", icon: BadgeDollarSign },
-  { to: "reminders", label: "Reminders", icon: Mail },
-  { to: "integrations", label: "Integrations", icon: Link2 },
-  { to: "imports", label: "Imports", icon: FolderSync },
-  { to: "billing", label: "Billing", icon: CreditCard },
-  { to: "account", label: "Account", icon: Shield },
+  { to: "/settings/firm", label: "Firm", icon: Building2 },
+  { to: "/settings/team", label: "Team", icon: Users2 },
+  { to: "/settings/packages", label: "Service Packages", icon: BadgeDollarSign },
+  { to: "/settings/reminders", label: "Reminders", icon: Mail },
+  { to: "/settings/integrations", label: "Integrations", icon: Link2 },
+  { to: "/settings/imports", label: "Imports", icon: FolderSync },
+  { to: "/settings/billing", label: "Billing", icon: CreditCard },
+  { to: "/settings/account", label: "Account", icon: Shield },
 ];
 
 export function Settings() {
@@ -124,6 +124,25 @@ export function Settings() {
 function FirmPanel() {
   const { firm, isLoading } = useFirm();
   const sessionQuery = useRemoteSession();
+  const updateFirm = trpc.firm.update.useMutation({
+    onSuccess: () => {
+      void sessionQuery.refetch();
+    },
+  });
+  const [name, setName] = useState("");
+  const [tier, setTier] = useState<FirmSession["tier"]>("solo");
+  const [primaryStates, setPrimaryStates] = useState<string[]>([]);
+  const [primaryColor, setPrimaryColor] = useState("");
+  const [emailSignature, setEmailSignature] = useState("");
+
+  useEffect(() => {
+    if (!firm || !sessionQuery.data) return;
+    setName(firm.name);
+    setTier(firm.tier);
+    setPrimaryStates(firm.primaryStates);
+    setPrimaryColor(sessionQuery.data.firm.branding?.primaryColor ?? "");
+    setEmailSignature(sessionQuery.data.firm.branding?.emailSignature ?? "");
+  }, [firm, sessionQuery.data]);
 
   if (isLoading) {
     return <Surface title="Firm">Loading…</Surface>;
@@ -133,42 +152,147 @@ function FirmPanel() {
     return <Surface title="Firm">Firm details are unavailable.</Surface>;
   }
 
+  const toggleState = (code: string) => {
+    setPrimaryStates((current) =>
+      current.includes(code)
+        ? current.filter((value) => value !== code)
+        : [...current, code]
+    );
+  };
+
   return (
     <div className="space-y-4">
       <Surface
         title="Firm profile"
         description="Tenant-level identity and limits used across onboarding, reminders, and alerts."
       >
-        <KeyValueGrid
-          rows={[
-            ["Name", firm.name],
-            ["Tier", firm.tier],
-            ["Subscription", firm.subscriptionStatus.replace(/_/g, " ")],
-            ["Primary states", firm.primaryStates.join(", ") || "None set"],
-            ["Client limit", firm.clientLimit === null ? "Unlimited" : String(firm.clientLimit)],
-            ["Seat limit", String(firm.seatLimit)],
-          ]}
-        />
+        <div className="space-y-4">
+          <label className="block">
+            <span className="text-xs uppercase tracking-wide text-ink-500">
+              Firm name
+            </span>
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              className="mt-1 w-full px-3 py-2 rounded-md border border-line text-sm"
+            />
+          </label>
+          <div>
+            <span className="text-xs uppercase tracking-wide text-ink-500">
+              Primary states
+            </span>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {STATE_CODES.map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => toggleState(code)}
+                  className={`text-xs px-2 py-1 rounded border ${
+                    primaryStates.includes(code)
+                      ? "bg-accent text-canvas border-accent"
+                      : "border-line text-ink-600 hover:bg-sunken"
+                  }`}
+                >
+                  {code}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="block">
+              <span className="text-xs uppercase tracking-wide text-ink-500">
+                Plan
+              </span>
+              <select
+                value={tier}
+                onChange={(event) =>
+                  setTier(event.target.value as FirmSession["tier"])
+                }
+                className="mt-1 w-full px-3 py-2 rounded-md border border-line text-sm bg-surface"
+              >
+                <option value="solo">solo</option>
+                <option value="pro">pro</option>
+                <option value="team">team</option>
+              </select>
+            </label>
+            <div className="border border-line rounded-md px-3 py-3">
+              <div className="text-xs uppercase tracking-wide text-ink-500">
+                Subscription
+              </div>
+              <div className="mt-1 text-sm text-ink-900 capitalize">
+                {firm.subscriptionStatus.replace(/_/g, " ")}
+              </div>
+              <div className="mt-1 text-xs text-ink-500">
+                Seats {firm.seatLimit} · Clients{" "}
+                {firm.clientLimit === null ? "unlimited" : firm.clientLimit}
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() =>
+                updateFirm.mutate({
+                  name: name.trim(),
+                  tier,
+                  primaryStates: primaryStates as StateCode[],
+                })
+              }
+              className="text-sm px-3 py-2 rounded-md border border-line hover:bg-sunken"
+            >
+              {updateFirm.isPending ? "Saving..." : "Save firm profile"}
+            </button>
+          </div>
+        </div>
       </Surface>
 
       <Surface
         title="Branding surfaces"
         description="Wireframe-level for now, but these values already flow into outbound email and account identity."
       >
-        <KeyValueGrid
-          rows={[
-            [
-              "Email signature",
-              sessionQuery.data.firm.branding?.emailSignature ??
-                "Best, Sarah Mitchell\nMitchell CPA",
-            ],
-            [
-              "Primary color",
-              sessionQuery.data.firm.branding?.primaryColor ?? "Not customized",
-            ],
-            ["Logo", sessionQuery.data.firm.logoStorageKey ?? "No logo uploaded"],
-          ]}
-        />
+        <div className="space-y-4">
+          <label className="block">
+            <span className="text-xs uppercase tracking-wide text-ink-500">
+              Primary color
+            </span>
+            <input
+              value={primaryColor}
+              onChange={(event) => setPrimaryColor(event.target.value)}
+              placeholder="#1f2937"
+              className="mt-1 w-full px-3 py-2 rounded-md border border-line text-sm"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs uppercase tracking-wide text-ink-500">
+              Email signature
+            </span>
+            <textarea
+              value={emailSignature}
+              onChange={(event) => setEmailSignature(event.target.value)}
+              rows={5}
+              className="mt-1 w-full px-3 py-2 rounded-md border border-line text-sm"
+            />
+          </label>
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-ink-500">
+              Logo: {sessionQuery.data.firm.logoStorageKey ?? "No logo uploaded"}
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                updateFirm.mutate({
+                  branding: {
+                    primaryColor: primaryColor.trim() || undefined,
+                    emailSignature: emailSignature.trim() || undefined,
+                  },
+                })
+              }
+              className="text-sm px-3 py-2 rounded-md border border-line hover:bg-sunken"
+            >
+              {updateFirm.isPending ? "Saving..." : "Save branding"}
+            </button>
+          </div>
+        </div>
       </Surface>
     </div>
   );
@@ -177,6 +301,12 @@ function FirmPanel() {
 function TeamPanel() {
   const teamQuery = trpc.team.list.useQuery();
   const invite = trpc.team.invite.useMutation({
+    onSuccess: () => teamQuery.refetch(),
+  });
+  const updateRole = trpc.team.updateRole.useMutation({
+    onSuccess: () => teamQuery.refetch(),
+  });
+  const removeMember = trpc.team.remove.useMutation({
     onSuccess: () => teamQuery.refetch(),
   });
   const [email, setEmail] = useState("");
@@ -239,10 +369,33 @@ function TeamPanel() {
                 <div className="text-sm font-medium text-ink-900">
                   {member.displayName ?? member.email}
                 </div>
-                <div className="text-xs text-ink-500">{member.email}</div>
+              <div className="text-xs text-ink-500">{member.email}</div>
               </div>
-              <div className="text-xs text-ink-500">
-                {member.role} · Last active {member.lastActiveAt ?? "recently"}
+              <div className="flex items-center gap-2">
+                <select
+                  value={member.role}
+                  onChange={(event) =>
+                    updateRole.mutate({
+                      id: member.id,
+                      role: event.target.value as "owner" | "member",
+                    })
+                  }
+                  className="px-2 py-1 rounded-md border border-line text-xs bg-surface"
+                >
+                  <option value="owner">owner</option>
+                  <option value="member">member</option>
+                </select>
+                <button
+                  type="button"
+                  disabled={member.role === "owner" && member.email === "sarah@mitchellcpa.com"}
+                  onClick={() => removeMember.mutate({ id: member.id })}
+                  className="text-xs px-2 py-1 rounded-md border border-line hover:bg-sunken disabled:opacity-40"
+                >
+                  Remove
+                </button>
+                <div className="text-xs text-ink-500">
+                  Last active {member.lastActiveAt ?? "recently"}
+                </div>
               </div>
             </div>
           ))}
@@ -254,6 +407,12 @@ function TeamPanel() {
 
 function PackagesPanel() {
   const packagesQuery = useServicePackages();
+  const clonePackage = trpc.servicePackages.clone.useMutation({
+    onSuccess: () => packagesQuery.refetch(),
+  });
+  const updatePackage = trpc.servicePackages.updateCustom.useMutation({
+    onSuccess: () => packagesQuery.refetch(),
+  });
   const packages = packagesQuery.data ?? [];
 
   return (
@@ -263,25 +422,19 @@ function PackagesPanel() {
     >
       <div className="space-y-3">
         {packages.map((pkg) => (
-          <div key={pkg.id} className="border border-line rounded-md p-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-sm font-medium text-ink-900">{pkg.name}</h3>
-              <span className="text-xs px-2 py-1 rounded border border-line text-ink-500">
-                {pkg.isSystem ? "System" : "Custom"}
-              </span>
-            </div>
-            {pkg.description && (
-              <p className="mt-2 text-sm text-ink-600">{pkg.description}</p>
-            )}
-            <div className="mt-3 flex flex-wrap gap-2 text-xs text-ink-500">
-              <span className="px-2 py-1 rounded bg-sunken">
-                Entities: {pkg.applicableEntityTypes.join(", ") || "Any"}
-              </span>
-              <span className="px-2 py-1 rounded bg-sunken">
-                States: {pkg.applicableStates.join(", ") || "Any"}
-              </span>
-            </div>
-          </div>
+          <PackageCard
+            key={pkg.id}
+            pkg={pkg}
+            onClone={() => clonePackage.mutate({ id: pkg.id })}
+            onSave={(patch) =>
+              updatePackage.mutate({
+                id: pkg.id,
+                patch,
+              })
+            }
+            cloning={clonePackage.isPending && clonePackage.variables?.id === pkg.id}
+            saving={updatePackage.isPending && updatePackage.variables?.id === pkg.id}
+          />
         ))}
       </div>
     </Surface>
@@ -619,6 +772,140 @@ function ReminderTemplateEditor({
           {saving ? "Saving…" : "Save template"}
         </button>
       </div>
+    </div>
+  );
+}
+
+function PackageCard({
+  pkg,
+  onClone,
+  onSave,
+  cloning,
+  saving,
+}: {
+  pkg: ServicePackage;
+  onClone: () => void;
+  onSave: (patch: {
+    name?: string;
+    description?: string;
+    applicableEntityTypes?: ServicePackage["applicableEntityTypes"];
+    applicableStates?: ServicePackage["applicableStates"];
+  }) => void;
+  cloning: boolean;
+  saving: boolean;
+}) {
+  const [name, setName] = useState(pkg.name);
+  const [description, setDescription] = useState(pkg.description ?? "");
+  const [entities, setEntities] = useState(pkg.applicableEntityTypes.join(", "));
+  const [states, setStates] = useState(pkg.applicableStates.join(", "));
+
+  useEffect(() => {
+    setName(pkg.name);
+    setDescription(pkg.description ?? "");
+    setEntities(pkg.applicableEntityTypes.join(", "));
+    setStates(pkg.applicableStates.join(", "));
+  }, [pkg]);
+
+  return (
+    <div className="border border-line rounded-md p-4">
+      <div className="flex flex-wrap items-center gap-2 justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-medium text-ink-900">{pkg.name}</h3>
+          <span className="text-xs px-2 py-1 rounded border border-line text-ink-500">
+            {pkg.isSystem ? "System" : "Custom"}
+          </span>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onClone}
+            className="text-sm px-3 py-2 rounded-md border border-line hover:bg-sunken"
+          >
+            {cloning ? "Cloning..." : "Clone"}
+          </button>
+          {!pkg.isSystem && (
+            <button
+              type="button"
+              onClick={() =>
+              onSave({
+                  name: name.trim(),
+                  description: description.trim() || undefined,
+                  applicableEntityTypes: entities
+                    .split(",")
+                    .map((value) => value.trim())
+                    .filter(Boolean) as ServicePackage["applicableEntityTypes"],
+                  applicableStates: states
+                    .split(",")
+                    .map((value) => value.trim())
+                    .filter(Boolean) as ServicePackage["applicableStates"],
+                })
+              }
+              className="text-sm px-3 py-2 rounded-md border border-line hover:bg-sunken"
+            >
+              {saving ? "Saving..." : "Save"}
+            </button>
+          )}
+        </div>
+      </div>
+      {pkg.isSystem ? (
+        <>
+          {pkg.description && (
+            <p className="mt-2 text-sm text-ink-600">{pkg.description}</p>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2 text-xs text-ink-500">
+            <span className="px-2 py-1 rounded bg-sunken">
+              Entities: {pkg.applicableEntityTypes.join(", ") || "Any"}
+            </span>
+            <span className="px-2 py-1 rounded bg-sunken">
+              States: {pkg.applicableStates.join(", ") || "Any"}
+            </span>
+          </div>
+        </>
+      ) : (
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <label className="block">
+            <span className="text-xs uppercase tracking-wide text-ink-500">
+              Name
+            </span>
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              className="mt-1 w-full px-3 py-2 rounded-md border border-line text-sm"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs uppercase tracking-wide text-ink-500">
+              States
+            </span>
+            <input
+              value={states}
+              onChange={(event) => setStates(event.target.value)}
+              className="mt-1 w-full px-3 py-2 rounded-md border border-line text-sm"
+            />
+          </label>
+          <label className="block md:col-span-2">
+            <span className="text-xs uppercase tracking-wide text-ink-500">
+              Description
+            </span>
+            <textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              rows={3}
+              className="mt-1 w-full px-3 py-2 rounded-md border border-line text-sm"
+            />
+          </label>
+          <label className="block md:col-span-2">
+            <span className="text-xs uppercase tracking-wide text-ink-500">
+              Entity types
+            </span>
+            <input
+              value={entities}
+              onChange={(event) => setEntities(event.target.value)}
+              className="mt-1 w-full px-3 py-2 rounded-md border border-line text-sm"
+            />
+          </label>
+        </div>
+      )}
     </div>
   );
 }

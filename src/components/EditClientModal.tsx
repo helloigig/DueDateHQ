@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Client, EntityType, StateCode } from "../types";
-import { STATE_NAMES } from "../types";
+import { STATE_CODES, STATE_NAMES } from "../types";
 import { useModalDialog } from "../hooks/useModalDialog";
 import { MigrationPreviewModal } from "./MigrationPreviewModal";
 import { useUpdateClient } from "../hooks/useClients";
@@ -13,7 +13,7 @@ const ENTITY_OPTIONS: EntityType[] = [
   "Partnership",
   "Trust",
 ];
-const STATE_OPTIONS: StateCode[] = ["CA", "NY", "TX", "LA", "FL"];
+const STATE_OPTIONS: readonly StateCode[] = STATE_CODES;
 
 export function EditClientModal({
   open,

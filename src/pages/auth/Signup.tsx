@@ -28,7 +28,8 @@ export function Signup() {
         userEmail: form.email,
         tier: form.tier,
       });
-      navigate("/", { replace: true });
+      // New firms hit the onboarding flow; existing logins go straight to /.
+      navigate("/onboarding/firm", { replace: true });
     },
     onError: (err) => setSubmitError(err.message),
   });

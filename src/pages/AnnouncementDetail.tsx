@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowRight, Mail, TriangleAlert } from "lucide-react";
+import { ArrowRight, Mail, TriangleAlert, Filter } from "lucide-react";
 import { useAnnouncement, useBatchAdjustFromAnnouncement, useDismissAnnouncement, useMarkAnnouncementRead } from "../hooks/useAnnouncements";
 import { useClients } from "../hooks/useClients";
 import { PageSkeleton } from "../components/skeletons/DashboardSkeleton";
@@ -8,6 +8,71 @@ import { ErrorState } from "../components/ErrorState";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { BatchNotifyModal } from "../components/BatchNotifyModal";
 import { formatLongDate } from "../data/dateHelpers";
+import type { Announcement, Client } from "../types";
+
+/** Human-readable rationale for why a client matched / didn't match an alert. */
+interface MatchSummary {
+  matched: Array<{ client: Client; basis: string }>;
+  excluded: Array<{ client: Client; reason: string }>;
+}
+
+function computeMatches(
+  ann: Announcement,
+  allClients: Client[],
+  affectedIds: Set<string>
+): MatchSummary {
+  const matched: MatchSummary["matched"] = [];
+  const excluded: MatchSummary["excluded"] = [];
+  const entityFilter =
+    ann.entityTypes.length > 0 ? new Set(ann.entityTypes) : null;
+  const countyFilter =
+    ann.counties.length > 0
+      ? new Set(ann.counties.map((c) => c.toLowerCase()))
+      : null;
+
+  for (const c of allClients) {
+    if (c.status !== "active") continue;
+    const stateMatch =
+      c.primaryState === ann.stateCode || c.nexusStates.includes(ann.stateCode);
+    if (!stateMatch) continue;
+
+    if (affectedIds.has(c.id)) {
+      const parts: string[] = [];
+      parts.push(
+        c.primaryState === ann.stateCode
+          ? `primary state ${ann.stateCode}`
+          : `nexus state ${ann.stateCode}`
+      );
+      if (entityFilter && entityFilter.has(c.entityType)) {
+        parts.push(`entity ${c.entityType}`);
+      }
+      if (countyFilter && c.county && countyFilter.has(c.county.toLowerCase())) {
+        parts.push(`based in ${c.county} County`);
+      } else if (!countyFilter) {
+        // statewide alert with no county scope
+      }
+      matched.push({ client: c, basis: parts.join(" · ") });
+    } else {
+      // State-eligible but excluded — work out why
+      const reasons: string[] = [];
+      if (entityFilter && !entityFilter.has(c.entityType)) {
+        reasons.push(
+          `entity ${c.entityType} not in scope (${ann.entityTypes.join(", ")})`
+        );
+      }
+      if (countyFilter) {
+        if (!c.county) {
+          reasons.push("county unknown — alert is county-scoped");
+        } else if (!countyFilter.has(c.county.toLowerCase())) {
+          reasons.push(`${c.county} County not in scope`);
+        }
+      }
+      if (reasons.length === 0) reasons.push("filtered out by source matching");
+      excluded.push({ client: c, reason: reasons.join(" · ") });
+    }
+  }
+  return { matched, excluded };
+}
 
 export function AnnouncementDetail() {
   const { id } = useParams<{ id: string }>();
@@ -20,10 +85,17 @@ export function AnnouncementDetail() {
 
   const announcement = announcementQuery.data ?? null;
   const clients = clientsQuery.data?.items ?? [];
-  const clientsById = useMemo(
-    () => new Map(clients.map((client) => [client.id, client])),
-    [clients]
-  );
+
+  const matches = useMemo(() => {
+    if (!announcement) return null;
+    return computeMatches(
+      announcement,
+      clients,
+      new Set(announcement.affectedClientIds)
+    );
+  }, [announcement, clients]);
+
+  const [showExcluded, setShowExcluded] = useState(false);
 
   const [selected, setSelected] = useState<string[]>([]);
   const [notifyOpen, setNotifyOpen] = useState(false);
@@ -207,37 +279,33 @@ export function AnnouncementDetail() {
           </header>
 
           <div className="divide-y divide-line">
-            {announcement.affectedClientIds.map((clientId) => {
-              const client = clientsById.get(clientId);
-              if (!client) return null;
-              const selectedNow = selected.includes(clientId);
+            {(matches?.matched ?? []).map(({ client, basis }) => {
+              const selectedNow = selected.includes(client.id);
               return (
                 <div
-                  key={clientId}
-                  className="px-5 py-4 flex flex-col gap-3 xl:grid xl:grid-cols-[auto_minmax(0,1fr)_180px_auto] xl:items-center"
+                  key={client.id}
+                  className="px-5 py-4 flex flex-col gap-3 xl:grid xl:grid-cols-[auto_minmax(0,1fr)_220px_auto] xl:items-center"
                 >
                   <label className="inline-flex items-center gap-3">
                     <input
                       type="checkbox"
                       checked={selectedNow}
-                      onChange={() => toggleClient(clientId)}
+                      onChange={() => toggleClient(client.id)}
                     />
                     <span className="text-sm font-medium text-ink-900">
                       {client.name}
                     </span>
                   </label>
                   <div className="text-sm text-ink-600">
-                    {client.entityType} · {client.primaryState} · {client.contactEmail}
+                    {client.entityType} · {client.primaryState}
+                    {client.contactEmail ? ` · ${client.contactEmail}` : ""}
                   </div>
-                  <div className="text-xs text-ink-500">
-                    Packages:{" "}
-                    {client.servicePackages.length > 0
-                      ? client.servicePackages.join(", ")
-                      : "none"}
+                  <div className="text-xs text-ink-500" title="Match basis">
+                    {basis}
                   </div>
                   <div className="flex xl:justify-end">
                     <Link
-                      to={`/clients/${clientId}`}
+                      to={`/clients/${client.id}`}
                       className="text-sm px-3 py-2 rounded-md border border-line hover:bg-sunken"
                     >
                       Open client
@@ -247,6 +315,46 @@ export function AnnouncementDetail() {
               );
             })}
           </div>
+
+          {matches && matches.excluded.length > 0 && (
+            <div className="border-t border-line">
+              <button
+                type="button"
+                onClick={() => setShowExcluded((v) => !v)}
+                className="w-full px-5 py-3 text-left text-xs uppercase tracking-wider text-ink-500 hover:bg-sunken flex items-center gap-2"
+                aria-expanded={showExcluded}
+              >
+                <Filter className="w-3 h-3" aria-hidden />
+                {showExcluded ? "Hide" : "Show"} {matches.excluded.length} client
+                {matches.excluded.length === 1 ? "" : "s"} excluded by source matching
+              </button>
+              {showExcluded && (
+                <ul className="divide-y divide-line">
+                  {matches.excluded.map(({ client, reason }) => (
+                    <li
+                      key={client.id}
+                      className="px-5 py-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div>
+                        <Link
+                          to={`/clients/${client.id}`}
+                          className="text-sm text-ink-700 hover:underline"
+                        >
+                          {client.name}
+                        </Link>
+                        <span className="text-xs text-ink-400 ml-2">
+                          {client.entityType} · {client.primaryState}
+                        </span>
+                      </div>
+                      <span className="text-xs text-ink-500" title="Exclusion reason">
+                        {reason}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </section>
 
         <aside className="space-y-4">

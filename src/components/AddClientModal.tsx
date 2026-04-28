@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { EntityType, StateCode } from "../types";
-import { STATE_NAMES } from "../types";
+import type { EntityType, PriorYearStatus, StateCode } from "../types";
+import { STATE_CODES, STATE_NAMES } from "../types";
 import { useModalDialog } from "../hooks/useModalDialog";
 import { useCreateClient } from "../hooks/useClients";
 
@@ -13,7 +13,8 @@ const ENTITY_OPTIONS: EntityType[] = [
   "Partnership",
   "Trust",
 ];
-const STATE_OPTIONS: StateCode[] = ["CA", "NY", "TX", "LA", "FL"];
+
+const STATE_OPTIONS: readonly StateCode[] = STATE_CODES;
 
 function suggestBundle(entity: EntityType, state: StateCode): string {
   if (entity === "S-Corp") return `S-Corp Standard (${state})`;
@@ -38,6 +39,12 @@ export function AddClientModal({
   const [nexus, setNexus] = useState<StateCode[]>([]);
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [county, setCounty] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [fiscalYearEndMonth, setFiscalYearEndMonth] = useState<number>(12);
+  const [priorYearStatus, setPriorYearStatus] =
+    useState<PriorYearStatus>("returning_existing");
+  const [showSubstrate, setShowSubstrate] = useState(false);
   const createClient = useCreateClient();
 
   const dialogRef = useModalDialog(open, onClose);
@@ -58,6 +65,10 @@ export function AddClientModal({
         contactEmail: email.trim(),
         contactPhone: phone.trim() || undefined,
         servicePackage: bundle,
+        county: county.trim() || undefined,
+        industry: industry.trim() || undefined,
+        fiscalYearEndMonth: fiscalYearEndMonth,
+        priorYearStatus,
       },
       {
         onSuccess: ({ id }) => {
@@ -76,6 +87,11 @@ export function AddClientModal({
     setNexus([]);
     setEmail("");
     setPhone("");
+    setCounty("");
+    setIndustry("");
+    setFiscalYearEndMonth(12);
+    setPriorYearStatus("returning_existing");
+    setShowSubstrate(false);
   };
 
   return (
@@ -191,11 +207,81 @@ export function AddClientModal({
           </Field>
 
           <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded px-3 py-2">
-            Suggested filing bundle:{" "}
+            Suggested service package:{" "}
             <span className="font-medium text-slate-900">{bundle}</span>
             <div className="text-slate-500 mt-0.5">
               You can change this on the client page after creation.
             </div>
+          </div>
+
+          <div className="border-t border-slate-100 pt-3">
+            <button
+              type="button"
+              onClick={() => setShowSubstrate((v) => !v)}
+              className="text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1"
+              aria-expanded={showSubstrate}
+            >
+              {showSubstrate ? "▾" : "▸"} Optional substrate fields
+              <span className="text-slate-400 ml-1">
+                (sharpens reminder timing & checklist tailoring)
+              </span>
+            </button>
+
+            {showSubstrate && (
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <Field label="County (optional)">
+                  <input
+                    value={county}
+                    onChange={(e) => setCounty(e.target.value)}
+                    placeholder="e.g. Marin"
+                    className="w-full px-2.5 py-1.5 rounded border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  />
+                </Field>
+                <Field label="Industry / NAICS tag (optional)">
+                  <input
+                    value={industry}
+                    onChange={(e) => setIndustry(e.target.value)}
+                    placeholder="e.g. real-estate, saas, 541211"
+                    className="w-full px-2.5 py-1.5 rounded border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  />
+                </Field>
+                <Field label="Fiscal year end month">
+                  <select
+                    value={fiscalYearEndMonth}
+                    onChange={(e) => setFiscalYearEndMonth(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 rounded border border-slate-200 bg-white"
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => (
+                      <option key={m} value={m}>
+                        {new Date(2025, m - 1, 1).toLocaleString("en-US", {
+                          month: "long",
+                        })}{" "}
+                        {m === 12 && "(calendar year)"}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Prior-year status">
+                  <select
+                    value={priorYearStatus}
+                    onChange={(e) =>
+                      setPriorYearStatus(e.target.value as PriorYearStatus)
+                    }
+                    className="w-full px-2.5 py-1.5 rounded border border-slate-200 bg-white"
+                  >
+                    <option value="returning_existing">
+                      Returning · we filed last year
+                    </option>
+                    <option value="returning_new_to_us">
+                      Returning · filed elsewhere last year
+                    </option>
+                    <option value="first_year">
+                      First year (newly formed / first return)
+                    </option>
+                  </select>
+                </Field>
+              </div>
+            )}
           </div>
         </div>
 

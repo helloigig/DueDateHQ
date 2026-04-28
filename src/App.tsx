@@ -9,7 +9,11 @@ import { TaskDetail } from "./pages/TaskDetail";
 import { Import } from "./pages/Import";
 import { Placeholder } from "./pages/Placeholder";
 import { Settings } from "./pages/Settings";
-import { OnboardingLayer1, OnboardingLayer2 } from "./pages/Onboarding";
+import {
+  OnboardingFirm,
+  OnboardingLayer1,
+  OnboardingLayer2,
+} from "./pages/Onboarding";
 import { Login } from "./pages/Login";
 import { Signup } from "./pages/auth/Signup";
 import { AcceptInvite } from "./pages/auth/AcceptInvite";
@@ -71,8 +75,4 @@ export default function App() {
 function RedirectAnnouncementToAlert() {
   const { id } = useParams<{ id: string }>();
   return <Navigate to={id ? `/alerts/${id}` : "/alerts"} replace />;
-}
-
-function OnboardingFirm() {
-  return <Navigate to="/onboarding/layer-1" replace />;
 }

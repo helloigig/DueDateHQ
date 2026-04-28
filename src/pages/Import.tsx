@@ -9,7 +9,7 @@ import {
   type FieldMapping,
 } from "../data/mockImportData";
 import type { EntityType, StateCode } from "../types";
-import { STATE_NAMES } from "../types";
+import { STATE_CODES, STATE_NAMES } from "../types";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import {
   parseCsv,
@@ -432,7 +432,7 @@ const ENTITY_OPTIONS: EntityType[] = [
   "Partnership",
   "Trust",
 ];
-const STATE_OPTIONS: StateCode[] = ["CA", "NY", "TX", "LA", "FL"];
+const STATE_OPTIONS: readonly StateCode[] = STATE_CODES;
 
 function PreviewStep({
   rows,

@@ -1,6 +1,5 @@
 import { initTRPC } from "@trpc/server";
 import { z } from "zod";
-import { randomUUID } from "node:crypto";
 import {
   addClientNote,
   archiveClientRecord,
@@ -34,6 +33,7 @@ import {
   listNotificationRows,
   listReminderTemplateRows,
   listServicePackageRows,
+  listTeamMembers,
   listTriageDeadlines,
   markAllNotificationsRead,
   markAnnouncementRead,
@@ -55,7 +55,13 @@ import {
   updateClientRecord,
   updateDeadlineStatus,
   updateEmailDraft,
+  updateFirmProfile,
   updateReminderTemplateRow,
+  updateTeamMemberRole,
+  removeTeamMember,
+  inviteTeamMember,
+  cloneServicePackageRow,
+  updateCustomServicePackageRow,
   deleteClientNote,
   getTaskDetail as getTask,
 } from "../services/app-service";
@@ -77,7 +83,10 @@ import {
   loginSchema,
   resetPasswordSchema,
   signupSchema,
+  stateCodeSchema,
+  entityTypeSchema,
   teamInviteSchema,
+  firmTierSchema,
   unassignBundleSchema,
 } from "../../src/types/schemas";
 
@@ -124,6 +133,34 @@ const reminderTemplateUpdateSchema = z.object({
     active: z.boolean().optional(),
   }),
 });
+const firmUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  primaryStates: z.array(stateCodeSchema).optional(),
+  branding: z
+    .object({
+      primaryColor: z.string().optional(),
+      emailSignature: z.string().optional(),
+    })
+    .optional(),
+  tier: firmTierSchema.optional(),
+});
+const teamRoleUpdateSchema = z.object({
+  id: z.string(),
+  role: z.enum(["owner", "member"]),
+});
+const servicePackageCloneSchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+});
+const servicePackageUpdateSchema = z.object({
+  id: z.string(),
+  patch: z.object({
+    name: z.string().min(1).optional(),
+    description: z.string().optional(),
+    applicableEntityTypes: z.array(entityTypeSchema).optional(),
+    applicableStates: z.array(stateCodeSchema).optional(),
+  }),
+});
 
 export const appRouter = t.router({
   auth: t.router({
@@ -144,6 +181,11 @@ export const appRouter = t.router({
 
   dashboard: t.router({
     get: t.procedure.query(() => getDashboardPayload()),
+  }),
+
+  firm: t.router({
+    get: t.procedure.query(() => getFirmContext()),
+    update: t.procedure.input(firmUpdateSchema).mutation(({ input }) => updateFirmProfile(input)),
   }),
 
   clients: t.router({
@@ -243,8 +285,8 @@ export const appRouter = t.router({
     assignToClient: t.procedure.input(assignBundleSchema).mutation(({ input }) =>
       assignPackageToClient(input.clientId, input.bundleId)
     ),
-    clone: t.procedure.input(jsonPassthrough).mutation(async () => ({ id: randomUUID() })),
-    updateCustom: t.procedure.input(jsonPassthrough).mutation(async () => ({ ok: true as const })),
+    clone: t.procedure.input(servicePackageCloneSchema).mutation(({ input }) => cloneServicePackageRow(input)),
+    updateCustom: t.procedure.input(servicePackageUpdateSchema).mutation(({ input }) => updateCustomServicePackageRow(input)),
   }),
 
   announcements: t.router({
@@ -310,13 +352,10 @@ export const appRouter = t.router({
   }),
 
   team: t.router({
-    list: t.procedure.query(async () => {
-      const session = await getFirmContext();
-      return [session.user];
-    }),
-    invite: t.procedure.input(teamInviteSchema).mutation(async () => ({ ok: true as const })),
-    updateRole: t.procedure.input(jsonPassthrough).mutation(async () => ({ ok: true as const })),
-    remove: t.procedure.input(jsonPassthrough).mutation(async () => ({ ok: true as const })),
+    list: t.procedure.query(() => listTeamMembers()),
+    invite: t.procedure.input(teamInviteSchema).mutation(({ input }) => inviteTeamMember(input)),
+    updateRole: t.procedure.input(teamRoleUpdateSchema).mutation(({ input }) => updateTeamMemberRole(input)),
+    remove: t.procedure.input(z.object({ id: z.string() })).mutation(({ input }) => removeTeamMember(input.id)),
   }),
 });
 

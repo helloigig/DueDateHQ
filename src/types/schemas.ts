@@ -4,7 +4,9 @@
  */
 import { z } from "zod";
 
-export const stateCodeSchema = z.enum(["CA", "NY", "TX", "LA", "FL"]);
+import { STATE_CODES } from "../types";
+
+export const stateCodeSchema = z.enum(STATE_CODES);
 
 export const entityTypeSchema = z.enum([
   "LLC",

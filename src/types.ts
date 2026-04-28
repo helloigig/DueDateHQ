@@ -6,15 +6,76 @@ export type EntityType =
   | "Partnership"
   | "Trust";
 
-export type StateCode = "CA" | "NY" | "TX" | "LA" | "FL";
+// US 50 states + DC. Drives client primary/nexus state pickers, deadline
+// jurisdictions, and announcement matching. Loosened from MVP-5 (CA/NY/TX/LA/FL)
+// to full 50 in v0.7 alignment with the 50-state deadline DB + scrape pipeline.
+export const STATE_CODES = [
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL",
+  "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME",
+  "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH",
+  "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI",
+  "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
+] as const;
+
+export type StateCode = (typeof STATE_CODES)[number];
 
 export const STATE_NAMES: Record<StateCode, string> = {
+  AL: "Alabama",
+  AK: "Alaska",
+  AZ: "Arizona",
+  AR: "Arkansas",
   CA: "California",
-  NY: "New York",
-  TX: "Texas",
-  LA: "Louisiana",
+  CO: "Colorado",
+  CT: "Connecticut",
+  DE: "Delaware",
+  DC: "District of Columbia",
   FL: "Florida",
+  GA: "Georgia",
+  HI: "Hawaii",
+  ID: "Idaho",
+  IL: "Illinois",
+  IN: "Indiana",
+  IA: "Iowa",
+  KS: "Kansas",
+  KY: "Kentucky",
+  LA: "Louisiana",
+  ME: "Maine",
+  MD: "Maryland",
+  MA: "Massachusetts",
+  MI: "Michigan",
+  MN: "Minnesota",
+  MS: "Mississippi",
+  MO: "Missouri",
+  MT: "Montana",
+  NE: "Nebraska",
+  NV: "Nevada",
+  NH: "New Hampshire",
+  NJ: "New Jersey",
+  NM: "New Mexico",
+  NY: "New York",
+  NC: "North Carolina",
+  ND: "North Dakota",
+  OH: "Ohio",
+  OK: "Oklahoma",
+  OR: "Oregon",
+  PA: "Pennsylvania",
+  RI: "Rhode Island",
+  SC: "South Carolina",
+  SD: "South Dakota",
+  TN: "Tennessee",
+  TX: "Texas",
+  UT: "Utah",
+  VT: "Vermont",
+  VA: "Virginia",
+  WA: "Washington",
+  WV: "West Virginia",
+  WI: "Wisconsin",
+  WY: "Wyoming",
 };
+
+export function isStateCode(value: string): value is StateCode {
+  return (STATE_CODES as readonly string[]).includes(value);
+}
 
 export type ClientStatus = "active" | "inactive" | "prospect" | "archived";
 
@@ -56,6 +117,21 @@ export interface ActivityEntry {
   relatedDeadlineId?: string;
 }
 
+/**
+ * Prior-year posture relative to the current firm.
+ *  - first_year: client has no prior return on file anywhere
+ *  - returning_existing: this firm prepared the prior return
+ *  - returning_new_to_us: client filed elsewhere last year, joined us this year
+ *
+ * Drives Mode A substrate generation: a "first_year" S-Corp gets the new-entity
+ * checklist; a "returning_existing" gets the rollover checklist; a
+ * "returning_new_to_us" gets the prior-year reconciliation checklist.
+ */
+export type PriorYearStatus =
+  | "first_year"
+  | "returning_existing"
+  | "returning_new_to_us";
+
 export interface Client {
   id: string;
   name: string;
@@ -68,6 +144,13 @@ export interface Client {
   addedAt: string;
   servicePackages: string[];
   county?: string;
+  /** NAICS code or short industry tag — drives Mode A industry substrate. */
+  industry?: string;
+  /** 1–12. Defaults to 12 (calendar year) when unset. */
+  fiscalYearEndMonth?: number;
+  /** ISO date (YYYY-MM-DD). Used for "first year" filing logic. */
+  dateOfIncorporation?: string;
+  priorYearStatus?: PriorYearStatus;
   relatedClientIds?: string[];
   noteEntries?: ClientNote[];
   activity?: ActivityEntry[];

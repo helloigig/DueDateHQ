@@ -20,6 +20,7 @@ import {
   notifications,
   reminderTemplates,
   servicePackages,
+  serviceTemplates,
   stateAnnouncements,
   tasks,
   users,
@@ -213,8 +214,9 @@ async function getFirmRow() {
     tier: firmRow.plan as Firm["tier"],
     subscriptionStatus: "active",
     trialEndsAt: firmRow.trialEndsAt?.toISOString() ?? null,
-    seatLimit: 3,
-    clientLimit: null,
+    seatLimit:
+      firmRow.plan === "team" ? 10 : firmRow.plan === "pro" ? 3 : 1,
+    clientLimit: firmRow.plan === "solo" ? 50 : null,
   };
   const user: User = {
     id: userRow.id,
@@ -225,6 +227,112 @@ async function getFirmRow() {
     lastActiveAt: userRow.lastActiveAt?.toISOString() ?? null,
   };
   return { firm, user };
+}
+
+export async function updateFirmProfile(input: {
+  name?: string;
+  primaryStates?: StateCode[];
+  branding?: {
+    primaryColor?: string;
+    emailSignature?: string;
+  };
+  tier?: Firm["tier"];
+}) {
+  const rows = await db.select().from(firms).where(eq(firms.id, DEMO_FIRM_ID));
+  const current = rows[0];
+  if (!current) throw new Error("Firm not found");
+  const currentBranding = (current.branding ?? {}) as Record<string, unknown>;
+  await db
+    .update(firms)
+    .set({
+      name: input.name?.trim() || current.name,
+      primaryStates: input.primaryStates ?? (current.primaryStates as StateCode[]),
+      branding: {
+        ...currentBranding,
+        ...(input.branding ?? {}),
+      },
+      plan: input.tier ?? current.plan,
+      updatedAt: new Date(),
+    })
+    .where(eq(firms.id, DEMO_FIRM_ID));
+  return getFirmContext();
+}
+
+export async function listTeamMembers(): Promise<User[]> {
+  const rows = await db
+    .select()
+    .from(users)
+    .where(eq(users.firmId, DEMO_FIRM_ID))
+    .orderBy(asc(users.createdAt));
+  return rows.map((row) => ({
+    id: row.id,
+    email: row.email,
+    displayName: row.fullName,
+    role: row.role as User["role"],
+    timezone: "America/Los_Angeles",
+    lastActiveAt: row.lastActiveAt?.toISOString() ?? null,
+  }));
+}
+
+export async function inviteTeamMember(input: {
+  email: string;
+  role: User["role"];
+}) {
+  const normalizedEmail = input.email.trim().toLowerCase();
+  const existingRows = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.firmId, DEMO_FIRM_ID), eq(users.email, normalizedEmail)));
+  const existing = existingRows[0];
+  if (existing) {
+    await db
+      .update(users)
+      .set({ role: input.role })
+      .where(eq(users.id, existing.id));
+    return { ok: true as const, userId: existing.id };
+  }
+  const id = randomUUID();
+  await db.insert(users).values({
+    id,
+    firmId: DEMO_FIRM_ID,
+    email: normalizedEmail,
+    passwordHash: "invited-demo",
+    role: input.role,
+    fullName: null,
+    createdAt: new Date(),
+    lastActiveAt: null,
+  });
+  await db.insert(notifications).values({
+    firmId: DEMO_FIRM_ID,
+    userId: DEMO_USER_ID,
+    type: "team_invite",
+    title: `Invited ${normalizedEmail}`,
+    body: `${normalizedEmail} invited as ${input.role}`,
+    deepLink: "/settings/team",
+    readAt: null,
+    createdAt: new Date(),
+    payload: {},
+  });
+  return { ok: true as const, userId: id };
+}
+
+export async function updateTeamMemberRole(input: {
+  id: string;
+  role: User["role"];
+}) {
+  if (input.id === DEMO_USER_ID && input.role !== "owner") {
+    throw new Error("The demo owner must remain an owner");
+  }
+  await db.update(users).set({ role: input.role }).where(eq(users.id, input.id));
+  return { ok: true as const };
+}
+
+export async function removeTeamMember(id: string) {
+  if (id === DEMO_USER_ID) {
+    throw new Error("Cannot remove the demo owner");
+  }
+  await db.delete(users).where(eq(users.id, id));
+  return { ok: true as const };
 }
 
 async function clientPackagesMap(clientIds: string[]) {
@@ -1090,6 +1198,80 @@ export async function listServicePackageRows(): Promise<ServicePackage[]> {
     applicableStates: (row.applicableStates ?? []) as ServicePackage["applicableStates"],
     isSystem: row.isSystem,
   }));
+}
+
+export async function cloneServicePackageRow(input: {
+  id: string;
+  name?: string;
+}) {
+  const rows = await db
+    .select()
+    .from(servicePackages)
+    .where(eq(servicePackages.id, input.id));
+  const source = rows[0];
+  if (!source) throw new Error("Service package not found");
+  const newId = randomUUID();
+  const newName = input.name?.trim() || `${source.name} copy`;
+  await db.insert(servicePackages).values({
+    id: newId,
+    firmId: DEMO_FIRM_ID,
+    name: newName,
+    description: source.description,
+    applicableEntityTypes: source.applicableEntityTypes,
+    applicableStates: source.applicableStates,
+    isSystem: false,
+    createdAt: new Date(),
+  });
+  const templateRows = await db
+    .select()
+    .from(serviceTemplates)
+    .where(eq(serviceTemplates.packageId, source.id));
+  if (templateRows.length > 0) {
+    await db.insert(serviceTemplates).values(
+      templateRows.map((template) => ({
+        id: randomUUID(),
+        packageId: newId,
+        formType: template.formType,
+        jurisdiction: template.jurisdiction,
+        dueDateRule: template.dueDateRule,
+        rolloverRule: template.rolloverRule,
+        defaultReminderSchedule: template.defaultReminderSchedule,
+        dependencies: template.dependencies,
+        standardChecklist: template.standardChecklist,
+      }))
+    );
+  }
+  return { id: newId };
+}
+
+export async function updateCustomServicePackageRow(input: {
+  id: string;
+  patch: Partial<Pick<ServicePackage, "name" | "description" | "applicableEntityTypes" | "applicableStates">>;
+}) {
+  const rows = await db
+    .select()
+    .from(servicePackages)
+    .where(eq(servicePackages.id, input.id));
+  const current = rows[0];
+  if (!current) throw new Error("Service package not found");
+  if (current.isSystem) {
+    throw new Error("System packages must be cloned before editing");
+  }
+  await db
+    .update(servicePackages)
+    .set({
+      name: input.patch.name?.trim() || current.name,
+      description:
+        input.patch.description === undefined
+          ? current.description
+          : input.patch.description,
+      applicableEntityTypes:
+        input.patch.applicableEntityTypes ?? current.applicableEntityTypes,
+      applicableStates:
+        input.patch.applicableStates ?? current.applicableStates,
+    })
+    .where(eq(servicePackages.id, input.id));
+  return { ok: true as const };
 }
 
 export async function listAnnouncements(opts: { activeOnly?: boolean }) {
