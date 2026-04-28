@@ -137,11 +137,20 @@ export function TopBar() {
             <button
               onClick={() => {
                 setUserMenuOpen(false);
-                navigate("/settings");
+                navigate("/settings/firm");
               }}
               className="w-full text-left px-3 py-2 text-sm text-ink-700 hover:bg-sunken"
             >
               Settings
+            </button>
+            <button
+              onClick={() => {
+                setUserMenuOpen(false);
+                navigate("/onboarding/layer-1");
+              }}
+              className="w-full text-left px-3 py-2 text-sm text-ink-700 hover:bg-sunken"
+            >
+              Setup
             </button>
             <button
               onClick={() => {

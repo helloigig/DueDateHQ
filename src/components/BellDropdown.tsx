@@ -49,7 +49,7 @@ function announcementAsNotification(a: Announcement): Notification {
     detail: `${a.affectedClientIds.length} client${
       a.affectedClientIds.length === 1 ? "" : "s"
     } affected · ${a.authority}`,
-    href: `/announcements/${a.id}`,
+    href: `/alerts/${a.id}`,
     read: a.read,
     announcementId: a.id,
   };
@@ -176,7 +176,7 @@ export function BellDropdown() {
 
           <div className="border-t border-line px-3 py-2">
             <Link
-              to="/announcements"
+              to="/alerts"
               onClick={() => setOpen(false)}
               className="text-xs text-ink-500 hover:text-ink-900"
             >

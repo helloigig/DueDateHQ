@@ -5,19 +5,27 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:server": "tsx watch server/index.ts",
+    "dev:app": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "lint": "tsc -b --noEmit"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.4.5",
+    "@hono/node-server": "^2.0.0",
     "@tanstack/react-query": "^5.100.1",
     "@trpc/client": "^11.16.0",
     "@trpc/react-query": "^11.16.0",
     "@trpc/server": "^11.16.0",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.15",
     "lucide-react": "^1.11.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.2",
+    "tsx": "^4.21.0",
+    "ws": "^8.20.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

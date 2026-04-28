@@ -7,6 +7,7 @@ import "./index.css";
 import { trpc, createTrpcClient } from "./lib/api/client";
 import { createQueryClient } from "./lib/query-client";
 import { subscribeStore } from "./data/store";
+import { env } from "./config";
 
 function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => createQueryClient());
@@ -15,6 +16,7 @@ function Providers({ children }: { children: React.ReactNode }) {
   // Mock-mode glue: when direct `actions.*` calls mutate the store, nuke the
   // React Query cache so hooks refetch. On real backend this becomes a no-op.
   useEffect(() => {
+    if (!env.useMockApi) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     return subscribeStore(() => {
       if (timer) clearTimeout(timer);

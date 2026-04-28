@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { actions } from "../data/store";
 import type { EntityType, StateCode } from "../types";
 import { STATE_NAMES } from "../types";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { useCreateClient } from "../hooks/useClients";
 
 const ENTITY_OPTIONS: EntityType[] = [
   "Individual",
@@ -38,6 +38,7 @@ export function AddClientModal({
   const [nexus, setNexus] = useState<StateCode[]>([]);
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const createClient = useCreateClient();
 
   const dialogRef = useModalDialog(open, onClose);
 
@@ -48,18 +49,24 @@ export function AddClientModal({
   const canSave = name.trim().length > 0 && email.trim().length > 0;
 
   const onSave = () => {
-    const id = actions.addClient({
-      name: name.trim(),
-      entityType: entity,
-      primaryState: state,
-      nexusStates: nexus,
-      contactEmail: email.trim(),
-      contactPhone: phone.trim() || undefined,
-      servicePackage: bundle,
-    });
-    reset();
-    onClose();
-    navigate(`/clients/${id}`);
+    createClient.mutate(
+      {
+        name: name.trim(),
+        entityType: entity,
+        primaryState: state,
+        nexusStates: nexus,
+        contactEmail: email.trim(),
+        contactPhone: phone.trim() || undefined,
+        servicePackage: bundle,
+      },
+      {
+        onSuccess: ({ id }) => {
+          reset();
+          onClose();
+          navigate(`/clients/${id}`);
+        },
+      }
+    );
   };
 
   const reset = () => {

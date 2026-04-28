@@ -12,7 +12,7 @@ export const env = {
   publicAssetsUrl:
     (import.meta.env.VITE_PUBLIC_ASSETS_URL as string | undefined) ?? "",
   useMockApi:
-    (import.meta.env.VITE_USE_MOCK_API as string | undefined) !== "false",
+    (import.meta.env.VITE_USE_MOCK_API as string | undefined) === "true",
   sentryDsn: (import.meta.env.VITE_SENTRY_DSN as string | undefined) ?? "",
   enableDevTools:
     (import.meta.env.VITE_ENABLE_DEV_TOOLS as string | undefined) === "true",

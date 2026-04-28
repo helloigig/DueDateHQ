@@ -1,717 +1,361 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, ChevronDown, AlertCircle, Filter, Download } from "lucide-react";
-import { useShortcuts } from "../hooks/useKeyboard";
+import { useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
+import { ArrowRight, Inbox, Sparkles, TriangleAlert } from "lucide-react";
+import { trpc } from "../lib/api/client";
 import { useClients } from "../hooks/useClients";
-import { useTriageDeadlines } from "../hooks/useDeadlines";
 import { useDetectAnnouncements } from "../hooks/useAnnouncements";
-import { useRealtimeAnnouncements } from "../hooks/useRealtimeAnnouncements";
-import { ShortcutsModal } from "../components/ShortcutsModal";
+import { AnnouncementBanner } from "../components/AnnouncementBanner";
+import { DeadlineRow } from "../components/DeadlineRow";
 import { DashboardSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
-import {
-  bucketOf,
-  TODAY,
-  toIso,
-  addDays,
-  weekOfLabel,
-  formatLongDate,
-  parseDate,
-  hoursSince,
-  escalationTier,
-} from "../data/dateHelpers";
-import { useDashboardPreferences } from "../data/preferences";
-import { DeadlineRow } from "../components/DeadlineRow";
-import { HeatmapStrip } from "../components/HeatmapStrip";
-import { PriorityCard } from "../components/PriorityCard";
-import { AnnouncementBanner } from "../components/AnnouncementBanner";
-import { BlockingAlertsDialog } from "../components/BlockingAlertsDialog";
-import { ExportModal } from "../components/ExportModal";
-import type { Announcement, Client, Deadline } from "../types";
+import { useSession } from "../data/session";
+import type { Client, Deadline } from "../types";
 
-const HIDE_STATUSES = new Set(["completed", "filed_extension"]);
+const SECTION_META = [
+  {
+    key: "overdue",
+    title: "Overdue",
+    copy: "Needs attention first.",
+  },
+  {
+    key: "thisWeek",
+    title: "This Week",
+    copy: "What you owe clients this week.",
+  },
+  {
+    key: "thisMonth",
+    title: "This Month",
+    copy: "Upcoming work already inside the near-term window.",
+  },
+  {
+    key: "longTerm",
+    title: "Long Term",
+    copy: "The next horizon after this month.",
+  },
+] as const;
 
 export function Dashboard() {
+  const dashboardQuery = trpc.dashboard.get.useQuery();
   const clientsQuery = useClients();
-  const triageQuery = useTriageDeadlines();
-  const announcementsQuery = useRealtimeAnnouncements();
-  const detectMutation = useDetectAnnouncements();
+  const detectAnnouncements = useDetectAnnouncements();
+  const session = useSession();
 
-  // One-shot: run the detector on mount (simulates 24h SLA scrape)
   useEffect(() => {
-    detectMutation.mutate();
+    detectAnnouncements.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const { prefs, update, toggleCollapsed } = useDashboardPreferences();
-  const [thisWeekExpanded, setThisWeekExpanded] = useState(false);
-  const [dayFilter, setDayFilter] = useState<string | null>(null);
-  const [exportOpen, setExportOpen] = useState(false);
-
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const filterBtnRef = useRef<HTMLButtonElement>(null);
-
-  useShortcuts([
-    {
-      key: "j",
-      description: "Next row",
-      handler: () => focusAdjacentRow(1),
-    },
-    {
-      key: "k",
-      description: "Previous row",
-      handler: () => focusAdjacentRow(-1),
-    },
-    {
-      key: "/",
-      description: "Focus filter",
-      handler: () => filterBtnRef.current?.focus(),
-    },
-    {
-      key: "?",
-      shift: true,
-      description: "Show shortcuts",
-      handler: () => setShortcutsOpen(true),
-    },
-  ]);
-
+  const payload = dashboardQuery.data;
   const clients = clientsQuery.data?.items ?? [];
-  const announcements = announcementsQuery.data ?? [];
-  const triage = triageQuery.data;
-
-  const clientsById = useMemo(() => {
+  const clientMap = useMemo(() => {
     const map = new Map<string, Client>();
-    clients.forEach((c) => map.set(c.id, c));
+    for (const client of clients) {
+      map.set(client.id, client);
+    }
     return map;
   }, [clients]);
 
-  const active = useMemo(() => {
-    if (!triage) return [] as Deadline[];
-    return [
-      ...triage.overdue,
-      ...triage.thisWeek,
-      ...triage.thisMonth,
-      ...triage.longTerm,
-    ].filter((d) => !HIDE_STATUSES.has(d.status));
-  }, [triage]);
+  if (dashboardQuery.isLoading || clientsQuery.isLoading) {
+    return <DashboardSkeleton />;
+  }
 
-  const filtered = useMemo(
-    () => (dayFilter ? active.filter((d) => d.officialDueDate === dayFilter) : active),
-    [active, dayFilter]
-  );
-
-  const byBucket = useMemo(() => {
-    const buckets = {
-      overdue: [] as Deadline[],
-      this_week: [] as Deadline[],
-      this_month: [] as Deadline[],
-      long_term: [] as Deadline[],
-    };
-    for (const d of filtered) buckets[bucketOf(d.officialDueDate)].push(d);
-    const byDate = (a: Deadline, b: Deadline) =>
-      a.officialDueDate.localeCompare(b.officialDueDate);
-    buckets.overdue.sort(byDate);
-    buckets.this_week.sort(byDate);
-    buckets.this_month.sort(byDate);
-    buckets.long_term.sort(byDate);
-    return buckets;
-  }, [filtered]);
-
-  const activeBanners = announcements.filter(
-    (a) => !a.dismissed && a.affectedClientIds.length > 0
-  );
-
-  const alertsByTier = useMemo(() => {
-    const out = {
-      fresh: [] as Announcement[],
-      reminder: [] as Announcement[],
-      escalated: [] as Announcement[],
-      blocking: [] as Announcement[],
-    };
-    for (const a of activeBanners) {
-      out[escalationTier(hoursSince(a.detectedAt))].push(a);
-    }
-    return out;
-  }, [activeBanners]);
-
-  const alertsSnoozedToday = prefs.alerts_snoozed_until === toIso(TODAY);
-  const showBlockingDialog =
-    alertsByTier.blocking.length > 0 && !alertsSnoozedToday;
-  const [blockingDismissed, setBlockingDismissed] = useState(false);
-
-  const greeting = useMemo(() => {
-    const dayName = TODAY.toLocaleDateString("en-US", {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-    });
-    return `${dayName} · Good morning, Sarah`;
-  }, []);
-
-  const summary = useMemo(() => {
-    const overdueCount = byBucket.overdue.length;
-    const weekCount = byBucket.this_week.length;
-    const activeClients = clients.filter((c) => c.status === "active").length;
-    const inProgress = active.filter((d) => d.status === "in_progress").length;
-    return { overdueCount, weekCount, activeClients, inProgress };
-  }, [byBucket, clients, active]);
-
-  const upcoming8w = useMemo(() => {
-    const end = toIso(addDays(TODAY, 56));
-    return active.filter(
-      (d) => d.officialDueDate >= toIso(TODAY) && d.officialDueDate < end
-    ).length;
-  }, [active]);
-  const showHeatmap = prefs.heatmap_visible && upcoming8w >= 30;
-
-  const priorityDismissedToday =
-    prefs.priority_dismissed_until === toIso(TODAY);
-  const visibleTopIds = new Set<string>([
-    ...byBucket.overdue.map((d) => d.id),
-    ...byBucket.this_week.map((d) => d.id),
-  ]);
-  const showPriority = !priorityDismissedToday;
-
-  const thisMonthGrouped = useMemo(() => {
-    const groups = new Map<string, Deadline[]>();
-    for (const d of byBucket.this_month) {
-      const key = weekOfLabel(d.officialDueDate);
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(d);
-    }
-    return Array.from(groups.entries());
-  }, [byBucket.this_month]);
-
-  const laterGrouped = useMemo(() => {
-    const groups = new Map<string, Deadline[]>();
-    for (const d of byBucket.long_term) {
-      const date = parseDate(d.officialDueDate);
-      const quarter = Math.floor(date.getMonth() / 3) + 1;
-      const key = `Q${quarter} ${date.getFullYear()}`;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(d);
-    }
-    return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [byBucket.long_term]);
-
-  const laterDescription = useMemo(() => {
-    if (laterGrouped.length === 0) return "";
-    const quarters = laterGrouped.map(([label]) => label.split(" ")[0]).join(" & ");
-    return `${quarters} — ${byBucket.long_term.length} deadlines`;
-  }, [laterGrouped, byBucket.long_term.length]);
-
-  const thisWeekDisplay = thisWeekExpanded
-    ? byBucket.this_week
-    : byBucket.this_week.slice(0, 5);
-
-  const overdueCollapsed = prefs.collapsed_sections.includes("overdue");
-  const thisMonthCollapsed = prefs.collapsed_sections.includes("this_month");
-  const laterCollapsed = prefs.collapsed_sections.includes("later");
-
-  const hasNoClients = clients.length === 0;
-  const hasNoDeadlinesThisWeek =
-    !hasNoClients && byBucket.this_week.length === 0 && byBucket.overdue.length === 0;
-  const nextDeadline = useMemo(() => {
-    if (!hasNoDeadlinesThisWeek) return null;
-    const next = [...byBucket.this_month, ...byBucket.long_term][0];
-    if (!next) return null;
-    const c = clientsById.get(next.clientId);
-    return { deadline: next, client: c };
-  }, [hasNoDeadlinesThisWeek, byBucket, clientsById]);
-
-  const filterEmpty =
-    dayFilter !== null &&
-    byBucket.overdue.length === 0 &&
-    byBucket.this_week.length === 0 &&
-    byBucket.this_month.length === 0 &&
-    byBucket.long_term.length === 0;
-
-  const isLoading = clientsQuery.isLoading || triageQuery.isLoading;
-  const loadError =
-    clientsQuery.error || triageQuery.error || announcementsQuery.error;
-
-  if (isLoading) return <DashboardSkeleton />;
-
-  if (loadError) {
+  if (dashboardQuery.error || clientsQuery.error || !payload) {
     return (
-      <div className="max-w-5xl mx-auto px-4 md:px-6 py-6">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-6">
         <ErrorState
-          title="Couldn't load your dashboard."
-          message={loadError instanceof Error ? loadError.message : undefined}
+          title="Couldn't load the dashboard."
+          message={
+            (dashboardQuery.error ?? clientsQuery.error) instanceof Error
+              ? (dashboardQuery.error ?? clientsQuery.error)?.message
+              : undefined
+          }
           onRetry={() => {
+            dashboardQuery.refetch();
             clientsQuery.refetch();
-            triageQuery.refetch();
-            announcementsQuery.refetch();
           }}
         />
       </div>
     );
   }
 
-  if (hasNoClients) {
+  const grouped = payload.timeGroupedTasks;
+  const hasAnyTasks = SECTION_META.some(
+    (section) => grouped[section.key].length > 0
+  );
+
+  if (payload.stats.activeClients === 0) {
     return (
-      <div className="max-w-5xl mx-auto px-6 py-12">
-        <EmptyState
-          title="Let's get your clients in."
-          actions={
-            <>
-              <EmptyStateButton to="/import" primary>Import CSV</EmptyStateButton>
-              <EmptyStateButton to="/clients">Add 5 manually</EmptyStateButton>
-              <EmptyStateButton to="/import?demo=1">Try demo data</EmptyStateButton>
-            </>
-          }
-        />
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-10">
+        <div className="border border-line bg-surface rounded-md p-8">
+          <div className="text-xs uppercase tracking-wide text-ink-500">
+            Monday-morning triage starts here
+          </div>
+          <h1 className="mt-1 text-2xl font-semibold text-ink-900">
+            Bring in a roster to light up the dashboard
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm text-ink-600">
+            DueDateHQ gets useful as soon as client roster data exists. Import a
+            CSV or load the sample workspace and the app will generate tasks,
+            checklist baselines, and alert matches immediately.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Link
+              to="/onboarding/layer-1"
+              className="text-sm px-3 py-2 rounded-md bg-accent text-canvas hover:bg-accent-hover"
+            >
+              Start onboarding
+            </Link>
+            <Link
+              to="/import"
+              className="text-sm px-3 py-2 rounded-md border border-line hover:bg-sunken"
+            >
+              Open importer
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-5">
-      <AnnouncementBanner announcements={activeBanners} />
-
-      {showBlockingDialog && !blockingDismissed && (
-        <BlockingAlertsDialog
-          alerts={alertsByTier.blocking}
-          onSnooze={(reason) => {
-            update({ alerts_snoozed_until: toIso(TODAY) });
-            if (reason) {
-              console.info(
-                "[alerts] snooze logged",
-                { date: toIso(TODAY), reason }
-              );
-            }
-            setBlockingDismissed(true);
-          }}
-          onClose={() => setBlockingDismissed(true)}
-        />
+    <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 space-y-6">
+      {payload.alertBanner && (
+        <AnnouncementBanner announcements={[payload.alertBanner]} />
       )}
 
-      <div>
-        <h1 className="text-lg font-semibold text-ink-900">{greeting}</h1>
-        <div className="text-sm text-ink-500 mt-1 flex items-center flex-wrap gap-x-2 gap-y-1">
-          <span>
-            <span className="text-ink-900 font-medium">{summary.activeClients}</span>{" "}
-            active clients
-          </span>
-          {summary.overdueCount > 0 && (
-            <>
-              <span className="text-ink-300">·</span>
-              <span className="inline-flex items-center gap-1 text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded font-medium bg-danger-bg text-danger-ink border border-danger-border">
-                <AlertCircle className="w-3 h-3" aria-hidden />
-                {summary.overdueCount} overdue
-              </span>
-            </>
-          )}
-          <span className="text-ink-300">·</span>
-          <span>
-            <span className="text-ink-900 font-medium">{summary.weekCount}</span>{" "}
-            due this week
-          </span>
-          {summary.inProgress > 0 && (
-            <>
-              <span className="text-ink-300">·</span>
-              <span>
-                <span className="text-ink-900 font-medium">{summary.inProgress}</span>{" "}
-                in progress
-              </span>
-            </>
+      <header className="border border-line bg-surface rounded-md p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <div className="text-xs uppercase tracking-wide text-ink-500">
+              Dashboard
+            </div>
+            <h1 className="mt-1 text-2xl font-semibold text-ink-900">
+              Good morning, {session?.userName?.split(" ")[0] ?? "there"}
+            </h1>
+            <p className="mt-2 text-sm text-ink-600">
+              What do you owe whom this week, and did anything change since the
+              last time you looked?
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              to="/alerts"
+              className="text-sm px-3 py-2 rounded-md border border-line hover:bg-sunken"
+            >
+              Review alerts
+            </Link>
+            <Link
+              to="/clients"
+              className="text-sm px-3 py-2 rounded-md border border-line hover:bg-sunken"
+            >
+              Open clients
+            </Link>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard label="Active clients" value={payload.stats.activeClients} />
+          <MetricCard label="Overdue" value={payload.stats.overdue} />
+          <MetricCard label="Due this week" value={payload.stats.dueThisWeek} />
+          <MetricCard label="In progress" value={payload.stats.inProgress} />
+        </div>
+      </header>
+
+      <section className="grid gap-4 lg:grid-cols-[1.45fr_0.95fr]">
+        <div className="space-y-4">
+          {hasAnyTasks ? (
+            SECTION_META.map((section) => (
+              <TaskSection
+                key={section.key}
+                title={section.title}
+                copy={section.copy}
+                rows={grouped[section.key]}
+                clientMap={clientMap}
+              />
+            ))
+          ) : (
+            <div className="border border-line bg-surface rounded-md p-6 text-sm text-ink-600">
+              No open tasks right now.
+            </div>
           )}
         </div>
-      </div>
 
-      {dayFilter && (
-        <div className="bg-info-bg border border-info-border text-info-ink rounded-md px-3 py-2 text-sm flex items-center">
-          <span>Filtered to {formatLongDate(dayFilter)}</span>
-          <button
-            onClick={() => setDayFilter(null)}
-            className="ml-auto text-xs underline"
+        <aside className="space-y-4">
+          <Panel
+            icon={Sparkles}
+            title="Onboarding Layer 3"
+            description={payload.onboardingWidget.title}
           >
-            Clear
-          </button>
-        </div>
-      )}
-
-      {byBucket.overdue.length > 0 && (
-        <Section
-          title="Overdue"
-          count={byBucket.overdue.length}
-          tone="danger"
-          collapsed={overdueCollapsed}
-          onToggleCollapsed={() => toggleCollapsed("overdue")}
-        >
-          <GroupedRows
-            items={byBucket.overdue}
-            clientsById={clientsById}
-            inOverdueSection
-          />
-        </Section>
-      )}
-
-      <Section
-        title="This week"
-        count={byBucket.this_week.length}
-        hero
-        actions={
-          <>
-            <button
-              ref={filterBtnRef}
-              className="text-xs flex items-center gap-1 px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken"
-            >
-              <Filter className="w-3 h-3" aria-hidden />
-              Filter
-            </button>
-            <button
-              onClick={() => setExportOpen(true)}
-              className="text-xs flex items-center gap-1 px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken"
-            >
-              <Download className="w-3 h-3" aria-hidden />
-              Export
-            </button>
-          </>
-        }
-      >
-        {filterEmpty ? (
-          <EmptyRow
-            message="No deadlines match these filters."
-            action={
-              <button
-                onClick={() => setDayFilter(null)}
-                className="text-sm px-3 py-1.5 rounded-md border border-line text-ink-700 hover:bg-sunken"
+            <ul className="space-y-2 text-sm text-ink-600">
+              {payload.onboardingWidget.nextSteps.map((item) => (
+                <li
+                  key={item}
+                  className="border border-line rounded-md px-3 py-3"
+                >
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link
+                to="/onboarding/layer-2"
+                className="text-sm px-3 py-2 rounded-md border border-line hover:bg-sunken inline-flex items-center gap-2"
               >
-                Clear filters
-              </button>
-            }
-          />
-        ) : hasNoDeadlinesThisWeek && nextDeadline?.client ? (
-          <EmptyRow
-            title="All clear this week."
-            message={`Next deadline: ${formatLongDate(
-              nextDeadline.deadline.officialDueDate
-            )} · ${nextDeadline.client.name} · ${nextDeadline.deadline.form}`}
-          />
-        ) : byBucket.this_week.length === 0 ? (
-          <EmptyRow title="All clear this week." message="Nice work." />
-        ) : (
-          <>
-            <GroupedRows items={thisWeekDisplay} clientsById={clientsById} />
-            {byBucket.this_week.length > 5 && (
-              <button
-                onClick={() => setThisWeekExpanded((v) => !v)}
-                className="w-full text-left px-4 py-2 text-xs text-ink-500 hover:bg-sunken border-t border-line"
+                Continue setup
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                to="/settings/integrations"
+                className="text-sm px-3 py-2 rounded-md border border-line hover:bg-sunken"
               >
-                {thisWeekExpanded
-                  ? "Show less"
-                  : `${byBucket.this_week.length - 5} more`}
-              </button>
-            )}
-          </>
-        )}
-      </Section>
+                Integrations
+              </Link>
+            </div>
+          </Panel>
 
-      {showPriority && (
-        <PriorityCard
-          deadlines={filtered}
-          clientsById={clientsById}
-          excludeIds={visibleTopIds}
-          escalatedAlerts={alertsByTier.escalated}
-          onDismiss={() => update({ priority_dismissed_until: toIso(TODAY) })}
-        />
-      )}
+          <Panel
+            icon={Inbox}
+            title="Daily workflow"
+            description="The body of the product is task detail, checklist state, and reminders."
+          >
+            <div className="space-y-3 text-sm text-ink-600">
+              <StepRow
+                title="1. Open a task"
+                copy="Start from any row below to see the client-specific checklist."
+              />
+              <StepRow
+                title="2. Chase missing items"
+                copy="Send reminder drafts from requested or flagged checklist rows."
+              />
+              <StepRow
+                title="3. Review inbound"
+                copy="Confirm, reject, or mark issues when documents arrive."
+              />
+            </div>
+          </Panel>
 
-      <Section
-        title="This month"
-        count={byBucket.this_month.length}
-        collapsed={thisMonthCollapsed}
-        onToggleCollapsed={() => toggleCollapsed("this_month")}
-      >
-        {thisMonthGrouped.length === 0 ? (
-          <EmptyRow message="Nothing else this month." />
-        ) : (
-          thisMonthGrouped.map(([label, items]) => (
-            <WeekGroup
-              key={label}
-              label={label}
-              items={items}
-              clientsById={clientsById}
-            />
-          ))
-        )}
-      </Section>
-
-      <Section
-        title="Later this year"
-        count={byBucket.long_term.length}
-        description={laterDescription}
-        collapsed={laterCollapsed}
-        onToggleCollapsed={() => toggleCollapsed("later")}
-      >
-        {laterGrouped.map(([label, items]) => (
-          <WeekGroup
-            key={label}
-            label={label}
-            items={items}
-            clientsById={clientsById}
-          />
-        ))}
-      </Section>
-
-      {showHeatmap && (
-        <HeatmapStrip
-          deadlines={active}
-          selectedDate={dayFilter ?? undefined}
-          onDayClick={(iso) =>
-            setDayFilter((cur) => (cur === iso ? null : iso))
-          }
-          onHide={() => update({ heatmap_visible: false })}
-        />
-      )}
-
-      {!showHeatmap && prefs.heatmap_visible === false && upcoming8w >= 30 && (
-        <button
-          onClick={() => update({ heatmap_visible: true })}
-          className="text-xs text-ink-500 hover:text-ink-900 underline"
-        >
-          Show heatmap
-        </button>
-      )}
-
-      <ExportModal
-        open={exportOpen}
-        deadlines={filtered}
-        clients={clients}
-        title="Export deadlines"
-        onClose={() => setExportOpen(false)}
-      />
-
-      <ShortcutsModal
-        open={shortcutsOpen}
-        onClose={() => setShortcutsOpen(false)}
-        shortcuts={[
-          { keys: ["j"], label: "Next deadline row" },
-          { keys: ["k"], label: "Previous deadline row" },
-          { keys: ["Enter"], label: "Open focused row's actions" },
-          { keys: ["c"], label: "Mark focused row complete" },
-          { keys: ["/"], label: "Focus filter" },
-          { keys: ["⌘", "k"], label: "Open search" },
-          { keys: ["?"], label: "Show this help" },
-          { keys: ["Esc"], label: "Close dialog" },
-        ]}
-      />
-
-      <div className="pt-2 pb-6 text-2xs text-ink-400 flex items-center justify-end">
-        <button
-          onClick={() => setShortcutsOpen(true)}
-          className="hover:text-ink-700 flex items-center gap-1"
-        >
-          <kbd className="px-1 py-0.5 border border-line rounded font-mono">?</kbd>
-          for shortcuts
-        </button>
-      </div>
+          <Panel
+            icon={TriangleAlert}
+            title="Alert posture"
+            description="The wedge is still visible, but it supports the daily workflow instead of replacing it."
+          >
+            <div className="text-sm text-ink-600">
+              {payload.alertBanner ? (
+                <>
+                  <div className="font-medium text-ink-900">
+                    {payload.alertBanner.title}
+                  </div>
+                  <div className="mt-1">
+                    {payload.alertBanner.affectedClientIds.length} clients may
+                    need deadline or communication updates.
+                  </div>
+                </>
+              ) : (
+                "No active state alert is currently affecting this firm."
+              )}
+            </div>
+          </Panel>
+        </aside>
+      </section>
     </div>
   );
 }
 
-function focusAdjacentRow(direction: 1 | -1) {
-  const rows = Array.from(
-    document.querySelectorAll<HTMLElement>("[data-deadline-row]")
-  );
-  if (rows.length === 0) return;
-  const active = document.activeElement as HTMLElement | null;
-  const currentIndex = rows.findIndex((r) => r === active);
-  const nextIndex =
-    currentIndex === -1
-      ? direction > 0
-        ? 0
-        : rows.length - 1
-      : Math.max(0, Math.min(rows.length - 1, currentIndex + direction));
-  rows[nextIndex]?.focus();
-  rows[nextIndex]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-}
-
-function GroupedRows({
-  items,
-  clientsById,
-  inOverdueSection = false,
+function MetricCard({
+  label,
+  value,
 }: {
-  items: Deadline[];
-  clientsById: Map<string, Client>;
-  inOverdueSection?: boolean;
+  label: string;
+  value: number;
 }) {
-  const rows: React.ReactNode[] = [];
-  let lastKey: string | null = null;
-  for (const d of items) {
-    const client = clientsById.get(d.clientId);
-    if (!client) continue;
-    const key = `${d.clientId}:${d.officialDueDate}`;
-    const suppress = key === lastKey;
-    rows.push(
-      <DeadlineRow
-        key={d.id}
-        deadline={d}
-        client={client}
-        suppressClientName={suppress}
-        inOverdueSection={inOverdueSection}
-      />
-    );
-    lastKey = key;
-  }
-  return <>{rows}</>;
+  return (
+    <div className="border border-line rounded-md px-4 py-4">
+      <div className="text-xs uppercase tracking-wide text-ink-500">{label}</div>
+      <div className="mt-2 text-2xl font-semibold text-ink-900">{value}</div>
+    </div>
+  );
 }
 
-function Section({
+function TaskSection({
   title,
-  count,
-  description,
-  children,
-  hero = false,
-  tone = "neutral",
-  actions,
-  collapsed = false,
-  onToggleCollapsed,
+  copy,
+  rows,
+  clientMap,
 }: {
   title: string;
-  count?: number;
-  description?: string;
-  children: React.ReactNode;
-  hero?: boolean;
-  tone?: "neutral" | "danger";
-  actions?: React.ReactNode;
-  collapsed?: boolean;
-  onToggleCollapsed?: () => void;
+  copy: string;
+  rows: Deadline[];
+  clientMap: Map<string, Client>;
 }) {
-  const titleClass =
-    tone === "danger" ? "text-danger-ink" : "text-ink-700";
-  const headerBg = tone === "danger" ? "bg-danger-bg/40" : "";
-  const heroRing = hero ? "ring-1 ring-accent/5" : "";
   return (
-    <section
-      className={`bg-surface border border-line rounded-md overflow-hidden ${heroRing}`}
-    >
-      <header
-        className={`flex items-center px-4 py-3 border-b border-line ${headerBg}`}
-      >
-        <h2
-          className={`text-xs font-semibold uppercase tracking-wider ${titleClass}`}
-        >
-          {title}
-          {typeof count === "number" && (
-            <span className="ml-2 text-ink-400 font-normal normal-case tracking-normal">
-              ({count})
-            </span>
-          )}
-        </h2>
-        {description && (
-          <span className="ml-3 text-xs text-ink-500 normal-case tracking-normal">
-            {description}
-          </span>
-        )}
-        {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
-        {onToggleCollapsed && !actions && (
-          <button
-            onClick={onToggleCollapsed}
-            className="ml-auto text-ink-400 hover:text-ink-900 flex items-center"
-            aria-label={collapsed ? "Expand section" : "Collapse section"}
-            title={collapsed ? "Expand" : "Collapse"}
-          >
-            {collapsed ? (
-              <ChevronRight className="w-4 h-4" aria-hidden />
-            ) : (
-              <ChevronDown className="w-4 h-4" aria-hidden />
-            )}
-          </button>
-        )}
+    <section className="border border-line bg-surface rounded-md overflow-hidden">
+      <header className="px-4 py-4 border-b border-line flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-ink-900">{title}</h2>
+          <p className="text-sm text-ink-600">{copy}</p>
+        </div>
+        <div className="text-xs text-ink-500">{rows.length} task{rows.length === 1 ? "" : "s"}</div>
       </header>
-      {!collapsed && <div>{children}</div>}
+      {rows.length === 0 ? (
+        <div className="px-4 py-5 text-sm text-ink-500">Nothing in this bucket.</div>
+      ) : (
+        <div>
+          {rows.map((deadline) => {
+            const client = clientMap.get(deadline.clientId);
+            if (!client) return null;
+            return (
+              <DeadlineRow
+                key={deadline.id}
+                deadline={deadline}
+                client={client}
+                inOverdueSection={title === "Overdue"}
+              />
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }
 
-function EmptyRow({
+function Panel({
+  icon: Icon,
   title,
-  message,
-  action,
-}: {
-  title?: string;
-  message: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="px-4 py-6 text-sm text-ink-500">
-      {title && <p className="text-ink-900 font-medium mb-0.5">{title}</p>}
-      <p>{message}</p>
-      {action && <div className="mt-3">{action}</div>}
-    </div>
-  );
-}
-
-function WeekGroup({
-  label,
-  items,
-  clientsById,
-}: {
-  label: string;
-  items: Deadline[];
-  clientsById: Map<string, Client>;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="border-b border-line last:border-b-0">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center px-4 py-2.5 text-sm text-ink-700 hover:bg-sunken"
-      >
-        <span className="flex-1 text-left">{label}</span>
-        <span className="text-xs text-ink-500">
-          {items.length} deadline{items.length === 1 ? "" : "s"}
-        </span>
-        <span className="ml-3 text-ink-400">
-          {open ? (
-            <ChevronDown className="w-4 h-4" aria-hidden />
-          ) : (
-            <ChevronRight className="w-4 h-4" aria-hidden />
-          )}
-        </span>
-      </button>
-      {open && (
-        <div>
-          <GroupedRows items={items} clientsById={clientsById} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function EmptyState({
-  title,
-  actions,
-}: {
-  title: string;
-  actions: React.ReactNode;
-}) {
-  return (
-    <div className="bg-surface border border-line rounded-md px-6 py-16 text-center">
-      <p className="text-sm text-ink-700 font-medium">{title}</p>
-      <div className="mt-4 flex items-center justify-center gap-2">
-        {actions}
-      </div>
-    </div>
-  );
-}
-
-function EmptyStateButton({
-  to,
-  primary,
+  description,
   children,
 }: {
-  to: string;
-  primary?: boolean;
+  icon: typeof Sparkles;
+  title: string;
+  description: string;
   children: React.ReactNode;
 }) {
-  const cls = primary
-    ? "text-sm px-3 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover"
-    : "text-sm px-3 py-1.5 rounded-md border border-line text-ink-700 hover:bg-sunken";
   return (
-    <a href={to} className={cls}>
-      {children}
-    </a>
+    <section className="border border-line bg-surface rounded-md p-4">
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 rounded-md border border-line flex items-center justify-center">
+          <Icon className="w-4 h-4 text-ink-900" />
+        </div>
+        <div>
+          <h2 className="text-sm font-semibold text-ink-900">{title}</h2>
+          <p className="text-xs text-ink-500">{description}</p>
+        </div>
+      </div>
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
+function StepRow({
+  title,
+  copy,
+}: {
+  title: string;
+  copy: string;
+}) {
+  return (
+    <div className="border border-line rounded-md px-3 py-3">
+      <div className="font-medium text-ink-900">{title}</div>
+      <div className="mt-1">{copy}</div>
+    </div>
   );
 }

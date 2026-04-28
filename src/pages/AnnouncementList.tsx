@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ChevronRight } from "lucide-react";
+import { ArrowRight, BellRing, TriangleAlert } from "lucide-react";
 import { useAnnouncements } from "../hooks/useAnnouncements";
 import { PageSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
@@ -8,11 +8,14 @@ import { formatLongDate } from "../data/dateHelpers";
 export function AnnouncementList() {
   const announcementsQuery = useAnnouncements();
   const announcements = announcementsQuery.data ?? [];
-  if (announcementsQuery.isLoading)
-    return <PageSkeleton title="Loading alerts…" />;
+
+  if (announcementsQuery.isLoading) {
+    return <PageSkeleton title="Loading alerts..." />;
+  }
+
   if (announcementsQuery.error) {
     return (
-      <div className="max-w-4xl mx-auto px-4 md:px-6 py-6">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-6">
         <ErrorState
           title="Couldn't load alerts."
           message={
@@ -25,75 +28,158 @@ export function AnnouncementList() {
       </div>
     );
   }
-  const activeAnnouncements = announcements.filter((a) => !a.dismissed);
-  const hasAny = announcements.length > 0;
-  const allDismissed = hasAny && activeAnnouncements.length === 0;
+
+  const active = announcements.filter((item) => !item.dismissed);
+  const archived = announcements.filter((item) => item.dismissed);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 md:px-6 py-6">
-      <h1 className="text-lg font-semibold text-ink-900">Alerts</h1>
-      <p className="text-sm text-ink-500 mt-1">
-        State DOR announcements and regulation changes affecting your clients,
-        detected within 24 hours.
-      </p>
+    <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 space-y-6">
+      <header className="border border-line bg-surface rounded-md p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <div className="text-xs uppercase tracking-wide text-ink-500">
+              Alerts
+            </div>
+            <h1 className="mt-1 text-2xl font-semibold text-ink-900">
+              State changes that may alter client work
+            </h1>
+            <p className="mt-2 text-sm text-ink-600 max-w-3xl">
+              Alerts are the wedge. The actual value is what happens after they
+              arrive: matched clients, deadline changes, and client communication.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Metric label="Active alerts" value={active.length} />
+            <Metric
+              label="Unread"
+              value={active.filter((item) => !item.read).length}
+            />
+            <Metric
+              label="Affected clients"
+              value={active.reduce(
+                (total, item) => total + item.affectedClientIds.length,
+                0
+              )}
+            />
+          </div>
+        </div>
+      </header>
 
-      {!hasAny ? (
-        <div className="mt-6 bg-surface border border-line rounded-md px-6 py-12 text-center">
-          <p className="text-sm text-ink-700 font-medium">
-            No state announcements affecting your clients.
-          </p>
-          <p className="text-xs text-ink-500 mt-1">
-            We check 50 state authorities every hour. You'll see anything relevant here.
-          </p>
+      <AlertSection
+        title="Active alerts"
+        description="Review these first. Each one can fan out into deadline adjustment and notify-client work."
+        icon={TriangleAlert}
+        items={active}
+      />
+
+      <AlertSection
+        title="Archived alerts"
+        description="Dismissed items remain visible for audit context."
+        icon={BellRing}
+        items={archived}
+      />
+    </div>
+  );
+}
+
+function AlertSection({
+  title,
+  description,
+  icon: Icon,
+  items,
+}: {
+  title: string;
+  description: string;
+  icon: typeof TriangleAlert;
+  items: ReturnType<typeof useAnnouncements>["data"];
+}) {
+  return (
+    <section className="border border-line bg-surface rounded-md overflow-hidden">
+      <header className="px-5 py-4 border-b border-line flex items-center gap-2">
+        <Icon className="w-4 h-4 text-ink-900" />
+        <div>
+          <h2 className="text-sm font-semibold text-ink-900">{title}</h2>
+          <p className="text-sm text-ink-600">{description}</p>
         </div>
-      ) : allDismissed ? (
-        <div className="mt-6 bg-surface border border-line rounded-md px-6 py-12 text-center">
-          <p className="text-sm text-ink-700 font-medium">All caught up.</p>
-          <p className="text-xs text-ink-500 mt-1">
-            Dismissed announcements are archived in Settings › Alerts.
-          </p>
-        </div>
+      </header>
+      {!items || items.length === 0 ? (
+        <div className="px-5 py-8 text-sm text-ink-500">Nothing here right now.</div>
       ) : (
-        <ul className="mt-5 space-y-3">
-          {announcements.map((a) => {
-            const tone =
-              a.type === "disaster_extension"
-                ? "border-l-danger-solid"
-                : a.type === "pte_change" || a.type === "penalty_relief"
-                ? "border-l-warn-solid"
-                : "border-l-info-solid";
-            return (
-              <li key={a.id}>
-                <Link
-                  to={`/announcements/${a.id}`}
-                  className={`block bg-surface border border-line border-l-4 ${tone} rounded-md p-4 hover:bg-sunken transition-colors`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-2xs uppercase tracking-wider text-ink-500">
-                        {a.authority}
-                      </div>
-                      <h2 className="text-base font-medium text-ink-900 mt-1">
-                        {a.title}
-                      </h2>
-                      <p className="text-sm text-ink-700 mt-1 line-clamp-2">
-                        {a.summary}
-                      </p>
-                      <div className="mt-2 text-xs text-ink-500">
-                        Published {formatLongDate(a.publishedDate)} ·{" "}
-                        {a.affectedClientIds.length} affected clients
-                        {a.dismissed && " · Dismissed"}
-                        {!a.read && !a.dismissed && " · Unread"}
-                      </div>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-ink-400 shrink-0 mt-1" aria-hidden />
+        <div className="divide-y divide-line">
+          {items.map((item) => (
+            <Link
+              key={item.id}
+              to={`/alerts/${item.id}`}
+              className="block px-5 py-4 hover:bg-sunken"
+            >
+              <div className="flex flex-col gap-3 xl:grid xl:grid-cols-[minmax(0,1.2fr)_160px_220px_auto] xl:items-center">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs px-2 py-1 rounded border border-line text-ink-500">
+                      {item.authority}
+                    </span>
+                    {!item.read && !item.dismissed && (
+                      <span className="text-xs px-2 py-1 rounded border border-line text-ink-500">
+                        unread
+                      </span>
+                    )}
                   </div>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+                  <div className="mt-2 text-sm font-medium text-ink-900">
+                    {item.stateCode}: {item.title}
+                  </div>
+                  <div className="mt-1 text-sm text-ink-600 line-clamp-2">
+                    {item.summary}
+                  </div>
+                </div>
+                <InfoBlock
+                  label="Published"
+                  value={formatLongDate(item.publishedDate)}
+                />
+                <InfoBlock
+                  label="Affected clients"
+                  value={String(item.affectedClientIds.length)}
+                />
+                <div className="xl:justify-self-end">
+                  <span className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded-md border border-line">
+                    Review alert
+                    <ArrowRight className="w-4 h-4" />
+                  </span>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
       )}
+    </section>
+  );
+}
+
+function Metric({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="border border-line rounded-md px-4 py-4 min-w-[120px]">
+      <div className="text-xs uppercase tracking-wide text-ink-500">{label}</div>
+      <div className="mt-2 text-2xl font-semibold text-ink-900">{value}</div>
+    </div>
+  );
+}
+
+function InfoBlock({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div>
+      <div className="text-xs uppercase tracking-wide text-ink-500">{label}</div>
+      <div className="mt-1 text-sm font-medium text-ink-900">{value}</div>
     </div>
   );
 }

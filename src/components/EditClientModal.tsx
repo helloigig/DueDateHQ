@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { actions } from "../data/store";
 import type { Client, EntityType, StateCode } from "../types";
 import { STATE_NAMES } from "../types";
 import { useModalDialog } from "../hooks/useModalDialog";
 import { MigrationPreviewModal } from "./MigrationPreviewModal";
+import { useUpdateClient } from "../hooks/useClients";
 
 const ENTITY_OPTIONS: EntityType[] = [
   "Individual",
@@ -31,6 +31,7 @@ export function EditClientModal({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [migrationOpen, setMigrationOpen] = useState(false);
+  const updateClient = useUpdateClient();
 
   useEffect(() => {
     if (open && client) {
@@ -56,16 +57,25 @@ export function EditClientModal({
       JSON.stringify([...client.nexusStates].sort());
 
   const commitSave = () => {
-    actions.updateClient(client.id, {
-      name: name.trim(),
-      entityType: entity,
-      primaryState: state,
-      nexusStates: nexus,
-      contactEmail: email.trim(),
-      contactPhone: phone.trim() || undefined,
-    });
-    setMigrationOpen(false);
-    onClose();
+    updateClient.mutate(
+      {
+        id: client.id,
+        patch: {
+          name: name.trim(),
+          entityType: entity,
+          primaryState: state,
+          nexusStates: nexus,
+          contactEmail: email.trim(),
+          contactPhone: phone.trim() || undefined,
+        },
+      },
+      {
+        onSuccess: () => {
+          setMigrationOpen(false);
+          onClose();
+        },
+      }
+    );
   };
 
   const onSave = () => {

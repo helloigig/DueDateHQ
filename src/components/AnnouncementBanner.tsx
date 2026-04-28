@@ -18,7 +18,7 @@ import {
   escalationTier,
   type EscalationTier,
 } from "../data/dateHelpers";
-import { actions } from "../data/store";
+import { useDismissAnnouncement } from "../hooks/useAnnouncements";
 
 type Tone = "danger" | "warn" | "info";
 
@@ -97,6 +97,7 @@ export function AnnouncementBanner({
 
 function BannerCard({ ann }: { ann: Announcement }) {
   const [dismissing, setDismissing] = useState(false);
+  const dismissAnnouncement = useDismissAnnouncement();
   const hours = hoursSince(ann.detectedAt);
   const tier = escalationTier(hours);
   const tone = toneFor(ann.type, tier);
@@ -107,7 +108,7 @@ function BannerCard({ ann }: { ann: Announcement }) {
     e.preventDefault();
     e.stopPropagation();
     setDismissing(true);
-    setTimeout(() => actions.dismissAnnouncement(ann.id), 3000);
+    setTimeout(() => dismissAnnouncement.mutate({ id: ann.id }), 3000);
   };
 
   if (dismissing) {
@@ -124,7 +125,7 @@ function BannerCard({ ann }: { ann: Announcement }) {
         <Icon className="w-4 h-4 shrink-0" aria-hidden />
         <div className="flex-1 min-w-0">
           <Link
-            to={`/announcements/${ann.id}`}
+            to={`/alerts/${ann.id}`}
             className="block hover:underline"
           >
             <div className="text-sm font-medium">
@@ -147,7 +148,7 @@ function BannerCard({ ann }: { ann: Announcement }) {
           )}
         </div>
         <Link
-          to={`/announcements/${ann.id}`}
+          to={`/alerts/${ann.id}`}
           className={`text-sm font-medium flex items-center gap-1 shrink-0 px-2 py-1 rounded hover:bg-surface/60 ${TONE_SUB_CLASSES[tone]}`}
         >
           Review

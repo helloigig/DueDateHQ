@@ -1,64 +1,629 @@
 import { useMemo, useState } from "react";
-import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
-import { Mail, Bell, User, Download, Upload, Users2, Trash2 } from "lucide-react";
-import { actions } from "../data/store";
-import { useImportHistory } from "../hooks/useImports";
-import { signOut, updateSession, useSession } from "../data/session";
-import { ConfirmDialog } from "../components/ConfirmDialog";
-import { ErrorState } from "../components/ErrorState";
-import { UpgradePrompt } from "../components/UpgradePrompt";
-import { useFeatureFlags } from "../hooks/useFeatureFlags";
-import type { FirmSession } from "../data/session";
+import { NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import {
+  BadgeDollarSign,
+  Building2,
+  CreditCard,
+  FolderSync,
+  Link2,
+  Mail,
+  Shield,
+  Users2,
+} from "lucide-react";
+import { trpc } from "../lib/api/client";
+import { useFirm } from "../hooks/useFirm";
+import { useImportHistory, useUndoImport } from "../hooks/useImports";
+import {
+  useAvailableIntegrations,
+  useConnectIntegration,
+  useDisconnectIntegration,
+  useIntegrations,
+  useSyncIntegration,
+} from "../hooks/useIntegrations";
+import { useReminderTemplates, useUpdateReminderTemplate } from "../hooks/useReminderTemplates";
+import { useServicePackages } from "../hooks/useServicePackages";
+import { signOut, updateSession, useSession, type FirmSession } from "../data/session";
+import { useRemoteSession } from "../hooks/useSession";
+import type { ReminderTemplate } from "../types";
 
 const NAV = [
-  { to: "/settings", label: "Profile", icon: User, end: true },
-  { to: "/settings/alerts", label: "Alerts & email", icon: Mail },
-  { to: "/settings/notifications", label: "Notifications", icon: Bell },
-  { to: "/settings/imports", label: "Imports", icon: Upload },
-  { to: "/settings/team", label: "Team", icon: Users2 },
-  { to: "/settings/data", label: "Data", icon: Download },
+  { to: "firm", label: "Firm", icon: Building2 },
+  { to: "team", label: "Team", icon: Users2 },
+  { to: "packages", label: "Service Packages", icon: BadgeDollarSign },
+  { to: "reminders", label: "Reminders", icon: Mail },
+  { to: "integrations", label: "Integrations", icon: Link2 },
+  { to: "imports", label: "Imports", icon: FolderSync },
+  { to: "billing", label: "Billing", icon: CreditCard },
+  { to: "account", label: "Account", icon: Shield },
 ];
 
 export function Settings() {
+  const remoteSession = useRemoteSession();
+  const summary = useMemo(() => {
+    const firm = remoteSession.data?.firm;
+    if (!firm) return null;
+    return [
+      `${firm.tier} plan`,
+      firm.subscriptionStatus.replace(/_/g, " "),
+      firm.primaryStates.length > 0
+        ? `${firm.primaryStates.length} primary state${
+            firm.primaryStates.length === 1 ? "" : "s"
+          }`
+        : "no states set",
+    ];
+  }, [remoteSession.data]);
+
   return (
-    <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 flex flex-col md:flex-row gap-6">
-      <aside className="md:w-56 shrink-0">
-        <h1 className="text-lg font-semibold text-ink-900 mb-3">Settings</h1>
-        <nav className="flex md:flex-col gap-0.5 overflow-x-auto md:overflow-visible -mx-4 md:mx-0 px-4 md:px-0 pb-1 md:pb-0">
-          {NAV.map(({ to, label, icon: Icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              className={({ isActive }) =>
-                `flex items-center gap-2 px-3 py-1.5 rounded text-sm whitespace-nowrap shrink-0 ${
-                  isActive
-                    ? "bg-sunken text-ink-900 font-medium"
-                    : "text-ink-500 hover:bg-sunken hover:text-ink-900"
-                }`
-              }
-            >
-              <Icon className="w-3.5 h-3.5 shrink-0" aria-hidden />
-              {label}
-            </NavLink>
-          ))}
-        </nav>
-      </aside>
-      <div className="flex-1 min-w-0">
-        <Routes>
-          <Route index element={<ProfilePanel />} />
-          <Route path="alerts" element={<AlertsPanel />} />
-          <Route path="notifications" element={<NotificationsPanel />} />
-          <Route path="imports" element={<ImportsPanel />} />
-          <Route path="team" element={<TeamPanel />} />
-          <Route path="data" element={<DataPanel />} />
-        </Routes>
+    <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 space-y-6">
+      <header className="border border-line bg-surface rounded-md p-5">
+        <div className="text-xs uppercase tracking-wide text-ink-500">
+          Settings
+        </div>
+        <h1 className="mt-1 text-2xl font-semibold text-ink-900">
+          Configure the firm behind the workflow
+        </h1>
+        <p className="mt-2 text-sm text-ink-600 max-w-3xl">
+          This is where DueDateHQ picks up firm identity, team access, service
+          package baselines, reminder templates, integrations, and billing
+          limits.
+        </p>
+        {summary && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {summary.map((item) => (
+              <span
+                key={item}
+                className="text-xs px-2 py-1 rounded border border-line text-ink-600"
+              >
+                {item}
+              </span>
+            ))}
+          </div>
+        )}
+      </header>
+
+      <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
+        <aside className="border border-line bg-surface rounded-md overflow-hidden h-fit">
+          <nav className="divide-y divide-line">
+            {NAV.map(({ to, label, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-4 py-3 text-sm ${
+                    isActive
+                      ? "bg-sunken text-ink-900 font-medium"
+                      : "text-ink-600 hover:bg-sunken"
+                  }`
+                }
+              >
+                <Icon className="w-4 h-4" />
+                <span>{label}</span>
+              </NavLink>
+            ))}
+          </nav>
+        </aside>
+
+        <div className="min-w-0">
+          <Routes>
+            <Route index element={<Navigate to="firm" replace />} />
+            <Route path="firm" element={<FirmPanel />} />
+            <Route path="team" element={<TeamPanel />} />
+            <Route path="packages" element={<PackagesPanel />} />
+            <Route path="reminders" element={<RemindersPanel />} />
+            <Route path="integrations" element={<IntegrationsPanel />} />
+            <Route path="imports" element={<ImportsPanel />} />
+            <Route path="billing" element={<BillingPanel />} />
+            <Route path="account" element={<AccountPanel />} />
+          </Routes>
+        </div>
       </div>
     </div>
   );
 }
 
-function Card({
+function FirmPanel() {
+  const { firm, isLoading } = useFirm();
+  const sessionQuery = useRemoteSession();
+
+  if (isLoading) {
+    return <Surface title="Firm">Loading…</Surface>;
+  }
+
+  if (!firm || !sessionQuery.data) {
+    return <Surface title="Firm">Firm details are unavailable.</Surface>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <Surface
+        title="Firm profile"
+        description="Tenant-level identity and limits used across onboarding, reminders, and alerts."
+      >
+        <KeyValueGrid
+          rows={[
+            ["Name", firm.name],
+            ["Tier", firm.tier],
+            ["Subscription", firm.subscriptionStatus.replace(/_/g, " ")],
+            ["Primary states", firm.primaryStates.join(", ") || "None set"],
+            ["Client limit", firm.clientLimit === null ? "Unlimited" : String(firm.clientLimit)],
+            ["Seat limit", String(firm.seatLimit)],
+          ]}
+        />
+      </Surface>
+
+      <Surface
+        title="Branding surfaces"
+        description="Wireframe-level for now, but these values already flow into outbound email and account identity."
+      >
+        <KeyValueGrid
+          rows={[
+            [
+              "Email signature",
+              sessionQuery.data.firm.branding?.emailSignature ??
+                "Best, Sarah Mitchell\nMitchell CPA",
+            ],
+            [
+              "Primary color",
+              sessionQuery.data.firm.branding?.primaryColor ?? "Not customized",
+            ],
+            ["Logo", sessionQuery.data.firm.logoStorageKey ?? "No logo uploaded"],
+          ]}
+        />
+      </Surface>
+    </div>
+  );
+}
+
+function TeamPanel() {
+  const teamQuery = trpc.team.list.useQuery();
+  const invite = trpc.team.invite.useMutation({
+    onSuccess: () => teamQuery.refetch(),
+  });
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<"owner" | "member">("member");
+
+  return (
+    <div className="space-y-4">
+      <Surface
+        title="Team access"
+        description="Owners can manage firm settings. Members work tasks, review checklist items, and send reminders."
+      >
+        <form
+          className="grid gap-3 md:grid-cols-[1fr_180px_auto]"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!email.trim()) return;
+            invite.mutate(
+              { email: email.trim(), role },
+              {
+                onSuccess: () => {
+                  setEmail("");
+                  setRole("member");
+                },
+              }
+            );
+          }}
+        >
+          <input
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="teammate@firm.com"
+            className="px-3 py-2 rounded-md border border-line text-sm"
+          />
+          <select
+            value={role}
+            onChange={(event) => setRole(event.target.value as "owner" | "member")}
+            className="px-3 py-2 rounded-md border border-line text-sm bg-surface"
+          >
+            <option value="member">Member</option>
+            <option value="owner">Owner</option>
+          </select>
+          <button
+            type="submit"
+            disabled={invite.isPending}
+            className="text-sm px-3 py-2 rounded-md bg-accent text-canvas hover:bg-accent-hover disabled:opacity-60"
+          >
+            {invite.isPending ? "Inviting…" : "Invite teammate"}
+          </button>
+        </form>
+      </Surface>
+
+      <Surface title="Current team">
+        <div className="divide-y divide-line">
+          {(teamQuery.data ?? []).map((member) => (
+            <div
+              key={member.id}
+              className="py-3 flex flex-col gap-1 md:flex-row md:items-center md:justify-between"
+            >
+              <div>
+                <div className="text-sm font-medium text-ink-900">
+                  {member.displayName ?? member.email}
+                </div>
+                <div className="text-xs text-ink-500">{member.email}</div>
+              </div>
+              <div className="text-xs text-ink-500">
+                {member.role} · Last active {member.lastActiveAt ?? "recently"}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Surface>
+    </div>
+  );
+}
+
+function PackagesPanel() {
+  const packagesQuery = useServicePackages();
+  const packages = packagesQuery.data ?? [];
+
+  return (
+    <Surface
+      title="Service packages"
+      description="The Mode A baseline starts here. Packages determine which deadlines and checklist items appear on client tasks."
+    >
+      <div className="space-y-3">
+        {packages.map((pkg) => (
+          <div key={pkg.id} className="border border-line rounded-md p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-medium text-ink-900">{pkg.name}</h3>
+              <span className="text-xs px-2 py-1 rounded border border-line text-ink-500">
+                {pkg.isSystem ? "System" : "Custom"}
+              </span>
+            </div>
+            {pkg.description && (
+              <p className="mt-2 text-sm text-ink-600">{pkg.description}</p>
+            )}
+            <div className="mt-3 flex flex-wrap gap-2 text-xs text-ink-500">
+              <span className="px-2 py-1 rounded bg-sunken">
+                Entities: {pkg.applicableEntityTypes.join(", ") || "Any"}
+              </span>
+              <span className="px-2 py-1 rounded bg-sunken">
+                States: {pkg.applicableStates.join(", ") || "Any"}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Surface>
+  );
+}
+
+function RemindersPanel() {
+  const templatesQuery = useReminderTemplates();
+  const updateTemplate = useUpdateReminderTemplate();
+
+  return (
+    <Surface
+      title="Reminder templates"
+      description="These are the Phase 1 drafts that feed the email modal. Tone switching happens at send time; the template is the baseline."
+    >
+      <div className="space-y-4">
+        {(templatesQuery.data ?? []).map((template) => (
+          <ReminderTemplateEditor
+            key={template.id}
+            template={template}
+            onSave={(patch) =>
+              updateTemplate.mutate({ id: template.id, patch })
+            }
+            saving={updateTemplate.isPending && updateTemplate.variables?.id === template.id}
+          />
+        ))}
+      </div>
+    </Surface>
+  );
+}
+
+function IntegrationsPanel() {
+  const integrationsQuery = useIntegrations();
+  const availableQuery = useAvailableIntegrations();
+  const connect = useConnectIntegration();
+  const syncNow = useSyncIntegration();
+  const disconnect = useDisconnectIntegration();
+  const integrations = integrationsQuery.data ?? [];
+  const available = availableQuery.data ?? [];
+
+  return (
+    <div className="space-y-4">
+      <Surface
+        title="Connected sources"
+        description="This is the Layer 2 and Layer 3 growth surface: roster first, then one source, then ongoing enrichment."
+      >
+        <div className="space-y-3">
+          {available.map((item) => {
+            const existing = integrations.find((row) => row.type === item.type);
+            return (
+              <div
+                key={item.type}
+                className="border border-line rounded-md p-4 flex flex-col gap-3 md:flex-row md:items-center"
+              >
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-ink-900">
+                    {item.label}
+                  </div>
+                  <div className="mt-1 text-xs text-ink-500">
+                    Tier {item.tier} ·{" "}
+                    {existing
+                      ? `status ${existing.status}`
+                      : "not connected"}
+                    {existing?.lastSyncAt
+                      ? ` · last sync ${new Date(existing.lastSyncAt).toLocaleString()}`
+                      : ""}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {existing ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => syncNow.mutate({ id: existing.id })}
+                        className="text-sm px-3 py-2 rounded-md border border-line hover:bg-sunken"
+                      >
+                        Sync now
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => disconnect.mutate({ id: existing.id })}
+                        className="text-sm px-3 py-2 rounded-md border border-line hover:bg-sunken"
+                      >
+                        Disconnect
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => connect.mutate({ type: item.type })}
+                      className="text-sm px-3 py-2 rounded-md bg-accent text-canvas hover:bg-accent-hover"
+                    >
+                      Connect
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Surface>
+    </div>
+  );
+}
+
+function ImportsPanel() {
+  const historyQuery = useImportHistory();
+  const undoImport = useUndoImport();
+  const rows = historyQuery.data ?? [];
+
+  return (
+    <Surface
+      title="Import history"
+      description="Import Tier 1 is the signup unlock. Tiers 2-4 build on it over time."
+    >
+      <div className="space-y-3">
+        {rows.length === 0 ? (
+          <div className="text-sm text-ink-500">No imports recorded yet.</div>
+        ) : (
+          rows.map((run) => (
+            <div key={run.id} className="border border-line rounded-md p-4">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="text-sm font-medium text-ink-900">
+                    {run.originalFilename ?? "Imported dataset"}
+                  </div>
+                  <div className="mt-1 text-xs text-ink-500">
+                    {run.sourceFormat ?? "unknown source"} · {run.status} ·{" "}
+                    {new Date(run.createdAt).toLocaleString()}
+                  </div>
+                </div>
+                {run.status !== "undone" && (
+                  <button
+                    type="button"
+                    onClick={() => undoImport.mutate({ id: run.id })}
+                    className="text-sm px-3 py-2 rounded-md border border-line hover:bg-sunken"
+                  >
+                    Undo import
+                  </button>
+                )}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-ink-500">
+                <span className="px-2 py-1 rounded bg-sunken">
+                  Clients created: {run.clientsCreated}
+                </span>
+                <span className="px-2 py-1 rounded bg-sunken">
+                  Deadlines created: {run.deadlinesCreated}
+                </span>
+                <span className="px-2 py-1 rounded bg-sunken">
+                  Rows failed: {run.rowsFailed}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </Surface>
+  );
+}
+
+function BillingPanel() {
+  const sessionQuery = useRemoteSession();
+  const firm = sessionQuery.data?.firm;
+
+  return (
+    <div className="space-y-4">
+      <Surface
+        title="Plan and limits"
+        description="Simple wireframe billing for now, but it matches the real firm tier and seat model."
+      >
+        {firm ? (
+          <KeyValueGrid
+            rows={[
+              ["Plan", firm.tier],
+              ["Subscription", firm.subscriptionStatus.replace(/_/g, " ")],
+              ["Trial ends", firm.trialEndsAt ?? "N/A"],
+              ["Seat limit", String(firm.seatLimit)],
+              ["Client limit", firm.clientLimit === null ? "Unlimited" : String(firm.clientLimit)],
+            ]}
+          />
+        ) : (
+          <div className="text-sm text-ink-500">Billing details unavailable.</div>
+        )}
+      </Surface>
+      <Surface title="Commercial posture">
+        <p className="text-sm text-ink-600">
+          The wedge is alerts, but the body is document chasing. This page is
+          intentionally spare for now; the working limits already enforce the
+          firm plan model underneath.
+        </p>
+      </Surface>
+    </div>
+  );
+}
+
+function AccountPanel() {
+  const navigate = useNavigate();
+  const localSession = useSession();
+  const [digestMode, setDigestMode] = useState<FirmSession["digestMode"]>(
+    localSession?.digestMode ?? "digest_8am"
+  );
+
+  return (
+    <div className="space-y-4">
+      <Surface
+        title="Account"
+        description="User identity and delivery preferences for the current signed-in CPA."
+      >
+        {localSession ? (
+          <KeyValueGrid
+            rows={[
+              ["Name", localSession.userName],
+              ["Email", localSession.userEmail],
+              ["Firm", localSession.firmName],
+              ["Signed in", new Date(localSession.signedInAt).toLocaleString()],
+            ]}
+          />
+        ) : (
+          <div className="text-sm text-ink-500">No active local session.</div>
+        )}
+      </Surface>
+
+      <Surface title="Alert delivery">
+        <div className="space-y-2">
+          {[
+            {
+              value: "digest_8am" as const,
+              label: "Daily 8am digest",
+              copy: "One message covering new alerts and queued reminders.",
+            },
+            {
+              value: "per_alert" as const,
+              label: "Per-alert email",
+              copy: "Send an email whenever a new state alert lands.",
+            },
+          ].map((option) => (
+            <label
+              key={option.value}
+              className={`block border rounded-md px-3 py-3 cursor-pointer ${
+                digestMode === option.value
+                  ? "border-ink-900 bg-sunken"
+                  : "border-line"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <input
+                  type="radio"
+                  checked={digestMode === option.value}
+                  onChange={() => {
+                    setDigestMode(option.value);
+                    updateSession({ digestMode: option.value });
+                  }}
+                />
+                <div>
+                  <div className="text-sm font-medium text-ink-900">
+                    {option.label}
+                  </div>
+                  <div className="text-xs text-ink-500">{option.copy}</div>
+                </div>
+              </div>
+            </label>
+          ))}
+        </div>
+      </Surface>
+
+      <Surface title="Session controls">
+        <button
+          type="button"
+          onClick={() => {
+            signOut();
+            navigate("/login", { replace: true });
+          }}
+          className="text-sm px-3 py-2 rounded-md border border-line hover:bg-sunken"
+        >
+          Sign out
+        </button>
+      </Surface>
+    </div>
+  );
+}
+
+function ReminderTemplateEditor({
+  template,
+  onSave,
+  saving,
+}: {
+  template: ReminderTemplate;
+  onSave: (patch: Partial<ReminderTemplate>) => void;
+  saving: boolean;
+}) {
+  const [subject, setSubject] = useState(template.subject);
+  const [body, setBody] = useState(template.bodyMdx);
+  const [active, setActive] = useState(template.active);
+
+  return (
+    <div className="border border-line rounded-md p-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <div className="text-sm font-medium text-ink-900">
+            {template.templateKey.replace(/_/g, " ")}
+          </div>
+          <div className="text-xs text-ink-500">
+            Template id {template.id.slice(0, 8)} · package{" "}
+            {template.packageId ?? "all"}
+          </div>
+        </div>
+        <label className="inline-flex items-center gap-2 text-sm text-ink-700">
+          <input
+            type="checkbox"
+            checked={active}
+            onChange={(event) => setActive(event.target.checked)}
+          />
+          Active
+        </label>
+      </div>
+      <div className="mt-4 space-y-3">
+        <input
+          value={subject}
+          onChange={(event) => setSubject(event.target.value)}
+          className="w-full px-3 py-2 rounded-md border border-line text-sm"
+        />
+        <textarea
+          value={body}
+          onChange={(event) => setBody(event.target.value)}
+          rows={7}
+          className="w-full px-3 py-2 rounded-md border border-line text-sm"
+        />
+      </div>
+      <div className="mt-3 flex justify-end">
+        <button
+          type="button"
+          onClick={() => onSave({ subject, bodyMdx: body, active })}
+          className="text-sm px-3 py-2 rounded-md border border-line hover:bg-sunken"
+        >
+          {saving ? "Saving…" : "Save template"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Surface({
   title,
   description,
   children,
@@ -68,11 +633,11 @@ function Card({
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-surface border border-line rounded-md overflow-hidden mb-5">
-      <header className="px-5 py-3 border-b border-line">
+    <section className="border border-line bg-surface rounded-md overflow-hidden">
+      <header className="px-5 py-4 border-b border-line">
         <h2 className="text-sm font-semibold text-ink-900">{title}</h2>
         {description && (
-          <p className="text-xs text-ink-500 mt-0.5">{description}</p>
+          <p className="mt-1 text-sm text-ink-600">{description}</p>
         )}
       </header>
       <div className="px-5 py-4">{children}</div>
@@ -80,369 +645,23 @@ function Card({
   );
 }
 
-function Row({
-  label,
-  value,
+function KeyValueGrid({
+  rows,
 }: {
-  label: string;
-  value: React.ReactNode;
+  rows: Array<[label: string, value: string]>;
 }) {
   return (
-    <div className="flex items-start gap-4 py-2 first:pt-0 last:pb-0">
-      <dt className="w-40 shrink-0 text-xs uppercase tracking-wider text-ink-500 mt-0.5">
-        {label}
-      </dt>
-      <dd className="text-sm text-ink-900 flex-1 min-w-0">{value}</dd>
-    </div>
+    <dl className="grid gap-3 md:grid-cols-2">
+      {rows.map(([label, value]) => (
+        <div key={label} className="border border-line rounded-md px-3 py-3">
+          <dt className="text-xs uppercase tracking-wide text-ink-500">
+            {label}
+          </dt>
+          <dd className="mt-1 text-sm text-ink-900 whitespace-pre-wrap">
+            {value}
+          </dd>
+        </div>
+      ))}
+    </dl>
   );
-}
-
-function ProfilePanel() {
-  const session = useSession();
-  const navigate = useNavigate();
-  if (!session) return null;
-
-  const onSignOut = () => {
-    signOut();
-    navigate("/login", { replace: true });
-  };
-
-  return (
-    <>
-      <Card title="Profile" description="Your firm and user identity.">
-        <dl>
-          <Row label="Firm" value={session.firmName} />
-          <Row label="Your name" value={session.userName} />
-          <Row label="Email" value={session.userEmail} />
-          <Row
-            label="Plan"
-            value={
-              <span className="capitalize">
-                {session.tier}
-                <span className="ml-2 text-2xs text-ink-500">
-                  {session.tier === "team"
-                    ? "up to 5 users"
-                    : session.tier === "pro"
-                    ? "unlimited clients"
-                    : "solo user"}
-                </span>
-              </span>
-            }
-          />
-          <Row
-            label="Signed in"
-            value={new Date(session.signedInAt).toLocaleString()}
-          />
-        </dl>
-      </Card>
-      <Card title="Session">
-        <button
-          onClick={onSignOut}
-          className="text-sm px-3 py-1.5 rounded-md border border-line text-ink-700 hover:bg-sunken"
-        >
-          Sign out
-        </button>
-      </Card>
-    </>
-  );
-}
-
-function AlertsPanel() {
-  const session = useSession();
-  const [digest, setDigest] = useState<FirmSession["digestMode"]>(
-    session?.digestMode ?? "digest_8am"
-  );
-  if (!session) return null;
-
-  const save = (next: FirmSession["digestMode"]) => {
-    setDigest(next);
-    updateSession({ digestMode: next });
-  };
-
-  return (
-    <Card
-      title="Alerts & email delivery"
-      description="How state announcement alerts reach your inbox. In-app banners fire regardless."
-    >
-      <div className="space-y-2">
-        <RadioRow
-          checked={digest === "digest_8am"}
-          onChange={() => save("digest_8am")}
-          label="Daily 8am digest"
-          hint="One email per morning with all state announcements from the last 24h."
-        />
-        <RadioRow
-          checked={digest === "per_alert"}
-          onChange={() => save("per_alert")}
-          label="Per-alert email"
-          hint="Email fires immediately when an announcement is detected."
-        />
-      </div>
-      <p className="text-2xs text-ink-500 mt-4">
-        SMS reminders are deferred to Phase 2 — we won't half-build them.
-      </p>
-    </Card>
-  );
-}
-
-function RadioRow({
-  checked,
-  onChange,
-  label,
-  hint,
-}: {
-  checked: boolean;
-  onChange: () => void;
-  label: string;
-  hint: string;
-}) {
-  return (
-    <label
-      className={`flex items-start gap-3 p-3 rounded border cursor-pointer ${
-        checked ? "border-accent bg-sunken" : "border-line hover:bg-sunken"
-      }`}
-    >
-      <input
-        type="radio"
-        checked={checked}
-        onChange={onChange}
-        className="mt-0.5"
-      />
-      <div className="flex-1">
-        <div className="text-sm font-medium text-ink-900">{label}</div>
-        <div className="text-xs text-ink-500 mt-0.5">{hint}</div>
-      </div>
-    </label>
-  );
-}
-
-function NotificationsPanel() {
-  return (
-    <Card
-      title="In-app notifications"
-      description="Controls what appears in the bell dropdown."
-    >
-      <p className="text-sm text-ink-500">
-        All categories are enabled by default. Fine-grained toggles will appear
-        here as we add notification types beyond state alerts and email
-        bounces.
-      </p>
-    </Card>
-  );
-}
-
-function ImportsPanel() {
-  const importHistoryQuery = useImportHistory();
-  const imports = importHistoryQuery.data ?? [];
-  const [confirming, setConfirming] = useState<string | null>(null);
-
-  const active = useMemo(
-    () => imports.filter((r) => r.status !== "undone"),
-    [imports]
-  );
-
-  if (importHistoryQuery.isLoading) {
-    return (
-      <Card title="Imports">
-        <p className="text-sm text-ink-500">Loading…</p>
-      </Card>
-    );
-  }
-
-  if (importHistoryQuery.error) {
-    return (
-      <Card title="Imports">
-        <ErrorState
-          compact
-          title="Couldn't load import history."
-          onRetry={() => importHistoryQuery.refetch()}
-        />
-      </Card>
-    );
-  }
-
-  if (imports.length === 0) {
-    return (
-      <Card title="Imports">
-        <p className="text-sm text-ink-500">
-          No CSV imports yet. Try{" "}
-          <NavLink to="/import" className="text-ink-900 underline">
-            importing clients
-          </NavLink>
-          .
-        </p>
-      </Card>
-    );
-  }
-
-  const undoTarget = imports.find((r) => r.id === confirming);
-
-  return (
-    <>
-      <Card
-        title="Import history"
-        description="Undo is available for 7 days after an import."
-      >
-        <ul className="divide-y divide-line -my-3">
-          {imports.map((r) => {
-            const recordedAt = r.committedAt ?? r.createdAt;
-            const daysAgo = Math.floor(
-              (Date.now() - new Date(recordedAt).getTime()) / 86_400_000
-            );
-            const undone = r.status === "undone";
-            const undoable = !undone && daysAgo <= 7;
-            return (
-              <li key={r.id} className="flex items-center gap-3 py-3">
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm text-ink-900 font-medium">
-                    {r.clientsCreated} client
-                    {r.clientsCreated === 1 ? "" : "s"} imported
-                    {r.sourceFormat ? ` from ${r.sourceFormat}` : ""}
-                  </div>
-                  <div className="text-xs text-ink-500 mt-0.5">
-                    {new Date(recordedAt).toLocaleString()} ·{" "}
-                    {r.deadlinesCreated} deadline
-                    {r.deadlinesCreated === 1 ? "" : "s"} generated
-                    {r.rowsFailed > 0 && ` · ${r.rowsFailed} skipped`}
-                    {undone && " · undone"}
-                  </div>
-                </div>
-                <button
-                  onClick={() => setConfirming(r.id)}
-                  disabled={!undoable}
-                  className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
-                >
-                  <Trash2 className="w-3 h-3" aria-hidden />
-                  {undone ? "Undone" : undoable ? "Undo" : "Expired"}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </Card>
-      {active.length === 0 && (
-        <p className="text-2xs text-ink-500 -mt-2">
-          All imports have been undone.
-        </p>
-      )}
-      <ConfirmDialog
-        open={!!undoTarget}
-        destructive
-        title="Undo this import?"
-        body={
-          undoTarget ? (
-            <>
-              <p>
-                This will remove{" "}
-                <strong>{undoTarget.clientsCreated}</strong> client record
-                {undoTarget.clientsCreated === 1 ? "" : "s"} and{" "}
-                <strong>{undoTarget.deadlinesCreated}</strong> generated
-                deadline{undoTarget.deadlinesCreated === 1 ? "" : "s"}.
-              </p>
-              <p className="mt-2 text-xs text-slate-500">
-                Any notes or status changes made on those clients since import
-                will be lost.
-              </p>
-            </>
-          ) : null
-        }
-        confirmLabel="Undo import"
-        onCancel={() => setConfirming(null)}
-        onConfirm={() => {
-          if (confirming) actions.undoImport(confirming);
-          setConfirming(null);
-        }}
-      />
-    </>
-  );
-}
-
-function TeamPanel() {
-  const flags = useFeatureFlags();
-  if (!flags.canInviteTeammates) {
-    return (
-      <UpgradePrompt feature="Team invites" requiredTier="pro" />
-    );
-  }
-  return (
-    <Card
-      title="Team members"
-      description={`Invite up to ${flags.maxTeammates} teammate${
-        flags.maxTeammates === 1 ? "" : "s"
-      } and assign client ownership.`}
-    >
-      <p className="text-sm text-ink-500">
-        Team invite flow ships with the {flags.tier === "team" ? "Team" : "Pro"}{" "}
-        tier release. You're on {flags.tier}.
-      </p>
-    </Card>
-  );
-}
-
-function DataPanel() {
-  const [confirmReset, setConfirmReset] = useState(false);
-  return (
-    <>
-      <Card
-        title="Export all data"
-        description="Download every client, deadline, and announcement as JSON."
-      >
-        <button
-          onClick={() => {
-            const blob = new Blob(
-              [JSON.stringify(snapshot(), null, 2)],
-              { type: "application/json" }
-            );
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "duedatehq-export.json";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
-          }}
-          className="text-sm px-3 py-1.5 rounded-md border border-line text-ink-700 hover:bg-sunken"
-        >
-          Download JSON
-        </button>
-      </Card>
-      <Card
-        title="Reset local data"
-        description="Wipes your browser state and restores the demo seeds. Your firm profile stays."
-      >
-        <button
-          onClick={() => setConfirmReset(true)}
-          className="text-sm px-3 py-1.5 rounded-md bg-danger-solid text-canvas hover:bg-danger-ink"
-        >
-          Reset to demo seeds
-        </button>
-      </Card>
-      <ConfirmDialog
-        open={confirmReset}
-        destructive
-        title="Reset all local data?"
-        body={
-          <p>
-            Clients, deadlines, notes, and activity you've created will be
-            removed and replaced with the demo seed data.
-          </p>
-        }
-        confirmLabel="Reset"
-        onCancel={() => setConfirmReset(false)}
-        onConfirm={() => {
-          actions.resetToSeeds();
-          setConfirmReset(false);
-        }}
-      />
-    </>
-  );
-}
-
-function snapshot() {
-  try {
-    return JSON.parse(localStorage.getItem("duedatehq.store.v1") ?? "{}");
-  } catch {
-    return {};
-  }
 }

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import type { Client, StateCode } from "../types";
-import { actions } from "../data/store";
 import { toIso, addDays, TODAY } from "../data/dateHelpers";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { useQuickAddDeadline } from "../hooks/useDeadlines";
 
 const COMMON_FORMS = [
   "1040 (federal)",
@@ -46,6 +46,7 @@ export function AddDeadlineModal({
   );
   const [date, setDate] = useState(toIso(addDays(TODAY, 30)));
   const [customForm, setCustomForm] = useState("");
+  const quickAddDeadline = useQuickAddDeadline();
 
   useEffect(() => {
     if (open && client) {
@@ -73,8 +74,17 @@ export function AddDeadlineModal({
   const canSave = resolvedForm.length > 0 && date.length > 0;
 
   const onSave = () => {
-    actions.addDeadline(client.id, resolvedForm, jurisdiction, date);
-    onClose();
+    quickAddDeadline.mutate(
+      {
+        clientId: client.id,
+        form: resolvedForm,
+        jurisdiction,
+        officialDueDate: date,
+      },
+      {
+        onSuccess: () => onClose(),
+      }
+    );
   };
 
   const jurisdictionOptions: Array<"federal" | StateCode> = [

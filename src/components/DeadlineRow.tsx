@@ -3,9 +3,9 @@ import { Link } from "react-router-dom";
 import { Check, MoreHorizontal } from "lucide-react";
 import type { Client, Deadline, DeadlineStatus } from "../types";
 import { countdownLabel, daysBetween, parseDate, TODAY } from "../data/dateHelpers";
-import { actions } from "../data/store";
 import { bundleById } from "../data/bundles";
 import { QuickActionModal } from "./QuickActionModal";
+import { useSetDeadlineStatus } from "../hooks/useDeadlines";
 
 type UrgencyTone = "danger" | "warn" | "neutral";
 type DotShape = "filled" | "half" | "empty";
@@ -80,6 +80,7 @@ export function DeadlineRow({
   inOverdueSection = false,
 }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
+  const setDeadlineStatus = useSetDeadlineStatus();
   const tone = urgency(deadline);
   const shape = dotShape(deadline);
   const isOverdue = deadline.status === "overdue";
@@ -95,7 +96,7 @@ export function DeadlineRow({
   const onComplete = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    actions.setDeadlineStatus(deadline.id, "completed");
+    setDeadlineStatus.mutate({ id: deadline.id, status: "completed" });
   };
 
   return (
@@ -111,7 +112,7 @@ export function DeadlineRow({
             setModalOpen(true);
           } else if (e.key === "c" && !e.metaKey && !e.ctrlKey) {
             e.preventDefault();
-            actions.setDeadlineStatus(deadline.id, "completed");
+            setDeadlineStatus.mutate({ id: deadline.id, status: "completed" });
           }
         }}
         className={[
@@ -153,7 +154,16 @@ export function DeadlineRow({
         </div>
 
         <span className="text-sm text-ink-700 flex-1 truncate min-w-0">
-          {deadline.form}
+          {deadline.taskId ? (
+            <Link
+              to={`/clients/${client.id}/tasks/${deadline.taskId}`}
+              className="hover:underline"
+            >
+              {deadline.form}
+            </Link>
+          ) : (
+            deadline.form
+          )}
         </span>
 
         <JurisdictionChip

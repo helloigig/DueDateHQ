@@ -9,7 +9,7 @@ import {
   hoursSince,
   parseDate,
 } from "../data/dateHelpers";
-import { actions } from "../data/store";
+import { useSetDeadlineStatus } from "../hooks/useDeadlines";
 
 type PriorityItem =
   | {
@@ -71,6 +71,7 @@ export function PriorityCard({
   escalatedAlerts?: Announcement[];
   onDismiss: () => void;
 }) {
+  const setDeadlineStatus = useSetDeadlineStatus();
   const items: PriorityItem[] = useMemo(() => {
     const active = deadlines.filter(
       (d) =>
@@ -151,7 +152,7 @@ export function PriorityCard({
                 </div>
               </div>
               <Link
-                to={`/announcements/${item.alert.id}`}
+                to={`/alerts/${item.alert.id}`}
                 className="text-sm font-medium px-2.5 py-1 rounded-md bg-accent text-canvas hover:bg-accent-hover flex items-center gap-1"
               >
                 Review
@@ -167,7 +168,11 @@ export function PriorityCard({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <Link
-                    to={`/clients/${item.client.id}`}
+                    to={
+                      item.deadline.taskId
+                        ? `/clients/${item.client.id}/tasks/${item.deadline.taskId}`
+                        : `/clients/${item.client.id}`
+                    }
                     className="text-sm font-medium text-ink-900 hover:underline truncate"
                   >
                     {item.client.name}
@@ -185,7 +190,10 @@ export function PriorityCard({
               </span>
               <button
                 onClick={() =>
-                  actions.setDeadlineStatus(item.deadline.id, "completed")
+                  setDeadlineStatus.mutate({
+                    id: item.deadline.id,
+                    status: "completed",
+                  })
                 }
                 className="text-xs p-1.5 rounded bg-ok-bg text-ok-ink hover:bg-ok-border/40"
                 aria-label="Mark complete"

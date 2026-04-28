@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Client, Deadline } from "../types";
-import { actions } from "../data/store";
 import { bundleById } from "../data/bundles";
 import { formatLongDate, toIso, addDays, TODAY } from "../data/dateHelpers";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { useAddNote } from "../hooks/useClients";
+import {
+  useDeferDeadline,
+  useFileExtension,
+  useSetDeadlineStatus,
+} from "../hooks/useDeadlines";
 
 type Mode = "choose" | "defer" | "note";
 
@@ -34,6 +39,10 @@ export function QuickActionModal({
   }, [open]);
 
   const dialogRef = useModalDialog(open, onClose);
+  const addNote = useAddNote();
+  const setDeadlineStatus = useSetDeadlineStatus();
+  const deferDeadline = useDeferDeadline();
+  const fileExtension = useFileExtension();
 
   if (!open || !deadline || !client) return null;
 
@@ -47,25 +56,25 @@ export function QuickActionModal({
   const close = () => onClose();
 
   const onComplete = () => {
-    actions.setDeadlineStatus(deadline.id, "completed");
+    setDeadlineStatus.mutate({ id: deadline.id, status: "completed" });
     close();
   };
   const onInProgress = () => {
-    actions.setDeadlineStatus(deadline.id, "in_progress");
+    setDeadlineStatus.mutate({ id: deadline.id, status: "in_progress" });
     close();
   };
   const onDeferSubmit = () => {
-    actions.deferDeadline(deadline.id, deferDate);
+    deferDeadline.mutate({ id: deadline.id, newDate: deferDate });
     close();
   };
   const onFiledExtension = () => {
-    actions.fileExtension(deadline.id);
+    fileExtension.mutate({ id: deadline.id });
     close();
   };
   const onNoteSubmit = () => {
     const body = note.trim();
     if (!body) return;
-    actions.addNote(client.id, body, deadline.id);
+    addNote.mutate({ clientId: client.id, body, relatedDeadlineId: deadline.id });
     close();
   };
 
@@ -124,11 +133,15 @@ export function QuickActionModal({
             />
             <li className="px-5 py-2 border-t border-slate-100 mt-1">
               <Link
-                to={`/clients/${client.id}`}
+                to={
+                  deadline.taskId
+                    ? `/clients/${client.id}/tasks/${deadline.taskId}`
+                    : `/clients/${client.id}`
+                }
                 onClick={close}
                 className="text-sm text-slate-500 hover:text-slate-900"
               >
-                View client detail →
+                {deadline.taskId ? "Open task detail →" : "View client detail →"}
               </Link>
             </li>
           </ul>

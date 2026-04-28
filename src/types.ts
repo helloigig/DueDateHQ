@@ -71,11 +71,13 @@ export interface Client {
   relatedClientIds?: string[];
   noteEntries?: ClientNote[];
   activity?: ActivityEntry[];
+  contacts?: Contact[];
 }
 
 export interface Deadline {
   id: string;
   clientId: string;
+  taskId?: string;
   form: string;
   jurisdiction: "federal" | StateCode;
   officialDueDate: string;
@@ -264,6 +266,99 @@ export interface FirmAnnouncement {
   dismissedReason: string | null;
   escalationLevel: "normal" | "dark" | "blocking";
   batchAdjustedAt: string | null;
+}
+
+export type ChecklistState =
+  | "not_requested"
+  | "requested_waiting"
+  | "received_unreviewed"
+  | "received_confirmed"
+  | "received_issue"
+  | "not_applicable";
+
+export interface ChecklistItem {
+  id: string;
+  taskId: string;
+  label: string;
+  itemType: string;
+  description: string | null;
+  sortOrder: number;
+  state: ChecklistState;
+  stateChangedAt: string;
+  stateChangedByKind: "user" | "ai" | "system";
+  stateChangedByUserId: string | null;
+  aiConfidence: number | null;
+  aiFlagReason: string | null;
+  sourceDocumentUrl: string | null;
+  lastReminderAt: string | null;
+}
+
+export interface TimelineEntry {
+  id: string;
+  timestamp: string;
+  type: string;
+  actorName: string;
+  summary: string;
+  relatedChecklistItemId?: string | null;
+}
+
+export interface TaskInsightBlock {
+  timing: {
+    windowLabel: string;
+    confidence: "high" | "medium" | "low";
+    basis: string;
+  };
+  anomalies: Array<{
+    itemType: string;
+    summary: string;
+  }>;
+  opportunities: string[];
+}
+
+export interface TaskRecord {
+  id: string;
+  clientId: string;
+  deadlineId: string;
+  title: string;
+  assignedUser: string | null;
+  status: DeadlineStatus;
+  officialDueDate: string;
+  adjustedDueDate: string;
+  internalTargetDate: string | null;
+  forwardingEmailAddress: string;
+  completionPercentage: number;
+}
+
+export interface TaskDetail {
+  task: TaskRecord;
+  deadline: Deadline;
+  checklistItems: ChecklistItem[];
+  activityTimelineRecent: TimelineEntry[];
+  aiInsights: TaskInsightBlock;
+  client: Client;
+}
+
+export interface EmailDraftRecord {
+  id: string;
+  taskId: string;
+  checklistItemId: string | null;
+  status: string;
+  subject: string;
+  body: string;
+  tone: string;
+  aiSources: Record<string, unknown>;
+  to: string[];
+  cc: string[];
+}
+
+export interface IntegrationView {
+  id: string;
+  type: string;
+  tier: number;
+  status: string;
+  lastSyncAt: string | null;
+  metadata: Record<string, unknown>;
+  error: Record<string, unknown> | null;
 }
 
 export type DeadlineExtensionSubStatus = "submitted" | "approved";
