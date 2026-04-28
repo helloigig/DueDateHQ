@@ -6,6 +6,7 @@ import {
   Bell,
   Settings,
   Inbox,
+  TrendingUp,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
@@ -18,6 +19,7 @@ const primary = [
   { to: "/inbox", label: "Inbox", Icon: Inbox, end: false },
   { to: "/clients", label: "Clients", Icon: Users, end: false },
   { to: "/alerts", label: "Alerts", Icon: Bell, end: false },
+  { to: "/insights", label: "Insights", Icon: TrendingUp, end: false },
 ];
 
 const COLLAPSED_KEY = "duedatehq.sidebar_collapsed.v1";
@@ -109,14 +111,14 @@ export function Sidebar() {
                 <Icon className="w-4 h-4 shrink-0" aria-hidden />
                 {!collapsed && <span className="flex-1">{label}</span>}
                 {!collapsed &&
-                  to === "/announcements" &&
+                  to === "/alerts" &&
                   unread > 0 && (
                     <span className="ml-auto bg-danger-solid text-white text-2xs rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center tabular-nums">
                       {unread}
                     </span>
                   )}
                 {collapsed &&
-                  to === "/announcements" &&
+                  to === "/alerts" &&
                   unread > 0 && (
                     <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-danger-solid" />
                   )}

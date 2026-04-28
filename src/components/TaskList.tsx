@@ -11,7 +11,10 @@ import {
   CalendarClock,
   FileText,
   ChevronDown,
+  List,
+  CalendarDays,
 } from "lucide-react";
+import { CalendarGrid } from "./CalendarGrid";
 import { useStore, actions } from "../data/store";
 import { useAllOpenInsights } from "../hooks/useAiInsights";
 import { useSession } from "../data/session";
@@ -100,6 +103,7 @@ export function TaskList() {
   const showAssignee = session?.tier !== "solo";
   const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null);
   const [assigneeMenuOpen, setAssigneeMenuOpen] = useState(false);
+  const [view, setView] = useState<"list" | "grid">("list");
 
   const clientById = useMemo(
     () => new Map(clients.map((c) => [c.id, c])),
@@ -259,9 +263,35 @@ export function TaskList() {
             className="text-2xs text-ink-500"
             title="Ranked by deadline urgency, AI flags, unread alerts, and risk forecast"
           >
-            {filtered.length} of {rows.length} · ranked by urgency
+            {filtered.length} of {rows.length} ·{" "}
+            {view === "list" ? "ranked by urgency" : "due date grid"}
           </span>
           <div className="ml-auto flex items-center gap-1 flex-wrap">
+            {/* List / Grid toggle */}
+            <span className="inline-flex border border-line rounded overflow-hidden mr-1">
+              <button
+                onClick={() => setView("list")}
+                className={`px-2 py-0.5 text-2xs uppercase tracking-wide inline-flex items-center gap-1 ${
+                  view === "list"
+                    ? "bg-ink-900 text-canvas"
+                    : "text-ink-500 hover:bg-sunken"
+                }`}
+                title="List view (ranked by urgency)"
+              >
+                <List className="w-2.5 h-2.5" aria-hidden /> List
+              </button>
+              <button
+                onClick={() => setView("grid")}
+                className={`px-2 py-0.5 text-2xs uppercase tracking-wide inline-flex items-center gap-1 ${
+                  view === "grid"
+                    ? "bg-ink-900 text-canvas"
+                    : "text-ink-500 hover:bg-sunken"
+                }`}
+                title="Calendar grid view (month-at-a-glance)"
+              >
+                <CalendarDays className="w-2.5 h-2.5" aria-hidden /> Grid
+              </button>
+            </span>
             {showAssignee && assignees.length > 1 && (
               <div className="relative">
                 <button
@@ -347,7 +377,11 @@ export function TaskList() {
             })}
           </div>
         </header>
-        {filtered.length === 0 ? (
+        {view === "grid" ? (
+          <div className="bg-canvas">
+            <CalendarGrid />
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-ink-500">
             Nothing matches this filter.
           </div>

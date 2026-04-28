@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { X, Send, Calendar, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
+import { X, Send, Calendar, Sparkles, Mail } from "lucide-react";
 import type {
   AiSource,
   Client,
@@ -8,7 +9,7 @@ import type {
   Task,
 } from "../types";
 import { draftEmail } from "../lib/ai-stub";
-import { actions } from "../data/store";
+import { actions, useStore } from "../data/store";
 import { useSession } from "../data/session";
 
 /**
@@ -55,6 +56,24 @@ export function EmailDraftModal({ open, intent, onClose }: Props) {
 
   const itemLabel = intent?.checklistItem?.label;
   const itemType = intent?.checklistItem?.itemType;
+
+  // Match the inbound item to a system reminder template — closes the loop
+  // between Settings → Reminder Templates and the email modal. Educates the
+  // CPA on which template AI used as the seed.
+  const { reminderTemplates } = useStore();
+  const matchedTemplate = useMemo(() => {
+    if (!itemType) return null;
+    // Direct itemType match first
+    const direct = reminderTemplates.find((t) => t.itemType === itemType);
+    if (direct) return direct;
+    // Fall back to family match (e.g., "1099_int" → "1099_any")
+    const family = itemType.split("_")[0];
+    return (
+      reminderTemplates.find(
+        (t) => t.itemType === `${family}_any`
+      ) ?? null
+    );
+  }, [itemType, reminderTemplates]);
 
   const cacheKey = useMemo(() => {
     if (!intent) return "";
@@ -214,11 +233,38 @@ export function EmailDraftModal({ open, intent, onClose }: Props) {
             )}
           </div>
 
-          {/* AI sources panel */}
+          {/* AI sources panel — now shows the source reminder template too,
+              so the CPA can trace "where did this draft come from?" */}
           <div className="border border-line rounded p-3 bg-sunken/30">
             <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold mb-1.5">
               AI sources
             </p>
+            {matchedTemplate && (
+              <div className="text-xs text-ink-700 flex items-start gap-2 pb-1.5 mb-1.5 border-b border-line">
+                <span className="text-ink-400 uppercase tracking-wider text-2xs w-20 shrink-0">
+                  template
+                </span>
+                <span className="flex-1 flex items-center gap-1.5 flex-wrap">
+                  <Mail className="w-3 h-3 text-ink-500" aria-hidden />
+                  <Link
+                    to="/settings/reminders"
+                    className="font-medium text-ink-900 hover:underline"
+                    title={`${matchedTemplate.name} · ${matchedTemplate.cadence} cadence · Phase ${matchedTemplate.phase}`}
+                  >
+                    {matchedTemplate.name}
+                  </Link>
+                  <span className="text-ink-500">
+                    {matchedTemplate.trigger && (
+                      <>· {matchedTemplate.trigger}</>
+                    )}
+                    {matchedTemplate.cadence && (
+                      <> · {matchedTemplate.cadence}</>
+                    )}
+                    <> · Phase {matchedTemplate.phase ?? 1}</>
+                  </span>
+                </span>
+              </div>
+            )}
             <ul className="space-y-1">
               {aiSources.map((s, i) => (
                 <li

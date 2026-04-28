@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  AlertTriangle,
+  AlertCircle,
+  Megaphone,
   ChevronRight,
   Clock,
-  History,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import type { Announcement } from "../types";
 import {
@@ -13,11 +16,6 @@ import {
   escalationTier,
   type EscalationTier,
 } from "../data/dateHelpers";
-import {
-  TOPIC_LABEL,
-  TAX_TYPE_LABEL,
-  CONFIDENCE_LABEL,
-} from "../data/announcementLabels";
 import { actions } from "../data/store";
 
 type Tone = "danger" | "warn" | "info";
@@ -31,160 +29,217 @@ function toneFor(type: Announcement["type"], tier: EscalationTier): Tone {
   return "info";
 }
 
-const TIER_BG: Record<EscalationTier, string> = {
-  fresh: "bg-info-bg/40",
-  reminder: "bg-warn-bg/40",
-  escalated: "bg-danger-bg/40",
-  blocking: "bg-danger-bg/60",
+const TONE_DOT: Record<Tone, string> = {
+  danger: "bg-danger-solid",
+  warn: "bg-warn-solid",
+  info: "bg-info-solid",
 };
 
-const TIER_ESCALATION_INK: Record<EscalationTier, string> = {
-  fresh: "text-ink-500",
-  reminder: "text-warn-ink",
-  escalated: "text-danger-ink",
-  blocking: "text-danger-ink",
+const TONE_TEXT: Record<Tone, string> = {
+  danger: "text-danger-ink",
+  warn: "text-warn-ink",
+  info: "text-info-ink",
 };
 
-const CONFIDENCE_TONE = {
-  high: "bg-ok-bg text-ok-ink",
-  medium: "bg-sunken text-ink-700",
-  low: "bg-warn-bg text-warn-ink",
-} as const;
-
-function escalationCopy(tier: EscalationTier, hours: number): string | null {
-  if (tier === "fresh") return null;
-  const h = Math.round(hours);
-  if (tier === "reminder") return `Still unactioned · detected ${h}h ago`;
-  if (tier === "escalated")
-    return `Still unactioned after ${h}h — affecting live deadlines`;
-  return `${h}h unactioned — review required`;
+function iconFor(type: Announcement["type"]): LucideIcon {
+  if (type === "disaster_extension") return AlertTriangle;
+  if (type === "pte_change" || type === "penalty_relief") return AlertCircle;
+  return Megaphone;
 }
 
+/**
+ * Rolled-up state-alert list. Shows ALL alerts as one-line rows (not just
+ * the lead with "X more in bell"). Density without volume — six alerts in
+ * ~150px instead of one big banner that hides the others.
+ *
+ * Severity differentiation: escalated tier (>72h unactioned) carries the
+ * red dot + ESCALATED label. Fresh and reminder tiers calmly color-code.
+ *
+ * Each row clickable → alert detail. Header offers "Mark all read."
+ */
 export function AnnouncementBanner({
   announcements,
 }: {
   announcements: Announcement[];
 }) {
-  // Show ONLY the most-urgent unread alert as a banner. The rest live in the
-  // bell dropdown + /announcements page. Multi-alert in a banner is noise —
-  // research suggests CPAs want one anchor, not a stack.
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   if (announcements.length === 0) return null;
-  // Sort by escalation tier first, then by detectedAt (newest first)
-  const sorted = [...announcements].sort((a, b) => {
-    const aTier = escalationTier(hoursSince(a.detectedAt));
-    const bTier = escalationTier(hoursSince(b.detectedAt));
-    const order = ["blocking", "escalated", "reminder", "fresh"];
-    const aRank = order.indexOf(aTier);
-    const bRank = order.indexOf(bTier);
-    if (aRank !== bRank) return aRank - bRank;
-    return b.detectedAt.localeCompare(a.detectedAt);
-  });
-  const [head] = sorted;
-  const restCount = sorted.length - 1;
+
+  // Sort by escalation tier first, then most-recent
+  const visible = announcements
+    .filter((a) => !dismissedIds.has(a.id))
+    .sort((a, b) => {
+      const aTier = escalationTier(hoursSince(a.detectedAt));
+      const bTier = escalationTier(hoursSince(b.detectedAt));
+      const order = ["blocking", "escalated", "reminder", "fresh"];
+      const aRank = order.indexOf(aTier);
+      const bRank = order.indexOf(bTier);
+      if (aRank !== bRank) return aRank - bRank;
+      return b.detectedAt.localeCompare(a.detectedAt);
+    });
+
+  if (visible.length === 0) return null;
+
+  const escalatedCount = visible.filter(
+    (a) => escalationTier(hoursSince(a.detectedAt)) === "escalated"
+  ).length;
+  const unreadCount = visible.filter((a) => !a.read).length;
+
+  const markAllRead = () => {
+    for (const a of visible) {
+      if (!a.read) actions.markAnnouncementRead(a.id);
+    }
+  };
+
+  const dismiss = (id: string) => {
+    setDismissedIds((prev) => new Set(prev).add(id));
+    setTimeout(() => actions.dismissAnnouncement(id), 200);
+  };
 
   return (
-    <div className="space-y-2">
-      <BannerCard ann={head} />
-      {restCount > 0 && (
-        <Link
-          to="/announcements"
-          className="block text-2xs text-ink-500 hover:text-ink-900 px-1 flex items-center gap-1"
-        >
-          + {restCount} more state {restCount === 1 ? "alert" : "alerts"} in the bell + Alerts feed
-        </Link>
-      )}
-    </div>
+    <section
+      className="bg-surface border border-line rounded-md overflow-hidden"
+      aria-label="State alerts"
+    >
+      <header className="flex items-center px-4 py-2 border-b border-line bg-sunken/40 gap-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-700">
+          State alerts
+        </h2>
+        <span className="text-2xs text-ink-500">
+          {visible.length}
+          {escalatedCount > 0 && (
+            <>
+              <span className="text-ink-300"> · </span>
+              <span className="text-danger-ink font-medium">
+                {escalatedCount} escalated
+              </span>
+            </>
+          )}
+          {unreadCount > 0 && unreadCount < visible.length && (
+            <>
+              <span className="text-ink-300"> · </span>
+              <span>{unreadCount} unread</span>
+            </>
+          )}
+        </span>
+        <span className="ml-auto flex items-center gap-2">
+          {unreadCount > 0 && (
+            <button
+              onClick={markAllRead}
+              className="text-2xs text-ink-500 hover:text-ink-900"
+            >
+              Mark all read
+            </button>
+          )}
+          <Link
+            to="/announcements"
+            className="text-2xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-0.5"
+          >
+            All alerts <ChevronRight className="w-3 h-3" aria-hidden />
+          </Link>
+        </span>
+      </header>
+      <ul className="divide-y divide-line">
+        {visible.map((a) => (
+          <AlertRow key={a.id} ann={a} onDismiss={() => dismiss(a.id)} />
+        ))}
+      </ul>
+    </section>
   );
 }
 
-function BannerCard({ ann }: { ann: Announcement }) {
-  const [dismissing, setDismissing] = useState(false);
+function AlertRow({
+  ann,
+  onDismiss,
+}: {
+  ann: Announcement;
+  onDismiss: () => void;
+}) {
   const hours = hoursSince(ann.detectedAt);
   const tier = escalationTier(hours);
-  const escCopy = escalationCopy(tier, hours);
-
-  const onDismiss = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDismissing(true);
-    setTimeout(() => actions.dismissAnnouncement(ann.id), 3000);
-  };
-
-  if (dismissing) {
-    return (
-      <div className="border border-line rounded-md px-4 py-3 text-xs text-ink-400">
-        Dismissed · {ann.stateCode}: {ann.title}
-      </div>
-    );
-  }
-
-  // Build the AI-match reason — explains *why* DDHQ thinks these clients are
-  // affected, so the CPA isn't trusting an opaque count.
+  const tone = toneFor(ann.type, tier);
+  const Icon = iconFor(ann.type);
   const matchReason = matchReasonFor(ann);
 
   return (
-    <div className={`border rounded-md px-4 py-3 transition-colors ${TONE_CLASSES[tone]}`}>
-      <div className="flex items-start gap-3">
-        <Icon className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
-        <div className="flex-1 min-w-0">
-          <Link
-            to={`/announcements/${ann.id}`}
-            className="block hover:underline"
-          >
-            <div className="text-sm font-medium">
-              {ann.stateCode}: {ann.title}
-            </div>
-          </Link>
-          <div className={`text-xs mt-1 flex items-center flex-wrap gap-x-2 gap-y-0.5 ${TONE_SUB_CLASSES[tone]}`}>
-            <span>
-              <span className="font-semibold">
-                {ann.affectedClientIds.length} of yours
-              </span>
-              {" "}affected
-            </span>
-            {matchReason && (
-              <>
-                <span className="opacity-50">·</span>
-                <span className="opacity-80">{matchReason}</span>
-              </>
-            )}
-            {ann.newDeadline && (
-              <>
-                <span className="opacity-50">·</span>
-                <span>new deadline {formatLongDate(ann.newDeadline)}</span>
-              </>
-            )}
-          </div>
-          {escCopy && (
-            <div className={`text-xs mt-1 font-medium flex items-center gap-1 ${TONE_SUB_CLASSES[tone]}`}>
-              <Clock className="w-3 h-3" aria-hidden />
-              {escCopy}
-            </div>
-          )}
-        </div>
+    <li
+      className={[
+        "px-4 py-2.5 flex items-center gap-3",
+        tier === "escalated" ? "bg-danger-bg/15" : "hover:bg-sunken/30",
+      ].join(" ")}
+    >
+      {/* Severity dot — color carries the urgency */}
+      <span
+        className={`w-2 h-2 rounded-full shrink-0 ${TONE_DOT[tone]}`}
+        aria-hidden
+      />
+      <Icon className={`w-3.5 h-3.5 shrink-0 ${TONE_TEXT[tone]}`} aria-hidden />
+
+      <div className="flex-1 min-w-0">
         <Link
           to={`/announcements/${ann.id}`}
-          className={`text-sm font-medium flex items-center gap-1 shrink-0 px-2.5 py-1 rounded hover:bg-surface/60 ${TONE_SUB_CLASSES[tone]}`}
-          title="Review affected clients and apply the new deadline"
+          className="text-sm text-ink-900 hover:underline truncate flex items-baseline gap-2 flex-wrap"
         >
-          Review affected
-          <ChevronRight className="w-4 h-4" aria-hidden />
+          <span className="font-semibold">{ann.stateCode}:</span>
+          <span>{ann.title}</span>
+          {tier === "escalated" && (
+            <span className="text-2xs uppercase tracking-wide px-1 py-0.5 rounded bg-danger-bg text-danger-ink border border-danger-border font-semibold">
+              escalated
+            </span>
+          )}
+          {!ann.read && tier !== "escalated" && (
+            <span className="w-1.5 h-1.5 rounded-full bg-info-solid" title="Unread" />
+          )}
         </Link>
-        <button
-          onClick={onDismiss}
-          aria-label="Dismiss announcement"
-          className={`p-1 rounded hover:bg-surface/60 ${TONE_SUB_CLASSES[tone]}`}
-        >
-          <X className="w-3.5 h-3.5" aria-hidden />
-        </button>
+        <p className="text-2xs text-ink-500 mt-0.5 flex items-center flex-wrap gap-x-2">
+          <span>
+            <span className="font-medium text-ink-700">
+              {ann.affectedClientIds.length} affected
+            </span>
+          </span>
+          {matchReason && (
+            <>
+              <span className="text-ink-300">·</span>
+              <span>{matchReason}</span>
+            </>
+          )}
+          {ann.newDeadline && (
+            <>
+              <span className="text-ink-300">·</span>
+              <span>new {formatLongDate(ann.newDeadline)}</span>
+            </>
+          )}
+          {tier !== "fresh" && (
+            <>
+              <span className="text-ink-300">·</span>
+              <span className={`flex items-center gap-1 ${TONE_TEXT[tone]}`}>
+                <Clock className="w-2.5 h-2.5" aria-hidden />
+                {Math.round(hours)}h unactioned
+              </span>
+            </>
+          )}
+        </p>
       </div>
-    </div>
+
+      <Link
+        to={`/announcements/${ann.id}`}
+        className="text-xs text-ink-500 hover:text-ink-900 px-2 py-1 rounded hover:bg-sunken inline-flex items-center gap-0.5 shrink-0"
+      >
+        Review <ChevronRight className="w-3 h-3" aria-hidden />
+      </Link>
+      <button
+        onClick={onDismiss}
+        aria-label="Dismiss alert"
+        className="p-1 rounded text-ink-400 hover:text-ink-700 hover:bg-sunken shrink-0"
+      >
+        <X className="w-3 h-3" aria-hidden />
+      </button>
+    </li>
   );
 }
 
-/** Build a short "why these clients" explanation for the banner. Sources
- *  the announcement's parsed-impact (county / entity / tax filters) so the
- *  CPA sees the AI's reasoning, not an opaque match count. */
+/** Build a short "why these clients" explanation. Sources the announcement's
+ *  parsed-impact (county / entity / tax filters). */
 function matchReasonFor(ann: Announcement): string | null {
   const parts: string[] = [];
   if (ann.counties.length === 1) parts.push(`${ann.counties[0]} County`);
