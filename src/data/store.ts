@@ -33,7 +33,7 @@ interface State {
   imports: ImportRecord[];
 }
 
-const STORAGE_KEY = "duedatehq.store.v1";
+const STORAGE_KEY = "duedatehq.store.v2";
 
 function seedState(): State {
   return {
@@ -725,7 +725,7 @@ export const actions = {
         detail: `${affectedClientIds.length} client${
           affectedClientIds.length === 1 ? "" : "s"
         } affected · ${resolved.authority}`,
-        href: `/announcements/${resolved.id}`,
+        href: `/alerts/${resolved.id}`,
         read: false,
         announcementId: resolved.id,
       });

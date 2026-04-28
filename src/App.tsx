@@ -40,8 +40,8 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="clients" element={<Clients />} />
           <Route path="clients/:id" element={<ClientDetail />} />
-          <Route path="announcements" element={<AnnouncementList />} />
-          <Route path="announcements/:id" element={<AnnouncementDetail />} />
+          <Route path="alerts" element={<AnnouncementList />} />
+          <Route path="alerts/:id" element={<AnnouncementDetail />} />
           <Route path="import" element={<Import />} />
           <Route path="settings/*" element={<Settings />} />
           <Route path="*" element={<Placeholder name="Not found" />} />

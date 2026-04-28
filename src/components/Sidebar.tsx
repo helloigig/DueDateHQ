@@ -6,7 +6,7 @@ import { useSession } from "../data/session";
 const primary = [
   { to: "/", label: "Dashboard", Icon: LayoutDashboard, end: true },
   { to: "/clients", label: "Clients", Icon: Users, end: false },
-  { to: "/announcements", label: "Alerts", Icon: Bell, end: false },
+  { to: "/alerts", label: "Alerts", Icon: Bell, end: false },
 ];
 
 export function Sidebar() {
@@ -45,7 +45,7 @@ export function Sidebar() {
                 )}
                 <Icon className="w-4 h-4 shrink-0" aria-hidden />
                 <span className="flex-1">{label}</span>
-                {to === "/announcements" && unread > 0 && (
+                {to === "/alerts" && unread > 0 && (
                   <span className="ml-auto bg-danger-solid text-white text-2xs rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center tabular-nums">
                     {unread}
                   </span>

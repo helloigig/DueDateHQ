@@ -1,13 +1,27 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { History } from "lucide-react";
 import { actions } from "../data/store";
 import { useAnnouncement } from "../hooks/useAnnouncements";
 import { useClients } from "../hooks/useClients";
 import { PageSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
 import { formatLongDate } from "../data/dateHelpers";
+import {
+  CONFIDENCE_LABEL,
+  SOURCE_AUTHORITY_LABEL,
+  SOURCE_AUTHORITY_TOOLTIP,
+  TAX_TYPE_LABEL,
+  TOPIC_LABEL,
+} from "../data/announcementLabels";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { BatchNotifyModal } from "../components/BatchNotifyModal";
+
+const CONFIDENCE_TONE = {
+  high: "bg-emerald-50 text-emerald-700",
+  medium: "bg-slate-100 text-slate-700",
+  low: "bg-amber-50 text-amber-700",
+} as const;
 
 export function AnnouncementDetail() {
   const { id } = useParams<{ id: string }>();
@@ -53,7 +67,7 @@ export function AnnouncementDetail() {
   if (!ann) {
     return (
       <div className="max-w-4xl mx-auto px-4 md:px-6 py-10">
-        <Link to="/announcements" className="text-sm text-slate-500 hover:underline">
+        <Link to="/alerts" className="text-sm text-slate-500 hover:underline">
           ‹ Alerts
         </Link>
         <p className="mt-6 text-slate-600">Announcement not found.</p>
@@ -98,51 +112,70 @@ export function AnnouncementDetail() {
 
   const doDismiss = () => {
     actions.dismissAnnouncement(ann.id);
-    navigate("/announcements");
+    navigate("/alerts");
   };
-
-  const confidenceLabel =
-    ann.confidence === "high"
-      ? "High"
-      : ann.confidence === "medium"
-      ? "Medium"
-      : "Low";
-
-  const typeLabel = ann.type.replace(/_/g, " ");
-
-  const toneHeader =
-    ann.type === "disaster_extension"
-      ? "bg-red-50 border-red-200"
-      : ann.type === "pte_change" || ann.type === "penalty_relief"
-      ? "bg-amber-50 border-amber-200"
-      : "bg-blue-50 border-blue-200";
 
   return (
     <div className="max-w-4xl mx-auto px-4 md:px-6 py-6">
-      <Link to="/announcements" className="text-sm text-slate-500 hover:underline">
+      <Link to="/alerts" className="text-sm text-slate-500 hover:underline">
         ‹ Alerts
       </Link>
 
-      <div className={`mt-4 border rounded-lg p-5 ${toneHeader}`}>
-        <div className="text-xs uppercase tracking-wide text-slate-600">
-          {ann.authority}
-        </div>
-        <h1 className="text-2xl font-semibold text-slate-900 mt-1">{ann.title}</h1>
-        <div className="text-sm text-slate-600 mt-2">
-          Published {formatLongDate(ann.publishedDate)} · Detected{" "}
-          {new Date(ann.detectedAt).toLocaleString("en-US")}
-        </div>
-        <div className="mt-3 flex items-center gap-3 text-sm">
-          <a
-            href={ann.sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-indigo-600 hover:underline"
-          >
-            View official source ↗
-          </a>
-          <span className="text-slate-400">·</span>
-          <span className="capitalize text-slate-600">{typeLabel}</span>
+      <div className="mt-4 border border-slate-200 bg-white rounded-lg p-5">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex items-center justify-center px-2.5 py-1 rounded text-sm font-semibold bg-slate-100 text-slate-900 border border-slate-200 shrink-0">
+            {ann.stateCode}
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start gap-3">
+              <h1 className="flex-1 text-2xl font-semibold text-slate-900">
+                {ann.title}
+              </h1>
+              <span className="text-xs text-slate-500 text-right shrink-0 max-w-[40%]">
+                {ann.authority}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              <span className="inline-flex items-center text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                {TOPIC_LABEL[ann.type]}
+              </span>
+              <span className="inline-flex items-center text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                {TAX_TYPE_LABEL[ann.taxType]}
+              </span>
+              {ann.retroactive && (
+                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                  <History className="w-3 h-3" aria-hidden />
+                  Retroactive
+                </span>
+              )}
+            </div>
+
+            <div className="text-sm text-slate-600 mt-3">
+              Issued {formatLongDate(ann.issuanceDate)}
+              {ann.effectiveDate &&
+                ` · Effective ${formatLongDate(ann.effectiveDate)}`}{" "}
+              · Detected {new Date(ann.detectedAt).toLocaleString("en-US")}
+            </div>
+
+            <div className="mt-3 flex items-center gap-3 text-sm">
+              <a
+                href={ann.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-600 hover:underline"
+              >
+                View official source ↗
+              </a>
+              <span className="text-slate-400">·</span>
+              <span
+                className="text-slate-600"
+                title={SOURCE_AUTHORITY_TOOLTIP[ann.sourceAuthority]}
+              >
+                Source: {SOURCE_AUTHORITY_LABEL[ann.sourceAuthority]}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -153,18 +186,23 @@ export function AnnouncementDetail() {
       )}
 
       <section className="mt-5 bg-white border border-slate-200 rounded-lg">
-        <div className="flex items-center px-4 py-3 border-b border-slate-100">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100">
           <h2 className="text-sm font-semibold text-slate-700">
             📋 PARSED IMPACT
           </h2>
           <span
             className={`ml-auto text-xs px-2 py-0.5 rounded ${
-              ann.confidence === "high"
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-amber-50 text-amber-700"
+              CONFIDENCE_TONE[ann.parseConfidence]
             }`}
           >
-            AI · {confidenceLabel} confidence
+            AI parse: {CONFIDENCE_LABEL[ann.parseConfidence]}
+          </span>
+          <span
+            className={`text-xs px-2 py-0.5 rounded ${
+              CONFIDENCE_TONE[ann.matchConfidence]
+            }`}
+          >
+            AI match: {CONFIDENCE_LABEL[ann.matchConfidence]}
           </span>
         </div>
         <dl className="divide-y divide-slate-100 text-sm">
