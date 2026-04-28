@@ -45,7 +45,14 @@ export type ActivityType =
   | "client_archived"
   | "batch_adjust"
   | "note_added"
-  | "bundle_assigned";
+  | "bundle_assigned"
+  | "email_sent"
+  | "email_received"
+  | "document_received"
+  | "document_confirmed"
+  | "document_flagged"
+  | "ai_inferred"
+  | "checklist_state_change";
 
 export interface ActivityEntry {
   id: string;
@@ -238,19 +245,45 @@ export interface ServicePackage {
   isSystem: boolean;
 }
 
+/**
+ * Reminder template — both the backend-aligned shape (firmId/packageId etc.)
+ * and the v0.7 §7.6 library shape (name/trigger/phase/system/body) live here.
+ * Most fields are optional so the 18 system templates and any user-created
+ * customizations can share the same type.
+ */
 export interface ReminderTemplate {
   id: string;
-  firmId: string;
-  packageId: string | null;
-  templateKey:
+  // Backend-aligned (Phase 0+) — optional for the system library
+  firmId?: string;
+  packageId?: string | null;
+  templateKey?:
     | "initial"
     | "t_minus_30"
     | "t_minus_14"
     | "t_minus_7"
     | "t_minus_1";
+  bodyMdx?: string;
+  sendTimeOfDay?: string; // '09:00'
+
+  // v0.7 §7.6 library shape
+  /** Display name, e.g., "W-2 first request". */
+  name?: string;
+  /** Trigger window relative to deadline (T-30 / T-14 / T-7 / etc.). */
+  trigger?: string;
+  /** Item type the template applies to (wage_w2, 1099_any, k1, etc.). */
+  itemType?: string;
+  /** Deadline class (individual_1040, partnership_1065, etc.). */
+  deadlineClass?: string;
+  /** Cadence after first send (once, weekly, every 3 days, etc.). */
+  cadence?: string;
+  /** Email automation phase. Phase 1 = AI draft + CPA review (default).
+   *  Phase 2 = auto-send when 3 conditions met. PRD §7.3. */
+  phase?: 1 | 2;
+  body?: string;
+  /** True for the 18 system templates that ship Day-1. */
+  system?: boolean;
+
   subject: string;
-  bodyMdx: string;
-  sendTimeOfDay: string; // '09:00'
   active: boolean;
 }
 
@@ -301,4 +334,166 @@ export interface DeadlineExtensionMeta {
   submittedAt: string | null;
   approvedAt: string | null;
   extendedFromDeadlineId: string | null;
+}
+
+// -------- v0.7 Layer 2-4 model (Task / ChecklistItem / Activity / Email / AI) --------
+
+export type TaskStatus =
+  | "not_started"
+  | "in_progress"
+  | "completed"
+  | "deferred"
+  | "filed_extension"
+  | "overdue";
+
+/**
+ * The six PRD §5.2 document states. Critical: AI never auto-promotes to
+ * `received_confirmed` — only an explicit CPA action transitions there.
+ * Enforced in `actions.confirmChecklistItem` (PRD §5.3 invariant).
+ */
+export type DocumentState =
+  | "not_requested"
+  | "requested_waiting"
+  | "received_unreviewed"
+  | "received_confirmed"
+  | "received_issue"
+  | "not_applicable";
+
+export type AiConfidence = "high" | "medium" | "low";
+
+/**
+ * One row in the per-task checklist (Layer 3). Each row's lifecycle is one
+ * of the six DocumentStates. AI-related fields are populated when AI Mode A
+ * (classifier on inbound) or Mode C (anomaly detector) has run.
+ */
+export interface ChecklistItem {
+  id: string;
+  taskId: string;
+  label: string; // "W-2 from ADP", "K-1 from Apex Fund", etc.
+  itemType: string; // "wage_w2", "1099_div", "k1", "1098", "schedule_e_support" — drives templates
+  state: DocumentState;
+  order: number;
+  custom: boolean;
+  /** Set when state moved to `received_*`. */
+  receivedAt?: string;
+  /** AI's classification confidence on the inbound document (Mode A applied to inbound). */
+  aiConfidence?: AiConfidence;
+  /** AI's guess of what document this is, e.g. "W-2 from ADP". */
+  aiClassification?: string;
+  /** Mode C anomaly flag. */
+  flagReason?: string;
+  flagSeverity?: "low" | "medium" | "high";
+  /** Set on `received_confirmed`. PRD §5.3 invariant: only "cpa" allowed here. */
+  confirmedAt?: string;
+  confirmedBy?: string;
+  /** Reminder cadence. */
+  lastReminderAt?: string;
+  nextReminderAt?: string;
+  /** Filename of the simulated received document (we never store the bytes). */
+  receivedFilename?: string;
+  /** Optional source link (CPA's existing system, e.g., SharePoint). */
+  sourceUrl?: string;
+}
+
+/**
+ * Layer 2 — one (Deadline × Client) pair. 1:1 with Deadline at MVP.
+ * Carries forwarding email per PRD §7.4 Method A.
+ */
+export interface Task {
+  id: string;
+  clientId: string;
+  deadlineId: string;
+  formType: string; // mirrors deadline.form
+  jurisdiction: "federal" | StateCode;
+  officialDueDate: string;
+  internalTargetDate: string;
+  clientPrepDate?: string;
+  status: TaskStatus;
+  /** Per-task forwarding address — `firstname-form-{4charToken}@duedatehq.com`. */
+  forwardingEmail: string;
+  assignedUser: string;
+  completedAt?: string;
+  completedBy?: string;
+}
+
+export type EmailTone = "formal" | "casual" | "urgent" | "apologetic";
+export type EmailDraftStatus =
+  | "draft"
+  | "scheduled"
+  | "sent"
+  | "discarded"
+  | "recalled";
+
+export interface AiSource {
+  kind: "tone_match" | "prior_year" | "forwarding_email" | "cohort" | "integration" | "substrate";
+  note: string;
+}
+
+/**
+ * Mode D output. Lives at Layer 4. Always has the CPA CC'd (PRD §7.2).
+ */
+export interface EmailDraft {
+  id: string;
+  taskId: string;
+  clientId: string;
+  checklistItemId?: string;
+  to: string;
+  cc: string;
+  subject: string;
+  body: string;
+  tone: EmailTone;
+  aiSources: AiSource[];
+  status: EmailDraftStatus;
+  scheduledFor?: string;
+  sentAt?: string;
+  sendMethod: "cpa_send" | "phase2_auto";
+  createdAt: string;
+}
+
+/**
+ * Record of every AI call. Used for online eval (PRD §4.7) and the AI
+ * insights panel sources (PRD §7.2).
+ */
+export interface AiInference {
+  id: string;
+  scope: "task" | "client" | "checklist_item";
+  scopeId: string;
+  mode: "A" | "B" | "C" | "D" | "E";
+  confidence: AiConfidence;
+  payload: unknown;
+  createdAt: string;
+}
+
+/**
+ * Per-client per-year facts pulled from prior tax software / QBO. Powers
+ * Modes A/B/C/E (PRD §6.6 Import Tier 3 unlocks this). The store seeds
+ * 2-3 prior years per client so Mode B/C/E have realistic baselines.
+ */
+export interface ImportedFact {
+  id: string;
+  clientId: string;
+  year: number;
+  itemType: string; // "wage_w2", "k1", "schedule_e", etc.
+  /** ISO date the document arrived in the prior year. Drives Mode B. */
+  observedDate?: string;
+  /** Numeric value when relevant (Mode C anomaly threshold). */
+  observedAmount?: number;
+  /** Free-text note. */
+  note?: string;
+}
+
+/**
+ * AI insight cards shown in the AI insights panel (Mode E + Mode B aggregates).
+ * Cold-start fallback per PRD §4.2 when no ImportedFact exists.
+ */
+export interface AiInsight {
+  id: string;
+  clientId: string;
+  mode: "B" | "C" | "E";
+  title: string;
+  detail: string;
+  /** Inline actions: "ask_client" opens the email modal pre-filled. */
+  actions: Array<"ask_client" | "schedule_advisory" | "mark_known" | "snooze">;
+  status: "open" | "resolved" | "snoozed";
+  createdAt: string;
 }
