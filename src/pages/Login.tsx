@@ -6,7 +6,6 @@ import { loginSchema } from "../types/schemas";
 import { signIn } from "../data/session";
 import { actions } from "../data/store";
 import { authInputClass } from "./auth/AuthShell";
-import { SsoButton } from "../components/SsoButton";
 import { env } from "../config";
 import { supabase } from "../lib/supabase";
 
@@ -146,27 +145,11 @@ export function Login() {
               : "Welcome back."}
           </p>
 
-          {/* SSO providers — wireframe shows the Phase 2 plan honestly.
-              The same OAuth surface that powers Method B inbound (PRD §7.4)
-              becomes the login. SAML SSO is Team-tier-only per PRD §7.3. */}
-          <div className="mt-6 grid grid-cols-2 gap-2">
-            <SsoButton provider="google" disabled />
-            <SsoButton provider="microsoft" disabled />
-          </div>
-          <p className="text-2xs text-ink-400 mt-2">
-            Sign-in with Google · Microsoft — Phase 2. Same OAuth that powers
-            Method B inbound mail routing.
-          </p>
+          {/* Google / Microsoft SSO and SAML are deliberately not shown until
+              wired — disabled buttons signal "broken" not "coming soon."
+              Re-introduce when OAuth flow ships in Phase 2. */}
 
-          <div className="my-5 flex items-center gap-3">
-            <span className="flex-1 h-px bg-line" />
-            <span className="text-2xs uppercase tracking-wider text-ink-400">
-              or with email
-            </span>
-            <span className="flex-1 h-px bg-line" />
-          </div>
-
-          <form onSubmit={onSubmit} className="space-y-3 text-sm">
+          <form onSubmit={onSubmit} className="space-y-3 text-sm mt-6">
             <Field label="Email" error={errors.email}>
               <input
                 type="email"
@@ -208,9 +191,15 @@ export function Login() {
             </div>
           </form>
 
-          <p className="text-2xs text-ink-400 mt-4 pt-4 border-t border-line">
-            <span className="font-medium text-ink-500">SAML SSO</span> ships with
-            Team tier (Phase 2, gated on SOC 2 Type II).
+          {/* Magic-link affordance — passwordless secondary path. Same flow
+              GitHub / Linear / Notion offer. Password stays primary because
+              CPAs use password managers (1Password is universal in firms);
+              magic link is a quiet escape hatch. */}
+          <p className="text-xs text-center text-ink-500 mt-4 pt-4 border-t border-line">
+            Don't want a password?{" "}
+            <Link to="/magic-link" className="text-ink-900 underline">
+              Email me a sign-in link instead
+            </Link>
           </p>
         </div>
 

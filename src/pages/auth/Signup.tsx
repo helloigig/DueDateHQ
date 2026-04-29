@@ -13,7 +13,6 @@ import { trpc } from "../../lib/api/client";
 import { signupSchema, type SignupInput } from "../../types/schemas";
 import { signIn } from "../../data/session";
 import { authInputClass } from "./AuthShell";
-import { SsoButton } from "../../components/SsoButton";
 import { env } from "../../config";
 import { supabase } from "../../lib/supabase";
 
@@ -143,31 +142,18 @@ export function Signup() {
             DueDateHQ
           </Link>
           <p className="text-2xs uppercase tracking-wider text-ink-500 mt-8 font-semibold">
-            Create your firm workspace
+            Sign up
           </p>
           <h1 className="text-2xl font-semibold text-ink-900 mt-1">
             30 days free, then $49/mo
           </h1>
           <p className="text-sm text-ink-500 mt-2">
-            Your account creates a firm workspace where you're the owner.
-            Teammates join via invite later. No credit card to start; after
-            day 30 you pay or your data goes read-only.
+            We'll set up your firm workspace in the next step. Teammates join
+            via invite later. No credit card to start; after day 30 you pay or
+            your data goes read-only.
           </p>
 
-          {/* SSO — Phase 2 affordance */}
-          <div className="mt-6 grid grid-cols-2 gap-2">
-            <SsoButton provider="google" disabled />
-            <SsoButton provider="microsoft" disabled />
-          </div>
-          <div className="my-5 flex items-center gap-3">
-            <span className="flex-1 h-px bg-line" />
-            <span className="text-2xs uppercase tracking-wider text-ink-400">
-              or with email
-            </span>
-            <span className="flex-1 h-px bg-line" />
-          </div>
-
-          <form onSubmit={onSubmit} className="space-y-3 text-sm">
+          <form onSubmit={onSubmit} className="space-y-3 text-sm mt-6">
             <Field label="Email" error={errors.email}>
               <input
                 type="email"
@@ -248,32 +234,29 @@ export function Signup() {
             </p>
           </form>
 
+          {/* Magic-link affordance — secondary path. The user types email, we
+              send a one-time sign-in link. No password to remember. Keeps
+              parity with how Notion / Linear / GitHub all let you in. */}
+          <p className="text-xs text-center text-ink-500 mt-3">
+            Don't want a password?{" "}
+            <Link to="/magic-link" className="text-ink-900 underline">
+              Email me a sign-in link instead
+            </Link>
+          </p>
+
           <div className="mt-6 pt-6 border-t border-line space-y-3">
-            <details className="group">
-              <summary className="text-xs text-ink-500 cursor-pointer hover:text-ink-900 list-none flex items-center gap-1.5">
-                <span className="text-ink-400 group-open:rotate-90 transition-transform">›</span>
-                Joining an existing firm? Enter an invite code
-              </summary>
-              <div className="mt-2 flex gap-2">
-                <input
-                  type="text"
-                  placeholder="6-character code from your firm owner"
-                  maxLength={6}
-                  className="flex-1 px-2.5 py-1.5 rounded border border-line bg-surface text-sm font-mono uppercase placeholder:text-ink-400 placeholder:font-sans placeholder:normal-case"
-                />
-                <button
-                  type="button"
-                  onClick={() => alert("Invite-code redemption stubbed in this wireframe build")}
-                  className="text-xs px-3 py-1.5 rounded border border-line text-ink-700 hover:bg-sunken"
-                >
-                  Redeem
-                </button>
-              </div>
-              <p className="text-2xs text-ink-400 mt-1.5">
-                Or use the link your firm owner emailed you. Both go to the
-                same place.
-              </p>
-            </details>
+            {/* Joining an existing firm — email-link is primary. Owner clicks
+                "invite Alice" in Settings → Team, Alice gets an email, click
+                takes her to /accept-invite/<token>. The 6-char paste-in code
+                stays as a fallback for the case where the invite email
+                bounced or got lost. */}
+            <p className="text-xs text-ink-500">
+              Joining an existing firm? Look for an invite email from your firm
+              owner — the link takes you straight in.{" "}
+              <Link to="/accept-invite" className="text-ink-900 underline">
+                Lost the email?
+              </Link>
+            </p>
 
             <p className="text-xs text-ink-500">
               Already have an account?{" "}

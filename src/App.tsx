@@ -16,6 +16,7 @@ import { Signup } from "./pages/auth/Signup";
 import { AcceptInvite } from "./pages/auth/AcceptInvite";
 import { ForgotPassword } from "./pages/auth/ForgotPassword";
 import { ResetPassword } from "./pages/auth/ResetPassword";
+import { MagicLink } from "./pages/auth/MagicLink";
 import { Changes } from "./pages/Changes";
 import { OnboardingFirm } from "./pages/onboarding/OnboardingFirm";
 import { OnboardingChoosePath } from "./pages/onboarding/OnboardingChoosePath";
@@ -39,6 +40,7 @@ export default function App() {
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/magic-link" element={<MagicLink />} />
 
       {/* Onboarding wizard — wizard chrome, no sidebar (IA §3.8) */}
       {localSession && (

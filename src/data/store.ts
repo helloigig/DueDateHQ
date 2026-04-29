@@ -53,10 +53,31 @@ interface State {
   emailDrafts: EmailDraft[];
 }
 
-// v3 bump: added Phase 2 eligibility seed data — new email drafts with
-// templateId field and a promoted rt-02 template. Existing localStorage
-// from v2 will be ignored and re-seeded.
-const STORAGE_KEY = "duedatehq.store.v3";
+// v4 bump: hydrate now defaults to EMPTY state (was: full demo seeds). The
+// 41-client demo workspace is opt-in via actions.resetToSeeds(), wired to
+// the "Try demo workspace" button on Login. This unblocks honest signup
+// testing — fresh signup now lands in an empty firm, not Sarah's demo.
+// Existing v3 localStorage will be ignored.
+const STORAGE_KEY = "duedatehq.store.v4";
+
+function emptyState(): State {
+  return {
+    clients: [],
+    deadlines: [],
+    announcements: [],
+    notifications: [],
+    imports: [],
+    tasks: [],
+    checklistItems: [],
+    // Reminder templates are firm-scoped config, but the 18 PRD §7.6
+    // defaults are always present from day 1 — they're substrate, not
+    // user data. Keep them in the empty state.
+    reminderTemplates: seedReminderTemplates,
+    importedFacts: [],
+    aiInsights: [],
+    emailDrafts: [],
+  };
+}
 
 function seedState(): State {
   const tasks = buildTasksFromDeadlines(seedDeadlines);
@@ -77,28 +98,28 @@ function seedState(): State {
 }
 
 function hydrate(): State {
-  if (typeof window === "undefined") return seedState();
+  if (typeof window === "undefined") return emptyState();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return seedState();
+    if (!raw) return emptyState();
     const parsed = JSON.parse(raw) as Partial<State>;
-    const seeded = seedState();
+    const fallback = emptyState();
     return {
-      clients: parsed.clients ?? seeded.clients,
-      deadlines: parsed.deadlines ?? seeded.deadlines,
-      announcements: parsed.announcements ?? seeded.announcements,
-      notifications: parsed.notifications ?? seeded.notifications,
-      imports: parsed.imports ?? seeded.imports,
-      tasks: parsed.tasks ?? seeded.tasks,
-      checklistItems: parsed.checklistItems ?? seeded.checklistItems,
+      clients: parsed.clients ?? fallback.clients,
+      deadlines: parsed.deadlines ?? fallback.deadlines,
+      announcements: parsed.announcements ?? fallback.announcements,
+      notifications: parsed.notifications ?? fallback.notifications,
+      imports: parsed.imports ?? fallback.imports,
+      tasks: parsed.tasks ?? fallback.tasks,
+      checklistItems: parsed.checklistItems ?? fallback.checklistItems,
       reminderTemplates:
-        parsed.reminderTemplates ?? seeded.reminderTemplates,
-      importedFacts: parsed.importedFacts ?? seeded.importedFacts,
-      aiInsights: parsed.aiInsights ?? seeded.aiInsights,
-      emailDrafts: parsed.emailDrafts ?? seeded.emailDrafts,
+        parsed.reminderTemplates ?? fallback.reminderTemplates,
+      importedFacts: parsed.importedFacts ?? fallback.importedFacts,
+      aiInsights: parsed.aiInsights ?? fallback.aiInsights,
+      emailDrafts: parsed.emailDrafts ?? fallback.emailDrafts,
     };
   } catch {
-    return seedState();
+    return emptyState();
   }
 }
 
