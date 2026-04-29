@@ -4,6 +4,8 @@ import { TopBar } from "./TopBar";
 import { BottomTabBar } from "./BottomTabBar";
 import { OfflineBanner } from "./OfflineBanner";
 import { InstallPrompt } from "./InstallPrompt";
+import { useSession } from "../data/session";
+import { useStore } from "../data/store";
 
 export function AppShell() {
   const session = useSession();
