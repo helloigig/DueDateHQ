@@ -12,8 +12,12 @@ import {
   Package,
   Plug,
   CreditCard,
+  Zap,
+  PauseCircle,
+  PlayCircle,
+  ShieldCheck,
 } from "lucide-react";
-import { actions } from "../data/store";
+import { actions, useStore } from "../data/store";
 import { useImportHistory } from "../hooks/useImports";
 import { signOut, updateSession, useSession } from "../data/session";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -26,6 +30,11 @@ import {
 } from "../hooks/useReminderTemplates";
 import type { FirmSession } from "../data/session";
 import { BUNDLES } from "../data/bundles";
+import {
+  computeEligibility,
+  eligibilityLabel,
+  type PhaseEligibility,
+} from "../lib/phase2Eligibility";
 
 const NAV = [
   { to: "/settings", label: "Account", icon: User, end: true },
@@ -758,61 +767,152 @@ function ServicePackagesPanel() {
 function RemindersPanel() {
   const templates = useReminderTemplates();
   const update = useUpdateReminderTemplate();
+  const session = useSession();
+  const { emailDrafts } = useStore();
   const [editingId, setEditingId] = useState<string | null>(null);
   const editing = templates.find((t) => t.id === editingId) ?? null;
 
+  // Compute eligibility once per render. Cheap — pure function over seed.
+  const eligibilityById = useMemo(() => {
+    const m = new Map<string, PhaseEligibility>();
+    for (const t of templates) m.set(t.id, computeEligibility(t, emailDrafts));
+    return m;
+  }, [templates, emailDrafts]);
+
+  const phase2Active = templates.filter((t) => t.phase === 2);
+  const phase2Eligible = templates.filter(
+    (t) => t.phase !== 2 && eligibilityById.get(t.id)?.eligible
+  );
+  const recentAutoSends = useMemo(
+    () =>
+      emailDrafts
+        .filter((d) => d.sendMethod === "phase2_auto" && d.status === "sent")
+        .sort((a, b) => (b.sentAt ?? "").localeCompare(a.sentAt ?? ""))
+        .slice(0, 5),
+    [emailDrafts]
+  );
+
+  const paused = !!session?.phase2AutoSendPaused;
+  const togglePause = () =>
+    updateSession({ phase2AutoSendPaused: !paused });
+
   return (
     <>
+      {/* Phase 2 status block — lives at the top of the Reminders page so
+          the CPA always knows the auto-send state of their firm before
+          they touch any template. */}
+      <Phase2StatusCard
+        paused={paused}
+        onTogglePause={togglePause}
+        activeCount={phase2Active.length}
+        eligibleCount={phase2Eligible.length}
+        autoSendsThisWeek={recentAutoSends.length}
+      />
+
       <Card
         title="Reminder Templates"
-        description="The 18 system templates ship with every firm Day-1 (PRD §7.6). Edit subject and body without affecting other firms. Phase 2 auto-send unlocks per template after Pattern Precedent (5+ approved drafts to a single client)."
+        description="The 18 system templates ship with every firm Day-1 (PRD §7.6). Edit subject and body without affecting other firms. Each row shows current phase and what it'd take to graduate to Phase 2 auto-send."
       >
         <ul className="divide-y divide-line">
-          {templates.map((t) => (
-            <li key={t.id} className="py-3">
-              <div className="flex items-start gap-3">
-                <Mail className="w-4 h-4 text-ink-400 mt-0.5" aria-hidden />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-ink-900">
-                    {t.name ?? t.subject}
-                  </p>
-                  <p className="text-xs text-ink-500 mt-0.5">{t.subject}</p>
-                  <div className="flex flex-wrap gap-1 mt-1.5 text-2xs uppercase tracking-wide">
-                    {t.trigger && (
-                      <span className="px-1.5 py-0.5 rounded bg-sunken text-ink-700">
-                        {t.trigger}
-                      </span>
-                    )}
-                    {t.cadence && (
-                      <span className="px-1.5 py-0.5 rounded bg-sunken text-ink-700">
-                        {t.cadence}
-                      </span>
-                    )}
-                    <span
-                      className={`px-1.5 py-0.5 rounded border ${
-                        t.phase === 2
-                          ? "bg-info-bg text-info-ink border-info-border"
-                          : "bg-sunken text-ink-700 border-line"
-                      }`}
-                    >
-                      Phase {t.phase ?? 1}
-                    </span>
+          {templates.map((t) => {
+            const elig = eligibilityById.get(t.id);
+            const isPhase2 = t.phase === 2;
+            return (
+              <li key={t.id} className="py-3">
+                <div className="flex items-start gap-3">
+                  <Mail
+                    className="w-4 h-4 text-ink-400 mt-0.5"
+                    aria-hidden
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-ink-900">
+                      {t.name ?? t.subject}
+                    </p>
+                    <p className="text-xs text-ink-500 mt-0.5">{t.subject}</p>
+                    <div className="flex flex-wrap items-center gap-1 mt-1.5 text-2xs uppercase tracking-wide">
+                      {t.trigger && (
+                        <span className="px-1.5 py-0.5 rounded bg-sunken text-ink-700">
+                          {t.trigger}
+                        </span>
+                      )}
+                      {t.cadence && (
+                        <span className="px-1.5 py-0.5 rounded bg-sunken text-ink-700">
+                          {t.cadence}
+                        </span>
+                      )}
+                      <PhaseBadge
+                        phase={t.phase ?? 1}
+                        paused={isPhase2 && paused}
+                      />
+                      {!isPhase2 && elig && (
+                        <span
+                          className={`px-1.5 py-0.5 rounded border ${
+                            elig.eligible
+                              ? "bg-ok-bg text-ok-ink border-ok-border"
+                              : "bg-sunken text-ink-500 border-line"
+                          }`}
+                        >
+                          {eligibilityLabel(elig)}
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  <button
+                    onClick={() => setEditingId(t.id)}
+                    className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken"
+                  >
+                    Edit
+                  </button>
                 </div>
-                <button
-                  onClick={() => setEditingId(t.id)}
-                  className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken"
-                >
-                  Edit
-                </button>
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       </Card>
+
+      {recentAutoSends.length > 0 && (
+        <Card
+          title="Recent auto-sends"
+          description="Phase 2 fires the system has executed without per-send approval. Audit trail keeps the actor field as 'ai (phase 2)' so review is unambiguous."
+        >
+          <ul className="divide-y divide-line">
+            {recentAutoSends.map((d) => {
+              const tmpl = templates.find((t) => t.id === d.templateId);
+              return (
+                <li
+                  key={d.id}
+                  className="py-2.5 flex items-start gap-3 text-sm"
+                >
+                  <Zap
+                    className="w-3.5 h-3.5 text-info-ink mt-0.5 shrink-0"
+                    aria-hidden
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-ink-900 truncate">
+                      {d.subject}
+                    </p>
+                    <p className="text-2xs text-ink-500 mt-0.5">
+                      To {d.to}
+                      {tmpl && <> · {tmpl.name ?? "template"}</>} ·{" "}
+                      {d.sentAt
+                        ? new Date(d.sentAt).toLocaleDateString()
+                        : "—"}
+                    </p>
+                  </div>
+                  <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-info-bg text-info-ink border border-info-border shrink-0">
+                    auto-sent
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
+
       {editing && (
         <ReminderTemplateEditor
           template={editing}
+          eligibility={eligibilityById.get(editing.id) ?? null}
           onSave={(patch) => {
             update(editing.id, patch);
             setEditingId(null);
@@ -824,19 +924,181 @@ function RemindersPanel() {
   );
 }
 
+function PhaseBadge({
+  phase,
+  paused,
+}: {
+  phase: 1 | 2;
+  paused: boolean;
+}) {
+  if (phase === 2) {
+    return (
+      <span
+        className={`px-1.5 py-0.5 rounded border inline-flex items-center gap-1 ${
+          paused
+            ? "bg-warn-bg text-warn-ink border-warn-border"
+            : "bg-info-bg text-info-ink border-info-border"
+        }`}
+      >
+        {paused ? (
+          <>
+            <PauseCircle className="w-2.5 h-2.5" aria-hidden /> Phase 2 paused
+          </>
+        ) : (
+          <>
+            <Zap className="w-2.5 h-2.5" aria-hidden /> Phase 2 live
+          </>
+        )}
+      </span>
+    );
+  }
+  return (
+    <span className="px-1.5 py-0.5 rounded border bg-sunken text-ink-700 border-line">
+      Phase 1
+    </span>
+  );
+}
+
+function Phase2StatusCard({
+  paused,
+  onTogglePause,
+  activeCount,
+  eligibleCount,
+  autoSendsThisWeek,
+}: {
+  paused: boolean;
+  onTogglePause: () => void;
+  activeCount: number;
+  eligibleCount: number;
+  autoSendsThisWeek: number;
+}) {
+  return (
+    <section
+      className={`bg-surface border rounded-md overflow-hidden ${
+        paused ? "border-warn-border" : "border-line"
+      }`}
+      aria-label="Phase 2 auto-send status"
+    >
+      <header
+        className={`px-5 py-3 border-b flex items-center gap-3 ${
+          paused
+            ? "border-warn-border bg-warn-bg/40"
+            : "border-line bg-sunken/40"
+        }`}
+      >
+        {paused ? (
+          <PauseCircle className="w-4 h-4 text-warn-ink" aria-hidden />
+        ) : (
+          <ShieldCheck className="w-4 h-4 text-ok-ink" aria-hidden />
+        )}
+        <div className="flex-1 min-w-0">
+          <h2 className="text-sm font-semibold text-ink-900">
+            Phase 2 auto-send
+          </h2>
+          <p className="text-2xs text-ink-500 mt-0.5">
+            {paused ? (
+              <>
+                <span className="text-warn-ink font-medium">Paused.</span>{" "}
+                The system is holding all auto-fires until you resume.
+              </>
+            ) : activeCount === 0 ? (
+              <>
+                Live. No templates currently auto-send — nothing is firing
+                without your review.
+              </>
+            ) : (
+              <>
+                Live. {activeCount} template{activeCount === 1 ? "" : "s"}{" "}
+                auto-fire on cadence; everything else still routes through
+                you.
+              </>
+            )}
+          </p>
+        </div>
+        <button
+          onClick={onTogglePause}
+          className={`text-xs px-3 py-1.5 rounded border inline-flex items-center gap-1.5 ${
+            paused
+              ? "bg-accent text-canvas border-accent hover:bg-accent-hover"
+              : "border-line text-ink-700 hover:bg-sunken"
+          }`}
+        >
+          {paused ? (
+            <>
+              <PlayCircle className="w-3.5 h-3.5" aria-hidden />
+              Resume auto-send
+            </>
+          ) : (
+            <>
+              <PauseCircle className="w-3.5 h-3.5" aria-hidden />
+              Pause all auto-sends
+            </>
+          )}
+        </button>
+      </header>
+      <div className="grid grid-cols-3 divide-x divide-line">
+        <Stat
+          label="Live templates"
+          value={activeCount}
+          tone={activeCount > 0 ? "info" : "muted"}
+        />
+        <Stat
+          label="Eligible to promote"
+          value={eligibleCount}
+          tone={eligibleCount > 0 ? "ok" : "muted"}
+        />
+        <Stat
+          label="Auto-sent this week"
+          value={autoSendsThisWeek}
+          tone="muted"
+        />
+      </div>
+    </section>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "info" | "ok" | "muted";
+}) {
+  const valueClass =
+    tone === "info"
+      ? "text-info-ink"
+      : tone === "ok"
+        ? "text-ok-ink"
+        : "text-ink-900";
+  return (
+    <div className="px-4 py-3">
+      <p className="text-2xs uppercase tracking-wider text-ink-500">
+        {label}
+      </p>
+      <p className={`text-xl font-semibold mt-0.5 tabular-nums ${valueClass}`}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
 function ReminderTemplateEditor({
   template,
+  eligibility,
   onSave,
   onClose,
 }: {
   template: ReturnType<typeof useReminderTemplates>[number];
+  eligibility: PhaseEligibility | null;
   onSave: (patch: Partial<typeof template>) => void;
   onClose: () => void;
 }) {
   const [subject, setSubject] = useState(template.subject);
   const [body, setBody] = useState(template.body ?? "");
   const [phase, setPhase] = useState<1 | 2>(template.phase ?? 1);
-  const [eligible] = useState(false); // Pattern Precedent — wireframe stub
+  const eligible = !!eligibility?.eligible;
 
   return (
     <div
@@ -875,37 +1137,76 @@ function ReminderTemplateEditor({
               className="w-full border border-line rounded px-2 py-2 text-sm font-sans"
             />
           </Field>
-          <div className="bg-sunken/50 border border-line rounded p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div>
+          <div
+            className={`border rounded p-3 ${
+              phase === 2 && eligible
+                ? "bg-info-bg/30 border-info-border"
+                : "bg-sunken/50 border-line"
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-ink-900">
                   Phase 2 auto-send
                 </p>
                 <p className="text-xs text-ink-500 mt-0.5">
-                  Auto-send when 3 conditions met: Pattern Precedent, Routine Item, Timing within Precedent. PRD §7.3.
+                  When all three conditions are met, the system fires this
+                  reminder on its own cadence. You stay in the audit trail
+                  as the configuring CPA — actor on each fire reads "ai
+                  (phase 2)."
                 </p>
               </div>
               <button
                 onClick={() => setPhase(phase === 2 ? 1 : 2)}
-                disabled={!eligible}
-                className={`text-xs px-3 py-1.5 rounded ${
+                disabled={!eligible && phase !== 2}
+                className={`text-xs px-3 py-1.5 rounded shrink-0 ${
                   phase === 2
-                    ? "bg-accent text-canvas"
+                    ? "bg-accent text-canvas hover:bg-accent-hover"
                     : "border border-line text-ink-700 hover:bg-sunken"
                 } disabled:opacity-40 disabled:cursor-not-allowed`}
                 title={
-                  eligible
+                  eligible || phase === 2
                     ? "Toggle Phase 2"
-                    : "Disabled until Pattern Precedent (5+ approved drafts) is met for at least one client"
+                    : "All three conditions must be met to enable"
                 }
               >
                 {phase === 2 ? "Enabled" : "Enable Phase 2"}
               </button>
             </div>
-            {!eligible && (
-              <p className="text-2xs text-ink-400 mt-2">
-                Locked: Pattern Precedent not yet established. Approve 5+ drafts of this template without modification on a single client to unlock.
-              </p>
+
+            {/* Three-condition breakdown — every condition shown, with its
+                current status. Removes the mystery from "what does
+                eligibility mean" and shows exactly what'd unlock it. */}
+            {eligibility && (
+              <ul className="mt-3 space-y-1.5 text-2xs">
+                <ConditionRow
+                  met={eligibility.patternPrecedent.met}
+                  label="Pattern Precedent"
+                  detail={
+                    eligibility.patternPrecedent.met
+                      ? `${eligibility.patternPrecedent.bestStreak} approved sends to one client`
+                      : `${eligibility.patternPrecedent.bestStreak} of ${eligibility.patternPrecedent.threshold} approvals to a single client (no edits)`
+                  }
+                />
+                <ConditionRow
+                  met={eligibility.routineItem}
+                  label="Routine Item"
+                  detail={
+                    eligibility.routineItem
+                      ? `Standard system template — ${template.itemType ?? ""}`
+                      : "Custom or non-system templates can't auto-send"
+                  }
+                />
+                <ConditionRow
+                  met={eligibility.timingWithinPrecedent}
+                  label="Timing within Precedent"
+                  detail={
+                    eligibility.timingWithinPrecedent
+                      ? `Recurring cadence — ${template.cadence ?? ""}`
+                      : "First-touch (\"once\") templates always need CPA review"
+                  }
+                />
+              </ul>
             )}
           </div>
         </div>
@@ -1108,5 +1409,40 @@ function Field({
       </span>
       {children}
     </label>
+  );
+}
+
+function ConditionRow({
+  met,
+  label,
+  detail,
+}: {
+  met: boolean;
+  label: string;
+  detail: string;
+}) {
+  return (
+    <li className="flex items-start gap-2">
+      <span
+        className={`mt-0.5 inline-flex w-3.5 h-3.5 rounded-full items-center justify-center text-2xs shrink-0 ${
+          met
+            ? "bg-ok-bg text-ok-ink border border-ok-border"
+            : "bg-sunken text-ink-400 border border-line"
+        }`}
+        aria-hidden
+      >
+        {met ? "✓" : "·"}
+      </span>
+      <div className="flex-1 min-w-0">
+        <span
+          className={`font-medium ${
+            met ? "text-ink-900" : "text-ink-500"
+          }`}
+        >
+          {label}
+        </span>
+        <span className="text-ink-500"> — {detail}</span>
+      </div>
+    </li>
   );
 }

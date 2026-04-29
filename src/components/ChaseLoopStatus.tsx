@@ -6,7 +6,8 @@ import {
   AlertTriangle,
   ArrowRight,
 } from "lucide-react";
-import { useStore, actions } from "../data/store";
+import { useStore } from "../data/store";
+import { confirmWithUndo } from "../lib/confirmWithUndo";
 import { useAllOpenInsights } from "../hooks/useAiInsights";
 import { TODAY, toIso } from "../data/dateHelpers";
 import { EmailDraftModal, type EmailDraftIntent } from "./EmailDraftModal";
@@ -222,9 +223,7 @@ export function ChaseLoopStatus() {
                 className="text-xs text-ink-700 flex items-center gap-2"
               >
                 <button
-                  onClick={() =>
-                    actions.setChecklistItemState(c.id, "received_confirmed", "cpa")
-                  }
+                  onClick={() => confirmWithUndo(c)}
                   className="text-2xs px-1.5 py-0.5 rounded bg-warn-bg text-warn-ink border border-warn-border hover:bg-warn-bg/70 shrink-0"
                   title="Confirm — only the CPA can do this (PRD §5.3)"
                 >

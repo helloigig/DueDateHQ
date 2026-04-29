@@ -53,7 +53,10 @@ interface State {
   emailDrafts: EmailDraft[];
 }
 
-const STORAGE_KEY = "duedatehq.store.v2";
+// v3 bump: added Phase 2 eligibility seed data — new email drafts with
+// templateId field and a promoted rt-02 template. Existing localStorage
+// from v2 will be ignored and re-seeded.
+const STORAGE_KEY = "duedatehq.store.v3";
 
 function seedState(): State {
   const tasks = buildTasksFromDeadlines(seedDeadlines);
