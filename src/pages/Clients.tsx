@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { AddClientModal } from "../components/AddClientModal";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { MultiSelectChip } from "../components/MultiSelectChip";
@@ -47,11 +46,7 @@ const TIER_OPTIONS: { value: ClientTier; label: string }[] = [
   { value: "custom", label: "Custom" },
 ];
 
-const TIER_LABEL: Record<ClientTier, string> = {
-  premium: "Premium",
-  standard: "Standard",
-  custom: "Custom",
-};
+// kept inline in TierPill, no separate constant needed
 
 type SortColumn = "name" | "entity" | "open" | "next";
 type SortDir = "asc" | "desc";
@@ -529,6 +524,55 @@ export function Clients() {
   );
 }
 
+function SortableTh({
+  col,
+  sortCol,
+  sortDir,
+  onClick,
+  align = "left",
+  children,
+}: {
+  col: SortColumn;
+  sortCol: SortColumn;
+  sortDir: SortDir;
+  onClick: (col: SortColumn) => void;
+  align?: "left" | "right";
+  children: React.ReactNode;
+}) {
+  const active = sortCol === col;
+  return (
+    <th
+      className={`px-4 py-2 font-semibold cursor-pointer ${
+        align === "right" ? "text-right" : "text-left"
+      } ${active ? "text-ink-900" : "text-ink-700"} hover:text-ink-900`}
+      onClick={() => onClick(col)}
+    >
+      <span className="inline-flex items-baseline gap-1">
+        {children}
+        {active && (
+          <span className="text-2xs">{sortDir === "asc" ? "↑" : "↓"}</span>
+        )}
+      </span>
+    </th>
+  );
+}
+
+function TierPill({ tier }: { tier: ClientTier }) {
+  const styles: Record<ClientTier, string> = {
+    premium: "bg-warn-bg text-warn-ink border-warn-border",
+    standard: "bg-sunken text-ink-700 border-line",
+    custom: "bg-info-bg text-info-ink border-info-border",
+  };
+  const label = tier.charAt(0).toUpperCase() + tier.slice(1);
+  return (
+    <span
+      className={`text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded border ${styles[tier]}`}
+    >
+      {label}
+    </span>
+  );
+}
+
 function StatCard({
   label,
   value,
@@ -553,60 +597,4 @@ function StatCard({
   );
 }
 
-function SortableTh({
-  col,
-  sortCol,
-  sortDir,
-  onClick,
-  align,
-  children,
-}: {
-  col: SortColumn;
-  sortCol: SortColumn;
-  sortDir: SortDir;
-  onClick: (col: SortColumn) => void;
-  align: "left" | "right";
-  children: React.ReactNode;
-}) {
-  const active = sortCol === col;
-  const Icon = !active ? ArrowUpDown : sortDir === "asc" ? ArrowUp : ArrowDown;
-  return (
-    <th
-      className={`px-4 py-2 font-semibold ${
-        align === "right" ? "text-right" : "text-left"
-      }`}
-      aria-sort={
-        active ? (sortDir === "asc" ? "ascending" : "descending") : "none"
-      }
-    >
-      <button
-        type="button"
-        onClick={() => onClick(col)}
-        className={`inline-flex items-center gap-1 uppercase tracking-wider hover:text-ink-900 ${
-          active ? "text-ink-900" : "text-ink-700"
-        } ${align === "right" ? "flex-row-reverse" : ""}`}
-      >
-        <span>{children}</span>
-        <Icon className="w-3 h-3" aria-hidden />
-      </button>
-    </th>
-  );
-}
-
-function TierPill({ tier }: { tier: ClientTier | undefined }) {
-  if (!tier) return <span className="text-ink-500">—</span>;
-  const tone =
-    tier === "premium"
-      ? "bg-accent/10 text-accent border-accent/30"
-      : tier === "custom"
-        ? "bg-warn-bg text-warn-ink border-warn-border"
-        : "bg-sunken text-ink-700 border-line";
-  return (
-    <span
-      className={`inline-flex items-center text-2xs font-medium px-1.5 py-0.5 rounded border ${tone}`}
-    >
-      {TIER_LABEL[tier]}
-    </span>
-  );
-}
 

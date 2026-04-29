@@ -5,7 +5,6 @@ import {
   Clock,
   AlertTriangle,
   Mail,
-  Filter,
   ChevronRight,
   MoreHorizontal,
   CalendarClock,
@@ -94,7 +93,7 @@ export function TaskList() {
   const insights = useAllOpenInsights();
   const session = useSession();
   const today = toIso(TODAY);
-  const [filter, setFilter] = useState<FilterKey>("all");
+  const [filter, setFilter] = useState<FilterKey>("needs_me");
   const [emailIntent, setEmailIntent] = useState<EmailDraftIntent | null>(null);
   // Pro / Team show assignee column. Solo hides it (only one user — useless).
   const showAssignee = session?.tier !== "solo";
@@ -252,17 +251,14 @@ export function TaskList() {
         aria-label="Tasks"
       >
         <header className="flex items-center px-4 py-2.5 border-b border-line bg-sunken/40 gap-2 flex-wrap">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-700">
+          <h2 className="text-sm font-semibold text-ink-900">
             Your tasks
           </h2>
-          <span
-            className="text-2xs text-ink-500"
-            title="Ranked by deadline urgency, AI flags, unread alerts, and risk forecast"
-          >
-            {filtered.length} of {rows.length} · ranked by urgency
+          <span className="text-2xs text-ink-500 tabular-nums">
+            {filtered.length}
           </span>
           <div className="ml-auto flex items-center gap-1 flex-wrap">
-            {showAssignee && assignees.length > 1 && (
+            {showAssignee && assignees.length > 2 && (
               <div className="relative">
                 <button
                   onClick={() => setAssigneeMenuOpen((v) => !v)}
@@ -318,10 +314,6 @@ export function TaskList() {
                 )}
               </div>
             )}
-            <Filter
-              className="w-3 h-3 text-ink-400 mr-1 ml-1"
-              aria-hidden
-            />
             {FILTERS.map((f) => {
               const active = filter === f.key;
               const count =
