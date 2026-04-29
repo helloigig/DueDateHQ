@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  AlertTriangle,
   ChevronRight,
-  ChevronDown,
-  ChevronUp,
   Clock,
-  History,
+  Info,
   X,
 } from "lucide-react";
 import type { Announcement } from "../types";
@@ -15,39 +14,36 @@ import {
   escalationTier,
   type EscalationTier,
 } from "../data/dateHelpers";
-import {
-  TOPIC_LABEL,
-  TAX_TYPE_LABEL,
-  CONFIDENCE_LABEL,
-} from "../data/announcementLabels";
 import { actions } from "../data/store";
 
-const TIER_BAR: Record<EscalationTier, string> = {
-  fresh: "border-l-info-solid",
-  reminder: "border-l-warn-solid",
-  escalated: "border-l-danger-solid",
-  blocking: "border-l-danger-solid",
+type Tone = "danger" | "warn" | "info";
+
+function toneFor(type: Announcement["type"], tier: EscalationTier): Tone {
+  // Reserve danger only for escalated (>72h unactioned). Fresh state alerts
+  // are info — they're news, not crises. PRD §1.6 calm-framing principle.
+  if (tier === "escalated") return "danger";
+  if (type === "disaster_extension" && tier !== "fresh") return "warn";
+  if (type === "pte_change" || type === "penalty_relief") return "info";
+  return "info";
+}
+
+const TONE_CLASSES: Record<Tone, string> = {
+  danger: "border-danger-border bg-danger-bg/40 text-ink-900",
+  warn: "border-warn-border bg-warn-bg/40 text-ink-900",
+  info: "border-info-border bg-info-bg/40 text-ink-900",
 };
 
-const TIER_BG: Record<EscalationTier, string> = {
-  fresh: "bg-info-bg/40",
-  reminder: "bg-warn-bg/40",
-  escalated: "bg-danger-bg/40",
-  blocking: "bg-danger-bg/60",
+const TONE_SUB_CLASSES: Record<Tone, string> = {
+  danger: "text-danger-ink",
+  warn: "text-warn-ink",
+  info: "text-info-ink",
 };
 
-const TIER_ESCALATION_INK: Record<EscalationTier, string> = {
-  fresh: "text-ink-500",
-  reminder: "text-warn-ink",
-  escalated: "text-danger-ink",
-  blocking: "text-danger-ink",
+const TONE_ICONS: Record<Tone, typeof AlertTriangle> = {
+  danger: AlertTriangle,
+  warn: Clock,
+  info: Info,
 };
-
-const CONFIDENCE_TONE = {
-  high: "bg-ok-bg text-ok-ink",
-  medium: "bg-sunken text-ink-700",
-  low: "bg-warn-bg text-warn-ink",
-} as const;
 
 function escalationCopy(tier: EscalationTier, hours: number): string | null {
   if (tier === "fresh") return null;
@@ -63,34 +59,33 @@ export function AnnouncementBanner({
 }: {
   announcements: Announcement[];
 }) {
-  const [expanded, setExpanded] = useState(false);
+  // Show ONLY the most-urgent unread alert as a banner. The rest live in the
+  // bell dropdown + /announcements page. Multi-alert in a banner is noise —
+  // research suggests CPAs want one anchor, not a stack.
   if (announcements.length === 0) return null;
-  const [head, ...rest] = announcements;
+  // Sort by escalation tier first, then by detectedAt (newest first)
+  const sorted = [...announcements].sort((a, b) => {
+    const aTier = escalationTier(hoursSince(a.detectedAt));
+    const bTier = escalationTier(hoursSince(b.detectedAt));
+    const order = ["blocking", "escalated", "reminder", "fresh"];
+    const aRank = order.indexOf(aTier);
+    const bRank = order.indexOf(bTier);
+    if (aRank !== bRank) return aRank - bRank;
+    return b.detectedAt.localeCompare(a.detectedAt);
+  });
+  const [head] = sorted;
+  const restCount = sorted.length - 1;
 
   return (
     <div className="space-y-2">
       <BannerCard ann={head} />
-
-      {rest.length > 0 && !expanded && (
-        <button
-          onClick={() => setExpanded(true)}
-          className="w-full text-left text-xs text-ink-500 hover:text-ink-900 px-2 flex items-center gap-1"
+      {restCount > 0 && (
+        <Link
+          to="/announcements"
+          className="block text-2xs text-ink-500 hover:text-ink-900 px-1 flex items-center gap-1"
         >
-          <ChevronDown className="w-3 h-3" aria-hidden />
-          {rest.length} more alert{rest.length === 1 ? "" : "s"}
-        </button>
-      )}
-
-      {expanded && rest.map((a) => <BannerCard key={a.id} ann={a} />)}
-
-      {expanded && (
-        <button
-          onClick={() => setExpanded(false)}
-          className="w-full text-left text-xs text-ink-500 hover:text-ink-900 px-2 flex items-center gap-1"
-        >
-          <ChevronUp className="w-3 h-3" aria-hidden />
-          Collapse
-        </button>
+          + {restCount} more state {restCount === 1 ? "alert" : "alerts"} in the bell + Alerts feed
+        </Link>
       )}
     </div>
   );
@@ -117,130 +112,83 @@ function BannerCard({ ann }: { ann: Announcement }) {
     );
   }
 
+  // Build the AI-match reason — explains *why* DDHQ thinks these clients are
+  // affected, so the CPA isn't trusting an opaque count.
+  const matchReason = matchReasonFor(ann);
+  const tone = toneFor(ann.type, tier);
+  const Icon = TONE_ICONS[tone];
+
   return (
-    <div
-      className={`border border-line border-l-4 rounded-md px-4 py-3 ${TIER_BAR[tier]} ${TIER_BG[tier]}`}
-    >
+    <div className={`border rounded-md px-4 py-3 transition-colors ${TONE_CLASSES[tone]}`}>
       <div className="flex items-start gap-3">
-        <span className="inline-flex items-center justify-center px-2 py-0.5 rounded text-xs font-semibold bg-surface text-ink-900 border border-line shrink-0">
-          {ann.stateCode}
-        </span>
-
+        <Icon className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
         <div className="flex-1 min-w-0">
-          <div className="flex items-start gap-3">
-            <Link to={`/alerts/${ann.id}`} className="flex-1 min-w-0 hover:underline">
-              <div className="text-sm font-medium text-ink-900">{ann.title}</div>
-            </Link>
-            <span className="text-2xs text-ink-500 text-right shrink-0 max-w-[40%] truncate">
-              {ann.authority}
+          <Link
+            to={`/announcements/${ann.id}`}
+            className="block hover:underline"
+          >
+            <div className="text-sm font-medium">
+              {ann.stateCode}: {ann.title}
+            </div>
+          </Link>
+          <div className={`text-xs mt-1 flex items-center flex-wrap gap-x-2 gap-y-0.5 ${TONE_SUB_CLASSES[tone]}`}>
+            <span>
+              <span className="font-semibold">
+                {ann.affectedClientIds.length} of yours
+              </span>
+              {" "}affected
             </span>
+            {matchReason && (
+              <>
+                <span className="opacity-50">·</span>
+                <span className="opacity-80">{matchReason}</span>
+              </>
+            )}
+            {ann.newDeadline && (
+              <>
+                <span className="opacity-50">·</span>
+                <span>new deadline {formatLongDate(ann.newDeadline)}</span>
+              </>
+            )}
           </div>
-
-          <ChipRow ann={ann} />
-          <MetaStrip ann={ann} />
-          <ConfidenceRow ann={ann} />
-
           {escCopy && (
-            <div
-              className={`text-xs mt-2 font-medium flex items-center gap-1 ${TIER_ESCALATION_INK[tier]}`}
-            >
+            <div className={`text-xs mt-1 font-medium flex items-center gap-1 ${TONE_SUB_CLASSES[tone]}`}>
               <Clock className="w-3 h-3" aria-hidden />
               {escCopy}
             </div>
           )}
         </div>
-
-        <div className="flex items-center gap-1 shrink-0">
-          <Link
-            to={`/alerts/${ann.id}`}
-            className="text-sm font-medium flex items-center gap-1 px-2 py-1 rounded hover:bg-surface text-ink-900"
-          >
-            Review
-            <ChevronRight className="w-4 h-4" aria-hidden />
-          </Link>
-          <button
-            onClick={onDismiss}
-            aria-label="Dismiss alert"
-            className="p-1 rounded hover:bg-surface text-ink-500"
-          >
-            <X className="w-3.5 h-3.5" aria-hidden />
-          </button>
-        </div>
+        <Link
+          to={`/announcements/${ann.id}`}
+          className={`text-sm font-medium flex items-center gap-1 shrink-0 px-2.5 py-1 rounded hover:bg-surface/60 ${TONE_SUB_CLASSES[tone]}`}
+          title="Review affected clients and apply the new deadline"
+        >
+          Review affected
+          <ChevronRight className="w-4 h-4" aria-hidden />
+        </Link>
+        <button
+          onClick={onDismiss}
+          aria-label="Dismiss announcement"
+          className={`p-1 rounded hover:bg-surface/60 ${TONE_SUB_CLASSES[tone]}`}
+        >
+          <X className="w-3.5 h-3.5" aria-hidden />
+        </button>
       </div>
     </div>
   );
 }
 
-function Chip({
-  children,
-  icon,
-}: {
-  children: React.ReactNode;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <span className="inline-flex items-center gap-1 text-2xs px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line">
-      {icon}
-      {children}
-    </span>
-  );
-}
-
-function ChipRow({ ann }: { ann: Announcement }) {
-  return (
-    <div className="flex flex-wrap gap-1 mt-1.5">
-      <Chip>{TOPIC_LABEL[ann.type]}</Chip>
-      <Chip>{TAX_TYPE_LABEL[ann.taxType]}</Chip>
-      {ann.retroactive && (
-        <Chip icon={<History className="w-3 h-3" aria-hidden />}>
-          Retroactive
-        </Chip>
-      )}
-    </div>
-  );
-}
-
-function MetaStrip({ ann }: { ann: Announcement }) {
+/** Build a short "why these clients" explanation for the banner. Sources
+ *  the announcement's parsed-impact (county / entity / tax filters) so the
+ *  CPA sees the AI's reasoning, not an opaque match count. */
+function matchReasonFor(ann: Announcement): string | null {
   const parts: string[] = [];
-  parts.push(
-    `${ann.affectedClientIds.length} client${
-      ann.affectedClientIds.length === 1 ? "" : "s"
-    }`
-  );
-  if (ann.entityTypes.length > 0)
-    parts.push(
-      `matched on ${ann.entityTypes.length} entity type${
-        ann.entityTypes.length === 1 ? "" : "s"
-      }`
-    );
-  if (ann.counties.length > 0)
-    parts.push(
-      `${ann.counties.length} ${ann.counties.length === 1 ? "county" : "counties"}`
-    );
-  if (ann.effectiveDate)
-    parts.push(`Eff. ${formatLongDate(ann.effectiveDate)}`);
-  return (
-    <div className="text-xs text-ink-500 mt-1.5">{parts.join(" · ")}</div>
-  );
-}
-
-function ConfidenceRow({ ann }: { ann: Announcement }) {
-  return (
-    <div className="flex flex-wrap gap-1 mt-1.5">
-      <span
-        className={`inline-flex items-center text-2xs px-1.5 py-0.5 rounded ${
-          CONFIDENCE_TONE[ann.parseConfidence]
-        }`}
-      >
-        AI parse: {CONFIDENCE_LABEL[ann.parseConfidence]}
-      </span>
-      <span
-        className={`inline-flex items-center text-2xs px-1.5 py-0.5 rounded ${
-          CONFIDENCE_TONE[ann.matchConfidence]
-        }`}
-      >
-        AI match: {CONFIDENCE_LABEL[ann.matchConfidence]}
-      </span>
-    </div>
-  );
+  if (ann.counties.length === 1) parts.push(`${ann.counties[0]} County`);
+  else if (ann.counties.length > 1)
+    parts.push(`${ann.counties.length} counties`);
+  if (ann.entityTypes.length === 1) parts.push(ann.entityTypes[0]);
+  else if (ann.entityTypes.length > 1)
+    parts.push(`${ann.entityTypes.length} entity types`);
+  if (parts.length === 0) return null;
+  return `matched on ${parts.join(" + ")}`;
 }

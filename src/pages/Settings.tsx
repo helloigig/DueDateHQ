@@ -1,6 +1,18 @@
 import { useMemo, useState } from "react";
 import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
-import { Mail, Bell, User, Download, Upload, Users2, Trash2 } from "lucide-react";
+import {
+  Mail,
+  Bell,
+  User,
+  Download,
+  Upload,
+  Users2,
+  Trash2,
+  Building2,
+  Package,
+  Plug,
+  CreditCard,
+} from "lucide-react";
 import { actions } from "../data/store";
 import { useImportHistory } from "../hooks/useImports";
 import { signOut, updateSession, useSession } from "../data/session";
@@ -8,14 +20,24 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ErrorState } from "../components/ErrorState";
 import { UpgradePrompt } from "../components/UpgradePrompt";
 import { useFeatureFlags } from "../hooks/useFeatureFlags";
+import {
+  useReminderTemplates,
+  useUpdateReminderTemplate,
+} from "../hooks/useReminderTemplates";
 import type { FirmSession } from "../data/session";
+import { BUNDLES } from "../data/bundles";
 
 const NAV = [
-  { to: "/settings", label: "Profile", icon: User, end: true },
-  { to: "/settings/alerts", label: "Alerts & email", icon: Mail },
-  { to: "/settings/notifications", label: "Notifications", icon: Bell },
-  { to: "/settings/imports", label: "Imports", icon: Upload },
+  { to: "/settings", label: "Account", icon: User, end: true },
+  { to: "/settings/firm", label: "Firm", icon: Building2 },
   { to: "/settings/team", label: "Team", icon: Users2 },
+  { to: "/settings/packages", label: "Service Packages", icon: Package },
+  { to: "/settings/reminders", label: "Reminder Templates", icon: Mail },
+  { to: "/settings/integrations", label: "Integrations", icon: Plug },
+  { to: "/settings/imports", label: "Imports", icon: Upload },
+  { to: "/settings/billing", label: "Billing", icon: CreditCard },
+  { to: "/settings/notifications", label: "Notifications", icon: Bell },
+  { to: "/settings/alerts", label: "Alert digest", icon: Bell },
   { to: "/settings/data", label: "Data", icon: Download },
 ];
 
@@ -47,6 +69,11 @@ export function Settings() {
       <div className="flex-1 min-w-0">
         <Routes>
           <Route index element={<ProfilePanel />} />
+          <Route path="firm" element={<FirmPanel />} />
+          <Route path="packages" element={<ServicePackagesPanel />} />
+          <Route path="reminders" element={<RemindersPanel />} />
+          <Route path="integrations" element={<IntegrationsPanel />} />
+          <Route path="billing" element={<BillingPanel />} />
           <Route path="alerts" element={<AlertsPanel />} />
           <Route path="notifications" element={<NotificationsPanel />} />
           <Route path="imports" element={<ImportsPanel />} />
@@ -359,23 +386,196 @@ function ImportsPanel() {
 
 function TeamPanel() {
   const flags = useFeatureFlags();
+  const session = useSession();
+  const [pending, setPending] = useState<
+    Array<{ id: string; email: string; role: "owner" | "member"; invitedAt: string }>
+  >([]);
+  const [emailInput, setEmailInput] = useState("");
+  const [roleInput, setRoleInput] = useState<"owner" | "member">("member");
+
   if (!flags.canInviteTeammates) {
-    return (
-      <UpgradePrompt feature="Team invites" requiredTier="pro" />
-    );
+    return <UpgradePrompt feature="Team invites" requiredTier="pro" />;
   }
+
+  const invite = () => {
+    if (!emailInput.trim()) return;
+    setPending((prev) => [
+      {
+        id: `inv-${Date.now()}`,
+        email: emailInput.trim(),
+        role: roleInput,
+        invitedAt: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
+    setEmailInput("");
+  };
+
+  const revoke = (id: string) => {
+    setPending((prev) => prev.filter((p) => p.id !== id));
+  };
+
   return (
-    <Card
-      title="Team members"
-      description={`Invite up to ${flags.maxTeammates} teammate${
-        flags.maxTeammates === 1 ? "" : "s"
-      } and assign client ownership.`}
-    >
-      <p className="text-sm text-ink-500">
-        Team invite flow ships with the {flags.tier === "team" ? "Team" : "Pro"}{" "}
-        tier release. You're on {flags.tier}.
-      </p>
-    </Card>
+    <>
+      <Card
+        title="How collaboration works in DueDateHQ"
+        description="The team model in one paragraph."
+      >
+        <div className="text-sm text-ink-700 space-y-2">
+          <p>
+            <span className="font-medium text-ink-900">Firm = workspace = tenant.</span>{" "}
+            All clients, tasks, and deadlines live under your firm. Users are
+            members of one firm at MVP (multi-firm is Phase 2).
+          </p>
+          <p>
+            <span className="font-medium text-ink-900">Each client has a relationship owner</span>{" "}
+            (typically a partner). Each task has a <strong>preparer</strong>{" "}
+            (does the work) and a <strong>reviewer</strong> (signs off — the
+            §5.3 confirm). In solo firms all three are you. In small firms
+            (2-5) the preparer is a junior CPA and the reviewer is a senior.
+          </p>
+          <p>
+            <span className="font-medium text-ink-900">Coverage is implicit.</span>{" "}
+            When a partner is on vacation, anyone can act on any task; the
+            activity timeline records who did what for the audit pack. Filter
+            the dashboard by assignee to see "what's on John's plate."
+          </p>
+          <p className="text-xs text-ink-500 pt-2">
+            What ships in Phase 2: per-client access restrictions, formal
+            handoff workflow (with auto-revert on return), and Specialist tags
+            (international tax / S-corp / trust) for routing.
+          </p>
+        </div>
+      </Card>
+
+      <Card
+        title="Roles at MVP"
+        description="Two roles only at this stage. Admin / Viewer / client-level access ship in Phase 2."
+      >
+        <ul className="divide-y divide-line">
+          <li className="py-2.5 flex items-start gap-3">
+            <span className="text-2xs uppercase tracking-wide px-2 py-0.5 rounded bg-ink-900 text-canvas font-semibold mt-0.5">
+              Owner
+            </span>
+            <div className="flex-1 text-xs text-ink-700">
+              <p className="font-medium text-ink-900">Full access · manages users + billing</p>
+              <p className="text-ink-500 mt-0.5">
+                Edit firm settings, invite/remove teammates, change plan, edit
+                service packages and reminder templates, all client + task data.
+                The first signup is automatically the Owner.
+              </p>
+            </div>
+          </li>
+          <li className="py-2.5 flex items-start gap-3">
+            <span className="text-2xs uppercase tracking-wide px-2 py-0.5 rounded bg-sunken text-ink-700 border border-line font-semibold mt-0.5">
+              Member
+            </span>
+            <div className="flex-1 text-xs text-ink-700">
+              <p className="font-medium text-ink-900">Full data access · cannot manage users or billing</p>
+              <p className="text-ink-500 mt-0.5">
+                See and act on every client and task. Send reminders, confirm
+                docs, resolve flags, edit reminder templates. Cannot invite
+                teammates, change plan, or modify firm settings.
+              </p>
+            </div>
+          </li>
+        </ul>
+        <p className="text-2xs text-ink-400 mt-3 pt-3 border-t border-line">
+          Phase 2 adds <span className="font-medium text-ink-700">Admin</span> (manage users, no billing) and{" "}
+          <span className="font-medium text-ink-700">Viewer</span> (read-only audit-trail consumer).
+          Per-client access restrictions also Phase 2. Multiple assignees per task
+          (preparer + reviewer roles) Phase 2.
+        </p>
+      </Card>
+
+      <Card
+        title="Team members"
+        description={`Invite up to ${flags.maxTeammates} teammate${
+          flags.maxTeammates === 1 ? "" : "s"
+        } and assign client ownership.`}
+      >
+        <ul className="divide-y divide-line">
+          <li className="py-3 flex items-center gap-3">
+            <span className="w-8 h-8 rounded-full bg-accent text-canvas text-sm flex items-center justify-center font-medium">
+              {session?.userInitials ?? "SM"}
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-ink-900">
+                {session?.userName ?? "You"}
+              </p>
+              <p className="text-xs text-ink-500">{session?.userEmail}</p>
+            </div>
+            <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line">
+              Owner · you
+            </span>
+          </li>
+        </ul>
+      </Card>
+
+      <Card
+        title="Invite teammate"
+        description="They'll get an email with a link to set their password and join."
+      >
+        <div className="flex flex-col md:flex-row gap-2 items-stretch md:items-end">
+          <Field label="Email">
+            <input
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
+              placeholder="teammate@firm.com"
+              className="w-full border border-line rounded px-2 py-1.5 text-sm"
+            />
+          </Field>
+          <Field label="Role">
+            <select
+              value={roleInput}
+              onChange={(e) => setRoleInput(e.target.value as "owner" | "member")}
+              className="border border-line rounded px-2 py-1.5 text-sm bg-surface"
+            >
+              <option value="member">Member</option>
+              <option value="owner">Owner</option>
+            </select>
+          </Field>
+          <button
+            onClick={invite}
+            disabled={!emailInput.trim()}
+            className="text-sm px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Send invite
+          </button>
+        </div>
+      </Card>
+
+      {pending.length > 0 && (
+        <Card
+          title="Pending invites"
+          description="They'll show up here until accepted or revoked."
+        >
+          <ul className="divide-y divide-line">
+            {pending.map((p) => (
+              <li
+                key={p.id}
+                className="py-2 flex items-center gap-3 text-sm"
+              >
+                <Users2 className="w-4 h-4 text-ink-400" aria-hidden />
+                <span className="text-ink-900">{p.email}</span>
+                <span className="text-2xs uppercase tracking-wide text-ink-500">
+                  {p.role}
+                </span>
+                <span className="text-2xs text-ink-400 ml-auto">
+                  {new Date(p.invitedAt).toLocaleDateString()}
+                </span>
+                <button
+                  onClick={() => revoke(p.id)}
+                  className="text-xs text-ink-500 hover:text-ink-900"
+                >
+                  Revoke
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+    </>
   );
 }
 
@@ -445,4 +645,468 @@ function snapshot() {
   } catch {
     return {};
   }
+}
+
+// -------- New v0.7 panels (IA §3.10-3.15) --------
+
+function FirmPanel() {
+  const session = useSession();
+  const [firmName, setFirmName] = useState(session?.firmName ?? "");
+  const [statesText, setStatesText] = useState(
+    (session?.primaryStates ?? ["CA"]).join(", ")
+  );
+  const save = () => {
+    updateSession({
+      firmName,
+      primaryStates: statesText
+        .split(",")
+        .map((s) => s.trim().toUpperCase())
+        .filter(Boolean),
+    });
+  };
+  return (
+    <>
+      <Card title="Firm profile" description="Basic info shown in client emails and exports.">
+        <div className="space-y-3">
+          <Field label="Firm name">
+            <input
+              value={firmName}
+              onChange={(e) => setFirmName(e.target.value)}
+              className="w-full border border-line rounded px-2 py-1.5 text-sm"
+            />
+          </Field>
+          <Field label="Primary states served (comma-separated)">
+            <input
+              value={statesText}
+              onChange={(e) => setStatesText(e.target.value)}
+              className="w-full border border-line rounded px-2 py-1.5 text-sm"
+              placeholder="CA, NY, TX"
+            />
+          </Field>
+          <Field label="Postal address (CAN-SPAM)">
+            <input
+              defaultValue="100 Market St, Suite 200, San Francisco, CA 94105"
+              className="w-full border border-line rounded px-2 py-1.5 text-sm"
+            />
+          </Field>
+          <Field label="Time zone">
+            <select className="border border-line rounded px-2 py-1.5 text-sm">
+              <option>America/Los_Angeles</option>
+              <option>America/New_York</option>
+              <option>America/Chicago</option>
+              <option>America/Denver</option>
+            </select>
+          </Field>
+          <button
+            onClick={save}
+            className="text-sm px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover"
+          >
+            Save firm settings
+          </button>
+        </div>
+      </Card>
+      <Card title="Branding" description="Used on client-facing reminder emails (Pro+).">
+        <Field label="Email signature">
+          <textarea
+            rows={3}
+            defaultValue={`${session?.userName ?? "Sarah"}\n${session?.firmName ?? "Mitchell CPA"}`}
+            className="w-full border border-line rounded px-2 py-1.5 text-sm font-sans"
+          />
+        </Field>
+      </Card>
+    </>
+  );
+}
+
+function ServicePackagesPanel() {
+  return (
+    <Card
+      title="Service Packages"
+      description="System-defined bundles you can apply to any client. Custom packages coming in P1."
+    >
+      <ul className="divide-y divide-line">
+        {BUNDLES.map((b) => (
+          <li key={b.id} className="py-3 flex items-start gap-3">
+            <Package className="w-4 h-4 text-ink-400 mt-0.5" aria-hidden />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-ink-900">{b.name}</p>
+              <p className="text-xs text-ink-500 mt-0.5">{b.description}</p>
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {b.entityTypes.map((e) => (
+                  <span
+                    key={e}
+                    className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-700"
+                  >
+                    {e}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <button
+              className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken"
+              title="Cloning is wireframe-only — backend wires this in P0"
+            >
+              Clone
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+function RemindersPanel() {
+  const templates = useReminderTemplates();
+  const update = useUpdateReminderTemplate();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const editing = templates.find((t) => t.id === editingId) ?? null;
+
+  return (
+    <>
+      <Card
+        title="Reminder Templates"
+        description="The 18 system templates ship with every firm Day-1 (PRD §7.6). Edit subject and body without affecting other firms. Phase 2 auto-send unlocks per template after Pattern Precedent (5+ approved drafts to a single client)."
+      >
+        <ul className="divide-y divide-line">
+          {templates.map((t) => (
+            <li key={t.id} className="py-3">
+              <div className="flex items-start gap-3">
+                <Mail className="w-4 h-4 text-ink-400 mt-0.5" aria-hidden />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-ink-900">
+                    {t.name ?? t.subject}
+                  </p>
+                  <p className="text-xs text-ink-500 mt-0.5">{t.subject}</p>
+                  <div className="flex flex-wrap gap-1 mt-1.5 text-2xs uppercase tracking-wide">
+                    {t.trigger && (
+                      <span className="px-1.5 py-0.5 rounded bg-sunken text-ink-700">
+                        {t.trigger}
+                      </span>
+                    )}
+                    {t.cadence && (
+                      <span className="px-1.5 py-0.5 rounded bg-sunken text-ink-700">
+                        {t.cadence}
+                      </span>
+                    )}
+                    <span
+                      className={`px-1.5 py-0.5 rounded border ${
+                        t.phase === 2
+                          ? "bg-info-bg text-info-ink border-info-border"
+                          : "bg-sunken text-ink-700 border-line"
+                      }`}
+                    >
+                      Phase {t.phase ?? 1}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setEditingId(t.id)}
+                  className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken"
+                >
+                  Edit
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Card>
+      {editing && (
+        <ReminderTemplateEditor
+          template={editing}
+          onSave={(patch) => {
+            update(editing.id, patch);
+            setEditingId(null);
+          }}
+          onClose={() => setEditingId(null)}
+        />
+      )}
+    </>
+  );
+}
+
+function ReminderTemplateEditor({
+  template,
+  onSave,
+  onClose,
+}: {
+  template: ReturnType<typeof useReminderTemplates>[number];
+  onSave: (patch: Partial<typeof template>) => void;
+  onClose: () => void;
+}) {
+  const [subject, setSubject] = useState(template.subject);
+  const [body, setBody] = useState(template.body ?? "");
+  const [phase, setPhase] = useState<1 | 2>(template.phase ?? 1);
+  const [eligible] = useState(false); // Pattern Precedent — wireframe stub
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/30 p-4"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="bg-surface border border-line rounded-lg shadow-overlay w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <header className="flex items-center px-5 py-3 border-b border-line">
+          <h2 className="text-sm font-semibold text-ink-900">
+            Edit · {template.name ?? "Template"}
+          </h2>
+          <button
+            onClick={onClose}
+            className="ml-auto text-ink-500 hover:text-ink-900 text-sm"
+          >
+            ✕
+          </button>
+        </header>
+        <div className="overflow-y-auto px-5 py-4 space-y-3">
+          <Field label="Subject">
+            <input
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              className="w-full border border-line rounded px-2 py-1.5 text-sm"
+            />
+          </Field>
+          <Field label="Body (variables: {{client_name}}, {{deadline_date}}, {{forwarding_email}}, etc.)">
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={10}
+              className="w-full border border-line rounded px-2 py-2 text-sm font-sans"
+            />
+          </Field>
+          <div className="bg-sunken/50 border border-line rounded p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-medium text-ink-900">
+                  Phase 2 auto-send
+                </p>
+                <p className="text-xs text-ink-500 mt-0.5">
+                  Auto-send when 3 conditions met: Pattern Precedent, Routine Item, Timing within Precedent. PRD §7.3.
+                </p>
+              </div>
+              <button
+                onClick={() => setPhase(phase === 2 ? 1 : 2)}
+                disabled={!eligible}
+                className={`text-xs px-3 py-1.5 rounded ${
+                  phase === 2
+                    ? "bg-accent text-canvas"
+                    : "border border-line text-ink-700 hover:bg-sunken"
+                } disabled:opacity-40 disabled:cursor-not-allowed`}
+                title={
+                  eligible
+                    ? "Toggle Phase 2"
+                    : "Disabled until Pattern Precedent (5+ approved drafts) is met for at least one client"
+                }
+              >
+                {phase === 2 ? "Enabled" : "Enable Phase 2"}
+              </button>
+            </div>
+            {!eligible && (
+              <p className="text-2xs text-ink-400 mt-2">
+                Locked: Pattern Precedent not yet established. Approve 5+ drafts of this template without modification on a single client to unlock.
+              </p>
+            )}
+          </div>
+        </div>
+        <footer className="flex items-center px-5 py-3 border-t border-line gap-2 bg-sunken/20">
+          <button
+            onClick={onClose}
+            className="text-sm px-3 py-1.5 rounded text-ink-500 hover:bg-sunken"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onSave({ subject, body, phase })}
+            className="ml-auto text-sm px-4 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover"
+          >
+            Save changes
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function IntegrationsPanel() {
+  return (
+    <>
+      <Card
+        title="Tier 0 — must-have, two-way"
+        description="Connect Day-1 to put DueDateHQ alongside your existing stack (PRD §6.4)."
+      >
+        <ul className="divide-y divide-line">
+          <IntegrationRow
+            name="QuickBooks Online"
+            tier="Tier 0"
+            status="not_connected"
+            blurb="Two-way sync for financial profiles and Mode B/C anchors."
+          />
+          <IntegrationRow
+            name="Xero"
+            tier="Tier 0"
+            status="not_connected"
+            blurb="QBO equivalent for international markets."
+          />
+          <IntegrationRow
+            name="Gmail"
+            tier="Tier 0"
+            status="not_connected"
+            blurb="Method A send-only on Day 1 · Method B full read scope in P1."
+          />
+          <IntegrationRow
+            name="Outlook"
+            tier="Tier 0"
+            status="not_connected"
+            blurb="Same scope as Gmail."
+          />
+        </ul>
+      </Card>
+      <Card title="Tier 1 — strongly recommended" description="One-way connectors, P1 unless noted.">
+        <ul className="divide-y divide-line">
+          <IntegrationRow name="Lacerte / UltraTax / Drake / ProSeries" tier="Tier 1" status="not_connected" blurb="Prior-year imports — Import Tier 3 (PRD §6.6)." />
+          <IntegrationRow name="SharePoint" tier="Tier 1" status="not_connected" blurb="Write task summaries and audit packs back to SharePoint." />
+          <IntegrationRow name="HubSpot / Mailchimp" tier="Tier 1" status="not_connected" blurb="Client list export for marketing flows." />
+          <IntegrationRow name="Bloomberg / CCH publication feed" tier="Tier 1" status="not_connected" blurb="Read-only feed into the state-alert engine." />
+        </ul>
+      </Card>
+      <Card title="Not supported (intentional)">
+        <ul className="text-sm text-ink-500 space-y-1.5">
+          <li>· CCH Axcess — no usable API; customer base exiting (PRD §1.7).</li>
+          <li>· Client payments — use Stripe / CPACharge.</li>
+          <li>· Bank account access — PCI/regulatory complexity not justified.</li>
+        </ul>
+      </Card>
+    </>
+  );
+}
+
+function IntegrationRow({
+  name,
+  tier,
+  status,
+  blurb,
+}: {
+  name: string;
+  tier: string;
+  status: "connected" | "not_connected" | "error";
+  blurb: string;
+}) {
+  return (
+    <li className="py-3 flex items-start gap-3">
+      <Plug className="w-4 h-4 text-ink-400 mt-0.5" aria-hidden />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <p className="text-sm font-medium text-ink-900">{name}</p>
+          <span className="text-2xs uppercase tracking-wide text-ink-400">
+            {tier}
+          </span>
+          <span
+            className={`text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded border ${
+              status === "connected"
+                ? "bg-ok-bg text-ok-ink border-ok-border"
+                : status === "error"
+                ? "bg-warn-bg text-warn-ink border-warn-border"
+                : "bg-sunken text-ink-500 border-line"
+            }`}
+          >
+            {status.replace("_", " ")}
+          </span>
+        </div>
+        <p className="text-xs text-ink-500 mt-1">{blurb}</p>
+      </div>
+      <button
+        className="text-xs px-3 py-1 rounded border border-line text-ink-700 hover:bg-sunken"
+        title="OAuth flow stubbed for the wireframe"
+      >
+        Connect
+      </button>
+    </li>
+  );
+}
+
+function BillingPanel() {
+  const session = useSession();
+  const tier = session?.tier ?? "solo";
+  return (
+    <>
+      <Card
+        title="Subscription"
+        description="Monthly billing is the default. No annual lock-in (counter to TaxDome's annual upfront)."
+      >
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <PricingCard tier="solo" current={tier === "solo"} price="$29/mo" cap="1 user · ≤ 50 clients" />
+          <PricingCard tier="pro" current={tier === "pro"} price="$49/mo" cap="1-3 users · unlimited clients" highlight />
+          <PricingCard tier="team" current={tier === "team"} price="$99/mo" cap="≤ 10 users · API (P4)" />
+        </div>
+      </Card>
+      <Card title="Trial & lifecycle">
+        <ul className="text-sm text-ink-700 space-y-1.5">
+          <li>· 30-day trial, no credit card required.</li>
+          <li>· Day 31 unpaid → 14-day read-only grace period.</li>
+          <li>· Day 45 → soft-suspend, 90-day data retention.</li>
+          <li>· Day 135 → hard-delete after export warning.</li>
+          <li>· Seat overages blocked at invite.</li>
+        </ul>
+      </Card>
+      <Card title="Invoices">
+        <p className="text-sm text-ink-500">No invoices yet. Trial in progress.</p>
+      </Card>
+    </>
+  );
+}
+
+function PricingCard({
+  tier,
+  current,
+  price,
+  cap,
+  highlight,
+}: {
+  tier: string;
+  current: boolean;
+  price: string;
+  cap: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div
+      className={`border rounded p-3 ${
+        highlight ? "border-accent" : "border-line"
+      } ${current ? "bg-sunken/50" : "bg-surface"}`}
+    >
+      <p className="text-xs uppercase tracking-wider text-ink-500 font-semibold capitalize">
+        {tier}
+      </p>
+      <p className="text-lg font-semibold text-ink-900 mt-1">{price}</p>
+      <p className="text-xs text-ink-500 mt-0.5">{cap}</p>
+      <button
+        className={`mt-3 text-xs px-3 py-1 rounded w-full ${
+          current
+            ? "bg-sunken text-ink-500 cursor-default"
+            : "border border-line text-ink-700 hover:bg-sunken"
+        }`}
+        disabled={current}
+      >
+        {current ? "Current plan" : `Switch to ${tier}`}
+      </button>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="text-2xs uppercase tracking-wider text-ink-500 font-semibold block mb-1">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
 }

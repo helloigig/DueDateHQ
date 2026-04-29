@@ -1,0 +1,196 @@
+import { useEffect, useMemo, useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import { ArrowLeft, CheckCircle2, X } from "lucide-react";
+import { TaskHeader } from "../components/TaskHeader";
+import { ChecklistList } from "../components/ChecklistList";
+import { ActivityTimeline } from "../components/ActivityTimeline";
+import { AiInsightsPanel } from "../components/AiInsightsPanel";
+import { TaskAlertContext } from "../components/TaskAlertContext";
+import { EmailDraftModal, type EmailDraftIntent } from "../components/EmailDraftModal";
+import { useTask } from "../hooks/useTasks";
+import { useChecklist } from "../hooks/useChecklist";
+import {
+  useAiInsightsForClient,
+  useImportedFactsForClient,
+} from "../hooks/useAiInsights";
+import { useStore, actions } from "../data/store";
+import type { ChecklistItem } from "../types";
+
+/**
+ * Task detail — IA §3.4. The keystone interior screen. Holds Layers 2-4 of
+ * the architecture in one view. Reached from 5 entry paths (IA §4.1).
+ */
+export function TaskDetail() {
+  const { id: clientId, taskId } = useParams<{ id: string; taskId: string }>();
+  const task = useTask(taskId);
+  const checklist = useChecklist(taskId);
+  const { clients } = useStore();
+  const client = clients.find((c) => c.id === clientId) ?? null;
+  const facts = useImportedFactsForClient(clientId);
+  const insights = useAiInsightsForClient(clientId);
+
+  const [emailIntent, setEmailIntent] = useState<EmailDraftIntent | null>(null);
+  // Auto-suggest "ready to file" the moment the last checklist item flips
+  // to confirmed. Surfaces one ephemeral toast — the CPA either accepts
+  // (task → completed) or dismisses. Bridges the §5.3 invariant moment
+  // (last confirm) to the natural next step (task done) without forcing it.
+  const [suggestComplete, setSuggestComplete] = useState(false);
+  const [suggestDismissed, setSuggestDismissed] = useState(false);
+
+  const activity = useMemo(() => client?.activity ?? [], [client]);
+
+  const allConfirmed = useMemo(() => {
+    const relevant = checklist.filter((c) => c.state !== "not_applicable");
+    if (relevant.length === 0) return false;
+    return relevant.every((c) => c.state === "received_confirmed");
+  }, [checklist]);
+
+  useEffect(() => {
+    // Trigger the suggestion only on the *transition* to fully-confirmed,
+    // and only while the task itself isn't already completed.
+    if (allConfirmed && task && task.status !== "completed" && !suggestDismissed) {
+      setSuggestComplete(true);
+    } else {
+      setSuggestComplete(false);
+    }
+  }, [allConfirmed, task?.status, suggestDismissed, task]);
+
+  if (!task || !client) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 md:px-6 py-12 text-center">
+        <p className="text-sm text-ink-500">
+          Task not found.{" "}
+          <Link to="/" className="underline text-ink-900">
+            Back to dashboard
+          </Link>
+          .
+        </p>
+      </div>
+    );
+  }
+
+  const openEmail = (
+    itemId: string,
+    intent: "send_reminder" | "ask_client" | "request_initial"
+  ) => {
+    const item = checklist.find((c) => c.id === itemId);
+    if (!item) return;
+    setEmailIntent({
+      task,
+      client,
+      checklistItem: item,
+      context: contextFor(item, intent),
+    });
+  };
+
+  const onAskClientFromInsight = (insightId: string) => {
+    const insight = insights.find((i) => i.id === insightId);
+    if (!insight) return;
+    setEmailIntent({
+      task,
+      client,
+      context: insight.detail,
+    });
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 space-y-5">
+      <Link
+        to={`/clients/${client.id}`}
+        className="text-xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-1"
+      >
+        <ArrowLeft className="w-3 h-3" aria-hidden /> Back to {client.name}
+      </Link>
+
+      <TaskAlertContext task={task} client={client} />
+
+      {suggestComplete && (
+        <div className="bg-ok-bg border border-ok-border rounded-md px-4 py-3 flex items-start gap-3">
+          <CheckCircle2
+            className="w-4 h-4 text-ok-solid shrink-0 mt-0.5"
+            aria-hidden
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-ok-ink font-medium">
+              All docs confirmed. Mark this task complete?
+            </p>
+            <p className="text-xs text-ok-ink/80 mt-0.5">
+              Closes the chase loop and routes the task to History. You can
+              still re-open it if something arrives later.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              actions.updateTaskStatus(task.id, "completed");
+              setSuggestDismissed(true);
+            }}
+            className="text-xs px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover shrink-0"
+          >
+            Mark complete
+          </button>
+          <button
+            onClick={() => setSuggestDismissed(true)}
+            className="text-ink-400 hover:text-ink-700 shrink-0"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" aria-hidden />
+          </button>
+        </div>
+      )}
+
+      <TaskHeader
+        task={task}
+        client={client}
+        completionPct={completionPct(checklist)}
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5">
+        <div className="space-y-5 min-w-0">
+          <ChecklistList
+            taskId={task.id}
+            items={checklist}
+            onOpenEmailDraft={openEmail}
+          />
+          <ActivityTimeline
+            entries={activity}
+            scopeDeadlineId={task.deadlineId}
+            title="Activity timeline"
+          />
+        </div>
+        <div>
+          <AiInsightsPanel
+            task={task}
+            client={client}
+            checklistItems={checklist}
+            facts={facts}
+            insights={insights}
+            onAskClient={onAskClientFromInsight}
+          />
+        </div>
+      </div>
+
+      <EmailDraftModal
+        open={!!emailIntent}
+        intent={emailIntent}
+        onClose={() => setEmailIntent(null)}
+      />
+    </div>
+  );
+}
+
+function contextFor(
+  item: ChecklistItem,
+  intent: "send_reminder" | "ask_client" | "request_initial"
+): string | undefined {
+  if (intent === "ask_client" && item.flagReason) {
+    return `I wanted to confirm something on the ${item.label} you sent: ${item.flagReason}`;
+  }
+  return undefined;
+}
+
+function completionPct(items: ChecklistItem[]): number {
+  const denom = items.filter((c) => c.state !== "not_applicable").length;
+  if (denom === 0) return 0;
+  const confirmed = items.filter((c) => c.state === "received_confirmed").length;
+  return Math.round((confirmed / denom) * 100);
+}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, ChevronDown, AlertCircle, Filter, Download } from "lucide-react";
+import { ChevronRight, ChevronDown, Filter, Download } from "lucide-react";
 import { useShortcuts } from "../hooks/useKeyboard";
 import { useClients } from "../hooks/useClients";
 import { useTriageDeadlines } from "../hooks/useDeadlines";
@@ -12,7 +12,6 @@ import {
   bucketOf,
   TODAY,
   toIso,
-  addDays,
   weekOfLabel,
   formatLongDate,
   parseDate,
@@ -21,11 +20,13 @@ import {
 } from "../data/dateHelpers";
 import { useDashboardPreferences } from "../data/preferences";
 import { DeadlineRow } from "../components/DeadlineRow";
-import { HeatmapStrip } from "../components/HeatmapStrip";
-import { PriorityCard } from "../components/PriorityCard";
 import { AnnouncementBanner } from "../components/AnnouncementBanner";
 import { BlockingAlertsDialog } from "../components/BlockingAlertsDialog";
 import { ExportModal } from "../components/ExportModal";
+import { OnboardingLayer2Widget } from "../components/OnboardingLayer2Widget";
+import { TaskList } from "../components/TaskList";
+import { FirstRunWelcome } from "../components/FirstRunWelcome";
+import { AdvisoryPeek } from "../components/AdvisoryPeek";
 import type { Announcement, Client, Deadline } from "../types";
 
 const HIDE_STATUSES = new Set(["completed", "filed_extension"]);
@@ -155,22 +156,6 @@ export function Dashboard() {
     return { overdueCount, weekCount, activeClients, inProgress };
   }, [byBucket, clients, active]);
 
-  const upcoming8w = useMemo(() => {
-    const end = toIso(addDays(TODAY, 56));
-    return active.filter(
-      (d) => d.officialDueDate >= toIso(TODAY) && d.officialDueDate < end
-    ).length;
-  }, [active]);
-  const showHeatmap = prefs.heatmap_visible && upcoming8w >= 30;
-
-  const priorityDismissedToday =
-    prefs.priority_dismissed_until === toIso(TODAY);
-  const visibleTopIds = new Set<string>([
-    ...byBucket.overdue.map((d) => d.id),
-    ...byBucket.this_week.map((d) => d.id),
-  ]);
-  const showPriority = !priorityDismissedToday;
-
   const thisMonthGrouped = useMemo(() => {
     const groups = new Map<string, Deadline[]>();
     for (const d of byBucket.this_month) {
@@ -285,38 +270,48 @@ export function Dashboard() {
         />
       )}
 
-      <div>
-        <h1 className="text-lg font-semibold text-ink-900">{greeting}</h1>
-        <div className="text-sm text-ink-500 mt-1 flex items-center flex-wrap gap-x-2 gap-y-1">
+      <header>
+        <h1 className="text-2xl font-semibold text-ink-900">
+          {greeting}
+        </h1>
+        <p className="text-sm text-ink-500 mt-2 max-w-2xl">
+          {anchoringStatement(summary, activeBanners.length)}
+        </p>
+        {/* Calm inline strip — no big stat cards. Period-separated, conversational. */}
+        <p className="mt-3 text-sm text-ink-700 flex items-center flex-wrap gap-x-3 gap-y-1 tabular-nums">
           <span>
-            <span className="text-ink-900 font-medium">{summary.activeClients}</span>{" "}
-            active clients
+            <span className="text-ink-900 font-semibold">{summary.activeClients}</span>{" "}
+            <span className="text-ink-500">active clients</span>
           </span>
           {summary.overdueCount > 0 && (
             <>
               <span className="text-ink-300">·</span>
-              <span className="inline-flex items-center gap-1 text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded font-medium bg-danger-bg text-danger-ink border border-danger-border">
-                <AlertCircle className="w-3 h-3" aria-hidden />
-                {summary.overdueCount} overdue
+              <span className="text-danger-ink">
+                <span className="font-semibold">{summary.overdueCount}</span> overdue
               </span>
             </>
           )}
           <span className="text-ink-300">·</span>
           <span>
-            <span className="text-ink-900 font-medium">{summary.weekCount}</span>{" "}
-            due this week
+            <span className="text-ink-900 font-semibold">{summary.weekCount}</span>{" "}
+            <span className="text-ink-500">due this week</span>
           </span>
           {summary.inProgress > 0 && (
             <>
               <span className="text-ink-300">·</span>
               <span>
-                <span className="text-ink-900 font-medium">{summary.inProgress}</span>{" "}
-                in progress
+                <span className="text-ink-900 font-semibold">{summary.inProgress}</span>{" "}
+                <span className="text-ink-500">in progress</span>
               </span>
             </>
           )}
-        </div>
-      </div>
+        </p>
+      </header>
+
+      <FirstRunWelcome />
+      <AdvisoryPeek />
+      <TaskList />
+      <OnboardingLayer2Widget />
 
       {dayFilter && (
         <div className="bg-info-bg border border-info-border text-info-ink rounded-md px-3 py-2 text-sm flex items-center">
@@ -330,149 +325,163 @@ export function Dashboard() {
         </div>
       )}
 
-      {byBucket.overdue.length > 0 && (
-        <Section
-          title="Overdue"
-          count={byBucket.overdue.length}
-          tone="danger"
-          collapsed={overdueCollapsed}
-          onToggleCollapsed={() => toggleCollapsed("overdue")}
-        >
-          <GroupedRows
-            items={byBucket.overdue}
-            clientsById={clientsById}
-            inOverdueSection
-          />
-        </Section>
-      )}
-
-      <Section
-        title="This week"
-        count={byBucket.this_week.length}
-        hero
-        actions={
-          <>
-            <button
-              ref={filterBtnRef}
-              className="text-xs flex items-center gap-1 px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken"
-            >
-              <Filter className="w-3 h-3" aria-hidden />
-              Filter
-            </button>
-            <button
-              onClick={() => setExportOpen(true)}
-              className="text-xs flex items-center gap-1 px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken"
-            >
-              <Download className="w-3 h-3" aria-hidden />
-              Export
-            </button>
-          </>
-        }
-      >
-        {filterEmpty ? (
-          <EmptyRow
-            message="No deadlines match these filters."
-            action={
-              <button
-                onClick={() => setDayFilter(null)}
-                className="text-sm px-3 py-1.5 rounded-md border border-line text-ink-700 hover:bg-sunken"
-              >
-                Clear filters
-              </button>
-            }
-          />
-        ) : hasNoDeadlinesThisWeek && nextDeadline?.client ? (
-          <EmptyRow
-            title="All clear this week."
-            message={`Next deadline: ${formatLongDate(
-              nextDeadline.deadline.officialDueDate
-            )} · ${nextDeadline.client.name} · ${nextDeadline.deadline.form}`}
-          />
-        ) : byBucket.this_week.length === 0 ? (
-          <EmptyRow title="All clear this week." message="Nice work." />
-        ) : (
-          <>
-            <GroupedRows items={thisWeekDisplay} clientsById={clientsById} />
-            {byBucket.this_week.length > 5 && (
-              <button
-                onClick={() => setThisWeekExpanded((v) => !v)}
-                className="w-full text-left px-4 py-2 text-xs text-ink-500 hover:bg-sunken border-t border-line"
-              >
-                {thisWeekExpanded
-                  ? "Show less"
-                  : `${byBucket.this_week.length - 5} more`}
-              </button>
+      {/* Calendar overview — single compact card. Expand only when the CPA
+          wants the wide view (most days they don't). */}
+      <details className="group bg-surface border border-line rounded-md">
+        <summary className="px-4 py-3 cursor-pointer hover:bg-sunken/40 list-none flex items-center gap-2">
+          <span className="text-2xs uppercase tracking-wider text-ink-700 font-semibold">
+            Calendar overview
+          </span>
+          <span className="text-xs text-ink-500 ml-2">
+            {byBucket.overdue.length > 0 && (
+              <span className="text-danger-ink font-medium">
+                {byBucket.overdue.length} overdue
+              </span>
             )}
-          </>
-        )}
-      </Section>
+            {byBucket.overdue.length > 0 && byBucket.this_week.length > 0 && (
+              <span className="text-ink-300"> · </span>
+            )}
+            {byBucket.this_week.length > 0 && (
+              <span>{byBucket.this_week.length} this week</span>
+            )}
+            {byBucket.this_month.length > 0 && (
+              <>
+                <span className="text-ink-300"> · </span>
+                <span>{byBucket.this_month.length} this month</span>
+              </>
+            )}
+            {byBucket.long_term.length > 0 && (
+              <>
+                <span className="text-ink-300"> · </span>
+                <span>{byBucket.long_term.length} later</span>
+              </>
+            )}
+          </span>
+          <span className="ml-auto text-2xs text-ink-400 group-open:hidden">
+            Expand
+          </span>
+          <span className="ml-auto text-2xs text-ink-400 hidden group-open:inline">
+            Collapse
+          </span>
+        </summary>
 
-      {showPriority && (
-        <PriorityCard
-          deadlines={filtered}
-          clientsById={clientsById}
-          excludeIds={visibleTopIds}
-          escalatedAlerts={alertsByTier.escalated}
-          onDismiss={() => update({ priority_dismissed_until: toIso(TODAY) })}
-        />
-      )}
+        <div className="border-t border-line">
+          {byBucket.overdue.length > 0 && (
+            <Section
+              title="Overdue"
+              count={byBucket.overdue.length}
+              tone="danger"
+              description="Past their official due date."
+              collapsed={overdueCollapsed}
+              onToggleCollapsed={() => toggleCollapsed("overdue")}
+            >
+              <GroupedRows
+                items={byBucket.overdue}
+                clientsById={clientsById}
+                inOverdueSection
+              />
+            </Section>
+          )}
 
-      <Section
-        title="This month"
-        count={byBucket.this_month.length}
-        collapsed={thisMonthCollapsed}
-        onToggleCollapsed={() => toggleCollapsed("this_month")}
-      >
-        {thisMonthGrouped.length === 0 ? (
-          <EmptyRow message="Nothing else this month." />
-        ) : (
-          thisMonthGrouped.map(([label, items]) => (
-            <WeekGroup
-              key={label}
-              label={label}
-              items={items}
-              clientsById={clientsById}
-            />
-          ))
-        )}
-      </Section>
+          <Section
+            title="This week"
+            count={byBucket.this_week.length}
+            description="Filing deadlines this week."
+            actions={
+              <>
+                <button
+                  ref={filterBtnRef}
+                  className="text-xs flex items-center gap-1 px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken"
+                >
+                  <Filter className="w-3 h-3" aria-hidden />
+                  Filter
+                </button>
+                <button
+                  onClick={() => setExportOpen(true)}
+                  className="text-xs flex items-center gap-1 px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken"
+                >
+                  <Download className="w-3 h-3" aria-hidden />
+                  Export
+                </button>
+              </>
+            }
+          >
+            {filterEmpty ? (
+              <EmptyRow
+                message="No deadlines match these filters."
+                action={
+                  <button
+                    onClick={() => setDayFilter(null)}
+                    className="text-sm px-3 py-1.5 rounded-md border border-line text-ink-700 hover:bg-sunken"
+                  >
+                    Clear filters
+                  </button>
+                }
+              />
+            ) : hasNoDeadlinesThisWeek && nextDeadline?.client ? (
+              <EmptyRow
+                title="All clear this week."
+                message={`Next deadline: ${formatLongDate(
+                  nextDeadline.deadline.officialDueDate
+                )} · ${nextDeadline.client.name} · ${nextDeadline.deadline.form}`}
+              />
+            ) : byBucket.this_week.length === 0 ? (
+              <EmptyRow title="All clear this week." message="Nice work." />
+            ) : (
+              <>
+                <GroupedRows items={thisWeekDisplay} clientsById={clientsById} />
+                {byBucket.this_week.length > 5 && (
+                  <button
+                    onClick={() => setThisWeekExpanded((v) => !v)}
+                    className="w-full text-left px-4 py-2 text-xs text-ink-500 hover:bg-sunken border-t border-line"
+                  >
+                    {thisWeekExpanded
+                      ? "Show less"
+                      : `${byBucket.this_week.length - 5} more`}
+                  </button>
+                )}
+              </>
+            )}
+          </Section>
 
-      <Section
-        title="Later this year"
-        count={byBucket.long_term.length}
-        description={laterDescription}
-        collapsed={laterCollapsed}
-        onToggleCollapsed={() => toggleCollapsed("later")}
-      >
-        {laterGrouped.map(([label, items]) => (
-          <WeekGroup
-            key={label}
-            label={label}
-            items={items}
-            clientsById={clientsById}
-          />
-        ))}
-      </Section>
+          <Section
+            title="This month"
+            count={byBucket.this_month.length}
+            collapsed={thisMonthCollapsed}
+            onToggleCollapsed={() => toggleCollapsed("this_month")}
+          >
+            {thisMonthGrouped.length === 0 ? (
+              <EmptyRow message="Nothing else this month." />
+            ) : (
+              thisMonthGrouped.map(([label, items]) => (
+                <WeekGroup
+                  key={label}
+                  label={label}
+                  items={items}
+                  clientsById={clientsById}
+                />
+              ))
+            )}
+          </Section>
 
-      {showHeatmap && (
-        <HeatmapStrip
-          deadlines={active}
-          selectedDate={dayFilter ?? undefined}
-          onDayClick={(iso) =>
-            setDayFilter((cur) => (cur === iso ? null : iso))
-          }
-          onHide={() => update({ heatmap_visible: false })}
-        />
-      )}
-
-      {!showHeatmap && prefs.heatmap_visible === false && upcoming8w >= 30 && (
-        <button
-          onClick={() => update({ heatmap_visible: true })}
-          className="text-xs text-ink-500 hover:text-ink-900 underline"
-        >
-          Show heatmap
-        </button>
-      )}
+          <Section
+            title="Later this year"
+            count={byBucket.long_term.length}
+            description={laterDescription}
+            collapsed={laterCollapsed}
+            onToggleCollapsed={() => toggleCollapsed("later")}
+          >
+            {laterGrouped.map(([label, items]) => (
+              <WeekGroup
+                key={label}
+                label={label}
+                items={items}
+                clientsById={clientsById}
+              />
+            ))}
+          </Section>
+        </div>
+      </details>
 
       <ExportModal
         open={exportOpen}
@@ -715,3 +724,23 @@ function EmptyStateButton({
     </a>
   );
 }
+
+function anchoringStatement(
+  summary: { overdueCount: number; weekCount: number; inProgress: number; activeClients: number },
+  newAlertCount: number
+): string {
+  // The headline answers Sarah's actual question: "what changed while I was
+  // off, and what needs me to decide right now?" — not "what's the calendar."
+  // Picks one register from the firm's current state.
+  if (summary.overdueCount > 0) {
+    return `${summary.overdueCount} overdue ${summary.overdueCount === 1 ? "task needs" : "tasks need"} attention first. The rest can wait.`;
+  }
+  if (newAlertCount > 0) {
+    return `${newAlertCount} new state ${newAlertCount === 1 ? "alert" : "alerts"} since you last looked. Review affected clients first.`;
+  }
+  if (summary.weekCount === 0) {
+    return "Quiet week ahead. Use the time to clear the inbox below.";
+  }
+  return `Nothing blocking. Scan the cards below to see what AI surfaced while you were off.`;
+}
+

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Check, MoreHorizontal } from "lucide-react";
 import type { Client, Deadline, DeadlineStatus } from "../types";
 import { countdownLabel, daysBetween, parseDate, TODAY } from "../data/dateHelpers";
@@ -80,6 +80,8 @@ export function DeadlineRow({
   inOverdueSection = false,
 }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
+  const navigate = useNavigate();
+  const taskHref = `/clients/${client.id}/tasks/t-${deadline.id}`;
   const tone = urgency(deadline);
   const shape = dotShape(deadline);
   const isOverdue = deadline.status === "overdue";
@@ -107,6 +109,9 @@ export function DeadlineRow({
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
+            e.preventDefault();
+            navigate(taskHref);
+          } else if (e.key === " ") {
             e.preventDefault();
             setModalOpen(true);
           } else if (e.key === "c" && !e.metaKey && !e.ctrlKey) {
@@ -152,9 +157,13 @@ export function DeadlineRow({
           )}
         </div>
 
-        <span className="text-sm text-ink-700 flex-1 truncate min-w-0">
+        <Link
+          to={taskHref}
+          className="text-sm text-ink-700 flex-1 truncate min-w-0 hover:text-ink-900 hover:underline"
+          title="Open task"
+        >
           {deadline.form}
-        </span>
+        </Link>
 
         <JurisdictionChip
           code={deadline.jurisdiction}

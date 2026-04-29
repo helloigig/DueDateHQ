@@ -1,4 +1,4 @@
-import { Outlet } from "react-router-dom";
+import { Link, Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { BottomTabBar } from "./BottomTabBar";
@@ -6,6 +6,14 @@ import { OfflineBanner } from "./OfflineBanner";
 import { InstallPrompt } from "./InstallPrompt";
 
 export function AppShell() {
+  const session = useSession();
+  const { clients } = useStore();
+  // Only nag the user about setup if (a) the flag is unset AND (b) they
+  // genuinely have no clients. If they're on the demo workspace or the
+  // session flag was never flipped but data exists, the banner is noise.
+  const showSetupBanner =
+    session && !session.onboardingComplete && clients.length === 0;
+
   return (
     <div className="h-screen flex bg-canvas">
       <a
@@ -20,6 +28,17 @@ export function AppShell() {
       </div>
       <div className="flex-1 min-w-0 flex flex-col">
         <TopBar />
+        {showSetupBanner && (
+          <div className="bg-info-bg border-b border-info-border px-4 py-2 text-xs text-info-ink flex items-center gap-2">
+            <span>Complete setup to lock in your firm settings.</span>
+            <Link
+              to="/onboarding/firm"
+              className="ml-auto underline hover:no-underline"
+            >
+              Resume setup
+            </Link>
+          </div>
+        )}
         <main
           id="main-content"
           tabIndex={-1}
