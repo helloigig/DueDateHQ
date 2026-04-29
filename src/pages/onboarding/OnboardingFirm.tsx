@@ -6,13 +6,62 @@ import { updateSession, useSession } from "../../data/session";
 import { env } from "../../config";
 import { trpc } from "../../lib/api/client";
 
-const STATES = [
-  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
-  "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
-  "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
-  "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
-  "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
-] as const;
+// State code → full name. The picker shows full names because two-letter
+// codes alone aren't meaningful enough at scan speed. Codes still appear
+// in the chip strip (compact, visually distinct).
+const STATES: ReadonlyArray<{ code: string; name: string }> = [
+  { code: "AL", name: "Alabama" },
+  { code: "AK", name: "Alaska" },
+  { code: "AZ", name: "Arizona" },
+  { code: "AR", name: "Arkansas" },
+  { code: "CA", name: "California" },
+  { code: "CO", name: "Colorado" },
+  { code: "CT", name: "Connecticut" },
+  { code: "DE", name: "Delaware" },
+  { code: "DC", name: "District of Columbia" },
+  { code: "FL", name: "Florida" },
+  { code: "GA", name: "Georgia" },
+  { code: "HI", name: "Hawaii" },
+  { code: "ID", name: "Idaho" },
+  { code: "IL", name: "Illinois" },
+  { code: "IN", name: "Indiana" },
+  { code: "IA", name: "Iowa" },
+  { code: "KS", name: "Kansas" },
+  { code: "KY", name: "Kentucky" },
+  { code: "LA", name: "Louisiana" },
+  { code: "ME", name: "Maine" },
+  { code: "MD", name: "Maryland" },
+  { code: "MA", name: "Massachusetts" },
+  { code: "MI", name: "Michigan" },
+  { code: "MN", name: "Minnesota" },
+  { code: "MS", name: "Mississippi" },
+  { code: "MO", name: "Missouri" },
+  { code: "MT", name: "Montana" },
+  { code: "NE", name: "Nebraska" },
+  { code: "NV", name: "Nevada" },
+  { code: "NH", name: "New Hampshire" },
+  { code: "NJ", name: "New Jersey" },
+  { code: "NM", name: "New Mexico" },
+  { code: "NY", name: "New York" },
+  { code: "NC", name: "North Carolina" },
+  { code: "ND", name: "North Dakota" },
+  { code: "OH", name: "Ohio" },
+  { code: "OK", name: "Oklahoma" },
+  { code: "OR", name: "Oregon" },
+  { code: "PA", name: "Pennsylvania" },
+  { code: "RI", name: "Rhode Island" },
+  { code: "SC", name: "South Carolina" },
+  { code: "SD", name: "South Dakota" },
+  { code: "TN", name: "Tennessee" },
+  { code: "TX", name: "Texas" },
+  { code: "UT", name: "Utah" },
+  { code: "VT", name: "Vermont" },
+  { code: "VA", name: "Virginia" },
+  { code: "WA", name: "Washington" },
+  { code: "WV", name: "West Virginia" },
+  { code: "WI", name: "Wisconsin" },
+  { code: "WY", name: "Wyoming" },
+];
 
 /**
  * Step 1 — set up the firm workspace. The framing here is explicit: the
@@ -175,20 +224,31 @@ function StateMultiSelect({
   onSetHome: (s: string) => void;
 }) {
   const [filter, setFilter] = useState("");
+  const nameByCode = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of STATES) m.set(s.code, s.name);
+    return m;
+  }, []);
+
   const filtered = useMemo(() => {
-    const f = filter.trim().toUpperCase();
+    const f = filter.trim().toLowerCase();
     if (!f) return STATES;
-    return STATES.filter((s) => s.includes(f));
+    return STATES.filter(
+      (s) =>
+        s.code.toLowerCase().includes(f) ||
+        s.name.toLowerCase().includes(f),
+    );
   }, [filter]);
 
   return (
     <div>
-      {/* Selected chips strip — shows the user's commitment at a glance */}
+      {/* Selected chips strip — codes for compactness, full name on hover */}
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
           {selected.map((s) => (
             <span
               key={s}
+              title={nameByCode.get(s) ?? s}
               className={[
                 "inline-flex items-center gap-1 text-2xs font-medium rounded px-1.5 py-1",
                 s === home
@@ -197,9 +257,12 @@ function StateMultiSelect({
               ].join(" ")}
             >
               {s === home && <Check className="w-2.5 h-2.5" aria-hidden />}
-              {s}
+              <span className="font-mono">{s}</span>
+              <span className="text-2xs opacity-80">
+                {nameByCode.get(s) ?? s}
+              </span>
               {s === home ? (
-                <span className="text-2xs opacity-70 ml-0.5">home</span>
+                <span className="text-2xs opacity-70 ml-0.5">· home</span>
               ) : (
                 <button
                   type="button"
@@ -227,33 +290,52 @@ function StateMultiSelect({
       <input
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
-        placeholder="Filter — type 'CA', 'TX', etc."
+        placeholder="Search by name or code (e.g. 'California' or 'CA')"
         className="w-full border border-line rounded px-3 py-2 text-sm mb-2"
       />
 
-      {/* Grid of state codes — 8 cols on wide, 5 on narrow */}
-      <div className="grid grid-cols-5 sm:grid-cols-8 gap-1 max-h-44 overflow-auto border border-line rounded p-1.5 bg-canvas">
-        {filtered.map((s) => {
-          const isSelected = selected.includes(s);
-          const isHome = s === home;
+      {/* Scrollable list of full state names. 2 columns on wide screens for
+          density without sacrificing readability. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-px max-h-72 overflow-auto border border-line rounded bg-canvas">
+        {filtered.map(({ code, name }) => {
+          const isSelected = selected.includes(code);
+          const isHome = code === home;
           return (
             <button
-              key={s}
+              key={code}
               type="button"
-              onClick={() => onToggle(s)}
+              onClick={() => onToggle(code)}
               className={[
-                "text-2xs font-mono py-1.5 rounded transition-colors",
+                "text-sm py-2 px-3 text-left transition-colors flex items-center gap-2 bg-surface",
                 isHome
-                  ? "bg-accent text-canvas font-semibold"
+                  ? "bg-accent text-canvas font-medium hover:bg-accent-hover"
                   : isSelected
-                    ? "bg-sunken text-ink-900 font-medium border border-line"
-                    : "text-ink-500 hover:bg-sunken hover:text-ink-900",
+                    ? "bg-sunken text-ink-900 font-medium hover:bg-sunken/80"
+                    : "text-ink-700 hover:bg-sunken",
               ].join(" ")}
             >
-              {s}
+              <span
+                className={[
+                  "w-4 h-4 rounded border flex items-center justify-center shrink-0",
+                  isSelected
+                    ? isHome
+                      ? "bg-canvas border-canvas text-accent"
+                      : "bg-accent border-accent text-canvas"
+                    : "border-line bg-canvas",
+                ].join(" ")}
+              >
+                {isSelected && <Check className="w-3 h-3" aria-hidden />}
+              </span>
+              <span className="flex-1">{name}</span>
+              <span className="text-2xs font-mono opacity-50">{code}</span>
             </button>
           );
         })}
+        {filtered.length === 0 && (
+          <p className="col-span-full text-xs text-ink-500 px-3 py-3">
+            No states match "{filter}".
+          </p>
+        )}
       </div>
     </div>
   );

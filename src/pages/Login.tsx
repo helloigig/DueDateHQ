@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Sparkles, ArrowRight, ArrowLeft, Mail } from "lucide-react";
 import { trpc } from "../lib/api/client";
-import { loginSchema } from "../types/schemas";
 import { signIn } from "../data/session";
 import { actions } from "../data/store";
 import { authInputClass } from "./auth/AuthShell";
@@ -10,26 +9,29 @@ import { env } from "../config";
 import { supabase } from "../lib/supabase";
 
 /**
- * Sign-in page — single-column shell.
+ * Sign-in / sign-up — UNIFIED OTP-only flow.
  *
- * Auth ladder, in order of prominence:
- *   1. Email + 6-digit code (OTP) — primary, inline on this page. Why OTP
- *      instead of magic link: cross-device-safe (laptop sign-in, phone
- *      email), phishing-resistant (the code only works in the legit tab),
- *      familiar muscle memory from banking. Same Linear/Notion/Slack pattern.
- *   2. Password — secondary, collapsed under a "Use a password instead"
- *      details element. Still available because some firms have password
- *      managers and don't want to wait for an email.
- *   3. Demo workspace — shown only in mock mode; loads 49 fake clients
- *      under a wipeable demo session.
+ * One path, no passwords. The user types email → we email them a 6-digit
+ * code → they type it back → they're in (existing user) or onboarding-bound
+ * (new user). Same as Substack, sigma B2B norm.
  *
- * Invited users (?invite=<token>) get a banner and a one-click jump to
- * /accept-invite/<token>; the "Create an account" footer link is hidden
- * because their path is "join the firm that invited you," not "spin up a
- * new firm."
+ * Why no password at all:
+ *   - Password resets are the primary auth-failure mode for SMB users
+ *     ("forgot my password" + email-deliverability issues = locked out)
+ *   - One path is simpler than "OTP primary, password collapsed"
+ *   - Supabase's signInWithOtp works for accounts that originally signed up
+ *     with password — they just stop needing the password
  *
- * SAML / Google / Microsoft SSO live under Phase 2 (PRD §7.3) — not shown
- * until wired, because greyed-out buttons read as "broken."
+ * Why OTP code (not magic link):
+ *   - Cross-device safe (laptop sign-in, phone email — type code anywhere)
+ *   - Phishing-resistant (the code only works in the legit tab)
+ *   - Familiar from banking
+ *
+ * Demo workspace path: only in mock mode, lets prospects skip auth entirely.
+ *
+ * Invitation flow: ?invite=<token> tells the page the user is joining an
+ * existing firm, not creating a new one. Banner adjusts; routes to
+ * /accept-invite after verify.
  */
 export function Login() {
   const navigate = useNavigate();
@@ -42,22 +44,12 @@ export function Login() {
   const [pending, setPending] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Password mode — collapsed by default. Pre-fill demo creds in mock mode.
-  const [showPassword, setShowPassword] = useState(false);
-  const [password, setPassword] = useState(env.useMockApi ? "demo" : "");
-  const [pwEmail, setPwEmail] = useState(
-    env.useMockApi ? "sarah@mitchellcpa.com" : "",
-  );
-  const [pwErrors, setPwErrors] = useState<{ email?: string; password?: string }>({});
-
   const trpcUtils = trpc.useUtils();
   const codeInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (step === "code") codeInputRef.current?.focus();
   }, [step]);
-
-  // ---------- OTP path (primary) ----------
 
   const sendCode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,7 +73,17 @@ export function Login() {
         },
       });
       if (error) {
-        setSubmitError(error.message);
+        // Surface rate-limit + deliverability errors honestly. Supabase
+        // free-tier limits to 4 emails per hour by default — easy to hit
+        // when testing.
+        const msg = error.message.toLowerCase();
+        if (msg.includes("rate") || msg.includes("too many")) {
+          setSubmitError(
+            "Too many sign-in attempts in the last hour. Wait ~60 minutes or contact support.",
+          );
+        } else {
+          setSubmitError(error.message);
+        }
         return;
       }
       setStep("code");
@@ -101,9 +103,12 @@ export function Login() {
     setPending(true);
     try {
       if (env.useMockApi) {
-        // Mock: any 6-digit value succeeds. Treat first-time as a fresh
-        // signup (lands in onboarding); demo email shortcut goes to demo.
-        if (email === "demo@duedatehq.com" || email.endsWith("@duedatehq.com")) {
+        // Mock: any 6-digit value succeeds. Demo email shortcut goes to
+        // demo workspace; everything else is treated as a fresh signup.
+        if (
+          email === "demo@duedatehq.com" ||
+          email === "sarah@mitchellcpa.com"
+        ) {
           actions.resetToSeeds();
           signIn({
             firmName: "Mitchell CPA (demo)",
@@ -124,7 +129,6 @@ export function Login() {
           }
           navigate("/", { replace: true });
         } else {
-          // New user via OTP — empty store + go through onboarding
           signIn({
             firmName: "_pending",
             userName: email.split("@")[0] ?? "",
@@ -149,7 +153,6 @@ export function Login() {
       }
       await trpcUtils.auth.session.invalidate();
       const remote = await trpcUtils.auth.session.fetch();
-      // Invited user → land them on /accept-invite to bind to the firm
       if (inviteToken) {
         signIn({
           firmName: "_pending",
@@ -182,83 +185,6 @@ export function Login() {
     }
   };
 
-  // ---------- Password path (secondary) ----------
-
-  const mockLogin = trpc.auth.login.useMutation({
-    onSuccess: () => {
-      signIn({
-        firmName: "Mitchell CPA",
-        userName: "Sarah Mitchell",
-        userEmail: pwEmail,
-        tier: "pro",
-      });
-      navigate("/", { replace: true });
-    },
-    onError: (err) => setSubmitError(err.message),
-  });
-
-  const realLogin = async (parsed: { email: string; password: string }) => {
-    setPending(true);
-    setSubmitError(null);
-    try {
-      const { error } = await supabase().auth.signInWithPassword(parsed);
-      if (error) {
-        const msg = error.message.toLowerCase();
-        if (msg.includes("email") && msg.includes("confirm")) {
-          setSubmitError(
-            "Check your inbox — you need to click the confirmation link before signing in.",
-          );
-        } else if (msg.includes("invalid") || msg.includes("credentials")) {
-          setSubmitError("Email or password is wrong. Forgot it? Reset below.");
-        } else {
-          setSubmitError(error.message);
-        }
-        return;
-      }
-      await trpcUtils.auth.session.invalidate();
-      const remote = await trpcUtils.auth.session.fetch();
-      if (!remote) {
-        signIn({
-          firmName: "_pending",
-          userName: parsed.email.split("@")[0] ?? "",
-          userEmail: parsed.email,
-          tier: "pro",
-        });
-        navigate("/onboarding/firm", { replace: true });
-        return;
-      }
-      signIn({
-        firmName: remote.firm.name,
-        userName: remote.user.displayName ?? remote.user.email,
-        userEmail: remote.user.email,
-        tier: remote.firm.tier,
-      });
-      navigate("/", { replace: true });
-    } finally {
-      setPending(false);
-    }
-  };
-
-  const submitPassword = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitError(null);
-    const parsed = loginSchema.safeParse({ email: pwEmail, password });
-    if (!parsed.success) {
-      const flat: typeof pwErrors = {};
-      for (const issue of parsed.error.issues) {
-        const k = issue.path[0] as "email" | "password";
-        if (!flat[k]) flat[k] = issue.message;
-      }
-      setPwErrors(flat);
-      return;
-    }
-    if (env.useMockApi) {
-      mockLogin.mutate(parsed.data);
-    } else {
-      void realLogin(parsed.data);
-    }
-  };
-
   const tryDemo = () => {
     actions.resetToSeeds();
     signIn({
@@ -281,9 +207,7 @@ export function Login() {
     navigate("/", { replace: true });
   };
 
-  // ---------- Render ----------
-
-  // Code-entry view — full screen replaces the form
+  // Code-entry view
   if (step === "code") {
     return (
       <div className="min-h-screen bg-canvas flex items-center justify-center p-6">
@@ -370,16 +294,17 @@ export function Login() {
           <Link to="/login" className="text-sm font-semibold text-ink-900">
             DueDateHQ
           </Link>
-          <h1 className="text-2xl font-semibold text-ink-900 mt-6">Sign in</h1>
+          <h1 className="text-2xl font-semibold text-ink-900 mt-6">
+            {inviteToken ? "Sign in to join the firm" : "Sign in"}
+          </h1>
           <p className="text-sm text-ink-500 mt-1">
             {inviteToken
-              ? "You've been invited. Sign in to join the firm."
+              ? "You've been invited. Type your email — we'll send a code."
               : env.useMockApi
-                ? "Demo workspace — type any email to start."
-                : "Welcome back."}
+                ? "Type any email to start. We'll email you a 6-digit code."
+                : "Type your email — we'll send a 6-digit code. New here? We'll set you up."}
           </p>
 
-          {/* OTP — primary path */}
           <form onSubmit={sendCode} className="space-y-3 text-sm mt-6">
             <label className="block">
               <span className="text-xs font-medium text-ink-700 mb-1 block">
@@ -408,59 +333,16 @@ export function Login() {
             >
               {pending ? "Sending code…" : "Send sign-in code"}
             </button>
-
-            <p className="text-2xs text-ink-400 text-center pt-1">
-              We'll email you a 6-digit code. No password to remember.
-            </p>
           </form>
 
-          {/* Password — secondary path, collapsed */}
-          <details
-            className="mt-5 pt-5 border-t border-line"
-            open={showPassword || undefined}
-            onToggle={(e) => setShowPassword((e.target as HTMLDetailsElement).open)}
-          >
-            <summary className="text-xs text-ink-500 hover:text-ink-900 cursor-pointer list-none flex items-center gap-1.5">
-              <span className="text-ink-400 group-open:rotate-90 transition-transform">›</span>
-              Use a password instead
-            </summary>
-            <form onSubmit={submitPassword} className="space-y-3 text-sm mt-3">
-              <Field label="Email" error={pwErrors.email}>
-                <input
-                  type="email"
-                  value={pwEmail}
-                  onChange={(e) => setPwEmail(e.target.value)}
-                  className={authInputClass}
-                />
-              </Field>
-              <Field label="Password" error={pwErrors.password}>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={authInputClass}
-                />
-              </Field>
-              <div className="flex items-center justify-between gap-2">
-                <Link
-                  to="/forgot-password"
-                  className="text-xs text-ink-500 hover:text-ink-900"
-                >
-                  Forgot password?
-                </Link>
-                <button
-                  type="submit"
-                  disabled={mockLogin.isPending || pending}
-                  className="text-sm px-4 py-1.5 rounded-md border border-line text-ink-700 hover:bg-sunken disabled:opacity-40"
-                >
-                  {mockLogin.isPending || pending ? "Signing in…" : "Sign in"}
-                </button>
-              </div>
-            </form>
-          </details>
+          <p className="text-2xs text-ink-400 mt-4 text-center">
+            No password — just a code. New users get an account
+            automatically.{" "}
+            <span className="text-ink-500">30-day Pro trial, no card.</span>
+          </p>
         </div>
 
-        {/* Demo workspace — only in mock mode */}
+        {/* Demo workspace — only in mock mode + not for invited users */}
         {env.useMockApi && !inviteToken && (
           <button
             onClick={tryDemo}
@@ -476,7 +358,7 @@ export function Login() {
                 </p>
                 <p className="text-xs text-ink-500 mt-0.5">
                   49 fake clients, live state alert, 3 years of prior history.
-                  No account, no email — just see how it works.
+                  No email, no waiting — just see how it works.
                 </p>
               </div>
               <ArrowRight
@@ -486,46 +368,7 @@ export function Login() {
             </div>
           </button>
         )}
-
-        {/* Footer — invited users see a different prompt because their path
-            is "join the firm that invited you," not "create a new firm". */}
-        {inviteToken ? (
-          <p className="text-xs text-ink-500 mt-6 text-center">
-            Not the right account?{" "}
-            <Link to="/login" className="text-ink-900 underline">
-              Use a different email
-            </Link>
-          </p>
-        ) : (
-          <p className="text-xs text-ink-500 mt-6 text-center">
-            New to DueDateHQ?{" "}
-            <Link to="/signup" className="text-ink-900 underline">
-              Create an account
-            </Link>
-            {" "}— 30-day trial, no credit card.
-          </p>
-        )}
       </div>
     </div>
-  );
-}
-
-function Field({
-  label,
-  children,
-  error,
-}: {
-  label: string;
-  children: React.ReactNode;
-  error?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="text-xs font-medium text-ink-700 mb-1 block">{label}</span>
-      {children}
-      {error && (
-        <span className="text-2xs text-danger-ink mt-1 block">{error}</span>
-      )}
-    </label>
   );
 }
