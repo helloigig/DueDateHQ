@@ -3,6 +3,7 @@ import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { BottomTabBar } from "./BottomTabBar";
 import { OfflineBanner } from "./OfflineBanner";
+import { InstallPrompt } from "./InstallPrompt";
 
 export function AppShell() {
   return (
@@ -28,6 +29,7 @@ export function AppShell() {
         </main>
       </div>
       <BottomTabBar />
+      <InstallPrompt />
     </div>
   );
 }
