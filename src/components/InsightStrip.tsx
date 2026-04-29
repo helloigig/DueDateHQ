@@ -39,7 +39,7 @@ export function InsightStrip() {
           Advisory opportunities
         </span>
         <span className="ml-2 text-2xs text-ink-500">
-          Mode E · {visible.length} open
+          {visible.length} open
         </span>
       </header>
 
@@ -53,9 +53,6 @@ export function InsightStrip() {
               >
                 {leadClient.name}
               </button>
-              <span className="text-2xs uppercase tracking-wide text-ink-400">
-                Mode {lead.mode}
-              </span>
             </div>
             <p className="text-sm text-ink-900 font-medium">{lead.title}</p>
             <p className="text-xs text-ink-500 mt-0.5">{lead.detail}</p>

@@ -5,62 +5,21 @@ import { OnboardingShell } from "../../components/OnboardingShell";
 import { updateSession, useSession } from "../../data/session";
 import { env } from "../../config";
 import { trpc } from "../../lib/api/client";
+import { US_STATES } from "../../data/usStates";
 
-// State code → full name. The picker shows full names because two-letter
-// codes alone aren't meaningful enough at scan speed. Codes still appear
-// in the chip strip (compact, visually distinct).
-const STATES: ReadonlyArray<{ code: string; name: string }> = [
-  { code: "AL", name: "Alabama" },
-  { code: "AK", name: "Alaska" },
-  { code: "AZ", name: "Arizona" },
-  { code: "AR", name: "Arkansas" },
-  { code: "CA", name: "California" },
-  { code: "CO", name: "Colorado" },
-  { code: "CT", name: "Connecticut" },
-  { code: "DE", name: "Delaware" },
-  { code: "DC", name: "District of Columbia" },
-  { code: "FL", name: "Florida" },
-  { code: "GA", name: "Georgia" },
-  { code: "HI", name: "Hawaii" },
-  { code: "ID", name: "Idaho" },
-  { code: "IL", name: "Illinois" },
-  { code: "IN", name: "Indiana" },
-  { code: "IA", name: "Iowa" },
-  { code: "KS", name: "Kansas" },
-  { code: "KY", name: "Kentucky" },
-  { code: "LA", name: "Louisiana" },
-  { code: "ME", name: "Maine" },
-  { code: "MD", name: "Maryland" },
-  { code: "MA", name: "Massachusetts" },
-  { code: "MI", name: "Michigan" },
-  { code: "MN", name: "Minnesota" },
-  { code: "MS", name: "Mississippi" },
-  { code: "MO", name: "Missouri" },
-  { code: "MT", name: "Montana" },
-  { code: "NE", name: "Nebraska" },
-  { code: "NV", name: "Nevada" },
-  { code: "NH", name: "New Hampshire" },
-  { code: "NJ", name: "New Jersey" },
-  { code: "NM", name: "New Mexico" },
-  { code: "NY", name: "New York" },
-  { code: "NC", name: "North Carolina" },
-  { code: "ND", name: "North Dakota" },
-  { code: "OH", name: "Ohio" },
-  { code: "OK", name: "Oklahoma" },
-  { code: "OR", name: "Oregon" },
-  { code: "PA", name: "Pennsylvania" },
-  { code: "RI", name: "Rhode Island" },
-  { code: "SC", name: "South Carolina" },
-  { code: "SD", name: "South Dakota" },
-  { code: "TN", name: "Tennessee" },
-  { code: "TX", name: "Texas" },
-  { code: "UT", name: "Utah" },
-  { code: "VT", name: "Vermont" },
-  { code: "VA", name: "Virginia" },
-  { code: "WA", name: "Washington" },
-  { code: "WV", name: "West Virginia" },
-  { code: "WI", name: "Wisconsin" },
-  { code: "WY", name: "Wyoming" },
+// Tile-grid US map: an 8×11 grid in roughly correct geography (NYT/WaPo
+// data-viz convention). Empty cells are gaps. Lets a CPA click states by
+// region rather than scrolling an alphabetical list.
+const STATE_GRID: string[][] = [
+  ["", "", "", "", "", "", "", "", "", "", "ME"],
+  ["AK", "", "", "", "", "", "", "", "VT", "NH", ""],
+  ["", "", "", "", "", "", "", "", "MA", "", ""],
+  ["WA", "MT", "ND", "MN", "IL", "WI", "MI", "", "NY", "RI", "CT"],
+  ["OR", "ID", "SD", "IA", "IN", "OH", "PA", "NJ", "", "", ""],
+  ["CA", "NV", "UT", "WY", "MO", "KY", "WV", "VA", "MD", "DC", "DE"],
+  ["", "AZ", "CO", "NE", "KS", "TN", "NC", "SC", "", "", ""],
+  ["", "", "NM", "OK", "AR", "MS", "AL", "GA", "", "", ""],
+  ["HI", "", "", "TX", "LA", "", "", "", "FL", "", ""],
 ];
 
 /**
@@ -223,119 +182,144 @@ function StateMultiSelect({
   onToggle: (s: string) => void;
   onSetHome: (s: string) => void;
 }) {
-  const [filter, setFilter] = useState("");
-  const nameByCode = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const s of STATES) m.set(s.code, s.name);
+  const [hoverCode, setHoverCode] = useState<string | null>(null);
+  const stateByCode = useMemo(() => {
+    const m = new Map<string, { code: string; name: string }>();
+    for (const s of US_STATES) m.set(s.code, s);
     return m;
   }, []);
-
-  const filtered = useMemo(() => {
-    const f = filter.trim().toLowerCase();
-    if (!f) return STATES;
-    return STATES.filter(
-      (s) =>
-        s.code.toLowerCase().includes(f) ||
-        s.name.toLowerCase().includes(f),
-    );
-  }, [filter]);
+  const hoveredState = hoverCode ? stateByCode.get(hoverCode) : null;
+  const isPicked = (code: string) => selected.includes(code);
 
   return (
-    <div>
-      {/* Selected chips strip — codes for compactness, full name on hover */}
+    <div className="space-y-3">
+      {/* Selected-states chip strip — visible commitment, with home-state
+          designation. Click 'set home' to swap which state's address goes
+          on outbound emails. */}
       {selected.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {selected.map((s) => (
-            <span
-              key={s}
-              title={nameByCode.get(s) ?? s}
-              className={[
-                "inline-flex items-center gap-1 text-2xs font-medium rounded px-1.5 py-1",
-                s === home
-                  ? "bg-accent text-canvas"
-                  : "bg-sunken text-ink-700 border border-line",
-              ].join(" ")}
-            >
-              {s === home && <Check className="w-2.5 h-2.5" aria-hidden />}
-              <span className="font-mono">{s}</span>
-              <span className="text-2xs opacity-80">
-                {nameByCode.get(s) ?? s}
-              </span>
-              {s === home ? (
-                <span className="text-2xs opacity-70 ml-0.5">· home</span>
-              ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {selected.map((s) => {
+            const meta = stateByCode.get(s);
+            const isHome = s === home;
+            return (
+              <span
+                key={s}
+                title={meta?.name ?? s}
+                className={[
+                  "inline-flex items-center gap-1 text-2xs font-medium rounded px-2 py-1",
+                  isHome
+                    ? "bg-accent text-canvas"
+                    : "bg-sunken text-ink-700 border border-line",
+                ].join(" ")}
+              >
+                {isHome && <Check className="w-2.5 h-2.5" aria-hidden />}
+                <span className="font-mono">{s}</span>
+                <span className="opacity-80">{meta?.name ?? ""}</span>
+                {isHome ? (
+                  <span className="opacity-70 ml-0.5">· home</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onSetHome(s)}
+                    className="underline opacity-60 hover:opacity-100"
+                    title="Make home state — this address goes on outbound emails"
+                  >
+                    set home
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => onSetHome(s)}
-                  className="text-2xs underline opacity-60 hover:opacity-100"
-                  title="Make home state"
+                  onClick={() => onToggle(s)}
+                  className="ml-0.5 opacity-60 hover:opacity-100"
+                  title="Remove"
+                  disabled={selected.length === 1 && isHome}
+                  aria-label={`Remove ${meta?.name ?? s}`}
                 >
-                  set home
+                  ×
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={() => onToggle(s)}
-                className="ml-0.5 text-2xs opacity-60 hover:opacity-100"
-                title="Remove"
-                disabled={selected.length === 1 && s === home}
-              >
-                ×
-              </button>
-            </span>
-          ))}
+              </span>
+            );
+          })}
         </div>
       )}
 
-      <input
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        placeholder="Search by name or code (e.g. 'California' or 'CA')"
-        className="w-full border border-line rounded px-3 py-2 text-sm mb-2"
-      />
+      {/* Tile-grid US map. Approximate 8×11 NYT/WaPo data-viz layout —
+          states sit in roughly the right geographic position. Click to
+          toggle. Picked states fill with accent; home state shows a check
+          glyph and a thicker ring. */}
+      <div className="bg-canvas border border-line rounded-md p-4">
+        <div className="space-y-1">
+          {STATE_GRID.map((row, ri) => (
+            <div key={ri} className="flex gap-1 justify-center">
+              {row.map((code, ci) => {
+                if (!code) {
+                  return <div key={ci} className="w-9 h-9" aria-hidden />;
+                }
+                const meta = stateByCode.get(code);
+                if (!meta) {
+                  return <div key={ci} className="w-9 h-9" aria-hidden />;
+                }
+                const picked = isPicked(code);
+                const isHome = code === home;
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => onToggle(code)}
+                    onMouseEnter={() => setHoverCode(code)}
+                    onMouseLeave={() =>
+                      setHoverCode((h) => (h === code ? null : h))
+                    }
+                    title={meta.name + (isHome ? " — home state" : "")}
+                    aria-label={`${meta.name}${picked ? ", selected" : ""}${isHome ? ", home state" : ""}`}
+                    aria-pressed={picked}
+                    className={[
+                      "w-9 h-9 rounded text-2xs font-mono font-semibold transition-all relative",
+                      isHome
+                        ? "bg-accent text-canvas ring-2 ring-offset-1 ring-accent shadow-sm"
+                        : picked
+                          ? "bg-accent/90 text-canvas hover:bg-accent shadow-sm"
+                          : "bg-surface border border-line text-ink-700 hover:bg-sunken hover:border-ink-400",
+                    ].join(" ")}
+                  >
+                    {code}
+                    {isHome && (
+                      <Check
+                        className="absolute -top-0.5 -right-0.5 w-3 h-3 text-canvas bg-ink-900 rounded-full p-0.5"
+                        aria-hidden
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
 
-      {/* Scrollable list of full state names. 2 columns on wide screens for
-          density without sacrificing readability. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-px max-h-72 overflow-auto border border-line rounded bg-canvas">
-        {filtered.map(({ code, name }) => {
-          const isSelected = selected.includes(code);
-          const isHome = code === home;
-          return (
-            <button
-              key={code}
-              type="button"
-              onClick={() => onToggle(code)}
-              className={[
-                "text-sm py-2 px-3 text-left transition-colors flex items-center gap-2 bg-surface",
-                isHome
-                  ? "bg-accent text-canvas font-medium hover:bg-accent-hover"
-                  : isSelected
-                    ? "bg-sunken text-ink-900 font-medium hover:bg-sunken/80"
-                    : "text-ink-700 hover:bg-sunken",
-              ].join(" ")}
-            >
-              <span
-                className={[
-                  "w-4 h-4 rounded border flex items-center justify-center shrink-0",
-                  isSelected
-                    ? isHome
-                      ? "bg-canvas border-canvas text-accent"
-                      : "bg-accent border-accent text-canvas"
-                    : "border-line bg-canvas",
-                ].join(" ")}
-              >
-                {isSelected && <Check className="w-3 h-3" aria-hidden />}
-              </span>
-              <span className="flex-1">{name}</span>
-              <span className="text-2xs font-mono opacity-50">{code}</span>
-            </button>
-          );
-        })}
-        {filtered.length === 0 && (
-          <p className="col-span-full text-xs text-ink-500 px-3 py-3">
-            No states match "{filter}".
-          </p>
-        )}
+      {/* Hover hint + legend */}
+      <div className="flex items-center justify-between text-2xs flex-wrap gap-2">
+        <div className="text-ink-500 min-h-[1.25em]">
+          {hoveredState ? (
+            <>
+              <span className="font-mono font-semibold">
+                {hoveredState.code}
+              </span>{" "}
+              · {hoveredState.name}
+            </>
+          ) : (
+            "Click a state to add or remove it. Set one as your home."
+          )}
+        </div>
+        <div className="flex items-center gap-3 text-ink-500">
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded bg-accent" /> picked
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded bg-surface border border-line" />{" "}
+            available
+          </span>
+        </div>
       </div>
     </div>
   );

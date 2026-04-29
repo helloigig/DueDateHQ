@@ -105,9 +105,9 @@ export function OnboardingDone() {
                   {stats.insights} advisory opportunit
                   {stats.insights === 1 ? "y" : "ies"} surfaced.
                 </span>{" "}
-                Mode E pattern recognition is already running. Look for the
-                "Advisory opportunities" section on your dashboard — that's
-                the lever for moving from preparer to advisor.
+                Cross-year pattern recognition is already running. Look for
+                the "Advisory opportunities" section on your dashboard —
+                that's the lever for moving from preparer to advisor.
               </p>
             </div>
           )}
@@ -125,7 +125,7 @@ export function OnboardingDone() {
                 What to expect from AI
               </h3>
               <span className="text-2xs text-ink-400 ml-auto">
-                PRD §4.5 — the authority gradient
+                How AI shows up across your work
               </span>
             </div>
             <p className="text-xs text-ink-500 mt-1">
@@ -142,7 +142,7 @@ export function OnboardingDone() {
             <ZoneRow
               tone="yellow"
               title="Yellow zone — AI proposes, you approve"
-              detail="Email drafts, Mode C anomaly flags, advisory triggers, applying state alerts to client lists. Most of your daily UX lives here."
+              detail="Email drafts, anomaly flags, advisory triggers, applying state alerts to client lists. Most of your daily UX lives here."
             />
             <ZoneRow
               tone="red"
@@ -151,8 +151,8 @@ export function OnboardingDone() {
             />
           </ul>
           <footer className="px-5 py-2 text-2xs text-ink-400 bg-sunken/30 border-t border-line">
-            The §5.3 invariant: AI never auto-promotes a checklist item to
-            received_confirmed. Every confirmation is your explicit click.
+            We never auto-confirm a checklist item — every confirmation is
+            your explicit click.
           </footer>
         </section>
 
@@ -171,17 +171,17 @@ export function OnboardingDone() {
             <UnlockRow
               icon={<Sparkles className="w-3.5 h-3.5" aria-hidden />}
               title="Connect QuickBooks"
-              detail="Unlocks financial profiles for your clients · Mode B/C/E anchors begin forming. ~30 seconds of OAuth."
+              detail="Unlocks financial profiles for your clients — richer per-client signals begin forming. ~30 seconds of OAuth."
             />
             <UnlockRow
               icon={<AlertTriangle className="w-3.5 h-3.5" aria-hidden />}
               title="Upload one prior-year return"
-              detail="One PDF activates Mode E cross-year insights and Mode B per-client timing. The biggest single capability unlock."
+              detail="One PDF activates cross-year insights and per-client timing. The biggest single capability unlock."
             />
             <UnlockRow
               icon={<Mail className="w-3.5 h-3.5" aria-hidden />}
               title="Connect Gmail or Outlook"
-              detail="Unlocks Method B inbound + Mode D voice mirroring. Your draft emails sound like you, not like a template."
+              detail="Inbound replies route automatically and your draft emails sound like you, not like a template."
             />
           </ul>
         </section>

@@ -349,7 +349,7 @@ export function TaskList() {
             <span>
               <span className="font-medium">AI noticed something on each of these.</span>{" "}
               We never auto-confirm a checklist item — your click is the only
-              way it advances. The §5.3 invariant.
+              way it advances.
             </span>
           </div>
         )}
@@ -479,7 +479,7 @@ function TaskRow({
             {row.insights.length > 0 && (
               <span
                 className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-info-bg text-info-ink border border-info-border"
-                title="Mode E — cross-year advisory opportunity"
+                title="Cross-year advisory opportunity"
               >
                 advisory
               </span>
@@ -842,7 +842,7 @@ function PrimaryAction({
       <button
         onClick={() => onConfirm(lead.id)}
         className="text-xs px-3 py-1.5 rounded bg-warn-bg text-warn-ink border border-warn-border hover:bg-warn-bg/70 inline-flex items-center gap-1 shrink-0"
-        title="Confirm — only the CPA can do this (PRD §5.3)"
+        title="Confirm — only you can do this"
       >
         <Check className="w-3 h-3" aria-hidden /> Confirm
       </button>

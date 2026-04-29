@@ -482,8 +482,8 @@ function ReviewStep(props: {
               <span className="font-medium text-slate-900">
                 {suggestedPackageName}
               </span>{" "}
-              is assigned, which generates this year&apos;s deadlines + Mode A
-              baseline checklists automatically.
+              is assigned, which generates this year&apos;s deadlines and a
+              baseline document checklist automatically.
             </li>
           ) : (
             <li>

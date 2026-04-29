@@ -74,7 +74,7 @@ export function OnboardingShell({
             {brandLine ?? DEFAULT_BRAND_LINE}
           </p>
           <p className="text-2xs text-ink-400">
-            Total target: ≤ 5 min — PRD §8.4
+            Total: under 5 minutes
           </p>
         </div>
       </footer>

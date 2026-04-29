@@ -159,11 +159,9 @@ export function EmailDraftModal({ open, intent, onClose }: Props) {
     >
       <div className="bg-surface border border-line rounded-lg shadow-overlay w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         <header className="flex items-center px-5 py-3 border-b border-line">
-          <h2 className="text-sm font-semibold text-ink-900">
-            Compose · Mode D
-          </h2>
+          <h2 className="text-sm font-semibold text-ink-900">Compose</h2>
           <span className="ml-2 text-2xs text-ink-400 uppercase tracking-wider">
-            Phase 1 · CPA reviews + sends
+            You review and send — we never send on your behalf
           </span>
           <button
             onClick={onClose}

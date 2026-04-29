@@ -192,7 +192,8 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
           )}
         </button>
         <span className="text-ink-400 ml-1">
-          Replies route here. Inbound parses with Mode A · flagged by Mode C.
+          Replies route here. Documents are sorted automatically and flagged
+          for your review.
         </span>
         <span className="ml-auto flex items-center gap-2">
           <button
@@ -208,7 +209,7 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
               exportAuditTrailPdfStub(task);
             }}
             className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken inline-flex items-center gap-1.5"
-            title="IRS audit-trail compliant export per PRD §15.4"
+            title="IRS audit-trail compliant export"
           >
             <FileDown className="w-3 h-3" aria-hidden /> Audit trail
           </button>

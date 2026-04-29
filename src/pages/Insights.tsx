@@ -71,7 +71,7 @@ export function Insights() {
             Pricing intelligence
           </h2>
           <span className="text-2xs text-ink-500">
-            Layer C · cohort baselines
+            cohort baselines
           </span>
         </header>
         <div className="px-5 py-4 space-y-3">
@@ -130,7 +130,7 @@ export function Insights() {
             Capacity planning
           </h2>
           <span className="text-2xs text-ink-500">
-            Layer C · workload forecast
+            workload forecast
           </span>
         </header>
         <div className="px-5 py-4 space-y-4">
@@ -195,7 +195,7 @@ export function Insights() {
         <header className="flex items-baseline px-5 py-3 border-b border-line bg-sunken/40 gap-2">
           <h2 className="text-sm font-semibold text-ink-900">Firm brain</h2>
           <span className="text-2xs text-ink-500">
-            Layer C · institutional knowledge
+            institutional knowledge
           </span>
         </header>
         <div className="px-5 py-4 space-y-3">
