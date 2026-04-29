@@ -7,6 +7,8 @@ import { signIn } from "../data/session";
 import { actions } from "../data/store";
 import { authInputClass } from "./auth/AuthShell";
 import { SsoButton } from "../components/SsoButton";
+import { env } from "../config";
+import { supabase } from "../lib/supabase";
 
 /**
  * Sign-in — simplified to email + password (the firm is implicit from the
@@ -27,9 +29,15 @@ export function Login() {
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const login = trpc.auth.login.useMutation({
+  const trpcUtils = trpc.useUtils();
+  const [pending, setPending] = useState(false);
+
+  // Mock-mode login goes through the FE's mock adapter via trpc.auth.login.
+  // Real mode uses Supabase Auth directly (the BE doesn't expose auth.login —
+  // Supabase mints the JWT, the BE just verifies it). After either path, the
+  // SessionProvider re-queries auth.session and routes the user.
+  const mockLogin = trpc.auth.login.useMutation({
     onSuccess: () => {
-      // Wireframe: persist a demo session locally; production sets cookies.
       signIn({
         firmName: "Mitchell CPA",
         userName: "Sarah Mitchell",
@@ -40,6 +48,41 @@ export function Login() {
     },
     onError: (err) => setSubmitError(err.message),
   });
+
+  const realLogin = async (parsed: { email: string; password: string }) => {
+    setPending(true);
+    setSubmitError(null);
+    try {
+      const { error } = await supabase().auth.signInWithPassword(parsed);
+      if (error) {
+        setSubmitError(error.message);
+        return;
+      }
+      // JWT now persisted by supabase-js. Pull fresh session from BE — if the
+      // user hasn't bootstrapped a firm yet, this returns null and we route
+      // to /onboarding/firm. Otherwise we have a real session and go home.
+      const remote = await trpcUtils.auth.session.fetch();
+      if (!remote) {
+        signIn({
+          firmName: "_pending",
+          userName: parsed.email.split("@")[0] ?? "",
+          userEmail: parsed.email,
+          tier: "pro",
+        });
+        navigate("/onboarding/firm", { replace: true });
+        return;
+      }
+      signIn({
+        firmName: remote.firm.name,
+        userName: remote.user.displayName ?? remote.user.email,
+        userEmail: remote.user.email,
+        tier: remote.firm.tier,
+      });
+      navigate("/", { replace: true });
+    } finally {
+      setPending(false);
+    }
+  };
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +97,11 @@ export function Login() {
       setErrors(flat);
       return;
     }
-    login.mutate(parsed.data);
+    if (env.useMockApi) {
+      mockLogin.mutate(parsed.data);
+    } else {
+      void realLogin(parsed.data);
+    }
   };
 
   const tryDemo = () => {
@@ -148,10 +195,10 @@ export function Login() {
               </Link>
               <button
                 type="submit"
-                disabled={login.isPending}
+                disabled={mockLogin.isPending || pending}
                 className="text-sm px-4 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40"
               >
-                {login.isPending ? "Signing in…" : "Sign in"}
+                {mockLogin.isPending || pending ? "Signing in…" : "Sign in"}
               </button>
             </div>
           </form>

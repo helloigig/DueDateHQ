@@ -1,21 +1,33 @@
 /**
  * tRPC React client + link selection.
  *
- * Mock mode: requests are dispatched to `mockAdapter` via `mockLink`.
- * Real mode: swap `mockLink` for `httpBatchLink({ url })` on integration day.
+ * Mock mode (VITE_USE_MOCK_API=true): requests dispatch to `mockAdapter`
+ * via `mockLink` (in-memory, no network).
+ *
+ * Real mode: requests go to `${VITE_API_URL}/trpc` with a Bearer token
+ * sourced from the Supabase Auth session.
  */
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { createTRPCReact } from "@trpc/react-query";
 import type { AppRouter } from "./router";
 import { mockLink } from "./mock-link";
 import { env } from "../../config";
+import { getAccessToken } from "../supabase";
 
 export const trpc = createTRPCReact<AppRouter>();
 
+function realLink() {
+  return httpBatchLink({
+    url: `${env.apiUrl}/trpc`,
+    async headers() {
+      const token = await getAccessToken();
+      return token ? { authorization: `Bearer ${token}` } : {};
+    },
+  });
+}
+
 function buildLinks() {
-  return env.useMockApi
-    ? [mockLink]
-    : [httpBatchLink({ url: `${env.apiUrl}/trpc` })];
+  return env.useMockApi ? [mockLink] : [realLink()];
 }
 
 export function createTrpcClient() {

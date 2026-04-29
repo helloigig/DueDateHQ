@@ -14,6 +14,8 @@ import { signupSchema, type SignupInput } from "../../types/schemas";
 import { signIn } from "../../data/session";
 import { authInputClass } from "./AuthShell";
 import { SsoButton } from "../../components/SsoButton";
+import { env } from "../../config";
+import { supabase } from "../../lib/supabase";
 
 /**
  * Sign-up — minimum-viable entry: just email + password (or SSO). The firm
@@ -46,36 +48,69 @@ export function Signup() {
     return KNOWN[domain] ?? null;
   })();
 
-  const signup = trpc.auth.signup.useMutation({
-    onSuccess: () => {
-      // Pre-fill placeholders; onboarding/firm fills the rest.
-      const at = email.indexOf("@");
-      const local = at > 0 ? email.slice(0, at) : "";
-      const domain = at > 0 ? email.slice(at + 1) : "";
-      const inferredName = local
-        .replace(/[._-]+/g, " ")
-        .replace(/\b\w/g, (c) => c.toUpperCase());
-      const inferredFirm = domain
-        ? domain
-            .split(".")[0]
-            .replace(/[-_]+/g, " ")
-            .replace(/\b\w/g, (c) => c.toUpperCase()) + " CPA"
-        : "";
-      signIn({
-        firmName: inferredFirm,
-        userName: inferredName,
-        userEmail: email,
-        tier: "pro",
-      });
-      navigate("/onboarding/firm", { replace: true });
-    },
+  const [pending, setPending] = useState(false);
+
+  function inferNames(emailValue: string) {
+    const at = emailValue.indexOf("@");
+    const local = at > 0 ? emailValue.slice(0, at) : "";
+    const domain = at > 0 ? emailValue.slice(at + 1) : "";
+    const userName = local
+      .replace(/[._-]+/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+    const firmName = domain
+      ? domain
+          .split(".")[0]
+          .replace(/[-_]+/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase()) + " CPA"
+      : "";
+    return { userName, firmName };
+  }
+
+  function afterSuccess() {
+    const { userName, firmName } = inferNames(email);
+    signIn({ firmName, userName, userEmail: email, tier: "pro" });
+    navigate("/onboarding/firm", { replace: true });
+  }
+
+  // Mock signup goes through trpc.auth.signup → mock adapter. Real signup
+  // calls Supabase Auth; the firm + public.users row aren't created here —
+  // OnboardingFirm calls auth.bootstrap once the user has supplied a name.
+  const mockSignup = trpc.auth.signup.useMutation({
+    onSuccess: afterSuccess,
     onError: (err) => setSubmitError(err.message),
   });
+
+  const realSignup = async (parsed: { email: string; password: string }) => {
+    setPending(true);
+    setSubmitError(null);
+    try {
+      const { data, error } = await supabase().auth.signUp({
+        email: parsed.email,
+        password: parsed.password,
+      });
+      if (error) {
+        setSubmitError(error.message);
+        return;
+      }
+      // If Supabase requires email confirmation (default), data.session is
+      // null until the user clicks the confirmation link. Surface that
+      // honestly rather than silently routing them into onboarding where
+      // auth.bootstrap will 401.
+      if (!data.session) {
+        setSubmitError(
+          "Check your email — you need to confirm before continuing.",
+        );
+        return;
+      }
+      afterSuccess();
+    } finally {
+      setPending(false);
+    }
+  };
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
-    // Use a small subset of the schema (email + password only) for now.
     const parsed = signupSchema.safeParse({
       email,
       password,
@@ -92,7 +127,11 @@ export function Signup() {
       setErrors(flat);
       return;
     }
-    signup.mutate(parsed.data);
+    if (env.useMockApi) {
+      mockSignup.mutate(parsed.data);
+    } else {
+      void realSignup({ email: parsed.data.email, password: parsed.data.password });
+    }
   };
 
   return (
@@ -199,10 +238,10 @@ export function Signup() {
 
             <button
               type="submit"
-              disabled={signup.isPending}
+              disabled={mockSignup.isPending || pending}
               className="w-full text-sm px-3 py-2 rounded-md bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 mt-2"
             >
-              {signup.isPending ? "Creating…" : "Continue → set up firm"}
+              {mockSignup.isPending || pending ? "Creating…" : "Continue → set up firm"}
             </button>
             <p className="text-2xs text-ink-400 text-center">
               By continuing you agree to the Terms and Privacy Policy.
