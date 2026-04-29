@@ -18,6 +18,7 @@ import { ForgotPassword } from "./pages/auth/ForgotPassword";
 import { ResetPassword } from "./pages/auth/ResetPassword";
 import { MagicLink } from "./pages/auth/MagicLink";
 import { Changes } from "./pages/Changes";
+import { Calendar } from "./pages/Calendar";
 import { OnboardingFirm } from "./pages/onboarding/OnboardingFirm";
 import { OnboardingChoosePath } from "./pages/onboarding/OnboardingChoosePath";
 import { OnboardingManual } from "./pages/onboarding/OnboardingManual";
@@ -69,6 +70,7 @@ export default function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="to-review" element={<Inbox />} />
+          <Route path="calendar" element={<Calendar />} />
           {/* Legacy /inbox route — redirect to canonical /to-review */}
           <Route path="inbox" element={<Navigate to="/to-review" replace />} />
           <Route path="opportunities" element={<Insights />} />

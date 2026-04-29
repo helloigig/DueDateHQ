@@ -9,6 +9,7 @@ import {
   TrendingUp,
   PanelLeftClose,
   PanelLeftOpen,
+  CalendarDays,
 } from "lucide-react";
 import { useAnnouncements } from "../hooks/useAnnouncements";
 import { useSession } from "../data/session";
@@ -18,6 +19,7 @@ const primary = [
   { to: "/", label: "Dashboard", Icon: LayoutDashboard, end: true },
   { to: "/to-review", label: "To review", Icon: CheckSquare, end: false },
   { to: "/clients", label: "Clients", Icon: Users, end: false },
+  { to: "/calendar", label: "Calendar", Icon: CalendarDays, end: false },
   { to: "/alerts", label: "Alerts", Icon: Bell, end: false },
   { to: "/opportunities", label: "Opportunities", Icon: TrendingUp, end: false },
 ];

@@ -23,7 +23,6 @@ import { ExportModal } from "../components/ExportModal";
 import { OnboardingLayer2Widget } from "../components/OnboardingLayer2Widget";
 import { TaskList } from "../components/TaskList";
 import { AdvisoryPeek } from "../components/AdvisoryPeek";
-import { CalendarGrid } from "../components/CalendarGrid";
 import { WelcomeTour } from "../components/WelcomeTour";
 import { PwaInstallCard } from "../components/PwaInstallCard";
 import type { Announcement, Deadline } from "../types";
@@ -265,46 +264,6 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* Calendar overview — the planning lens. Spatial month grid, not a
-          re-skinned task list. Collapsed by default because most mornings
-          you don't need it; expand when planning capacity or scanning the
-          shape of the month. */}
-      <details className="group bg-surface border border-line rounded-md">
-        <summary className="px-4 py-3 cursor-pointer hover:bg-sunken/40 list-none flex items-center gap-2">
-          <span className="text-sm font-semibold text-ink-900">
-            Calendar overview
-          </span>
-          <span className="text-2xs text-ink-500 ml-1">
-            {byBucket.overdue.length > 0 && (
-              <span className="text-danger-ink font-medium">
-                {byBucket.overdue.length} overdue
-              </span>
-            )}
-            {byBucket.overdue.length > 0 && byBucket.this_week.length > 0 && (
-              <span className="text-ink-300"> · </span>
-            )}
-            {byBucket.this_week.length > 0 && (
-              <span>{byBucket.this_week.length} this week</span>
-            )}
-            {byBucket.this_month.length > 0 && (
-              <>
-                <span className="text-ink-300"> · </span>
-                <span>{byBucket.this_month.length} this month</span>
-              </>
-            )}
-          </span>
-          <span className="ml-auto text-2xs text-ink-400 group-open:hidden">
-            Expand
-          </span>
-          <span className="ml-auto text-2xs text-ink-400 hidden group-open:inline">
-            Collapse
-          </span>
-        </summary>
-
-        <div className="border-t border-line bg-canvas">
-          <CalendarGrid />
-        </div>
-      </details>
 
       <ExportModal
         open={exportOpen}
