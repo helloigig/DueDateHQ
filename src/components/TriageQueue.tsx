@@ -232,7 +232,7 @@ export function TriageQueue({ onCountChange }: Props) {
         });
         break;
       case "alert":
-        navigate(`/announcements/${it.announcement.id}`);
+        navigate(`/alerts/${it.announcement.id}`);
         break;
       case "insight":
         navigate(`/clients/${it.client.id}`);
