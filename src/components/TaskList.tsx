@@ -102,6 +102,11 @@ export function TaskList() {
   const showAssignee = session?.tier !== "solo";
   const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null);
   const [assigneeMenuOpen, setAssigneeMenuOpen] = useState(false);
+  // Dashboard row cap. Default 10 keeps the morning view scannable;
+  // "Show 50" expander unlocks Yan-Jing-scale firms (600 clients,
+  // ~60 needs-decision items) without forcing a navigate to /to-review.
+  // Bulk lives on /to-review; this is just the in-place expansion.
+  const [showAll, setShowAll] = useState(false);
 
   const clientById = useMemo(
     () => new Map(clients.map((c) => [c.id, c])),
@@ -358,7 +363,7 @@ export function TaskList() {
           </div>
         ) : (
           <ul className="divide-y divide-line">
-            {filtered.slice(0, 10).map((row) => (
+            {filtered.slice(0, showAll ? 50 : 10).map((row) => (
               <TaskRow
                 key={row.task.id}
                 row={row}
@@ -373,12 +378,42 @@ export function TaskList() {
                 onSendChase={(item) => openEmailFor(row, item)}
               />
             ))}
-            {filtered.length > 10 && (
-              <li className="px-4 py-2.5 text-xs text-ink-500 hover:bg-sunken">
-                <Link to="/to-review" className="flex items-center gap-1">
-                  + {filtered.length - 10} more — open inbox for the full list
+            {filtered.length > 10 && !showAll && (
+              <li className="px-4 py-2.5 text-xs flex items-center gap-3 hover:bg-sunken">
+                <button
+                  onClick={() => setShowAll(true)}
+                  className="text-ink-700 hover:text-ink-900 font-medium"
+                >
+                  Show {Math.min(filtered.length - 10, 40)} more
+                </button>
+                <span className="text-ink-300">·</span>
+                <Link
+                  to="/to-review"
+                  className="text-ink-500 hover:text-ink-900 inline-flex items-center gap-1"
+                >
+                  Open To review for the full list
                   <ChevronRight className="w-3 h-3" aria-hidden />
                 </Link>
+              </li>
+            )}
+            {showAll && filtered.length > 50 && (
+              <li className="px-4 py-2.5 text-xs flex items-center gap-3">
+                <span className="text-ink-500">
+                  Showing 50 of {filtered.length}.
+                </span>
+                <Link
+                  to="/to-review"
+                  className="text-ink-700 hover:text-ink-900 font-medium inline-flex items-center gap-1"
+                >
+                  Open To review for the rest
+                  <ChevronRight className="w-3 h-3" aria-hidden />
+                </Link>
+                <button
+                  onClick={() => setShowAll(false)}
+                  className="ml-auto text-ink-500 hover:text-ink-900"
+                >
+                  Collapse
+                </button>
               </li>
             )}
           </ul>
