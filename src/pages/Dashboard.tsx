@@ -24,6 +24,8 @@ import { OnboardingLayer2Widget } from "../components/OnboardingLayer2Widget";
 import { TaskList } from "../components/TaskList";
 import { AdvisoryPeek } from "../components/AdvisoryPeek";
 import { CalendarGrid } from "../components/CalendarGrid";
+import { WelcomeTour } from "../components/WelcomeTour";
+import { PwaInstallCard } from "../components/PwaInstallCard";
 import type { Announcement, Deadline } from "../types";
 
 const HIDE_STATUSES = new Set(["completed", "filed_extension"]);
@@ -183,8 +185,14 @@ export function Dashboard() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-5">
+      {/* First-run product tour — three slides shown once, then never again */}
+      <WelcomeTour />
+
       <AnnouncementBanner announcements={activeBanners} />
       <ChaseBanner />
+
+      {/* PWA install prompt — only shows day 2-3 after signup, dismissible */}
+      <PwaInstallCard />
 
       {showBlockingDialog && !blockingDismissed && (
         <BlockingAlertsDialog

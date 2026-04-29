@@ -16,6 +16,13 @@ export interface FirmSession {
   onboardingComplete?: boolean;
   /** Primary states served (collected in Onboarding step "firm setup"). */
   primaryStates?: string[];
+  /** IANA time zone (e.g., "America/Los_Angeles"). Drives "due today" /
+   *  "this week" calculations. Defaulted from browser at signup; user can
+   *  override in Settings → Firm. */
+  timeZone?: string;
+  /** Calendar provider the partner wants deadlines pushed to. Each option
+   *  triggers a Phase 1 OAuth flow when wired. "none" = don't push. */
+  calendarProvider?: "google" | "outlook" | "apple" | "none";
   /** Firm-wide kill switch for Phase 2 auto-send (PRD §7.3). When true,
    *  every Phase-2-enabled template is paused regardless of per-template
    *  state. The CPA can flip it instantly from Settings → Reminders. */

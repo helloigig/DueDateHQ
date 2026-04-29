@@ -7,6 +7,18 @@ import { env } from "../../config";
 import { trpc } from "../../lib/api/client";
 import { US_STATES } from "../../data/usStates";
 
+// Common US time zones — covers ~99% of CPA firms. Auto-detected zones
+// outside this list still appear (we add them dynamically below the list).
+const COMMON_TIMEZONES: ReadonlyArray<{ value: string; label: string }> = [
+  { value: "America/New_York", label: "Eastern (New York)" },
+  { value: "America/Chicago", label: "Central (Chicago)" },
+  { value: "America/Denver", label: "Mountain (Denver)" },
+  { value: "America/Phoenix", label: "Mountain — no DST (Phoenix)" },
+  { value: "America/Los_Angeles", label: "Pacific (Los Angeles)" },
+  { value: "America/Anchorage", label: "Alaska (Anchorage)" },
+  { value: "Pacific/Honolulu", label: "Hawaii (Honolulu)" },
+];
+
 // Tile-grid US map: an 8×11 grid in roughly correct geography (NYT/WaPo
 // data-viz convention). Empty cells are gaps. Lets a CPA click states by
 // region rather than scrolling an alphabetical list.
@@ -55,6 +67,18 @@ export function OnboardingFirm() {
       ? session.primaryStates
       : ["CA"]
   );
+  // Time zone — auto-detected from the browser's Intl API; user can change.
+  // Defaults matter: if a CPA in PT lands here and the system's UTC clock
+  // says "due today" relative to NY, the planning day is broken.
+  const [timeZone, setTimeZone] = useState<string>(
+    session?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+  );
+  // Calendar provider — Phase 1 stub. Selecting a provider here doesn't
+  // start OAuth yet; we just record intent so the dashboard can show the
+  // "Connect calendar" affordance contextually.
+  const [calendarProvider, setCalendarProvider] = useState<
+    "google" | "outlook" | "apple" | "none"
+  >(session?.calendarProvider ?? "none");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Real mode: provision the firm + public.users row in the backend.
@@ -86,6 +110,8 @@ export function OnboardingFirm() {
       firmName,
       primaryStates: filingStates,
       tier: session?.tier ?? "pro",
+      timeZone,
+      calendarProvider,
     });
     navigate("/onboarding/choose-path");
   };
@@ -144,6 +170,54 @@ export function OnboardingFirm() {
             onSetHome={setAsHome}
           />
         </Field>
+
+        {/* Time zone + calendar in a 2-column grid — both affect daily flow.
+            Time zone drives "due today" math; calendar push gets deadlines
+            into the partner's existing planning surface. Everything else
+            (logo, EIN, address) lives in Settings → Firm. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field
+            label="Time zone"
+            hint="Used for 'due today' and 'this week' calculations."
+          >
+            <select
+              value={timeZone}
+              onChange={(e) => setTimeZone(e.target.value)}
+              className="w-full border border-line rounded px-3 py-2 text-sm bg-surface"
+            >
+              {COMMON_TIMEZONES.map((tz) => (
+                <option key={tz.value} value={tz.value}>
+                  {tz.label}
+                </option>
+              ))}
+              {/* If the auto-detected zone isn't in the common list, show it
+                  too so we don't silently overwrite */}
+              {!COMMON_TIMEZONES.some((tz) => tz.value === timeZone) && (
+                <option value={timeZone}>{timeZone}</option>
+              )}
+            </select>
+          </Field>
+
+          <Field
+            label="Push deadlines to your calendar"
+            hint="We'll add a 'Connect' button on your dashboard. Optional, change anytime."
+          >
+            <select
+              value={calendarProvider}
+              onChange={(e) =>
+                setCalendarProvider(
+                  e.target.value as "google" | "outlook" | "apple" | "none",
+                )
+              }
+              className="w-full border border-line rounded px-3 py-2 text-sm bg-surface"
+            >
+              <option value="none">No — just keep them here</option>
+              <option value="google">Google Calendar</option>
+              <option value="outlook">Outlook / Microsoft 365</option>
+              <option value="apple">Apple Calendar (iCloud)</option>
+            </select>
+          </Field>
+        </div>
 
         {submitError && (
           <div className="text-xs text-danger-ink bg-danger-bg border border-danger-border rounded px-3 py-2">
