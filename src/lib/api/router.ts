@@ -64,6 +64,22 @@ export const appRouter = t.router({
     resetPassword: t.procedure
       .input(z.object({ token: z.string(), password: z.string() }))
       .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    /** Provisions firm + public.users row for a fresh Supabase Auth user.
+     *  Called from /onboarding/firm in real mode; mock mode skips it. */
+    bootstrap: t.procedure
+      .input(
+        z.object({
+          firmName: z.string(),
+          primaryStates: z.array(z.string()),
+          displayName: z.string().optional(),
+        })
+      )
+      .mutation(
+        async (): Promise<{
+          firmId: string;
+          alreadyProvisioned: boolean;
+        }> => NOT_IMPL()
+      ),
   }),
 
   clients: t.router({

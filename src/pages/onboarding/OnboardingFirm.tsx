@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { OnboardingShell } from "../../components/OnboardingShell";
 import { updateSession, useSession } from "../../data/session";
+import { env } from "../../config";
+import { trpc } from "../../lib/api/client";
 
 const STATES = [
   "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
@@ -31,19 +33,43 @@ const STATES = [
 export function OnboardingFirm() {
   const navigate = useNavigate();
   const session = useSession();
-  const [firmName, setFirmName] = useState(session?.firmName ?? "");
+  const [firmName, setFirmName] = useState(session?.firmName === "_pending" ? "" : session?.firmName ?? "");
   const [homeState, setHomeState] = useState<string>(
     session?.primaryStates?.[0] ?? "CA"
   );
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const next = () => {
+  // Real mode: provision the firm + public.users row in the backend.
+  // Idempotent — re-runs on a user who's already provisioned just return
+  // the existing firmId.
+  const bootstrap = trpc.auth.bootstrap.useMutation({
+    onError: (err) => setSubmitError(err.message),
+  });
+
+  const goNext = () => {
     updateSession({
       firmName,
       primaryStates: [homeState],
-      // Default tier stays Pro for trial; user picks in Settings → Billing later.
       tier: session?.tier ?? "pro",
     });
     navigate("/onboarding/choose-path");
+  };
+
+  const next = async () => {
+    setSubmitError(null);
+    if (!env.useMockApi) {
+      try {
+        await bootstrap.mutateAsync({
+          firmName: firmName.trim(),
+          primaryStates: [homeState],
+          displayName: session?.userName,
+        });
+      } catch {
+        // onError set submitError — bail without navigating.
+        return;
+      }
+    }
+    goNext();
   };
 
   return (
@@ -83,12 +109,18 @@ export function OnboardingFirm() {
           </select>
         </Field>
 
+        {submitError && (
+          <div className="text-xs text-danger-ink bg-danger-bg border border-danger-border rounded px-3 py-2">
+            {submitError}
+          </div>
+        )}
+
         <button
-          onClick={next}
-          disabled={!firmName.trim()}
+          onClick={() => void next()}
+          disabled={!firmName.trim() || bootstrap.isPending}
           className="text-sm px-5 py-2 rounded bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          Continue
+          {bootstrap.isPending ? "Creating workspace…" : "Continue"}
         </button>
 
         <p className="text-2xs text-ink-400 mt-2">
