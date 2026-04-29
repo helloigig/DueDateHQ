@@ -9,6 +9,7 @@ import {
   Bell,
 } from "lucide-react";
 import { useStore, actions } from "../data/store";
+import { confirmWithUndo } from "../lib/confirmWithUndo";
 import type {
   Announcement,
   ChecklistItem,
@@ -207,7 +208,7 @@ export function TriageQueue({ onCountChange }: Props) {
       } else if (e.key.toLowerCase() === "c") {
         const it = items[activeIdx];
         if (it && it.kind === "decision_confirm") {
-          actions.setChecklistItemState(it.checklist.id, "received_confirmed", "cpa");
+          confirmWithUndo(it.checklist);
         }
       }
     };
@@ -219,7 +220,7 @@ export function TriageQueue({ onCountChange }: Props) {
   function primaryAction(it: QueueItem) {
     switch (it.kind) {
       case "decision_confirm":
-        actions.setChecklistItemState(it.checklist.id, "received_confirmed", "cpa");
+        confirmWithUndo(it.checklist);
         break;
       case "decision_flag":
         navigate(`/clients/${it.client.id}/tasks/${it.task.id}`);
@@ -622,11 +623,7 @@ function PrimaryAction({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              actions.setChecklistItemState(
-                item.checklist.id,
-                "received_confirmed",
-                "cpa"
-              );
+              confirmWithUndo(item.checklist);
             }}
             className={yellowBtn}
           >
