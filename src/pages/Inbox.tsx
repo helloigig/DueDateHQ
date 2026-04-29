@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Check, Mail, ChevronRight } from "lucide-react";
-import { useStore, actions } from "../data/store";
+import { useStore } from "../data/store";
 import type { ChecklistItem } from "../types";
 import { EmailDraftModal, type EmailDraftIntent } from "../components/EmailDraftModal";
+import { confirmWithUndo, confirmAllWithUndo } from "../lib/confirmWithUndo";
 import { TODAY, toIso } from "../data/dateHelpers";
 
 type Tab = "confirms" | "chases" | "all";
@@ -79,8 +80,10 @@ export function Inbox() {
 
   const visible = tab === "confirms" ? confirms : tab === "chases" ? chases : [...confirms, ...chases];
 
-  const onConfirm = (id: string) =>
-    actions.setChecklistItemState(id, "received_confirmed", "cpa");
+  const onConfirm = (id: string) => {
+    const item = checklistItems.find((c) => c.id === id);
+    if (item) confirmWithUndo(item);
+  };
 
   const onSend = (item: ChecklistItem) => {
     const task = taskById.get(item.taskId);
@@ -89,16 +92,11 @@ export function Inbox() {
     setEmailIntent({ task, client, checklistItem: item });
   };
 
+  // The undo-toast IS the safety net — no native confirm dialog needed.
+  // Bulk-confirming a wrong batch is recoverable for 5 seconds via the
+  // toast's "Undo all" button.
   const onConfirmAll = () => {
-    if (
-      !window.confirm(
-        `Confirm ${confirms.length} documents at once? Each one is recorded in the activity timeline.`
-      )
-    )
-      return;
-    confirms.forEach((c) =>
-      actions.setChecklistItemState(c.id, "received_confirmed", "cpa")
-    );
+    confirmAllWithUndo(confirms);
   };
 
   return (

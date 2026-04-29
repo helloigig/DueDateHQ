@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { AddClientModal } from "../components/AddClientModal";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { MultiSelectChip } from "../components/MultiSelectChip";
@@ -524,54 +525,11 @@ export function Clients() {
   );
 }
 
-function SortableTh({
-  col,
-  sortCol,
-  sortDir,
-  onClick,
-  align = "left",
-  children,
-}: {
-  col: SortColumn;
-  sortCol: SortColumn;
-  sortDir: SortDir;
-  onClick: (col: SortColumn) => void;
-  align?: "left" | "right";
-  children: React.ReactNode;
-}) {
-  const active = sortCol === col;
-  return (
-    <th
-      className={`px-4 py-2 font-semibold cursor-pointer ${
-        align === "right" ? "text-right" : "text-left"
-      } ${active ? "text-ink-900" : "text-ink-700"} hover:text-ink-900`}
-      onClick={() => onClick(col)}
-    >
-      <span className="inline-flex items-baseline gap-1">
-        {children}
-        {active && (
-          <span className="text-2xs">{sortDir === "asc" ? "↑" : "↓"}</span>
-        )}
-      </span>
-    </th>
-  );
-}
-
-function TierPill({ tier }: { tier: ClientTier }) {
-  const styles: Record<ClientTier, string> = {
-    premium: "bg-warn-bg text-warn-ink border-warn-border",
-    standard: "bg-sunken text-ink-700 border-line",
-    custom: "bg-info-bg text-info-ink border-info-border",
-  };
-  const label = tier.charAt(0).toUpperCase() + tier.slice(1);
-  return (
-    <span
-      className={`text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded border ${styles[tier]}`}
-    >
-      {label}
-    </span>
-  );
-}
+const TIER_LABEL: Record<ClientTier, string> = {
+  premium: "Premium",
+  standard: "Standard",
+  custom: "Custom",
+};
 
 function StatCard({
   label,
