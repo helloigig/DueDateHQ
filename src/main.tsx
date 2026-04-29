@@ -7,6 +7,9 @@ import "./index.css";
 import { trpc, createTrpcClient } from "./lib/api/client";
 import { createQueryClient } from "./lib/query-client";
 import { subscribeStore } from "./data/store";
+import { registerServiceWorker } from "./lib/pwa";
+
+registerServiceWorker();
 
 function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => createQueryClient());

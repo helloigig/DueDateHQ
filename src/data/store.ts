@@ -469,13 +469,16 @@ export const actions = {
     emit();
   },
 
-  dismissAnnouncement(id: string) {
+  dismissAnnouncement(id: string, reason?: string) {
     state = {
       ...state,
       announcements: state.announcements.map((a) =>
         a.id === id ? { ...a, dismissed: true, read: true } : a
       ),
     };
+    if (reason) {
+      console.info("[alerts] dismiss reason logged", { id, reason });
+    }
     emit();
   },
 
