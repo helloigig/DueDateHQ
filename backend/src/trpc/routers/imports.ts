@@ -77,4 +77,63 @@ export const importsRouter = router({
       message: "import_pipeline_phase1",
     });
   }),
+
+  /**
+   * Prior-year return PDF parser — Tier 3 import (PRD §6.6).
+   *
+   * Real production: download the PDF from Supabase Storage, run
+   * pdfjs-dist extract, send text to Claude with a structured-output
+   * prompt, write extracted facts to `imported_facts` for Mode E.
+   *
+   * Phase 1 (this stub): accepts the shape and returns deterministic
+   * placeholder data so the FE upload-and-review flow can be exercised
+   * end-to-end without LLM budget. Swap the body of
+   * `extractPriorYearFields` when ready.
+   */
+  parsePriorYearReturn: firmProcedure
+    .input(
+      z.object({
+        storageKey: z.string().min(1),
+        clientId: z.string().uuid().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const extracted = await extractPriorYearFields(input.storageKey);
+      return {
+        fields: extracted,
+        // Below 0.7 → reviewer must approve before commit
+        readyForCommit: extracted.confidence >= 0.7,
+      };
+    }),
 });
+
+/**
+ * Stub PDF extractor — deterministic by storageKey hash so re-running
+ * gives the same answer. Real implementation reads the PDF + LLM extract.
+ */
+async function extractPriorYearFields(storageKey: string): Promise<{
+  clientName: string | null;
+  ein: string | null;
+  entityType: string | null;
+  taxYear: number | null;
+  priorAGI: number | null;
+  formsFiled: string[];
+  k1Sources: string[];
+  confidence: number;
+}> {
+  const hash = Array.from(storageKey).reduce(
+    (h, c) => (h * 31 + c.charCodeAt(0)) | 0,
+    0,
+  );
+  return {
+    clientName: null,
+    ein: null,
+    entityType:
+      hash % 3 === 0 ? "LLC" : hash % 3 === 1 ? "S-Corp" : "Individual",
+    taxYear: 2024,
+    priorAGI: null,
+    formsFiled: [],
+    k1Sources: [],
+    confidence: 0.4,
+  };
+}
