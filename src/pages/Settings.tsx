@@ -31,6 +31,12 @@ import {
   useRejectScraped,
 } from "../hooks/useScraperReview";
 import {
+  useIntegrations,
+  useIntegrationCatalog,
+  useStartConnect,
+  useDisconnect,
+} from "../hooks/useIntegrations";
+import {
   useReminderTemplates,
   useUpdateReminderTemplate,
 } from "../hooks/useReminderTemplates";
@@ -1362,52 +1368,123 @@ function ReminderTemplateEditor({
   );
 }
 
+/**
+ * Tier 0 OAuth providers — wired to the new BE OAuth flow.
+ * QBO/Xero are two-way sync; Gmail/Outlook are send-only on day 1
+ * (Method B full-read is Phase 2). Each card knows whether the BE
+ * has client credentials configured (catalog) and surfaces "Connect"
+ * vs "Coming soon" honestly.
+ */
+const TIER_0_PROVIDERS: Array<{
+  kind: "qbo" | "xero" | "gmail" | "outlook";
+  name: string;
+  blurb: string;
+}> = [
+  {
+    kind: "qbo",
+    name: "QuickBooks Online",
+    blurb: "Two-way sync for financial profiles and per-client anomaly anchors.",
+  },
+  {
+    kind: "xero",
+    name: "Xero",
+    blurb: "Same as QBO for firms outside the US ecosystem.",
+  },
+  {
+    kind: "gmail",
+    name: "Gmail",
+    blurb: "Send chase emails on your behalf. Full read scope ships next quarter.",
+  },
+  {
+    kind: "outlook",
+    name: "Outlook / Microsoft 365",
+    blurb: "Same scope as Gmail.",
+  },
+];
+
 function IntegrationsPanel() {
+  const list = useIntegrations();
+  const catalog = useIntegrationCatalog();
+  const startConnect = useStartConnect();
+  const disconnect = useDisconnect();
+  // Index live integrations by kind for fast lookup
+  const byKind = useMemo(() => {
+    const m = new Map<string, NonNullable<typeof list.data>[number]>();
+    for (const row of list.data ?? []) m.set(row.kind, row);
+    return m;
+  }, [list.data]);
+
+  const onConnect = (kind: "qbo" | "xero" | "gmail" | "outlook") => {
+    startConnect.mutate({
+      kind,
+      redirectTo: window.location.href,
+    });
+  };
+
   return (
     <>
       <Card
-        title="Tier 0 — must-have, two-way"
-        description="Connect Day-1 to put DueDateHQ alongside your existing stack (PRD §6.4)."
+        title="Connected sources"
+        description="Each provider unlocks a specific capability — financial anchoring (QBO/Xero) or outbound email rerouting (Gmail/Outlook). Disconnect anytime."
       >
+        {list.error && (
+          <p className="text-xs text-danger-ink mb-3">
+            Couldn't load integrations: {list.error.message}
+          </p>
+        )}
+        {startConnect.error && (
+          <p className="text-xs text-danger-ink mb-3">
+            Connect failed: {startConnect.error.message}
+          </p>
+        )}
         <ul className="divide-y divide-line">
-          <IntegrationRow
-            name="QuickBooks Online"
-            tier="Tier 0"
-            status="not_connected"
-            blurb="Two-way sync for financial profiles and Mode B/C anchors."
-          />
-          <IntegrationRow
-            name="Xero"
-            tier="Tier 0"
-            status="not_connected"
-            blurb="QBO equivalent for international markets."
-          />
-          <IntegrationRow
-            name="Gmail"
-            tier="Tier 0"
-            status="not_connected"
-            blurb="Method A send-only on Day 1 · Method B full read scope in P1."
-          />
-          <IntegrationRow
-            name="Outlook"
-            tier="Tier 0"
-            status="not_connected"
-            blurb="Same scope as Gmail."
-          />
+          {TIER_0_PROVIDERS.map((p) => {
+            const live = byKind.get(p.kind);
+            const cat = catalog.data?.find((c) => c.kind === p.kind);
+            const configured = cat?.configured ?? false;
+            return (
+              <IntegrationRow
+                key={p.kind}
+                name={p.name}
+                blurb={p.blurb}
+                live={live}
+                configured={configured}
+                onConnect={() => onConnect(p.kind)}
+                onDisconnect={() =>
+                  live && disconnect.mutate({ id: live.id })
+                }
+                connecting={startConnect.isPending}
+                disconnecting={disconnect.isPending}
+              />
+            );
+          })}
         </ul>
       </Card>
-      <Card title="Tier 1 — strongly recommended" description="One-way connectors, P1 unless noted.">
-        <ul className="divide-y divide-line">
-          <IntegrationRow name="Lacerte / UltraTax / Drake / ProSeries" tier="Tier 1" status="not_connected" blurb="Prior-year imports — Import Tier 3 (PRD §6.6)." />
-          <IntegrationRow name="SharePoint" tier="Tier 1" status="not_connected" blurb="Write task summaries and audit packs back to SharePoint." />
-          <IntegrationRow name="HubSpot / Mailchimp" tier="Tier 1" status="not_connected" blurb="Client list export for marketing flows." />
-          <IntegrationRow name="Bloomberg / CCH publication feed" tier="Tier 1" status="not_connected" blurb="Read-only feed into the state-alert engine." />
+
+      <Card
+        title="Coming next"
+        description="Connectors on the roadmap — not yet wired. Tell us which would unblock you."
+      >
+        <ul className="text-sm text-ink-500 space-y-1.5">
+          <li>
+            · <span className="text-ink-700">Lacerte / UltraTax / Drake / ProSeries</span>
+            {" "}— prior-year-return imports
+          </li>
+          <li>
+            · <span className="text-ink-700">SharePoint</span> — write
+            task summaries + audit packs back to your firm's archive
+          </li>
+          <li>
+            · <span className="text-ink-700">Bloomberg / CCH publication feed</span>
+            {" "}— read-only feed into the state-alert engine
+          </li>
         </ul>
       </Card>
+
       <Card title="Not supported (intentional)">
         <ul className="text-sm text-ink-500 space-y-1.5">
-          <li>· CCH Axcess — no usable API; customer base exiting (PRD §1.7).</li>
-          <li>· Client payments — use Stripe / CPACharge.</li>
+          <li>· CCH Axcess — no usable API; customer base exiting.</li>
+          <li>· Client payments — use Stripe / CPACharge directly.</li>
           <li>· Bank account access — PCI/regulatory complexity not justified.</li>
         </ul>
       </Card>
@@ -1417,44 +1494,126 @@ function IntegrationsPanel() {
 
 function IntegrationRow({
   name,
-  tier,
-  status,
   blurb,
+  live,
+  configured,
+  onConnect,
+  onDisconnect,
+  connecting,
+  disconnecting,
 }: {
   name: string;
-  tier: string;
-  status: "connected" | "not_connected" | "error";
   blurb: string;
+  live:
+    | {
+        id: string;
+        status: "connected" | "disconnected" | "error";
+        externalAccountId: string | null;
+        lastSyncedAt: string | null;
+        lastError: string | null;
+        expiresAt: string | null;
+      }
+    | undefined;
+  configured: boolean;
+  onConnect: () => void;
+  onDisconnect: () => void;
+  connecting: boolean;
+  disconnecting: boolean;
 }) {
+  // Three states: connected, disconnected (or never connected), error.
+  // The visual hierarchy puts the action button on the right, mirroring
+  // the rest of the Settings panels.
+  const status: "connected" | "disconnected" | "error" =
+    live?.status === "connected"
+      ? "connected"
+      : live?.status === "error"
+        ? "error"
+        : "disconnected";
+
   return (
     <li className="py-3 flex items-start gap-3">
       <Plug className="w-4 h-4 text-ink-400 mt-0.5" aria-hidden />
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2 flex-wrap">
           <p className="text-sm font-medium text-ink-900">{name}</p>
-          <span className="text-2xs uppercase tracking-wide text-ink-400">
-            {tier}
-          </span>
           <span
             className={`text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded border ${
               status === "connected"
                 ? "bg-ok-bg text-ok-ink border-ok-border"
                 : status === "error"
-                ? "bg-warn-bg text-warn-ink border-warn-border"
-                : "bg-sunken text-ink-500 border-line"
+                  ? "bg-warn-bg text-warn-ink border-warn-border"
+                  : "bg-sunken text-ink-500 border-line"
             }`}
           >
-            {status.replace("_", " ")}
+            {status === "disconnected" ? "not connected" : status}
           </span>
+          {!configured && status !== "connected" && (
+            <span
+              className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded border bg-sunken/40 text-ink-400 border-line"
+              title="Backend doesn't have OAuth credentials for this provider yet"
+            >
+              coming soon
+            </span>
+          )}
         </div>
         <p className="text-xs text-ink-500 mt-1">{blurb}</p>
+        {status === "connected" && live && (
+          <p className="text-2xs text-ink-500 mt-1">
+            {live.externalAccountId && (
+              <>Account {live.externalAccountId.slice(0, 12)}…</>
+            )}
+            {live.lastSyncedAt && (
+              <>
+                {" · last synced "}
+                {new Date(live.lastSyncedAt).toLocaleString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </>
+            )}
+            {live.expiresAt && (
+              <>
+                {" · token valid until "}
+                {new Date(live.expiresAt).toLocaleDateString()}
+              </>
+            )}
+          </p>
+        )}
+        {status === "error" && live?.lastError && (
+          <p className="text-2xs text-warn-ink mt-1">
+            Last error: {live.lastError}
+          </p>
+        )}
       </div>
-      <button
-        className="text-xs px-3 py-1 rounded border border-line text-ink-700 hover:bg-sunken"
-        title="OAuth flow stubbed for the wireframe"
-      >
-        Connect
-      </button>
+      {status === "connected" ? (
+        <button
+          onClick={onDisconnect}
+          disabled={disconnecting}
+          className="text-xs px-3 py-1 rounded border border-line text-ink-700 hover:bg-sunken disabled:opacity-40"
+        >
+          {disconnecting ? "Disconnecting…" : "Disconnect"}
+        </button>
+      ) : (
+        <button
+          onClick={onConnect}
+          disabled={!configured || connecting}
+          className={[
+            "text-xs px-3 py-1 rounded",
+            !configured
+              ? "border border-line text-ink-400 cursor-not-allowed"
+              : "bg-accent text-canvas hover:bg-accent-hover",
+          ].join(" ")}
+          title={
+            configured
+              ? "Open the provider's OAuth consent screen"
+              : "Backend OAuth credentials not configured for this provider"
+          }
+        >
+          {connecting ? "Connecting…" : "Connect"}
+        </button>
+      )}
     </li>
   );
 }

@@ -31,6 +31,8 @@ import type {
 } from "../types";
 import { EmailDraftModal, type EmailDraftIntent } from "./EmailDraftModal";
 import { AuthorityChip } from "./AuthorityChip";
+import { BottomSheet } from "./BottomSheet";
+import { useIsTouchViewport } from "../hooks/useIsTouchViewport";
 
 /**
  * Task-centric dashboard. AI lives at Layer 4 *inside* each task per PRD §3
@@ -573,12 +575,17 @@ function TaskRow({
 
 /**
  * Per-row quick actions: mark complete, defer 7 days, file extension.
- * Closes PRD §10.3 #7 — the "status toggle on rows" P0 requirement that
- * lets the CPA dispatch routine state changes without entering Task detail.
+ *
+ * Renders as a desktop dropdown menu (anchored to the trigger) OR as a
+ * mobile bottom-sheet when the viewport is ≤640px. The bottom-sheet
+ * gives Sarah-on-phone bigger touch targets than the cramped dropdown
+ * positioning could provide, and dismiss-via-tap-outside is more
+ * forgiving than tapping a tiny X.
  */
 function QuickMenu({ task }: { task: Task }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
+  const isTouch = useIsTouchViewport();
 
   const onMarkComplete = () => {
     if (
@@ -599,6 +606,29 @@ function QuickMenu({ task }: { task: Task }) {
     close();
   };
 
+  const items = (
+    <>
+      <MenuItem
+        icon={<Check className="w-4 h-4 text-ok-solid" aria-hidden />}
+        label="Mark complete"
+        hint={isTouch ? "Closes the task and stops chases" : undefined}
+        onClick={onMarkComplete}
+      />
+      <MenuItem
+        icon={<CalendarClock className="w-4 h-4 text-ink-500" aria-hidden />}
+        label="Defer"
+        hint={isTouch ? "Push to next period — keeps the task open" : undefined}
+        onClick={onDefer}
+      />
+      <MenuItem
+        icon={<FileText className="w-4 h-4 text-ink-500" aria-hidden />}
+        label="File extension"
+        hint={isTouch ? "Marks Form 7004/4868 filed; opens the extension" : undefined}
+        onClick={onFileExtension}
+      />
+    </>
+  );
+
   return (
     <span className="relative">
       <button
@@ -606,41 +636,34 @@ function QuickMenu({ task }: { task: Task }) {
           e.stopPropagation();
           setOpen((v) => !v);
         }}
-        className="text-ink-400 hover:text-ink-900 hover:bg-sunken rounded p-1.5"
+        // Bigger touch target on mobile — the same icon, more padding
+        className="text-ink-400 hover:text-ink-900 hover:bg-sunken rounded p-2 sm:p-1.5"
         aria-label="More actions"
         title="More actions"
       >
-        <MoreHorizontal className="w-3.5 h-3.5" aria-hidden />
+        <MoreHorizontal className="w-4 h-4 sm:w-3.5 sm:h-3.5" aria-hidden />
       </button>
-      {open && (
-        <>
-          <span
-            className="fixed inset-0 z-30"
-            onClick={(e) => {
-              e.stopPropagation();
-              close();
-            }}
-          />
-          <div
-            className="absolute right-0 top-full mt-1 z-40 bg-surface border border-line rounded-md shadow-overlay py-1 w-48"
-          >
-            <MenuItem
-              icon={<Check className="w-3.5 h-3.5 text-ok-solid" aria-hidden />}
-              label="Mark complete"
-              onClick={onMarkComplete}
+
+      {/* Mobile path — full-width bottom-sheet with bigger rows */}
+      {isTouch ? (
+        <BottomSheet open={open} onClose={close} title={task.formType}>
+          <div className="divide-y divide-line">{items}</div>
+        </BottomSheet>
+      ) : (
+        open && (
+          <>
+            <span
+              className="fixed inset-0 z-30"
+              onClick={(e) => {
+                e.stopPropagation();
+                close();
+              }}
             />
-            <MenuItem
-              icon={<CalendarClock className="w-3.5 h-3.5 text-ink-500" aria-hidden />}
-              label="Defer"
-              onClick={onDefer}
-            />
-            <MenuItem
-              icon={<FileText className="w-3.5 h-3.5 text-ink-500" aria-hidden />}
-              label="File extension"
-              onClick={onFileExtension}
-            />
-          </div>
-        </>
+            <div className="absolute right-0 top-full mt-1 z-40 bg-surface border border-line rounded-md shadow-overlay py-1 w-48">
+              {items}
+            </div>
+          </>
+        )
       )}
     </span>
   );
@@ -663,7 +686,10 @@ function MenuItem({
         e.stopPropagation();
         onClick(e);
       }}
-      className="w-full text-left px-3 py-1.5 text-sm text-ink-700 hover:bg-sunken flex items-start gap-2"
+      // Bigger tap target on mobile (44pt min via py-3) — the same row
+      // is denser on desktop (py-1.5). Keeps both feel native to the
+      // input method.
+      className="w-full text-left px-4 py-3 sm:px-3 sm:py-1.5 text-sm text-ink-700 hover:bg-sunken active:bg-sunken/70 flex items-start gap-3 sm:gap-2"
     >
       <span className="mt-0.5">{icon}</span>
       <span className="flex-1">
@@ -949,6 +975,7 @@ function AskClientMenu({
 }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const isTouch = useIsTouchViewport();
 
   const close = () => setOpen(false);
 
@@ -970,6 +997,33 @@ function AskClientMenu({
     close();
   };
 
+  const items = (
+    <>
+      <MenuItem
+        icon={<Mail className="w-4 h-4 text-accent" aria-hidden />}
+        label="Quick chase"
+        onClick={onQuickChase}
+        hint="Send the default template"
+      />
+      <MenuItem
+        icon={<FileText className="w-4 h-4 text-ink-500" aria-hidden />}
+        label="Custom email…"
+        onClick={() => {
+          onCustom();
+          close();
+        }}
+        hint="Edit before sending"
+      />
+      <div className="border-t border-line my-1" />
+      <MenuItem
+        icon={<Mail className="w-4 h-4 text-ink-500" aria-hidden />}
+        label="Copy forwarding address"
+        onClick={onCopy}
+        hint="Paste into Slack, text, or anywhere"
+      />
+    </>
+  );
+
   return (
     <span className="relative shrink-0">
       <button
@@ -990,45 +1044,30 @@ function AskClientMenu({
           Copied!
         </span>
       )}
-      {open && (
-        <>
-          <span
-            className="fixed inset-0 z-30"
-            onClick={(e) => {
-              e.stopPropagation();
-              close();
-            }}
-          />
-          <div
-            className="absolute right-0 top-full mt-1 z-40 bg-surface border border-line rounded-md shadow-overlay py-1 w-56"
-            role="menu"
-          >
-            <MenuItem
-              icon={<Mail className="w-3.5 h-3.5 text-accent" aria-hidden />}
-              label="Quick chase"
-              onClick={onQuickChase}
-              hint="Send the default template"
-            />
-            <MenuItem
-              icon={
-                <FileText className="w-3.5 h-3.5 text-ink-500" aria-hidden />
-              }
-              label="Custom email…"
-              onClick={() => {
-                onCustom();
+
+      {/* Mobile: bottom-sheet. Desktop: anchored dropdown. */}
+      {isTouch ? (
+        <BottomSheet open={open} onClose={close} title={item.label}>
+          <div className="divide-y divide-line">{items}</div>
+        </BottomSheet>
+      ) : (
+        open && (
+          <>
+            <span
+              className="fixed inset-0 z-30"
+              onClick={(e) => {
+                e.stopPropagation();
                 close();
               }}
-              hint="Edit before sending"
             />
-            <div className="border-t border-line my-1" />
-            <MenuItem
-              icon={<Mail className="w-3.5 h-3.5 text-ink-500" aria-hidden />}
-              label="Copy forwarding address"
-              onClick={onCopy}
-              hint="Paste into Slack, text, or anywhere"
-            />
-          </div>
-        </>
+            <div
+              className="absolute right-0 top-full mt-1 z-40 bg-surface border border-line rounded-md shadow-overlay py-1 w-56"
+              role="menu"
+            >
+              {items}
+            </div>
+          </>
+        )
       )}
     </span>
   );
