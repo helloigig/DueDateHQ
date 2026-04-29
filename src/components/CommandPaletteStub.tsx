@@ -21,7 +21,7 @@ interface Result {
 const NAV_RESULTS: Result[] = [
   { id: "nav-dash", label: "Dashboard", href: "/", group: "navigate", icon: Sparkles },
   { id: "nav-clients", label: "Clients", href: "/clients", group: "navigate", icon: Users },
-  { id: "nav-alerts", label: "Alerts feed", href: "/announcements", group: "navigate", icon: Bell },
+  { id: "nav-alerts", label: "Alerts feed", href: "/alerts", group: "navigate", icon: Bell },
   { id: "nav-import", label: "Import roster", href: "/import", group: "navigate", icon: Plus },
   { id: "nav-firm", label: "Settings · Firm", href: "/settings/firm", group: "settings", icon: Settings },
   { id: "nav-team", label: "Settings · Team", href: "/settings/team", group: "settings", icon: Settings },
@@ -94,7 +94,7 @@ export function CommandPaletteStub({ open, onClose }: Props) {
           id: `a-${a.id}`,
           label: `${a.stateCode}: ${a.title}`,
           hint: `${a.affectedClientIds.length} affected`,
-          href: `/announcements/${a.id}`,
+          href: `/alerts/${a.id}`,
           group: "alerts",
           icon: Bell,
         });

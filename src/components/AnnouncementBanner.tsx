@@ -60,7 +60,7 @@ export function AnnouncementBanner({
   announcements: Announcement[];
 }) {
   // Show ONLY the most-urgent unread alert as a banner. The rest live in the
-  // bell dropdown + /announcements page. Multi-alert in a banner is noise —
+  // bell dropdown + /alerts page. Multi-alert in a banner is noise —
   // research suggests CPAs want one anchor, not a stack.
   if (announcements.length === 0) return null;
   // Sort by escalation tier first, then by detectedAt (newest first)
@@ -81,7 +81,7 @@ export function AnnouncementBanner({
       <BannerCard ann={head} />
       {restCount > 0 && (
         <Link
-          to="/announcements"
+          to="/alerts"
           className="block text-2xs text-ink-500 hover:text-ink-900 px-1 flex items-center gap-1"
         >
           + {restCount} more state {restCount === 1 ? "alert" : "alerts"} in the bell + Alerts feed
@@ -124,7 +124,7 @@ function BannerCard({ ann }: { ann: Announcement }) {
         <Icon className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
         <div className="flex-1 min-w-0">
           <Link
-            to={`/announcements/${ann.id}`}
+            to={`/alerts/${ann.id}`}
             className="block hover:underline"
           >
             <div className="text-sm font-medium">
@@ -159,7 +159,7 @@ function BannerCard({ ann }: { ann: Announcement }) {
           )}
         </div>
         <Link
-          to={`/announcements/${ann.id}`}
+          to={`/alerts/${ann.id}`}
           className={`text-sm font-medium flex items-center gap-1 shrink-0 px-2.5 py-1 rounded hover:bg-surface/60 ${TONE_SUB_CLASSES[tone]}`}
           title="Review affected clients and apply the new deadline"
         >

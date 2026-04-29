@@ -50,7 +50,7 @@ export function TaskAlertContext({ client }: Props) {
           {!lead.read && " You haven't reviewed it yet."}
         </p>
         <Link
-          to={`/announcements/${lead.id}`}
+          to={`/alerts/${lead.id}`}
           className="text-xs text-warn-ink hover:underline mt-1 inline-block font-medium"
         >
           Review alert →
