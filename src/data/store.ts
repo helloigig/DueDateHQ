@@ -1087,6 +1087,47 @@ export const actions = {
     emit();
   },
 
+  /** Quick-chase a checklist item: bypass the email composer and just
+   *  record the chase. Used by the "Quick chase" affordance in the task
+   *  row's AskClientMenu — the CPA trusts the template, so we skip the
+   *  draft+edit step and go straight to "send" semantics: state transitions
+   *  to requested_waiting (if not already), lastReminderAt = now, next
+   *  cadence + 7 days, and an activity event records the action.
+   *
+   *  Real BE will dispatch an actual email via the firm's reminder
+   *  template; in mock mode this is the implied template send. */
+  quickChase(itemId: string, cadenceDays = 7) {
+    const item = state.checklistItems.find((c) => c.id === itemId);
+    if (!item) return;
+    const now = nowIso();
+    const next = new Date(Date.now() + cadenceDays * 24 * 60 * 60 * 1000)
+      .toISOString();
+    state = {
+      ...state,
+      checklistItems: state.checklistItems.map((c) =>
+        c.id === itemId
+          ? {
+              ...c,
+              state:
+                c.state === "not_requested" ? "requested_waiting" : c.state,
+              lastReminderAt: now,
+              nextReminderAt: next,
+            }
+          : c,
+      ),
+    };
+    const task = state.tasks.find((t) => t.id === item.taskId);
+    if (task) {
+      appendActivity(
+        task.clientId,
+        "email_sent",
+        `Quick chase: ${item.label}`,
+        task.deadlineId,
+      );
+    }
+    emit();
+  },
+
   /** Discard an unsent draft. */
   discardEmailDraft(draftId: string) {
     state = {

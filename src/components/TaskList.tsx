@@ -616,21 +616,28 @@ function MenuItem({
   icon,
   label,
   onClick,
+  hint,
 }: {
   icon: React.ReactNode;
   label: string;
-  onClick: () => void;
+  onClick: (e: React.MouseEvent) => void;
+  hint?: string;
 }) {
   return (
     <button
       onClick={(e) => {
         e.stopPropagation();
-        onClick();
+        onClick(e);
       }}
-      className="w-full text-left px-3 py-1.5 text-sm text-ink-700 hover:bg-sunken flex items-center gap-2"
+      className="w-full text-left px-3 py-1.5 text-sm text-ink-700 hover:bg-sunken flex items-start gap-2"
     >
-      {icon}
-      {label}
+      <span className="mt-0.5">{icon}</span>
+      <span className="flex-1">
+        {label}
+        {hint && (
+          <span className="block text-2xs text-ink-500 mt-0.5">{hint}</span>
+        )}
+      </span>
     </button>
   );
 }
@@ -848,24 +855,18 @@ function PrimaryAction({
       </button>
     );
   }
-  if (lead?.state === "received_issue") {
+  // Both flagged-issue and waiting-for-reply lead to the Ask Client menu —
+  // the CPA's affordance is the same: chase or copy the forwarding address.
+  if (
+    lead?.state === "received_issue" ||
+    lead?.state === "requested_waiting"
+  ) {
     return (
-      <button
-        onClick={() => onSendChase(lead)}
-        className="text-xs px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover inline-flex items-center gap-1 shrink-0"
-      >
-        <Mail className="w-3 h-3" aria-hidden /> Ask client
-      </button>
-    );
-  }
-  if (lead?.state === "requested_waiting") {
-    return (
-      <button
-        onClick={() => onSendChase(lead)}
-        className="text-xs px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover inline-flex items-center gap-1 shrink-0"
-      >
-        <Mail className="w-3 h-3" aria-hidden /> Send
-      </button>
+      <AskClientMenu
+        item={lead}
+        forwardingEmail={row.task.forwardingEmail}
+        onCustom={() => onSendChase(lead)}
+      />
     );
   }
   if (row.isReady) {
@@ -886,6 +887,116 @@ function PrimaryAction({
     >
       Open <ChevronRight className="w-3 h-3" aria-hidden />
     </button>
+  );
+}
+
+/**
+ * Three-option dropdown replacing the single "Ask client" button. The
+ * critique: opening a 346-line email composer for every chase is overweight
+ * for what the CPA actually wants 80% of the time — "send the same template
+ * I always send."
+ *
+ *   1. Quick chase — one-click, sends the implied default template, just
+ *      bumps lastReminderAt + activity event. No modal.
+ *   2. Custom email… — opens the EmailDraftModal for full edit.
+ *   3. Copy forwarding address — clipboard. Lets the CPA paste it into a
+ *      different conversation (Slack thread with the bookkeeper, the
+ *      client's text message thread) — accepts that the product isn't the
+ *      only place email lives.
+ */
+function AskClientMenu({
+  item,
+  forwardingEmail,
+  onCustom,
+}: {
+  item: ChecklistItem;
+  forwardingEmail: string;
+  onCustom: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const close = () => setOpen(false);
+
+  const onQuickChase = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    actions.quickChase(item.id);
+    close();
+  };
+
+  const onCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(forwardingEmail);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
+    close();
+  };
+
+  return (
+    <span className="relative shrink-0">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        className="text-xs px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover inline-flex items-center gap-1"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <Mail className="w-3 h-3" aria-hidden />
+        Ask client
+        <ChevronDown className="w-3 h-3 opacity-70" aria-hidden />
+      </button>
+      {copied && (
+        <span className="absolute right-0 top-full mt-1 text-2xs text-ok-ink bg-ok-bg border border-ok-border rounded px-2 py-0.5 whitespace-nowrap">
+          Copied!
+        </span>
+      )}
+      {open && (
+        <>
+          <span
+            className="fixed inset-0 z-30"
+            onClick={(e) => {
+              e.stopPropagation();
+              close();
+            }}
+          />
+          <div
+            className="absolute right-0 top-full mt-1 z-40 bg-surface border border-line rounded-md shadow-overlay py-1 w-56"
+            role="menu"
+          >
+            <MenuItem
+              icon={<Mail className="w-3.5 h-3.5 text-accent" aria-hidden />}
+              label="Quick chase"
+              onClick={onQuickChase}
+              hint="Send the default template"
+            />
+            <MenuItem
+              icon={
+                <FileText className="w-3.5 h-3.5 text-ink-500" aria-hidden />
+              }
+              label="Custom email…"
+              onClick={() => {
+                onCustom();
+                close();
+              }}
+              hint="Edit before sending"
+            />
+            <div className="border-t border-line my-1" />
+            <MenuItem
+              icon={<Mail className="w-3.5 h-3.5 text-ink-500" aria-hidden />}
+              label="Copy forwarding address"
+              onClick={onCopy}
+              hint="Paste into Slack, text, or anywhere"
+            />
+          </div>
+        </>
+      )}
+    </span>
   );
 }
 
