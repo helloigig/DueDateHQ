@@ -16,6 +16,8 @@ import {
   PauseCircle,
   PlayCircle,
   ShieldCheck,
+  Brain,
+  TrendingDown,
 } from "lucide-react";
 import { actions, useStore } from "../data/store";
 import { useImportHistory } from "../hooks/useImports";
@@ -36,6 +38,7 @@ import {
   useStartConnect,
   useDisconnect,
 } from "../hooks/useIntegrations";
+import { useDriftReport, useAiStatus } from "../hooks/useDriftReport";
 import {
   useReminderTemplates,
   useUpdateReminderTemplate,
@@ -59,6 +62,7 @@ const NAV = [
   { to: "/settings/billing", label: "Billing", icon: CreditCard },
   { to: "/settings/notifications", label: "Notifications", icon: Bell },
   { to: "/settings/alerts", label: "Alert digest", icon: Bell },
+  { to: "/settings/ai", label: "AI eval", icon: Brain },
   { to: "/settings/data", label: "Data", icon: Download },
 ];
 
@@ -99,6 +103,7 @@ export function Settings() {
           <Route path="notifications" element={<NotificationsPanel />} />
           <Route path="imports" element={<ImportsPanel />} />
           <Route path="team" element={<TeamPanel />} />
+          <Route path="ai" element={<AiEvalPanel />} />
           <Route path="data" element={<DataPanel />} />
         </Routes>
       </div>
@@ -388,6 +393,255 @@ function RadioRow({
         <div className="text-xs text-ink-500 mt-0.5">{hint}</div>
       </div>
     </label>
+  );
+}
+
+/**
+ * AI eval panel — drift detection over time, per mode.
+ *
+ * Reads aiInferences.driftReport for the selected mode (default A).
+ * Shows:
+ *   - Configured-or-not banner (BE reads ANTHROPIC_API_KEY)
+ *   - Mode selector (only A and D will have data; B/C/E are
+ *     deterministic so the BE doesn't log them)
+ *   - Per-mode summary: latest acceptance + drift signal
+ *   - 12-week sparkline of acceptance rates
+ *   - Drift alert when latest week dropped >5pp below trailing mean
+ *
+ * Ops surface, not for everyday CPAs — sits in Settings → AI eval
+ * for partners + ops to monitor model performance over time.
+ */
+function AiEvalPanel() {
+  const [mode, setMode] = useState<"A" | "D">("A");
+  const status = useAiStatus();
+  const drift = useDriftReport(mode);
+
+  const latest = drift.data?.weeks[drift.data.weeks.length - 1];
+  const acceptancePct =
+    latest?.acceptanceRate !== null && latest?.acceptanceRate !== undefined
+      ? Math.round(latest.acceptanceRate * 100)
+      : null;
+  const driftPp =
+    drift.data?.drift !== null && drift.data?.drift !== undefined
+      ? Math.round(drift.data.drift * 100)
+      : null;
+
+  return (
+    <div className="space-y-6">
+      <Card
+        title="AI configuration"
+        description="Whether the backend has an Anthropic API key wired. Without it, AI procedures throw and the FE falls back to deterministic stubs."
+      >
+        {status.isLoading ? (
+          <p className="text-sm text-ink-500">Checking…</p>
+        ) : status.data?.configured ? (
+          <p className="text-sm text-ok-ink inline-flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4" aria-hidden />
+            Anthropic configured. Mode A + D + scraper run on real Claude.
+          </p>
+        ) : (
+          <div className="text-sm text-warn-ink bg-warn-bg/40 border border-warn-border rounded px-3 py-2">
+            <p className="font-medium">AI not yet configured.</p>
+            <p className="text-xs mt-1 text-warn-ink/90">
+              Set <code className="font-mono">ANTHROPIC_API_KEY</code> in
+              backend/.env.local to enable real Claude calls. Until then,
+              classifications and email drafts use deterministic stubs.
+            </p>
+          </div>
+        )}
+      </Card>
+
+      <Card
+        title="Acceptance over time"
+        description="What fraction of AI proposals you accept, bucketed by ISO week. Drift = latest week vs trailing 4-week mean. >5pp drop fires the alert below."
+      >
+        {/* Mode selector — A/D have real data, others are deterministic */}
+        <div className="flex gap-1 mb-4">
+          {(["A", "D"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={[
+                "text-xs px-3 py-1 rounded border",
+                mode === m
+                  ? "bg-sunken text-ink-900 border-ink-900 font-medium"
+                  : "border-line text-ink-500 hover:bg-sunken hover:text-ink-700",
+              ].join(" ")}
+            >
+              Mode {m}
+              <span className="ml-1.5 text-2xs opacity-70">
+                {m === "A" ? "Classify" : "Draft email"}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {drift.isLoading ? (
+          <p className="text-sm text-ink-500">Loading drift report…</p>
+        ) : drift.error ? (
+          <p className="text-sm text-danger-ink">
+            Couldn't load drift report: {drift.error.message}
+          </p>
+        ) : drift.data && drift.data.weeks.length === 0 ? (
+          <p className="text-sm text-ink-500">
+            No Mode {mode} inferences logged yet. Once your firm starts
+            confirming AI suggestions or sending drafts, this will populate.
+          </p>
+        ) : drift.data ? (
+          <>
+            {/* Headline numbers */}
+            <div className="flex items-baseline gap-6 mb-4">
+              <div>
+                <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
+                  Latest week
+                </p>
+                <p className="text-2xl font-semibold text-ink-900 tabular-nums mt-0.5">
+                  {acceptancePct !== null ? `${acceptancePct}%` : "—"}
+                </p>
+                <p className="text-2xs text-ink-500 mt-0.5">
+                  acceptance ({latest?.total ?? 0}{" "}
+                  inference{latest?.total === 1 ? "" : "s"})
+                </p>
+              </div>
+              <div>
+                <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
+                  Drift vs 4w mean
+                </p>
+                <p
+                  className={[
+                    "text-2xl font-semibold tabular-nums mt-0.5",
+                    driftPp === null
+                      ? "text-ink-400"
+                      : driftPp < -5
+                        ? "text-danger-ink"
+                        : driftPp < 0
+                          ? "text-warn-ink"
+                          : "text-ok-ink",
+                  ].join(" ")}
+                >
+                  {driftPp === null
+                    ? "—"
+                    : `${driftPp >= 0 ? "+" : ""}${driftPp}pp`}
+                </p>
+                <p className="text-2xs text-ink-500 mt-0.5">
+                  {driftPp === null
+                    ? "not enough history"
+                    : driftPp < -5
+                      ? "drift alert"
+                      : "stable"}
+                </p>
+              </div>
+            </div>
+
+            {/* Drift alert callout */}
+            {drift.data.alert && (
+              <div className="bg-danger-bg/40 border border-danger-border rounded px-3 py-2.5 mb-4 flex items-start gap-2">
+                <TrendingDown
+                  className="w-4 h-4 text-danger-ink shrink-0 mt-0.5"
+                  aria-hidden
+                />
+                <div className="text-xs text-danger-ink">
+                  <p className="font-medium">Drift alert</p>
+                  <p className="mt-0.5">
+                    Latest acceptance dropped more than 5pp below the
+                    trailing 4-week mean. Mode {mode} may be regressing —
+                    check recent inferences for misclassifications.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Sparkline — ASCII bars per week, calm + tabular */}
+            <SparklineChart weeks={drift.data.weeks} />
+          </>
+        ) : null}
+      </Card>
+
+      <Card
+        title="What gets logged"
+        description="Every Anthropic call writes to ai_inferences with mode + model + cost + latency + the input hash for grouping. CPA acceptance flips was_acted_on; this dashboard reads those flags."
+      >
+        <ul className="text-xs text-ink-500 space-y-1.5">
+          <li>
+            <span className="font-mono text-ink-700">Mode A</span>{" "}
+            (classify) — every inbound document. Logged on the BE inbound
+            email handler.
+          </li>
+          <li>
+            <span className="font-mono text-ink-700">Mode D</span>{" "}
+            (draft email) — every "Custom email…" click. Logged when the
+            BE returns the draft.
+          </li>
+          <li>
+            <span className="font-mono text-ink-700">Scraper</span> — LLM
+            lift on low-confidence regex hits. Logged with mode='C' for now
+            (worth a separate mode bucket once volume justifies).
+          </li>
+          <li className="text-ink-400 italic mt-2">
+            Modes B / C / E stay deterministic by design — their existing
+            logic (history math, statistical anomaly, set-difference) is
+            meaningful without an LLM round-trip.
+          </li>
+        </ul>
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * Tiny sparkline — vertical bars per week, height proportional to
+ * acceptance rate. 12 weeks max. Tabular numbers, no chart library.
+ */
+function SparklineChart({
+  weeks,
+}: {
+  weeks: Array<{
+    week: string;
+    total: number;
+    acceptanceRate: number | null;
+  }>;
+}) {
+  return (
+    <div>
+      <div className="flex items-end gap-1 h-24 border-b border-line">
+        {weeks.map((w) => {
+          const h = w.acceptanceRate !== null ? w.acceptanceRate * 100 : 0;
+          const isLatest = w === weeks[weeks.length - 1];
+          return (
+            <div
+              key={w.week}
+              className="flex-1 flex flex-col justify-end"
+              title={`${w.week}: ${
+                w.acceptanceRate !== null
+                  ? `${Math.round(w.acceptanceRate * 100)}%`
+                  : "no data"
+              } (${w.total} inferences)`}
+            >
+              <div
+                className={[
+                  "rounded-t",
+                  isLatest ? "bg-ink-900" : "bg-ink-300",
+                ].join(" ")}
+                style={{ height: `${Math.max(2, h * 0.95)}%` }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex gap-1 mt-1">
+        {weeks.map((w) => (
+          <span
+            key={w.week}
+            className="flex-1 text-center text-2xs text-ink-400 font-mono tabular-nums truncate"
+          >
+            {w.week.split("-W")[1]}
+          </span>
+        ))}
+      </div>
+      <p className="text-2xs text-ink-400 mt-2">
+        Week numbers (ISO). Hover a bar for the rate + inference count.
+      </p>
+    </div>
   );
 }
 

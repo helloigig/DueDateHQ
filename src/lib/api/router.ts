@@ -300,12 +300,25 @@ export const appRouter = t.router({
       .mutation(async (): Promise<unknown> => NOT_IMPL()),
     preview: t.procedure
       .input(jsonPassthrough)
-      .mutation(async (): Promise<unknown> => NOT_IMPL()),
+      .mutation(
+        async (): Promise<{
+          newClients: number;
+          duplicates: number;
+          withPackage: number;
+          unmatchedPackages: string[];
+        }> => NOT_IMPL(),
+      ),
     commit: t.procedure
       .input(jsonPassthrough)
       .mutation(
-        async (): Promise<{ importId: string; ids: string[] }> =>
-          NOT_IMPL()
+        async (): Promise<{
+          importId: string;
+          ids: string[];
+          clientsCreated?: number;
+          skippedCount?: number;
+          deadlinesCreated?: number;
+          tasksCreated?: number;
+        }> => NOT_IMPL()
       ),
     listHistory: t.procedure.query(
       async (): Promise<ImportRun[]> => NOT_IMPL()

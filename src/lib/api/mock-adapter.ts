@@ -499,9 +499,37 @@ export const mockAdapter = {
       await delay(300);
       return input;
     },
-    preview: async (input: unknown) => {
+    preview: async (input: {
+      rows: Array<{ name: string; primaryState: string; servicePackage?: string }>;
+    }) => {
       await delay();
-      return input;
+      // Mock preview — count rows + flag any duplicates against the
+      // current store. Real BE walks the clients table.
+      const existing = new Set(
+        getState().clients.map(
+          (c) => `${c.name.toLowerCase()}|${c.primaryState}`,
+        ),
+      );
+      let newClients = 0;
+      let duplicates = 0;
+      let withPackage = 0;
+      for (const r of input.rows) {
+        const key = `${r.name.toLowerCase()}|${r.primaryState}`;
+        if (existing.has(key)) duplicates++;
+        else {
+          newClients++;
+          if (r.servicePackage) withPackage++;
+        }
+      }
+      return {
+        newClients,
+        duplicates,
+        withPackage,
+        // Mock store doesn't have a firm_packages list, so unmatched
+        // package names are always empty here. Real BE checks against
+        // the firm's packages.
+        unmatchedPackages: [] as string[],
+      };
     },
     commit: async (input: {
       rows: Array<Parameters<typeof actions.addClientsBulk>[0][number]>;
@@ -513,7 +541,14 @@ export const mockAdapter = {
         source: input.source,
         skippedCount: input.skippedCount,
       });
-      return { ids, importId };
+      return {
+        ids,
+        importId,
+        clientsCreated: ids.length,
+        skippedCount: input.skippedCount ?? 0,
+        deadlinesCreated: 0,
+        tasksCreated: 0,
+      };
     },
     listHistory: async (): Promise<ImportRun[]> => {
       await delay();
