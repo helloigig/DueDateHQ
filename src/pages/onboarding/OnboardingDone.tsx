@@ -11,7 +11,7 @@ import { updateSession } from "../../data/session";
 import { useStore } from "../../data/store";
 
 /**
- * Onboarding Layer 1 — Done. The proof-of-Day-1 moment.
+ * Onboarding done. The proof-of-Day-1 moment.
  *
  * Two jobs:
  *   1. Show what just lit up (real numbers from the store, not promises)
@@ -21,6 +21,9 @@ import { useStore } from "../../data/store";
  *
  * Forever-no list (PRD §1.7): never apologize for cold start. The framing is
  * "here's what's already working," not "AI will get smarter."
+ *
+ * Internal vocabulary (Layer 1, Layer 2, etc.) lives in the spec but never
+ * appears in user-facing copy here.
  */
 export function OnboardingDone() {
   const navigate = useNavigate();
@@ -49,8 +52,8 @@ export function OnboardingDone() {
       totalSteps={3}
       estimate="done"
       title="You're set up."
-      subtitle="Onboarding Layer 1 complete. Here's what just lit up — every number below is real, not a promise."
-      brandLine="Layer 2 (one integration, 30 min) and Layer 3 (ongoing) compound on top. Never required."
+      subtitle="Here's what just lit up — every number below is real, not a promise."
+      brandLine="Connecting one more source (QuickBooks, Gmail, or a prior return) compounds the value. Never required, always optional."
     >
       <div className="space-y-5">
         {/* What's working */}
@@ -157,11 +160,11 @@ export function OnboardingDone() {
         <section className="bg-surface border border-line rounded-md overflow-hidden">
           <header className="px-5 py-3 border-b border-line">
             <h3 className="text-sm font-semibold text-ink-900">
-              What unlocks next (Onboarding Layer 2)
+              Connect one more source — optional, anytime
             </h3>
             <p className="text-xs text-ink-500 mt-1">
-              Optional — the dashboard widget will rotate suggestions on your
-              own timeline. You don't have to do these now.
+              Each connection unlocks new capabilities. The dashboard widget
+              will resurface these on your own timeline — no rush.
             </p>
           </header>
           <ul className="divide-y divide-line">

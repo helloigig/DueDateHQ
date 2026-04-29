@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Upload,
   UserPlus,
@@ -8,17 +8,23 @@ import {
 } from "lucide-react";
 import { OnboardingShell } from "../../components/OnboardingShell";
 import { OAuthWireframeModal } from "../../components/OAuthWireframeModal";
+import { updateSession } from "../../data/session";
 
 /**
  * Step 2 — bring your roster in. Restructured to make CSV the primary
  * affordance, with QBO/Xero (Tier 0 integrations) as the killer alternative
  * for CPAs who don't have a clean CSV at hand.
  *
- * Why QBO/Xero on Layer 1 rather than Layer 2: Yan Jing's "no CSV at hand"
+ * Why QBO/Xero on the same screen as CSV: Yan Jing's "no CSV at hand"
  * scenario is the most common one. Forcing them through manual or demo when
  * QBO is one OAuth click away is wrong. PRD §6.4 Tier 0.
+ *
+ * Always-visible "Skip for now" footer: accountants want to poke around
+ * before committing to a roster. The dashboard handles empty state cleanly,
+ * and they can come back via the Onboarding-Layer-2 widget any time.
  */
 export function OnboardingChoosePath() {
+  const navigate = useNavigate();
   const [oauthProvider, setOauthProvider] = useState<
     "quickbooks" | "xero" | null
   >(null);
@@ -105,6 +111,27 @@ export function OnboardingChoosePath() {
             detail="49 fake clients + a live state alert. Wipeable anytime."
           />
         </div>
+      </div>
+
+      {/* Skip-for-now footer — accountants poking around shouldn't be
+          forced to import or fake-demo. They mark onboarding complete and
+          land on the empty dashboard, with the OnboardingLayer2 widget
+          surfacing this same set of options later. */}
+      <div className="mt-8 pt-6 border-t border-line max-w-3xl">
+        <button
+          type="button"
+          onClick={() => {
+            updateSession({ onboardingComplete: true });
+            navigate("/", { replace: true });
+          }}
+          className="text-xs text-ink-500 hover:text-ink-900 underline"
+        >
+          Skip for now — I'll add clients later
+        </button>
+        <p className="text-2xs text-ink-400 mt-1">
+          Your dashboard works empty. You can connect a source from Settings
+          → Integrations whenever you're ready.
+        </p>
       </div>
 
       <OAuthWireframeModal

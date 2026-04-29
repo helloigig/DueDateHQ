@@ -13,15 +13,16 @@ interface Props {
 }
 
 const DEFAULT_BRAND_LINE =
-  "We integrate, we don't replace. Layer not platform. Useful Day 1 — no \"AI is learning\" copy here.";
+  "We integrate, we don't replace. Useful Day 1 — no \"AI is learning\" copy here.";
 
 /**
  * Wizard chrome for the /onboarding/* funnel. Outside the AppShell so the
- * user has no sidebar distractions during Layer 1.
+ * user has no sidebar distractions during setup.
  *
  * Each step shows its own time estimate + a single brand-line footer that
  * keeps the strategic posture present across the whole flow without
- * being preachy. PRD §1.3 / §1.6 / §1.7 / §6.6.
+ * being preachy. Internal "Layer 1/2/3" vocabulary lives in the spec —
+ * the user only ever sees "Step N of M". PRD §1.3 / §1.6 / §1.7 / §6.6.
  */
 export function OnboardingShell({
   step,
@@ -49,8 +50,6 @@ export function OnboardingShell({
                 <span>{estimate}</span>
               </>
             )}
-            <span className="text-ink-300">·</span>
-            <span>Layer 1 onboarding</span>
           </span>
         </div>
         <div className="h-1 bg-sunken">

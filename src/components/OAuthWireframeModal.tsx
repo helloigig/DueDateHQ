@@ -176,13 +176,15 @@ export function OAuthWireframeModal({ provider, onClose }: Props) {
               </p>
             </div>
             <p className="text-xs text-ink-500">
-              Next: confirm AI-suggested service packages.
+              Next: review which tax forms each client files. We'll suggest a
+              package per entity type (LLC → 1065, S-Corp → 1120-S, etc.); you
+              can adjust before deadlines auto-generate.
             </p>
             <button
               onClick={finish}
               className="w-full text-sm px-4 py-2 rounded bg-accent text-canvas hover:bg-accent-hover"
             >
-              Continue →
+              Continue → review packages
             </button>
           </div>
         )}
