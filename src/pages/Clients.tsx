@@ -47,11 +47,7 @@ const TIER_OPTIONS: { value: ClientTier; label: string }[] = [
   { value: "custom", label: "Custom" },
 ];
 
-const TIER_LABEL: Record<ClientTier, string> = {
-  premium: "Premium",
-  standard: "Standard",
-  custom: "Custom",
-};
+// kept inline in TierPill, no separate constant needed
 
 type SortColumn = "name" | "entity" | "open" | "next";
 type SortDir = "asc" | "desc";
@@ -536,6 +532,12 @@ export function Clients() {
   );
 }
 
+const TIER_LABEL: Record<ClientTier, string> = {
+  premium: "Premium",
+  standard: "Standard",
+  custom: "Custom",
+};
+
 function StatCard({
   label,
   value,
@@ -616,4 +618,5 @@ function TierPill({ tier }: { tier: ClientTier | undefined }) {
     </span>
   );
 }
+
 

@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Client, Deadline } from "../types";
 import { formatLongDate } from "../data/dateHelpers";
-import { useModalDialog } from "../hooks/useModalDialog";
+import { Modal, useModalLabelId } from "./Modal";
+import {
+  downloadJson,
+  escapeHtml,
+  printHtmlAsPdf,
+} from "../lib/printToPdf";
 
 type Scope = "current" | "all" | "range";
-type Format = "csv" | "pdf" | "ical";
+type Format = "csv" | "pdf" | "json" | "ical";
 type Recipient = "download" | "email_self" | "email_coworker";
 
 function buildCsv(deadlines: Deadline[], clients: Map<string, Client>): string {
@@ -77,11 +82,100 @@ function downloadBlob(filename: string, content: string, mime: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function buildPdfHtml(
+  deadlines: Deadline[],
+  clients: Map<string, Client>,
+  firmName: string,
+  exportTitle: string
+): string {
+  const generated = new Date().toLocaleString("en-US");
+  const range = deadlines.length
+    ? `${deadlines.reduce(
+        (m, d) => (d.officialDueDate < m ? d.officialDueDate : m),
+        deadlines[0].officialDueDate
+      )} → ${deadlines.reduce(
+        (m, d) => (d.officialDueDate > m ? d.officialDueDate : m),
+        deadlines[0].officialDueDate
+      )}`
+    : "—";
+  const rows = deadlines
+    .slice()
+    .sort((a, b) => a.officialDueDate.localeCompare(b.officialDueDate))
+    .map((d) => {
+      const c = clients.get(d.clientId);
+      return `<tr>
+        <td>${formatLongDate(d.officialDueDate)}</td>
+        <td>${escapeHtml(c?.name ?? "—")}</td>
+        <td>${escapeHtml(c?.entityType ?? "")}</td>
+        <td>${escapeHtml(d.form)}</td>
+        <td>${escapeHtml(d.jurisdiction)}</td>
+        <td>${escapeHtml(d.status)}</td>
+      </tr>`;
+    })
+    .join("");
+  return `
+    <h1>${escapeHtml(exportTitle)}</h1>
+    <div class="meta">
+      <strong>${escapeHtml(firmName)}</strong> ·
+      Generated ${escapeHtml(generated)} ·
+      ${deadlines.length} deadline${deadlines.length === 1 ? "" : "s"} ·
+      Range ${escapeHtml(range)}
+    </div>
+    <table>
+      <thead><tr>
+        <th>Due date</th><th>Client</th><th>Entity</th><th>Form</th>
+        <th>Jurisdiction</th><th>Status</th>
+      </tr></thead>
+      <tbody>${rows || `<tr><td colspan="6" class="subtle">No deadlines in scope.</td></tr>`}</tbody>
+    </table>
+    <div class="footer">
+      Source: DueDateHQ · This document was generated from the firm's deadline
+      record at the timestamp above. Client communications and per-task audit
+      trails are exported separately.
+    </div>
+  `;
+}
+
+function buildJsonPayload(
+  deadlines: Deadline[],
+  clients: Map<string, Client>,
+  firmName: string
+) {
+  return {
+    schema: "duedatehq.export.v1",
+    generatedAt: new Date().toISOString(),
+    firm: firmName,
+    count: deadlines.length,
+    deadlines: deadlines.map((d) => {
+      const c = clients.get(d.clientId);
+      return {
+        id: d.id,
+        client: c
+          ? {
+              id: c.id,
+              name: c.name,
+              entityType: c.entityType,
+              primaryState: c.primaryState,
+              email: c.contactEmail,
+            }
+          : null,
+        form: d.form,
+        jurisdiction: d.jurisdiction,
+        officialDueDate: d.officialDueDate,
+        status: d.status,
+        completedAt: d.completedAt ?? null,
+        bundleId: d.bundleId ?? null,
+      };
+    }),
+  };
+}
+
 export function ExportModal({
   open,
   deadlines,
   clients,
   title = "Export deadlines",
+  firmName = "Mitchell CPA",
   onClose,
 }: {
   open: boolean;
@@ -89,6 +183,7 @@ export function ExportModal({
   deadlines: Deadline[];
   clients: Client[];
   title?: string;
+  firmName?: string;
   onClose: () => void;
 }) {
   const [scope, setScope] = useState<Scope>("current");
@@ -97,6 +192,7 @@ export function ExportModal({
   const [flash, setFlash] = useState<string | null>(null);
   const [rangeStart, setRangeStart] = useState<string>("2026-01-01");
   const [rangeEnd, setRangeEnd] = useState<string>("2026-12-31");
+  const labelId = useModalLabelId();
 
   useEffect(() => {
     if (open) {
@@ -107,8 +203,6 @@ export function ExportModal({
     }
   }, [open]);
 
-  const dialogRef = useModalDialog(open, onClose);
-
   const clientsById = useMemo(() => {
     const m = new Map<string, Client>();
     clients.forEach((c) => m.set(c.id, c));
@@ -118,18 +212,13 @@ export function ExportModal({
   const scoped = useMemo(() => {
     if (scope === "current") return deadlines;
     if (scope === "all") {
-      // "all" = every active deadline in the client list
       const clientIds = new Set(clients.map((c) => c.id));
       return deadlines.filter((d) => clientIds.has(d.clientId));
     }
     return deadlines.filter(
-      (d) =>
-        d.officialDueDate >= rangeStart && d.officialDueDate <= rangeEnd
+      (d) => d.officialDueDate >= rangeStart && d.officialDueDate <= rangeEnd
     );
-    // note: "all" currently = same set in mock; in prod it'd come from server
   }, [scope, deadlines, clients, rangeStart, rangeEnd]);
-
-  if (!open) return null;
 
   const onRun = () => {
     if (recipient !== "download") {
@@ -143,238 +232,219 @@ export function ExportModal({
       return;
     }
     if (format === "csv") {
-      const content = buildCsv(scoped, clientsById);
-      downloadBlob("duedatehq-export.csv", content, "text/csv");
+      downloadBlob(
+        "duedatehq-export.csv",
+        buildCsv(scoped, clientsById),
+        "text/csv"
+      );
       setFlash(`Downloaded ${scoped.length} deadlines as CSV.`);
     } else if (format === "ical") {
-      const content = buildIcal(scoped, clientsById);
       downloadBlob(
         "duedatehq-export.ics",
-        content,
+        buildIcal(scoped, clientsById),
         "text/calendar"
       );
       setFlash(
         `Downloaded .ics — subscribe in Google/Outlook/Apple Calendar for live updates.`
       );
-    } else {
-      // PDF stub — real PDF would be server-rendered
-      const content = `DueDateHQ — Deadline report\n\n${scoped
-        .map((d) => {
-          const c = clientsById.get(d.clientId);
-          return `${d.officialDueDate}  ${c?.name ?? ""}  ${d.form}  (${
-            d.status
-          })`;
-        })
-        .join("\n")}`;
-      downloadBlob("duedatehq-export.pdf.txt", content, "text/plain");
+    } else if (format === "json") {
+      downloadJson(
+        "duedatehq-export.json",
+        buildJsonPayload(scoped, clientsById, firmName)
+      );
       setFlash(
-        `PDF export is server-rendered in production. Downloaded a text stub for now.`
+        `Downloaded ${scoped.length} deadlines as JSON. Stable schema: duedatehq.export.v1.`
+      );
+    } else {
+      // PDF: open browser print dialog with structured HTML — user saves as PDF
+      const html = buildPdfHtml(scoped, clientsById, firmName, title);
+      printHtmlAsPdf(html, title);
+      setFlash(
+        `Opened the print dialog — choose "Save as PDF" to download. ${scoped.length} deadlines included.`
       );
     }
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-lg shadow-xl border border-slate-200 w-full max-w-lg mx-4 outline-none"
-      >
-        <div className="px-5 py-3 border-b border-slate-100">
-          <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
-        </div>
+    <Modal open={open} onClose={onClose} ariaLabelledBy={labelId} size="lg">
+      <Modal.Header id={labelId} title={title} />
 
-        <div className="px-5 py-4 space-y-4 text-sm">
-          <div>
-            <div className="text-xs font-medium text-slate-600 mb-2">
-              What to include
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <ScopeCard
-                active={scope === "current"}
-                onClick={() => setScope("current")}
-                label="Current view"
-                hint={`${deadlines.length} deadline${
-                  deadlines.length === 1 ? "" : "s"
-                }`}
-              />
-              <ScopeCard
-                active={scope === "all"}
-                onClick={() => setScope("all")}
-                label="All deadlines"
-                hint="Every client"
-              />
-              <ScopeCard
-                active={scope === "range"}
-                onClick={() => setScope("range")}
-                label="Date range"
-                hint="Pick start / end"
-              />
-            </div>
-            {scope === "range" && (
-              <div className="mt-2 flex items-center gap-2">
-                <input
-                  type="date"
-                  value={rangeStart}
-                  onChange={(e) => setRangeStart(e.target.value)}
-                  className="flex-1 px-2 py-1 rounded border border-slate-200 text-sm"
-                />
-                <span className="text-slate-400">→</span>
-                <input
-                  type="date"
-                  value={rangeEnd}
-                  onChange={(e) => setRangeEnd(e.target.value)}
-                  className="flex-1 px-2 py-1 rounded border border-slate-200 text-sm"
-                />
-              </div>
-            )}
+      <Modal.Body className="space-y-4 text-sm" scroll>
+        <div>
+          <div className="text-xs font-medium text-ink-700 mb-2">
+            What to include
           </div>
-
-          <div>
-            <div className="text-xs font-medium text-slate-600 mb-2">Format</div>
-            <div className="grid grid-cols-3 gap-2">
-              <FormatCard
-                active={format === "csv"}
-                onClick={() => setFormat("csv")}
-                label="CSV"
-                hint="Raw data"
-              />
-              <FormatCard
-                active={format === "pdf"}
-                onClick={() => setFormat("pdf")}
-                label="PDF"
-                hint="Client-facing"
-              />
-              <FormatCard
-                active={format === "ical"}
-                onClick={() => setFormat("ical")}
-                label="iCal (.ics)"
-                hint="Subscribe"
-              />
-            </div>
-            {format === "ical" && (
-              <p className="mt-2 text-xs text-slate-500">
-                Subscribe once — deadlines update automatically in Google /
-                Outlook / Apple Calendar.
-              </p>
-            )}
+          <div className="grid grid-cols-3 gap-2">
+            <Card
+              active={scope === "current"}
+              onClick={() => setScope("current")}
+              label="Current view"
+              hint={`${deadlines.length} deadline${
+                deadlines.length === 1 ? "" : "s"
+              }`}
+            />
+            <Card
+              active={scope === "all"}
+              onClick={() => setScope("all")}
+              label="All deadlines"
+              hint="Every client"
+            />
+            <Card
+              active={scope === "range"}
+              onClick={() => setScope("range")}
+              label="Date range"
+              hint="Pick start / end"
+            />
           </div>
-
-          <div>
-            <div className="text-xs font-medium text-slate-600 mb-2">
-              Recipient
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <FormatCard
-                active={recipient === "download"}
-                onClick={() => setRecipient("download")}
-                label="Download"
-                hint="File saved to your computer"
+          {scope === "range" && (
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                type="date"
+                value={rangeStart}
+                onChange={(e) => setRangeStart(e.target.value)}
+                className="flex-1 px-2 py-1 rounded border border-line text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
-              <FormatCard
-                active={recipient === "email_self"}
-                onClick={() => setRecipient("email_self")}
-                label="Email me"
-                hint="Sarah Chen"
+              <span className="text-ink-400">→</span>
+              <input
+                type="date"
+                value={rangeEnd}
+                onChange={(e) => setRangeEnd(e.target.value)}
+                className="flex-1 px-2 py-1 rounded border border-line text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
-              <FormatCard
-                active={recipient === "email_coworker"}
-                onClick={() => setRecipient("email_coworker")}
-                label="Email coworker"
-                hint="Team tier"
-                disabled
-              />
-            </div>
-          </div>
-
-          <div className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded px-3 py-2">
-            Preview: <strong>{scoped.length}</strong> deadline
-            {scoped.length === 1 ? "" : "s"} · range{" "}
-            {scoped.length > 0 ? (
-              <>
-                {formatLongDate(
-                  scoped.reduce(
-                    (m, d) =>
-                      d.officialDueDate < m ? d.officialDueDate : m,
-                    scoped[0].officialDueDate
-                  )
-                )}{" "}
-                →{" "}
-                {formatLongDate(
-                  scoped.reduce(
-                    (m, d) =>
-                      d.officialDueDate > m ? d.officialDueDate : m,
-                    scoped[0].officialDueDate
-                  )
-                )}
-              </>
-            ) : (
-              "—"
-            )}
-          </div>
-
-          {flash && (
-            <div className="rounded border border-emerald-200 bg-emerald-50 text-emerald-800 text-sm px-3 py-2">
-              ✓ {flash}
             </div>
           )}
         </div>
 
-        <div className="px-5 py-3 bg-slate-50 rounded-b-lg flex items-center justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="text-sm px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50"
-          >
-            Close
-          </button>
-          <button
-            onClick={onRun}
-            disabled={scoped.length === 0}
-            className="text-sm px-3 py-1.5 rounded font-medium text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-40"
-          >
-            {recipient === "download" ? "Download" : "Send"}
-          </button>
+        <div>
+          <div className="text-xs font-medium text-ink-700 mb-2">Format</div>
+          <div className="grid grid-cols-4 gap-2">
+            <Card
+              active={format === "csv"}
+              onClick={() => setFormat("csv")}
+              label="CSV"
+              hint="Raw data"
+            />
+            <Card
+              active={format === "pdf"}
+              onClick={() => setFormat("pdf")}
+              label="PDF"
+              hint="Print-ready"
+            />
+            <Card
+              active={format === "json"}
+              onClick={() => setFormat("json")}
+              label="JSON"
+              hint="Audit trail"
+            />
+            <Card
+              active={format === "ical"}
+              onClick={() => setFormat("ical")}
+              label="iCal (.ics)"
+              hint="Subscribe"
+            />
+          </div>
+          {format === "ical" && (
+            <p className="mt-2 text-xs text-ink-500">
+              Subscribe once — deadlines update automatically in Google /
+              Outlook / Apple Calendar.
+            </p>
+          )}
+          {format === "pdf" && (
+            <p className="mt-2 text-xs text-ink-500">
+              Opens your browser's print dialog — pick "Save as PDF" or send to
+              a printer.
+            </p>
+          )}
+          {format === "json" && (
+            <p className="mt-2 text-xs text-ink-500">
+              Structured export with stable schema (duedatehq.export.v1) for
+              audit trails and integrations.
+            </p>
+          )}
         </div>
-      </div>
-    </div>
+
+        <div>
+          <div className="text-xs font-medium text-ink-700 mb-2">Recipient</div>
+          <div className="grid grid-cols-3 gap-2">
+            <Card
+              active={recipient === "download"}
+              onClick={() => setRecipient("download")}
+              label="Download"
+              hint="Saved to your computer"
+            />
+            <Card
+              active={recipient === "email_self"}
+              onClick={() => setRecipient("email_self")}
+              label="Email me"
+              hint="Sarah Chen"
+            />
+            <Card
+              active={recipient === "email_coworker"}
+              onClick={() => setRecipient("email_coworker")}
+              label="Email coworker"
+              hint="Team tier"
+              disabled
+            />
+          </div>
+        </div>
+
+        <div className="text-xs text-ink-500 bg-sunken border border-line rounded px-3 py-2">
+          Preview: <strong>{scoped.length}</strong> deadline
+          {scoped.length === 1 ? "" : "s"} · range{" "}
+          {scoped.length > 0 ? (
+            <>
+              {formatLongDate(
+                scoped.reduce(
+                  (m, d) =>
+                    d.officialDueDate < m ? d.officialDueDate : m,
+                  scoped[0].officialDueDate
+                )
+              )}{" "}
+              →{" "}
+              {formatLongDate(
+                scoped.reduce(
+                  (m, d) =>
+                    d.officialDueDate > m ? d.officialDueDate : m,
+                  scoped[0].officialDueDate
+                )
+              )}
+            </>
+          ) : (
+            "—"
+          )}
+        </div>
+
+        {flash && (
+          <div className="rounded border border-ok-border bg-ok-bg text-ok-ink text-sm px-3 py-2">
+            ✓ {flash}
+          </div>
+        )}
+      </Modal.Body>
+
+      <Modal.Footer tone="sunken">
+        <button
+          onClick={onClose}
+          className="text-sm px-3 py-1.5 rounded border border-line bg-surface hover:bg-sunken text-ink-700"
+        >
+          Close
+        </button>
+        <button
+          onClick={onRun}
+          disabled={scoped.length === 0}
+          className="text-sm px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40"
+        >
+          {recipient === "download"
+            ? format === "pdf"
+              ? "Open print dialog"
+              : "Download"
+            : "Send"}
+        </button>
+      </Modal.Footer>
+    </Modal>
   );
 }
 
-function ScopeCard({
-  active,
-  onClick,
-  label,
-  hint,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  hint: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`text-left px-3 py-2 rounded border transition-colors ${
-        active
-          ? "border-slate-900 bg-slate-900 text-white"
-          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-      }`}
-    >
-      <div className="text-sm font-medium">{label}</div>
-      <div className={`text-xs ${active ? "text-slate-300" : "text-slate-500"}`}>
-        {hint}
-      </div>
-    </button>
-  );
-}
-
-function FormatCard({
+function Card({
   active,
   onClick,
   label,
@@ -393,14 +463,14 @@ function FormatCard({
       disabled={disabled}
       className={`text-left px-3 py-2 rounded border transition-colors ${
         active
-          ? "border-slate-900 bg-slate-900 text-white"
+          ? "border-accent bg-accent text-canvas"
           : disabled
-          ? "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed"
-          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+          ? "border-line bg-sunken text-ink-400 cursor-not-allowed"
+          : "border-line bg-surface text-ink-700 hover:bg-sunken"
       }`}
     >
       <div className="text-sm font-medium">{label}</div>
-      <div className={`text-xs ${active ? "text-slate-300" : "text-slate-500"}`}>
+      <div className={`text-xs ${active ? "text-canvas/70" : "text-ink-500"}`}>
         {hint}
       </div>
     </button>

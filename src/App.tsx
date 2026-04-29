@@ -5,6 +5,7 @@ import { Clients } from "./pages/Clients";
 import { ClientDetail } from "./pages/ClientDetail";
 import { TaskDetail } from "./pages/TaskDetail";
 import { Inbox } from "./pages/Inbox";
+import { Insights } from "./pages/Insights";
 import { AnnouncementList } from "./pages/AnnouncementList";
 import { AnnouncementDetail } from "./pages/AnnouncementDetail";
 import { Import } from "./pages/Import";
@@ -15,6 +16,7 @@ import { Signup } from "./pages/auth/Signup";
 import { AcceptInvite } from "./pages/auth/AcceptInvite";
 import { ForgotPassword } from "./pages/auth/ForgotPassword";
 import { ResetPassword } from "./pages/auth/ResetPassword";
+import { Changes } from "./pages/Changes";
 import { OnboardingFirm } from "./pages/onboarding/OnboardingFirm";
 import { OnboardingChoosePath } from "./pages/onboarding/OnboardingChoosePath";
 import { OnboardingManual } from "./pages/onboarding/OnboardingManual";
@@ -32,6 +34,7 @@ export default function App() {
     <Routes>
       {/* Public auth routes — outside the AppShell */}
       <Route path="/login" element={<Login />} />
+      <Route path="/changes" element={<Changes />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -64,6 +67,7 @@ export default function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="inbox" element={<Inbox />} />
+          <Route path="insights" element={<Insights />} />
           <Route path="clients" element={<Clients />} />
           <Route path="clients/:id" element={<ClientDetail />} />
           <Route path="clients/:id/tasks/:taskId" element={<TaskDetail />} />
