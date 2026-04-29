@@ -447,6 +447,10 @@ export interface EmailDraft {
   scheduledFor?: string;
   sentAt?: string;
   sendMethod: "cpa_send" | "phase2_auto";
+  /** Source template (when the draft originated from a system or firm
+   *  template). Used by the Phase 2 eligibility detector to count
+   *  approved-without-edit sends per (template × client) pair. */
+  templateId?: string;
   createdAt: string;
 }
 
