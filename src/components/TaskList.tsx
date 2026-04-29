@@ -30,6 +30,7 @@ import type {
   AiInsight,
 } from "../types";
 import { EmailDraftModal, type EmailDraftIntent } from "./EmailDraftModal";
+import { AuthorityChip } from "./AuthorityChip";
 
 /**
  * Task-centric dashboard. AI lives at Layer 4 *inside* each task per PRD §3
@@ -342,14 +343,12 @@ export function TaskList() {
           </div>
         </header>
         {filter === "needs_me" && filtered.length > 0 && (
-          <div className="px-4 py-2 bg-info-bg/40 border-b border-info-border text-2xs text-info-ink flex items-start gap-2">
-            <span className="text-base leading-none mt-0.5" aria-hidden>
-              ◆
-            </span>
+          <div className="px-4 py-2 bg-info-bg/40 border-b border-info-border text-2xs text-info-ink flex items-center gap-2">
+            <AuthorityChip zone="yellow" label="AI proposes" />
             <span>
               <span className="font-medium">AI noticed something on each of these.</span>{" "}
-              We never auto-confirm a checklist item — your click is the only
-              way it advances.
+              We never auto-confirm — your click is the only way an item
+              advances.
             </span>
           </div>
         )}
