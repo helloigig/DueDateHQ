@@ -1,12 +1,16 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, isNull, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import { firmProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
 import {
+  checklistItems,
   clients,
   clientServicePackages,
+  deadlines,
+  serviceTemplates,
   servicePackages,
+  tasks,
 } from "../../db/schema.js";
 import { generateDeadlinesForClient } from "../../lib/deadline-generator.js";
 
@@ -149,7 +153,93 @@ export const servicePackagesRouter = router({
         packageId: input.packageId,
         year: input.year,
       });
-      return { ok: true as const, deadlinesCreated: created };
+
+      // Also spawn the corresponding Task + Mode-A baseline checklist for
+      // each deadline that doesn't have one yet. Doing it here avoids a
+      // second roundtrip from the FE and keeps the dashboard usable
+      // immediately. Idempotent on (deadline_id) — only creates tasks for
+      // deadlines without one.
+      const allDeadlines = await db
+        .select()
+        .from(deadlines)
+        .where(
+          and(
+            eq(deadlines.firmId, ctx.firmId),
+            eq(deadlines.clientId, input.clientId),
+          ),
+        );
+      const existingTasks = await db
+        .select({ deadlineId: tasks.deadlineId })
+        .from(tasks)
+        .where(
+          and(
+            eq(tasks.firmId, ctx.firmId),
+            inArray(
+              tasks.deadlineId,
+              allDeadlines.map((d) => d.id),
+            ),
+          ),
+        );
+      const taskedDeadlines = new Set(existingTasks.map((t) => t.deadlineId));
+      const taskRowsCreated: number = await (async () => {
+        let count = 0;
+        for (const dl of allDeadlines) {
+          if (taskedDeadlines.has(dl.id)) continue;
+          // forwarding-email local part — mirrors tasks router pattern.
+          const slug = client.name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "")
+            .slice(0, 16) || "task";
+          const formSlug = dl.formType
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "")
+            .slice(0, 16);
+          const token = Math.random().toString(36).slice(2, 6);
+          const local = `${slug}-${formSlug}-${token}`;
+          const [task] = await db
+            .insert(tasks)
+            .values({
+              firmId: ctx.firmId,
+              deadlineId: dl.id,
+              forwardingEmailLocalPart: local,
+              status: "not_started",
+            })
+            .returning();
+          if (!task) continue;
+          // Mode A baseline checklist from template.standardChecklist.
+          if (dl.serviceTemplateId) {
+            const tmpl = await db.query.serviceTemplates.findFirst({
+              where: eq(serviceTemplates.id, dl.serviceTemplateId),
+            });
+            const baseline =
+              (tmpl?.standardChecklist as Array<{
+                label: string;
+                itemType: string;
+              }> | null) ?? [];
+            if (baseline.length > 0) {
+              await db.insert(checklistItems).values(
+                baseline.map((b, idx) => ({
+                  firmId: ctx.firmId,
+                  taskId: task.id,
+                  label: b.label,
+                  itemType: b.itemType,
+                  sortOrder: idx,
+                  state: "not_requested" as const,
+                  stateChangedByKind: "system" as const,
+                })),
+              );
+            }
+          }
+          count++;
+        }
+        return count;
+      })();
+
+      return {
+        ok: true as const,
+        deadlinesCreated: created,
+        tasksCreated: taskRowsCreated,
+      };
     }),
 
   /**

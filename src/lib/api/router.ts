@@ -11,14 +11,21 @@
 import { initTRPC } from "@trpc/server";
 import { z } from "zod";
 import type {
+  ActivityEntry,
+  AiInsight,
   Announcement,
+  ChecklistItem,
   Client,
   Deadline,
+  DocumentState,
+  EmailDraft,
   Firm,
   FirmTier,
   ImportRun,
   Notification,
+  ReminderTemplate,
   ServicePackage,
+  Task,
   User,
 } from "../../types";
 
@@ -311,6 +318,151 @@ export const appRouter = t.router({
     remove: t.procedure
       .input(jsonPassthrough)
       .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+  }),
+
+  tasks: t.router({
+    list: t.procedure
+      .input(z.object({ clientId: z.string().optional() }).optional())
+      .query(async (): Promise<Task[]> => NOT_IMPL()),
+    get: t.procedure
+      .input(z.object({ id: z.string() }))
+      .query(async (): Promise<Task | null> => NOT_IMPL()),
+    updateStatus: t.procedure
+      .input(jsonPassthrough)
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    createForDeadline: t.procedure
+      .input(z.object({ deadlineId: z.string() }))
+      .mutation(
+        async (): Promise<{ id: string; alreadyExists: boolean }> =>
+          NOT_IMPL()
+      ),
+  }),
+
+  checklists: t.router({
+    listForTask: t.procedure
+      .input(z.object({ taskId: z.string() }))
+      .query(async (): Promise<ChecklistItem[]> => NOT_IMPL()),
+    setState: t.procedure
+      .input(
+        z.object({
+          id: z.string(),
+          state: z.string() as z.ZodType<DocumentState>,
+        })
+      )
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+  }),
+
+  activity: t.router({
+    listForTask: t.procedure
+      .input(z.object({ taskId: z.string(), limit: z.number().optional() }))
+      .query(async (): Promise<ActivityEntry[]> => NOT_IMPL()),
+  }),
+
+  emails: t.router({
+    listForTask: t.procedure
+      .input(z.object({ taskId: z.string() }))
+      .query(async (): Promise<EmailDraft[]> => NOT_IMPL()),
+    saveDraft: t.procedure
+      .input(jsonPassthrough)
+      .mutation(async (): Promise<{ id: string }> => NOT_IMPL()),
+    send: t.procedure
+      .input(z.object({ id: z.string() }))
+      .mutation(
+        async (): Promise<{
+          id: string;
+          sentAt: string;
+          recallWindowExpiresAt: string;
+        }> => NOT_IMPL()
+      ),
+    recall: t.procedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    discard: t.procedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+  }),
+
+  reminderTemplates: t.router({
+    list: t.procedure.query(
+      async (): Promise<ReminderTemplate[]> => NOT_IMPL()
+    ),
+  }),
+
+  aiInferences: t.router({
+    recordAcceptance: t.procedure
+      .input(z.object({ inferenceId: z.number(), accepted: z.boolean() }))
+      .mutation(
+        async (): Promise<{ ok: boolean; reason?: string }> => NOT_IMPL()
+      ),
+    summary: t.procedure
+      .input(z.object({ mode: z.string().optional() }).optional())
+      .query(
+        async (): Promise<{
+          total: number;
+          actedOn: number;
+          accepted: number;
+          acceptanceRate: number | null;
+          totalCostCents: number;
+        }> => NOT_IMPL()
+      ),
+  }),
+
+  aiInsights: t.router({
+    listForClient: t.procedure
+      .input(z.object({ clientId: z.string() }))
+      .query(async (): Promise<AiInsight[]> => NOT_IMPL()),
+  }),
+
+  multistate: t.router({
+    preview: t.procedure
+      .input(
+        z.object({
+          stateCodes: z.array(z.string()),
+          includeFederal: z.boolean().default(true),
+          year: z.number().int().optional(),
+        })
+      )
+      .query(
+        async (): Promise<{
+          groups: Array<{
+            jurisdiction: string;
+            templateCount: number;
+            deadlineCount: number;
+            deadlines: Array<{
+              templateId: string;
+              formType: string;
+              jurisdiction: string;
+              period: string;
+              officialDueDate: string;
+              adjustedDueDate: string;
+            }>;
+          }>;
+          totalDeadlines: number;
+          totalTemplates: number;
+          statesWithoutTemplates: string[];
+        }> => NOT_IMPL()
+      ),
+    commit: t.procedure
+      .input(
+        z.object({
+          clientId: z.string(),
+          stateCodes: z.array(z.string()),
+          includeFederal: z.boolean().default(true),
+          year: z.number().int().optional(),
+          excludedTemplateIds: z.array(z.string()).default([]),
+          saveAsPackage: z.boolean().default(false),
+          customPackageName: z.string().optional(),
+        })
+      )
+      .mutation(
+        async (): Promise<{
+          ok: true;
+          createdDeadlines: number;
+          createdTasks: number;
+          createdChecklistItems: number;
+          createdPackageId: string | null;
+        }> => NOT_IMPL()
+      ),
   }),
 });
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ChevronRight, ChevronDown, Filter, Download } from "lucide-react";
 import { useShortcuts } from "../hooks/useKeyboard";
 import { useClients } from "../hooks/useClients";
@@ -27,11 +28,16 @@ import { OnboardingLayer2Widget } from "../components/OnboardingLayer2Widget";
 import { TaskList } from "../components/TaskList";
 import { FirstRunWelcome } from "../components/FirstRunWelcome";
 import { AdvisoryPeek } from "../components/AdvisoryPeek";
+import { useMaybeServerSession } from "../lib/session-provider";
+import { useSession as useLocalSession } from "../data/session";
 import type { Announcement, Client, Deadline } from "../types";
 
 const HIDE_STATUSES = new Set(["completed", "filed_extension"]);
 
 export function Dashboard() {
+  const navigate = useNavigate();
+  const session = useMaybeServerSession();
+  const localSession = useLocalSession();
   const clientsQuery = useClients();
   const triageQuery = useTriageDeadlines();
   const announcementsQuery = useRealtimeAnnouncements();
@@ -145,8 +151,27 @@ export function Dashboard() {
       month: "long",
       day: "numeric",
     });
-    return `${dayName} · Good morning, Sarah`;
-  }, []);
+    const hour = new Date().getHours();
+    const timeOfDay =
+      hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
+    // Prefer the server session's displayName; fall back to the local
+    // session's userName; final fallback to the email's local-part with
+    // proper casing (gigi@example.com → "Gigi"). Phase 1: capture
+    // displayName during onboarding so the fallback isn't load-bearing.
+    const rawName =
+      session?.user.displayName ??
+      localSession?.userName ??
+      localSession?.userEmail?.split("@")[0] ??
+      "there";
+    const firstName = rawName
+      .replace(/[._-]+/g, " ")
+      .split(" ")[0]
+      ?.trim();
+    const displayName = firstName
+      ? firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
+      : "there";
+    return `${dayName} · Good ${timeOfDay}, ${displayName}`;
+  }, [session?.user.displayName, localSession?.userName, localSession?.userEmail]);
 
   const summary = useMemo(() => {
     const overdueCount = byBucket.overdue.length;
@@ -233,18 +258,53 @@ export function Dashboard() {
   }
 
   if (hasNoClients) {
+    // Multi-path orientation surface — the user just finished onboarding
+    // and is asking "what now?". Three paths with honest time estimates.
+    // Personalized greeting stays so it doesn't feel like a wall.
     return (
-      <div className="max-w-5xl mx-auto px-6 py-12">
-        <EmptyState
-          title="Let's get your clients in."
-          actions={
-            <>
-              <EmptyStateButton to="/import" primary>Import CSV</EmptyStateButton>
-              <EmptyStateButton to="/clients">Add 5 manually</EmptyStateButton>
-              <EmptyStateButton to="/import?demo=1">Try demo data</EmptyStateButton>
-            </>
-          }
-        />
+      <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-5">
+        <header>
+          <h1 className="text-2xl font-semibold text-ink-900">{greeting}</h1>
+          <p className="text-sm text-ink-500 mt-1">
+            Your dashboard fills in as you add clients. Three ways to start —
+            pick whichever fits your data today.
+          </p>
+        </header>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <FirstStepCard
+            kind="primary"
+            title="Add a client"
+            time="~2 min"
+            detail="Single client, manual entry. Fastest if you only have one or two to set up right now."
+            cta="+ Add client"
+            onClick={() => navigate("/clients")}
+          />
+          <FirstStepCard
+            kind="secondary"
+            title="Import a CSV"
+            time="~5 min"
+            detail="Bulk-upload your roster from Drake, ProConnect, TaxDome, or a plain spreadsheet. Field mapping is automatic."
+            cta="Open import wizard →"
+            onClick={() => navigate("/import")}
+          />
+          <FirstStepCard
+            kind="secondary"
+            title="Connect QuickBooks"
+            time="~30 sec"
+            detail="One-click OAuth pulls your client list and entity types. Two-way sync after."
+            cta="Go to integrations →"
+            onClick={() => navigate("/settings/integrations")}
+            badge="Phase 1"
+          />
+        </div>
+
+        <FirstRunWelcome />
+
+        <p className="text-xs text-ink-400">
+          State alerts auto-scan every hour against the 50-state DOR
+          databases — they'll surface here when relevant clients exist.
+        </p>
       </div>
     );
   }
@@ -689,39 +749,66 @@ function WeekGroup({
   );
 }
 
-function EmptyState({
+/**
+ * One of three "first steps" for an empty dashboard. The primary card has
+ * a filled CTA; secondary cards have outline CTAs and an optional "Phase 1"
+ * badge for paths that aren't fully wired against a real backend yet.
+ */
+function FirstStepCard({
+  kind,
   title,
-  actions,
+  time,
+  detail,
+  cta,
+  onClick,
+  badge,
 }: {
+  kind: "primary" | "secondary";
   title: string;
-  actions: React.ReactNode;
+  time: string;
+  detail: string;
+  cta: string;
+  onClick: () => void;
+  badge?: string;
 }) {
   return (
-    <div className="bg-surface border border-line rounded-md px-6 py-16 text-center">
-      <p className="text-sm text-ink-700 font-medium">{title}</p>
-      <div className="mt-4 flex items-center justify-center gap-2">
-        {actions}
+    <article
+      className={[
+        "rounded-md border p-4 flex flex-col",
+        kind === "primary"
+          ? "border-accent bg-accent/5"
+          : "border-line bg-surface",
+      ].join(" ")}
+    >
+      <header className="flex items-baseline justify-between gap-2 mb-1">
+        <h2 className="text-sm font-semibold text-ink-900">{title}</h2>
+        <span className="text-2xs uppercase tracking-wider text-ink-500 font-medium">
+          {time}
+        </span>
+      </header>
+      <p className="text-xs text-ink-500 mb-4 flex-1">{detail}</p>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={onClick}
+          className={[
+            "text-sm px-3 py-1.5 rounded-md font-medium",
+            kind === "primary"
+              ? "bg-accent text-canvas hover:bg-accent-hover"
+              : "border border-line text-ink-700 hover:bg-sunken",
+          ].join(" ")}
+        >
+          {cta}
+        </button>
+        {badge && (
+          <span
+            className="text-2xs italic text-ink-400"
+            title="Not fully wired against a real backend yet — Phase 1 work."
+          >
+            {badge}
+          </span>
+        )}
       </div>
-    </div>
-  );
-}
-
-function EmptyStateButton({
-  to,
-  primary,
-  children,
-}: {
-  to: string;
-  primary?: boolean;
-  children: React.ReactNode;
-}) {
-  const cls = primary
-    ? "text-sm px-3 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover"
-    : "text-sm px-3 py-1.5 rounded-md border border-line text-ink-700 hover:bg-sunken";
-  return (
-    <a href={to} className={cls}>
-      {children}
-    </a>
+    </article>
   );
 }
 

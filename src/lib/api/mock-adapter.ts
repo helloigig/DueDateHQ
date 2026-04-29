@@ -550,6 +550,234 @@ export const mockAdapter = {
       return { ok: true as const };
     },
   },
+
+  tasks: {
+    list: async (input: { clientId?: string } = {}) => {
+      await delay();
+      const { tasks } = getState();
+      return input.clientId
+        ? tasks.filter((t) => t.clientId === input.clientId)
+        : tasks;
+    },
+    get: async ({ id }: { id: string }) => {
+      await delay();
+      return getState().tasks.find((t) => t.id === id) ?? null;
+    },
+    updateStatus: async ({
+      id,
+      status,
+    }: {
+      id: string;
+      status: import("../../types").TaskStatus;
+    }) => {
+      await delay();
+      actions.updateTaskStatus(id, status);
+      return { ok: true as const };
+    },
+    createForDeadline: async (_: { deadlineId: string }) => {
+      // Tasks in mock mode are auto-built from deadlines on read; this
+      // procedure is a no-op for parity with the BE contract.
+      await delay();
+      return { id: _.deadlineId, alreadyExists: true as const };
+    },
+  },
+
+  checklists: {
+    listForTask: async ({ taskId }: { taskId: string }) => {
+      await delay();
+      const { checklistItems } = getState();
+      return checklistItems
+        .filter((c) => c.taskId === taskId)
+        .sort((a, b) => a.order - b.order);
+    },
+    setState: async ({
+      id,
+      state,
+    }: {
+      id: string;
+      state: import("../../types").DocumentState;
+    }) => {
+      await delay();
+      actions.setChecklistItemState(id, state, "cpa");
+      return { ok: true as const };
+    },
+  },
+
+  activity: {
+    listForTask: async ({ taskId }: { taskId: string }) => {
+      await delay();
+      // Mock store keeps activity on the client. Surface only entries
+      // related to this task — best-effort by `relatedDeadlineId`.
+      const { tasks, clients } = getState();
+      const task = tasks.find((t) => t.id === taskId);
+      if (!task) return [];
+      const client = clients.find((c) => c.id === task.clientId);
+      return (client?.activity ?? []).filter(
+        (a) => !a.relatedDeadlineId || a.relatedDeadlineId === task.deadlineId,
+      );
+    },
+  },
+
+  emails: {
+    listForTask: async ({ taskId }: { taskId: string }) => {
+      await delay();
+      return getState().emailDrafts.filter((d) => d.taskId === taskId);
+    },
+    saveDraft: async (input: import("../../types").EmailDraft) => {
+      await delay();
+      const id = actions.saveEmailDraft(input);
+      return { id };
+    },
+    send: async ({ id }: { id: string }) => {
+      await delay();
+      actions.sendEmail(id);
+      const sentAt = new Date().toISOString();
+      const recallWindowExpiresAt = new Date(Date.now() + 60_000).toISOString();
+      return { id, sentAt, recallWindowExpiresAt };
+    },
+    recall: async () => {
+      await delay();
+      return { ok: true as const };
+    },
+    discard: async ({ id }: { id: string }) => {
+      await delay();
+      actions.discardEmailDraft(id);
+      return { ok: true as const };
+    },
+  },
+
+  reminderTemplates: {
+    list: async () => {
+      await delay();
+      return getState().reminderTemplates;
+    },
+  },
+
+  aiInferences: {
+    recordAcceptance: async () => {
+      await delay();
+      return { ok: true as const };
+    },
+    summary: async () => {
+      await delay();
+      // Mock — show modest acceptance rates so the eval panel has shape.
+      return {
+        total: 142,
+        actedOn: 121,
+        accepted: 105,
+        acceptanceRate: 105 / 121,
+        totalCostCents: 487.2,
+      };
+    },
+  },
+
+  aiInsights: {
+    listForClient: async ({ clientId }: { clientId: string }) => {
+      await delay();
+      return getState().aiInsights.filter((i) => i.clientId === clientId);
+    },
+  },
+
+  multistate: {
+    preview: async (input: {
+      stateCodes: string[];
+      includeFederal?: boolean;
+      year?: number;
+    }) => {
+      await delay();
+      // Mock approximation: produce a synthetic deadline list per state.
+      // Real BE uses actual seeded service_templates.
+      const FED_FORMS = ["1040", "1040-ES", "941"];
+      const STATE_FORMS_BY_STATE: Record<string, string[]> = {
+        CA: ["CA 540", "CA 568", "CA 100S"],
+        NY: ["NY IT-201", "NY CT-3"],
+        TX: ["TX Franchise"],
+        LA: ["LA IT-540", "LA CIFT-620"],
+        FL: ["FL F-1120"],
+        IL: ["IL-1040", "IL-1120"],
+        PA: ["PA-40"],
+        GA: ["GA-500"],
+        NJ: ["NJ-1040"],
+        MA: ["MA Form 1"],
+      };
+      const year = input.year ?? new Date().getFullYear();
+      const groups = [] as Array<{
+        jurisdiction: string;
+        templateCount: number;
+        deadlineCount: number;
+        deadlines: Array<{
+          templateId: string;
+          formType: string;
+          jurisdiction: string;
+          period: string;
+          officialDueDate: string;
+          adjustedDueDate: string;
+        }>;
+      }>;
+      let totalTemplates = 0;
+      let totalDeadlines = 0;
+      const statesWithoutTemplates: string[] = [];
+      const due = `${year}-04-15`;
+      if (input.includeFederal !== false) {
+        const items = FED_FORMS.map((f, idx) => ({
+          templateId: `mock-fed-${idx}`,
+          formType: f,
+          jurisdiction: "federal",
+          period: `${year}`,
+          officialDueDate: due,
+          adjustedDueDate: due,
+        }));
+        groups.push({
+          jurisdiction: "federal",
+          templateCount: items.length,
+          deadlineCount: items.length,
+          deadlines: items,
+        });
+        totalTemplates += items.length;
+        totalDeadlines += items.length;
+      }
+      for (const code of input.stateCodes) {
+        const upper = code.toUpperCase();
+        const forms = STATE_FORMS_BY_STATE[upper];
+        if (!forms || forms.length === 0) {
+          statesWithoutTemplates.push(upper.toLowerCase());
+          continue;
+        }
+        const items = forms.map((f, idx) => ({
+          templateId: `mock-${upper}-${idx}`,
+          formType: f,
+          jurisdiction: upper.toLowerCase(),
+          period: `${year}`,
+          officialDueDate: due,
+          adjustedDueDate: due,
+        }));
+        groups.push({
+          jurisdiction: upper.toLowerCase(),
+          templateCount: items.length,
+          deadlineCount: items.length,
+          deadlines: items,
+        });
+        totalTemplates += items.length;
+        totalDeadlines += items.length;
+      }
+      return { groups, totalDeadlines, totalTemplates, statesWithoutTemplates };
+    },
+    commit: async (input: {
+      clientId: string;
+      stateCodes: string[];
+      saveAsPackage?: boolean;
+    }) => {
+      await delay(200);
+      // Mock just acks; the real store doesn't persist multistate bundles.
+      return {
+        ok: true as const,
+        createdDeadlines: input.stateCodes.length * 2,
+        createdTasks: input.stateCodes.length * 2,
+        createdChecklistItems: input.stateCodes.length * 6,
+        createdPackageId: input.saveAsPackage ? "pkg-mock-multistate" : null,
+      };
+    },
+  },
 } as const;
 
 export type MockAdapter = typeof mockAdapter;

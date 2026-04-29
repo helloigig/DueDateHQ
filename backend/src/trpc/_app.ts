@@ -11,6 +11,7 @@ import { emailsRouter, reminderTemplatesRouter } from "./routers/emails.js";
 import { exportsRouter } from "./routers/exports.js";
 import { importsRouter } from "./routers/imports.js";
 import { integrationsRouter } from "./routers/integrations.js";
+import { multistateRouter } from "./routers/multistate.js";
 import { servicePackagesRouter } from "./routers/servicePackages.js";
 import {
   activityRouter,
@@ -38,6 +39,7 @@ export const appRouter = router({
   imports: importsRouter,
   uploads: uploadsRouter,
   aiInferences: aiInferencesRouter,
+  multistate: multistateRouter,
 });
 
 export type AppRouter = typeof appRouter;

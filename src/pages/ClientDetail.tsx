@@ -27,6 +27,7 @@ import { ExportModal } from "../components/ExportModal";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { STATE_NAMES, type StateCode } from "../types";
 import { BUNDLES } from "../data/bundles";
+import { MultiStateWizard } from "../components/multistate/MultiStateWizard";
 import type {
   ActivityEntry,
   ActivityType,
@@ -774,6 +775,7 @@ function CollapsibleSection({
 function BundleManager({ client }: { client: Client }) {
   const [picking, setPicking] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [multistateOpen, setMultistateOpen] = useState(false);
 
   const assigned = client.servicePackages;
   const available = BUNDLES.filter(
@@ -781,6 +783,14 @@ function BundleManager({ client }: { client: Client }) {
       b.entityTypes.includes(client.entityType) &&
       !assigned.includes(b.name)
   );
+
+  // Multi-state-eligible entity types per Q1 of the wizard shape brief.
+  // Trust + Individual stay on single-state package picker.
+  const isMultiStateEligible =
+    client.entityType === "LLC" ||
+    client.entityType === "S-Corp" ||
+    client.entityType === "C-Corp" ||
+    client.entityType === "Partnership";
 
   const onAssign = (id: string) => {
     actions.assignBundle(client.id, id);
@@ -795,18 +805,29 @@ function BundleManager({ client }: { client: Client }) {
   return (
     <>
       <div className="bg-white border border-slate-200 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-2 gap-2">
           <h3 className="text-sm font-semibold text-slate-700">
             Filing bundles
           </h3>
-          {available.length > 0 && (
-            <button
-              onClick={() => setPicking((v) => !v)}
-              className="text-xs px-2 py-1 rounded border border-slate-200 hover:bg-slate-50"
-            >
-              {picking ? "Cancel" : "+ Assign"}
-            </button>
-          )}
+          <div className="flex items-center gap-1.5">
+            {isMultiStateEligible && (
+              <button
+                onClick={() => setMultistateOpen(true)}
+                className="text-xs px-2 py-1 rounded border border-slate-200 hover:bg-slate-50 text-slate-700"
+                title="Pick multiple states; we'll generate the deadlines for federal + each picked state."
+              >
+                + Multi-state…
+              </button>
+            )}
+            {available.length > 0 && (
+              <button
+                onClick={() => setPicking((v) => !v)}
+                className="text-xs px-2 py-1 rounded border border-slate-200 hover:bg-slate-50"
+              >
+                {picking ? "Cancel" : "+ Assign"}
+              </button>
+            )}
+          </div>
         </div>
 
         {assigned.length === 0 ? (
@@ -902,6 +923,16 @@ function BundleManager({ client }: { client: Client }) {
           }
           setRemoving(null);
         }}
+      />
+      <MultiStateWizard
+        open={multistateOpen}
+        onClose={() => setMultistateOpen(false)}
+        clientId={client.id}
+        clientName={client.name}
+        initialStates={[
+          client.primaryState,
+          ...(client.nexusStates ?? []),
+        ]}
       />
     </>
   );

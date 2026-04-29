@@ -24,8 +24,11 @@ import { supabase } from "../lib/supabase";
  */
 export function Login() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("sarah@mitchellcpa.com");
-  const [password, setPassword] = useState("demo");
+  // Pre-fill the demo email + password ONLY in mock mode. In real mode the
+  // login goes to Supabase Auth, so these fake creds would just produce a
+  // wall of "invalid credentials" errors. Real mode starts empty.
+  const [email, setEmail] = useState(env.useMockApi ? "sarah@mitchellcpa.com" : "");
+  const [password, setPassword] = useState(env.useMockApi ? "demo" : "");
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -138,7 +141,9 @@ export function Login() {
           </Link>
           <h1 className="text-2xl font-semibold text-ink-900 mt-6">Sign in</h1>
           <p className="text-sm text-ink-500 mt-1">
-            Welcome back. Wireframe build — credentials are pre-filled.
+            {env.useMockApi
+              ? "Demo workspace — credentials pre-filled. No real account needed."
+              : "Welcome back."}
           </p>
 
           {/* SSO providers — wireframe shows the Phase 2 plan honestly.
@@ -209,30 +214,33 @@ export function Login() {
           </p>
         </div>
 
-        {/* Demo workspace — separate card, intentionally distinct from sign-in */}
-        <button
-          onClick={tryDemo}
-          className="w-full mt-3 bg-surface border border-line hover:border-accent rounded-md p-4 text-left transition-colors group"
-        >
-          <div className="flex items-start gap-3">
-            <span className="w-8 h-8 rounded-full bg-info-bg border border-info-border text-info-ink flex items-center justify-center shrink-0">
-              <Sparkles className="w-3.5 h-3.5" aria-hidden />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-ink-900">
-                Try the demo workspace
-              </p>
-              <p className="text-xs text-ink-500 mt-0.5">
-                49 fake clients, live state alert, 3 years of prior history.
-                No account, no email — just see how it works.
-              </p>
+        {/* Demo workspace — only in mock mode. Wires to localStorage seeds;
+            meaningless against a real backend, so we hide it then. */}
+        {env.useMockApi && (
+          <button
+            onClick={tryDemo}
+            className="w-full mt-3 bg-surface border border-line hover:border-accent rounded-md p-4 text-left transition-colors group"
+          >
+            <div className="flex items-start gap-3">
+              <span className="w-8 h-8 rounded-full bg-info-bg border border-info-border text-info-ink flex items-center justify-center shrink-0">
+                <Sparkles className="w-3.5 h-3.5" aria-hidden />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-ink-900">
+                  Try the demo workspace
+                </p>
+                <p className="text-xs text-ink-500 mt-0.5">
+                  49 fake clients, live state alert, 3 years of prior history.
+                  No account, no email — just see how it works.
+                </p>
+              </div>
+              <ArrowRight
+                className="w-4 h-4 text-ink-400 mt-2 group-hover:text-ink-900 transition-colors"
+                aria-hidden
+              />
             </div>
-            <ArrowRight
-              className="w-4 h-4 text-ink-400 mt-2 group-hover:text-ink-900 transition-colors"
-              aria-hidden
-            />
-          </div>
-        </button>
+          </button>
+        )}
 
         <p className="text-xs text-ink-500 mt-6 text-center">
           New to DueDateHQ?{" "}
