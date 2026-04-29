@@ -336,8 +336,8 @@ export function TaskList() {
                   onClick={() => setFilter(f.key)}
                   className={`text-2xs uppercase tracking-wide px-2 py-0.5 rounded border ${
                     active
-                      ? "bg-ink-900 text-canvas border-ink-900"
-                      : "border-line text-ink-500 hover:bg-sunken"
+                      ? "bg-sunken text-ink-900 border-ink-900 font-medium"
+                      : "border-line text-ink-500 hover:bg-sunken hover:text-ink-700"
                   }`}
                 >
                   {f.label}

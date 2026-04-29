@@ -28,6 +28,7 @@ import { StateChipGroup } from "../components/StateChipGroup";
 import { STATE_NAMES, type StateCode } from "../types";
 import { BUNDLES } from "../data/bundles";
 import { MultiStateWizard } from "../components/multistate/MultiStateWizard";
+import { DocumentMatrixPreview } from "../components/DocumentMatrixPreview";
 import type {
   ActivityEntry,
   ActivityType,
@@ -260,6 +261,7 @@ export function ClientDetail() {
             extensions={extensions}
             allDeadlines={clientDeadlines}
             onAddDeadline={() => setAddDeadlineOpen(true)}
+            onOpenDocuments={() => setTab("documents")}
           />
         )}
         {tab === "documents" && <DocumentsTab client={client} />}
@@ -337,6 +339,7 @@ function DeadlinesTab({
   extensions,
   allDeadlines,
   onAddDeadline,
+  onOpenDocuments,
 }: {
   client: Client;
   upcoming: Deadline[];
@@ -345,6 +348,7 @@ function DeadlinesTab({
   extensions: Deadline[];
   allDeadlines: Deadline[];
   onAddDeadline: () => void;
+  onOpenDocuments: () => void;
 }) {
   const [yearOpen, setYearOpen] = useState(false);
   const [completedOpen, setCompletedOpen] = useState(false);
@@ -379,6 +383,15 @@ function DeadlinesTab({
           </span>
         </div>
       )}
+
+      {/* Promoted from buried in the Documents tab — the multi-year doc
+          lens is one of the strongest IA ideas in the product, but
+          burying it 1 click deep meant CPAs rarely saw it. Here the
+          compact preview surfaces top doc types × current+2 priors. */}
+      <DocumentMatrixPreview
+        clientId={client.id}
+        onOpenFull={onOpenDocuments}
+      />
 
       <Section
         title={`Upcoming (${upcoming.length})`}

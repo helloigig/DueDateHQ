@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Sparkles, ArrowRight, X } from "lucide-react";
+import { TrendingUp, ArrowRight, X } from "lucide-react";
 import { useAllOpenInsights, useResolveInsight } from "../hooks/useAiInsights";
 import { useStore } from "../data/store";
 import { useState } from "react";
@@ -34,7 +34,7 @@ export function InsightStrip() {
       className="bg-gradient-to-br from-surface to-sunken/40 border border-line rounded-md overflow-hidden"
     >
       <header className="flex items-center px-4 py-2 border-b border-line bg-sunken/40">
-        <Sparkles className="w-3.5 h-3.5 text-ink-500 mr-1.5" aria-hidden />
+        <TrendingUp className="w-3.5 h-3.5 text-ink-500 mr-1.5" aria-hidden />
         <span className="text-xs uppercase tracking-wider text-ink-700 font-semibold">
           Advisory opportunities
         </span>

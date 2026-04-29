@@ -7,7 +7,7 @@ import {
   BookOpen,
   ArrowUpRight,
   AlertTriangle,
-  Sparkles,
+  Globe,
 } from "lucide-react";
 import { useStore } from "../data/store";
 import { useAllOpenInsights } from "../hooks/useAiInsights";
@@ -272,7 +272,7 @@ export function Insights() {
         className="bg-info-bg/30 border border-info-border rounded-md p-4 scroll-mt-20"
       >
         <div className="flex items-baseline gap-2 mb-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-info-ink shrink-0" aria-hidden />
+          <Globe className="w-3.5 h-3.5 text-info-ink shrink-0" aria-hidden />
           <h2 className="text-sm font-semibold text-info-ink">
             Cross-firm benchmarks coming
           </h2>

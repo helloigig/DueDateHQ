@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import {
   CheckCircle2,
-  Sparkles,
+  TrendingUp,
+  Plug,
   ShieldCheck,
   AlertTriangle,
   Mail,
@@ -96,7 +97,7 @@ export function OnboardingDone() {
           </div>
           {stats.insights > 0 && (
             <div className="px-5 py-3 border-t border-line bg-info-bg/30 flex items-start gap-3">
-              <Sparkles
+              <TrendingUp
                 className="w-3.5 h-3.5 text-info-ink mt-0.5"
                 aria-hidden
               />
@@ -169,7 +170,7 @@ export function OnboardingDone() {
           </header>
           <ul className="divide-y divide-line">
             <UnlockRow
-              icon={<Sparkles className="w-3.5 h-3.5" aria-hidden />}
+              icon={<Plug className="w-3.5 h-3.5" aria-hidden />}
               title="Connect QuickBooks"
               detail="Unlocks financial profiles for your clients — richer per-client signals begin forming. ~30 seconds of OAuth."
             />

@@ -196,16 +196,21 @@ function TrialBadge() {
     const days = Math.ceil(ms / (24 * 60 * 60 * 1000));
     if (days <= 0) return { tone: "danger" as const, label: "Trial ended — pick a plan" };
     if (days <= 5) return { tone: "warn" as const, label: `Pro trial · ${days} day${days === 1 ? "" : "s"} left` };
-    return { tone: "info" as const, label: `Pro trial · ${days} days left` };
+    return { tone: "neutral" as const, label: `Pro trial · ${days} days left` };
   }, [session?.trialEndsAt]);
 
   if (!status) return null;
+  // The default state uses sunken-tone neutral, NOT info-blue. Info-blue
+  // is reserved for AI-decided surfaces (AdvisoryPeek, OTP step, "AI
+  // noticed" banner) — overloading it on the trial pill made every
+  // info-toned thing on screen feel like the same kind of signal.
+  // Warn + danger keep their tones — those are real alerts.
   const toneClass =
     status.tone === "danger"
       ? "bg-danger-bg text-danger-ink border-danger-border hover:border-danger-ink"
       : status.tone === "warn"
         ? "bg-warn-bg text-warn-ink border-warn-border hover:border-warn-ink"
-        : "bg-info-bg text-info-ink border-info-border hover:border-info-ink";
+        : "bg-sunken text-ink-700 border-line hover:border-ink-400 hover:text-ink-900";
 
   return (
     <Link
