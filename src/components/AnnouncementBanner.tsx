@@ -211,7 +211,7 @@ export function AnnouncementBanner({
             </button>
           )}
           <Link
-            to="/announcements"
+            to="/alerts"
             className="text-2xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-0.5"
           >
             All alerts <ChevronRight className="w-3 h-3" aria-hidden />
@@ -292,7 +292,7 @@ function AlertRow({
 
       <div className="flex-1 min-w-0">
         <Link
-          to={`/announcements/${ann.id}`}
+          to={`/alerts/${ann.id}`}
           className="text-sm text-ink-900 hover:underline truncate flex items-baseline gap-2 flex-wrap"
         >
           <span className="font-semibold">{ann.stateCode}:</span>
@@ -337,7 +337,7 @@ function AlertRow({
       </div>
 
       <Link
-        to={`/announcements/${ann.id}`}
+        to={`/alerts/${ann.id}`}
         className="text-xs text-ink-500 hover:text-ink-900 px-2 py-1 rounded hover:bg-sunken inline-flex items-center gap-0.5 shrink-0"
       >
         Review <ChevronRight className="w-3 h-3" aria-hidden />

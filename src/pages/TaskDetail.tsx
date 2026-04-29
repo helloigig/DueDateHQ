@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, X } from "lucide-react";
+import { ArrowLeft, CheckCircle2, FileDown, X } from "lucide-react";
 import { TaskHeader } from "../components/TaskHeader";
 import { ChecklistList } from "../components/ChecklistList";
 import { ActivityTimeline } from "../components/ActivityTimeline";
 import { AiInsightsPanel } from "../components/AiInsightsPanel";
 import { TaskAlertContext } from "../components/TaskAlertContext";
 import { EmailDraftModal, type EmailDraftIntent } from "../components/EmailDraftModal";
+import { TaskAuditPackModal } from "../components/TaskAuditPackModal";
 import { useTask } from "../hooks/useTasks";
 import { useChecklist } from "../hooks/useChecklist";
 import {
@@ -14,6 +15,7 @@ import {
   useImportedFactsForClient,
 } from "../hooks/useAiInsights";
 import { useStore, actions } from "../data/store";
+import { useSession } from "../data/session";
 import type { ChecklistItem } from "../types";
 
 /**
@@ -29,7 +31,9 @@ export function TaskDetail() {
   const facts = useImportedFactsForClient(clientId);
   const insights = useAiInsightsForClient(clientId);
 
+  const session = useSession();
   const [emailIntent, setEmailIntent] = useState<EmailDraftIntent | null>(null);
+  const [auditPackOpen, setAuditPackOpen] = useState(false);
   // Auto-suggest "ready to file" the moment the last checklist item flips
   // to confirmed. Surfaces one ephemeral toast — the CPA either accepts
   // (task → completed) or dismisses. Bridges the §5.3 invariant moment
@@ -144,6 +148,17 @@ export function TaskDetail() {
         completionPct={completionPct(checklist)}
       />
 
+      <div className="flex items-center justify-end -mt-3">
+        <button
+          onClick={() => setAuditPackOpen(true)}
+          className="text-xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-sunken"
+          title="Bundle this task's checklist + activity timeline as a PDF or JSON for IRS audit response"
+        >
+          <FileDown className="w-3.5 h-3.5" aria-hidden />
+          Audit pack
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5">
         <div className="space-y-5 min-w-0">
           <ChecklistList
@@ -173,6 +188,16 @@ export function TaskDetail() {
         open={!!emailIntent}
         intent={emailIntent}
         onClose={() => setEmailIntent(null)}
+      />
+
+      <TaskAuditPackModal
+        open={auditPackOpen}
+        task={task}
+        client={client}
+        checklist={checklist}
+        activity={activity}
+        firmName={session?.firmName ?? "Mitchell CPA"}
+        onClose={() => setAuditPackOpen(false)}
       />
     </div>
   );
