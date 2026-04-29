@@ -68,7 +68,9 @@ export default function App() {
           }
         >
           <Route index element={<Dashboard />} />
-          <Route path="inbox" element={<Inbox />} />
+          <Route path="to-review" element={<Inbox />} />
+          {/* Legacy /inbox route — redirect to canonical /to-review */}
+          <Route path="inbox" element={<Navigate to="/to-review" replace />} />
           <Route path="opportunities" element={<Insights />} />
           {/* Legacy /insights route — redirect to canonical /opportunities */}
           <Route path="insights" element={<Navigate to="/opportunities" replace />} />

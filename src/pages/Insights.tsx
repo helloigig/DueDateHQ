@@ -64,8 +64,26 @@ export function Insights() {
         </p>
       </header>
 
+      {/* Sticky in-page section nav. Four chips that jump to each section
+          via fragment links + scroll-margin so the section header isn't
+          obscured by the nav. Persists below the page header so a CPA
+          scrolling Pricing → Capacity → Firm brain doesn't have to scroll
+          back up to switch sections. */}
+      <nav
+        className="sticky top-0 z-10 -mx-4 md:-mx-6 px-4 md:px-6 py-2 bg-canvas/95 backdrop-blur-sm border-b border-line flex flex-wrap gap-1.5"
+        aria-label="Page sections"
+      >
+        <SectionAnchor href="#pricing" label="Pricing" />
+        <SectionAnchor href="#capacity" label="Capacity" />
+        <SectionAnchor href="#firm-brain" label="Firm brain" />
+        <SectionAnchor href="#benchmarks" label="Cross-firm benchmarks" />
+      </nav>
+
       {/* Pricing intelligence */}
-      <section className="bg-surface border border-line rounded-md overflow-hidden">
+      <section
+        id="pricing"
+        className="bg-surface border border-line rounded-md overflow-hidden scroll-mt-20"
+      >
         <header className="flex items-baseline px-5 py-3 border-b border-line bg-sunken/40 gap-2">
           <h2 className="text-sm font-semibold text-ink-900">
             Pricing intelligence
@@ -124,7 +142,10 @@ export function Insights() {
       </section>
 
       {/* Capacity planning */}
-      <section className="bg-surface border border-line rounded-md overflow-hidden">
+      <section
+        id="capacity"
+        className="bg-surface border border-line rounded-md overflow-hidden scroll-mt-20"
+      >
         <header className="flex items-baseline px-5 py-3 border-b border-line bg-sunken/40 gap-2">
           <h2 className="text-sm font-semibold text-ink-900">
             Capacity planning
@@ -191,7 +212,10 @@ export function Insights() {
       </section>
 
       {/* Firm brain */}
-      <section className="bg-surface border border-line rounded-md overflow-hidden">
+      <section
+        id="firm-brain"
+        className="bg-surface border border-line rounded-md overflow-hidden scroll-mt-20"
+      >
         <header className="flex items-baseline px-5 py-3 border-b border-line bg-sunken/40 gap-2">
           <h2 className="text-sm font-semibold text-ink-900">Firm brain</h2>
           <span className="text-2xs text-ink-500">
@@ -242,15 +266,18 @@ export function Insights() {
         </div>
       </section>
 
-      {/* Cross-firm benchmarks (Layer D teaser) */}
-      <section className="bg-info-bg/30 border border-info-border rounded-md p-4">
+      {/* Cross-firm benchmarks teaser */}
+      <section
+        id="benchmarks"
+        className="bg-info-bg/30 border border-info-border rounded-md p-4 scroll-mt-20"
+      >
         <div className="flex items-baseline gap-2 mb-1.5">
           <Sparkles className="w-3.5 h-3.5 text-info-ink shrink-0" aria-hidden />
           <h2 className="text-sm font-semibold text-info-ink">
             Cross-firm benchmarks coming
           </h2>
           <span className="text-2xs text-info-ink/70">
-            Layer D · Phase 2-3
+            once 100+ firms onboard
           </span>
         </div>
         <p className="text-xs text-info-ink/90">
@@ -367,5 +394,20 @@ function KnowledgeEntry({
       <p className="text-xs text-ink-700">{decision}</p>
       <p className="text-2xs text-ink-400 italic mt-2">— {author}</p>
     </article>
+  );
+}
+
+/**
+ * Anchor pill in the sticky page nav. Renders an accessible <a> for
+ * fragment navigation. Uses the URL hash, so deep-links work too.
+ */
+function SectionAnchor({ href, label }: { href: string; label: string }) {
+  return (
+    <a
+      href={href}
+      className="text-2xs uppercase tracking-wide font-semibold px-2.5 py-1 rounded border border-line text-ink-500 hover:text-ink-900 hover:bg-sunken transition-colors"
+    >
+      {label}
+    </a>
   );
 }

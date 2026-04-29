@@ -16,7 +16,7 @@ import { useStore } from "../data/store";
 
 const primary = [
   { to: "/", label: "Dashboard", Icon: LayoutDashboard, end: true },
-  { to: "/inbox", label: "To review", Icon: CheckSquare, end: false },
+  { to: "/to-review", label: "To review", Icon: CheckSquare, end: false },
   { to: "/clients", label: "Clients", Icon: Users, end: false },
   { to: "/alerts", label: "Alerts", Icon: Bell, end: false },
   { to: "/opportunities", label: "Opportunities", Icon: TrendingUp, end: false },
@@ -120,12 +120,12 @@ export function Sidebar() {
                   unread > 0 && (
                     <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-danger-solid" />
                   )}
-                {!collapsed && to === "/inbox" && inboxCount > 0 && (
+                {!collapsed && to === "/to-review" && inboxCount > 0 && (
                   <span className="ml-auto bg-sunken text-ink-700 text-2xs rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center tabular-nums border border-line">
                     {inboxCount}
                   </span>
                 )}
-                {collapsed && to === "/inbox" && inboxCount > 0 && (
+                {collapsed && to === "/to-review" && inboxCount > 0 && (
                   <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-info-solid" />
                 )}
               </>

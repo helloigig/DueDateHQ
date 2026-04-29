@@ -102,11 +102,8 @@ export function Inbox() {
   return (
     <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-5">
       <header>
-        <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
+        <h1 className="text-2xl font-semibold text-ink-900">
           To review
-        </p>
-        <h1 className="text-2xl font-semibold text-ink-900 mt-1">
-          The fast lane
         </h1>
         <p className="text-sm text-ink-500 mt-2 max-w-2xl">
           Routine decisions you can clear in 5 seconds each — AI is confident

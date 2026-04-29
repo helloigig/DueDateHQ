@@ -376,7 +376,7 @@ export function TaskList() {
             ))}
             {filtered.length > 10 && (
               <li className="px-4 py-2.5 text-xs text-ink-500 hover:bg-sunken">
-                <Link to="/inbox" className="flex items-center gap-1">
+                <Link to="/to-review" className="flex items-center gap-1">
                   + {filtered.length - 10} more — open inbox for the full list
                   <ChevronRight className="w-3 h-3" aria-hidden />
                 </Link>
@@ -901,29 +901,79 @@ function urgencyScore(r: TaskRowData): number {
   return score;
 }
 
+/**
+ * Urgency indicator. Pairs color with shape so color-blind users (~8% of
+ * CPAs, mostly deuteranopia) can still scan a list of 60+ rows. Shape
+ * mapping is consistent with traffic-light convention:
+ *   - filled solid    = act now (overdue / flagged)
+ *   - filled with ring = needs your decision
+ *   - half-filled      = due soon, on track
+ *   - check glyph      = ready to file
+ *   - hollow           = open, no signal yet
+ */
 function UrgencyDot({ row }: { row: TaskRowData }) {
   if (row.isOverdue || row.flagged > 0) {
     return (
-      <span className="w-2 h-2 rounded-full bg-danger-solid block" aria-label="urgent" />
+      <span
+        className="w-2.5 h-2.5 rounded-full bg-danger-solid block"
+        aria-label="urgent"
+        title="Urgent — overdue or flagged"
+      />
     );
   }
   if (row.unreviewed > 0) {
     return (
-      <span className="w-2 h-2 rounded-full bg-warn-solid block" aria-label="needs decision" />
+      // Concentric ring: outer warn-solid, inner canvas, distinct shape
+      <span
+        className="w-2.5 h-2.5 rounded-full bg-warn-solid relative block"
+        aria-label="needs your decision"
+        title="Needs your decision — AI flagged something"
+      >
+        <span className="absolute inset-[3px] rounded-full bg-canvas block" />
+      </span>
     );
   }
   if (row.daysUntil <= 7) {
     return (
-      <span className="w-2 h-2 rounded-full bg-info-solid block" aria-label="due soon" />
+      // Half-fill: bottom semicircle filled, top hollow
+      <span
+        className="w-2.5 h-2.5 rounded-full border border-info-solid relative overflow-hidden block"
+        aria-label="due soon"
+        title="Due this week"
+      >
+        <span className="absolute inset-x-0 bottom-0 h-1/2 bg-info-solid block" />
+      </span>
     );
   }
   if (row.isReady) {
     return (
-      <span className="w-2 h-2 rounded-full bg-ok-solid block" aria-label="ready" />
+      // Check glyph in a circle — unmistakable "done" signal
+      <span
+        className="w-2.5 h-2.5 rounded-full bg-ok-solid flex items-center justify-center"
+        aria-label="ready to file"
+        title="Ready to file — all docs confirmed"
+      >
+        <svg
+          viewBox="0 0 8 8"
+          className="w-2 h-2 text-canvas"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <path d="M2 4.2 L3.4 5.6 L6.2 2.4" />
+        </svg>
+      </span>
     );
   }
   return (
-    <span className="w-2 h-2 rounded-full border border-ink-300 block" aria-label="open" />
+    <span
+      className="w-2.5 h-2.5 rounded-full border border-ink-300 block"
+      aria-label="open"
+      title="Open"
+    />
   );
 }
 

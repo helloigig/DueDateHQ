@@ -212,7 +212,7 @@ export function ChaseLoopStatus() {
               : `${confirmTasks} tasks have docs in. Batch them when you have a minute.`
           }
           ctaLabel={confirms.length > 3 ? "Open inbox" : "Review"}
-          ctaHref="/inbox"
+          ctaHref="/to-review"
           items={confirms.slice(0, 3).map((c) => {
             const task = taskById.get(c.taskId);
             const client = task ? clientById.get(task.clientId) : null;
@@ -259,7 +259,7 @@ export function ChaseLoopStatus() {
               : `It's time to follow up on ${chaseTasks} task${chaseTasks === 1 ? "" : "s"}.`
           }
           ctaLabel={chases.length > 3 ? "Open inbox" : "Send all"}
-          ctaHref={chases.length > 3 ? "/inbox" : null}
+          ctaHref={chases.length > 3 ? "/to-review" : null}
           items={chases.slice(0, 3).map((c) => {
             const task = taskById.get(c.taskId);
             const client = task ? clientById.get(task.clientId) : null;
