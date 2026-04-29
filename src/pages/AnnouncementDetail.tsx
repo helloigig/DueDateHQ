@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { History } from "lucide-react";
+import { History, Link2 } from "lucide-react";
 import { actions } from "../data/store";
-import { useAnnouncement } from "../hooks/useAnnouncements";
+import { useAnnouncement, useAnnouncements } from "../hooks/useAnnouncements";
 import { useClients } from "../hooks/useClients";
 import { PageSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
@@ -16,6 +16,8 @@ import {
 } from "../data/announcementLabels";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { BatchNotifyModal } from "../components/BatchNotifyModal";
+import { DismissWithReasonDialog } from "../components/DismissWithReasonDialog";
+import { BatchApplyProgress } from "../components/BatchApplyProgress";
 
 const CONFIDENCE_TONE = {
   high: "bg-emerald-50 text-emerald-700",
@@ -28,16 +30,25 @@ export function AnnouncementDetail() {
   const navigate = useNavigate();
   const announcementQuery = useAnnouncement(id);
   const clientsQuery = useClients();
+  const allAnnouncementsQuery = useAnnouncements();
   const ann = announcementQuery.data ?? null;
   const clients = clientsQuery.data?.items ?? [];
+  const allAnnouncements = allAnnouncementsQuery.data ?? [];
 
-  const [selected, setSelected] = useState<Set<string>>(
-    new Set(ann?.affectedClientIds ?? [])
-  );
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (ann) setSelected(new Set(ann.affectedClientIds));
+  }, [ann?.id, ann?.affectedClientIds.join(",")]);
 
   const [flash, setFlash] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<"batch" | "dismiss" | null>(null);
+  const [confirm, setConfirm] = useState<"batch" | null>(null);
+  const [dismissOpen, setDismissOpen] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
+  const [progress, setProgress] = useState<{
+    total: number;
+    done: number;
+  } | null>(null);
 
   const clientsById = useMemo(() => {
     const m = new Map<string, (typeof clients)[number]>();
@@ -96,24 +107,44 @@ export function AnnouncementDetail() {
 
   const doBatchAdjust = () => {
     if (!ann.oldDeadline || !ann.newDeadline) return;
-    actions.batchAdjustDeadlines(
-      Array.from(selected),
-      ann.oldDeadline,
-      ann.newDeadline,
-      ann.title
-    );
-    setFlash(
-      `${selectedCount} deadline${
-        selectedCount === 1 ? "" : "s"
-      } adjusted to ${formatLongDate(ann.newDeadline)}.`
-    );
+    const ids = Array.from(selected);
+    const total = ids.length;
     setConfirm(null);
+    setProgress({ total, done: 0 });
+
+    let i = 0;
+    const tick = () => {
+      i += 1;
+      if (i <= total) {
+        setProgress({ total, done: i });
+        setTimeout(tick, Math.max(60, 240 - total * 8));
+      } else {
+        actions.batchAdjustDeadlines(
+          ids,
+          ann.oldDeadline!,
+          ann.newDeadline!,
+          ann.title
+        );
+        setProgress(null);
+        setFlash(
+          `${total} deadline${total === 1 ? "" : "s"} adjusted to ${formatLongDate(
+            ann.newDeadline!
+          )}.`
+        );
+      }
+    };
+    setTimeout(tick, 200);
   };
 
-  const doDismiss = () => {
-    actions.dismissAnnouncement(ann.id);
+  const doDismissWithReason = (reason: string) => {
+    actions.dismissAnnouncement(ann.id, reason);
+    setDismissOpen(false);
     navigate("/alerts");
   };
+
+  const relatedAlerts = ann.relatedAnnouncementIds
+    .map((rid) => allAnnouncements.find((a) => a.id === rid))
+    .filter((a): a is NonNullable<typeof a> => !!a);
 
   return (
     <div className="max-w-4xl mx-auto px-4 md:px-6 py-6">
@@ -229,6 +260,54 @@ export function AnnouncementDetail() {
         </div>
       </section>
 
+      {(relatedAlerts.length > 0 || ann.relatedAnnouncementIds.length > 0) && (
+        <section className="mt-5 bg-white border border-slate-200 rounded-lg">
+          <div className="flex items-center px-4 py-3 border-b border-slate-100">
+            <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <Link2 className="w-3.5 h-3.5" aria-hidden />
+              RELATED ALERTS
+            </h2>
+            <span className="ml-2 text-xs text-slate-500">
+              {ann.relatedAnnouncementIds.length} cross-reference
+              {ann.relatedAnnouncementIds.length === 1 ? "" : "s"}
+            </span>
+          </div>
+          <ul className="divide-y divide-slate-100">
+            {relatedAlerts.map((rel) => (
+              <li key={rel.id} className="px-4 py-2.5">
+                <Link
+                  to={`/alerts/${rel.id}`}
+                  className="flex items-start gap-2 hover:underline"
+                >
+                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-slate-100 text-slate-900 border border-slate-200 shrink-0 mt-0.5">
+                    {rel.stateCode}
+                  </span>
+                  <span className="text-sm text-slate-900">
+                    {rel.title}
+                    <span className="text-xs text-slate-500 ml-2">
+                      · {rel.authority}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+            {ann.relatedAnnouncementIds
+              .filter((rid) => !allAnnouncements.some((a) => a.id === rid))
+              .map((rid) => (
+                <li key={rid} className="px-4 py-2.5 text-xs text-slate-500">
+                  <span className="font-mono">{rid}</span> — referenced but not
+                  yet in your feed
+                </li>
+              ))}
+          </ul>
+          <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 text-xs text-slate-500">
+            Disaster declarations are often dual-source (IRS §7508A + state
+            DOR). Cross-references help you reconcile overlapping postponement
+            dates.
+          </div>
+        </section>
+      )}
+
       <section className="mt-5 bg-white border border-slate-200 rounded-lg overflow-hidden">
         <div className="flex items-center px-4 py-3 border-b border-slate-100">
           <h2 className="text-sm font-semibold text-slate-700">
@@ -319,12 +398,26 @@ export function AnnouncementDetail() {
           Review one-by-one
         </button>
         <button
-          onClick={() => setConfirm("dismiss")}
+          onClick={() => setDismissOpen(true)}
           className="ml-auto px-4 py-2 rounded text-sm text-slate-500 hover:bg-slate-50"
         >
           Not applicable — dismiss
         </button>
       </section>
+
+      <BatchApplyProgress
+        open={!!progress}
+        total={progress?.total ?? 0}
+        done={progress?.done ?? 0}
+        title={`Adjusting ${progress?.total ?? 0} deadline${
+          (progress?.total ?? 0) === 1 ? "" : "s"
+        }`}
+        subtitle={
+          ann.newDeadline
+            ? `New deadline: ${formatLongDate(ann.newDeadline)}`
+            : ""
+        }
+      />
 
       <ConfirmDialog
         open={confirm === "batch"}
@@ -370,23 +463,10 @@ export function AnnouncementDetail() {
         }
       />
 
-      <ConfirmDialog
-        open={confirm === "dismiss"}
-        title="Dismiss this announcement?"
-        destructive
-        requireAcknowledge="I've reviewed this and none of my clients are affected."
-        body={
-          <>
-            <p>
-              You won't see this in banners or the bell again. The announcement
-              stays in your history. You can undo by opening it from the Alerts
-              page.
-            </p>
-          </>
-        }
-        confirmLabel="Dismiss"
-        onConfirm={doDismiss}
-        onCancel={() => setConfirm(null)}
+      <DismissWithReasonDialog
+        open={dismissOpen}
+        onConfirm={doDismissWithReason}
+        onCancel={() => setDismissOpen(false)}
       />
     </div>
   );

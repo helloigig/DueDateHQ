@@ -180,6 +180,26 @@ export function ClientDetail() {
             {client.nexusStates.length > 0 && ` + ${client.nexusStates.length} nexus`} ·
             <span className="capitalize"> {client.status}</span> · Added {addedAtLabel}
           </p>
+          {client.servicePackages.length > 0 && (
+            <div className="mt-2 flex items-center flex-wrap gap-1.5">
+              <span className="text-2xs uppercase tracking-wider text-slate-500 font-semibold">
+                Service package{client.servicePackages.length === 1 ? "" : "s"}:
+              </span>
+              {client.servicePackages.map((p) => (
+                <Link
+                  key={p}
+                  to="/settings/packages"
+                  className="text-xs px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                  title={`${p} — generates this client's deadlines automatically. Click to view.`}
+                >
+                  {p}
+                </Link>
+              ))}
+              <span className="text-2xs text-slate-400">
+                · {clientDeadlines.length} deadline{clientDeadlines.length === 1 ? "" : "s"} auto-generated
+              </span>
+            </div>
+          )}
         </div>
         <button
           onClick={() => setExportOpen(true)}
