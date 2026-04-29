@@ -12,6 +12,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useStore, actions } from "../data/store";
+import { confirmWithUndo } from "../lib/confirmWithUndo";
 import { useAllOpenInsights } from "../hooks/useAiInsights";
 import { useSession } from "../data/session";
 import {
@@ -353,13 +354,10 @@ export function TaskList() {
                 onOpen={() =>
                   navigate(`/clients/${row.client.id}/tasks/${row.task.id}`)
                 }
-                onConfirm={(itemId) =>
-                  actions.setChecklistItemState(
-                    itemId,
-                    "received_confirmed",
-                    "cpa"
-                  )
-                }
+                onConfirm={(itemId) => {
+                  const item = checklistItems.find((c) => c.id === itemId);
+                  if (item) confirmWithUndo(item);
+                }}
                 onSendChase={(item) => openEmailFor(row, item)}
               />
             ))}

@@ -350,7 +350,7 @@ function AlertRow({
       </div>
 
       <Link
-        to={`/announcements/${ann.id}`}
+        to={`/alerts/${ann.id}`}
         className="text-xs text-ink-500 hover:text-ink-900 px-2 py-1 rounded hover:bg-sunken inline-flex items-center gap-0.5 shrink-0"
       >
         Review <ChevronRight className="w-3 h-3" aria-hidden />

@@ -2,8 +2,8 @@ import { useMemo, useState } from "react";
 import { Mail, Send } from "lucide-react";
 import type { Announcement, Client } from "../types";
 import { formatLongDate } from "../data/dateHelpers";
-import { useModalDialog } from "../hooks/useModalDialog";
 import { useSession } from "../data/session";
+import { Modal, useModalLabelId } from "./Modal";
 
 export function BatchNotifyModal({
   open,
@@ -19,7 +19,7 @@ export function BatchNotifyModal({
   onSent: (count: number) => void;
 }) {
   const session = useSession();
-  const dialogRef = useModalDialog(open, onClose);
+  const labelId = useModalLabelId();
 
   const defaultSubject = useMemo(() => {
     if (!announcement) return "";
@@ -56,7 +56,7 @@ export function BatchNotifyModal({
     setLastKey(key);
   }
 
-  if (!open || !announcement) return null;
+  if (!announcement) return null;
 
   const canSend = recipients.length > 0 && subject.trim() && body.trim();
 
@@ -71,106 +71,93 @@ export function BatchNotifyModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="batch-notify-title"
-        onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-lg shadow-xl border border-slate-200 w-full max-w-2xl mx-4 outline-none"
-      >
-        <header className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+    <Modal open={open} onClose={onClose} ariaLabelledBy={labelId} size="xl">
+      <Modal.Header>
+        <div className="flex items-center gap-2">
           <Mail className="w-4 h-4 text-ink-500" aria-hidden />
-          <h2
-            id="batch-notify-title"
-            className="text-base font-semibold text-slate-900"
-          >
+          <h2 id={labelId} className="text-base font-semibold text-ink-900">
             Notify {recipients.length} client
             {recipients.length === 1 ? "" : "s"} by email
           </h2>
-        </header>
-
-        <div className="px-5 py-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm max-h-[60vh] overflow-y-auto">
-          <div className="md:col-span-2 space-y-3">
-            <label className="block">
-              <span className="text-xs font-medium text-slate-600 mb-1 block">
-                Subject
-              </span>
-              <input
-                data-autofocus
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                className="w-full px-2.5 py-1.5 rounded border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs font-medium text-slate-600 mb-1 block">
-                Body (plain text — <code>{`{client_name}`}</code> is replaced per recipient)
-              </span>
-              <textarea
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                rows={12}
-                className="w-full px-2.5 py-1.5 rounded border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono text-xs resize-none"
-              />
-            </label>
-          </div>
-          <aside>
-            <div className="text-xs font-medium text-slate-600 mb-1">
-              Recipients ({recipients.length})
-            </div>
-            <div className="border border-slate-200 rounded max-h-72 overflow-y-auto">
-              <ul className="divide-y divide-slate-100">
-                {recipients.map((c) => (
-                  <li key={c.id} className="px-3 py-2">
-                    <div className="text-sm text-slate-900 truncate">
-                      {c.name}
-                    </div>
-                    <div className="text-2xs text-slate-500 truncate">
-                      {c.contactEmail}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <p className="text-2xs text-slate-500 mt-2">
-              Invalid emails are skipped. Bounces appear in the bell.
-            </p>
-          </aside>
         </div>
+      </Modal.Header>
 
-        {sent && (
-          <div className="mx-5 mb-3 rounded border border-emerald-200 bg-emerald-50 text-emerald-800 text-sm px-3 py-2">
-            Queued to {recipients.length} recipient
-            {recipients.length === 1 ? "" : "s"}. In production this hits the
-            sending provider; here we logged it to the console.
+      <Modal.Body
+        scroll
+        className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm"
+      >
+        <div className="md:col-span-2 space-y-3">
+          <label className="block">
+            <span className="text-xs font-medium text-ink-700 mb-1 block">
+              Subject
+            </span>
+            <input
+              data-autofocus
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-accent"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-medium text-ink-700 mb-1 block">
+              Body (plain text — <code>{`{client_name}`}</code> is replaced per recipient)
+            </span>
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={12}
+              className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-accent font-mono text-xs resize-none"
+            />
+          </label>
+        </div>
+        <aside>
+          <div className="text-xs font-medium text-ink-700 mb-1">
+            Recipients ({recipients.length})
           </div>
-        )}
+          <div className="border border-line rounded max-h-72 overflow-y-auto">
+            <ul className="divide-y divide-line">
+              {recipients.map((c) => (
+                <li key={c.id} className="px-3 py-2">
+                  <div className="text-sm text-ink-900 truncate">{c.name}</div>
+                  <div className="text-2xs text-ink-500 truncate">
+                    {c.contactEmail}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <p className="text-2xs text-ink-500 mt-2">
+            Invalid emails are skipped. Bounces appear in the bell.
+          </p>
+        </aside>
+      </Modal.Body>
 
-        <footer className="px-5 py-3 bg-slate-50 rounded-b-lg flex items-center justify-end gap-2">
+      {sent && (
+        <div className="mx-5 mb-3 rounded border border-ok-border bg-ok-bg text-ok-ink text-sm px-3 py-2">
+          Queued to {recipients.length} recipient
+          {recipients.length === 1 ? "" : "s"}. In production this hits the
+          sending provider; here we logged it to the console.
+        </div>
+      )}
+
+      <Modal.Footer tone="sunken">
+        <button
+          onClick={onClose}
+          className="text-sm px-3 py-1.5 rounded border border-line bg-surface hover:bg-sunken text-ink-700"
+        >
+          {sent ? "Close" : "Cancel"}
+        </button>
+        {!sent && (
           <button
-            onClick={onClose}
-            className="text-sm px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50"
+            onClick={send}
+            disabled={!canSend}
+            className="text-sm px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 flex items-center gap-1.5"
           >
-            {sent ? "Close" : "Cancel"}
+            <Send className="w-3.5 h-3.5" aria-hidden />
+            Send to {recipients.length}
           </button>
-          {!sent && (
-            <button
-              onClick={send}
-              disabled={!canSend}
-              className="text-sm px-3 py-1.5 rounded font-medium text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-40 flex items-center gap-1.5"
-            >
-              <Send className="w-3.5 h-3.5" aria-hidden />
-              Send to {recipients.length}
-            </button>
-          )}
-        </footer>
-      </div>
-    </div>
+        )}
+      </Modal.Footer>
+    </Modal>
   );
 }

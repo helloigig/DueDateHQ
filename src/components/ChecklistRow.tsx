@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import type { ChecklistItem, DocumentState } from "../types";
 import { actions } from "../data/store";
+import { confirmWithUndo } from "../lib/confirmWithUndo";
 
 /**
  * Renders one Layer 3 checklist item per IA §3.4. Each row's visual
@@ -98,7 +99,8 @@ export function ChecklistRow({ item, onOpenEmailDraft }: Props) {
 
   const onConfirm = () => {
     // PRD §5.3 invariant — only "cpa" actor permitted here.
-    actions.setChecklistItemState(item.id, "received_confirmed", "cpa");
+    // confirmWithUndo wraps this with a 5-sec undo window.
+    confirmWithUndo(item);
   };
   const onReject = () => {
     actions.setChecklistItemState(item.id, "requested_waiting", "cpa");
@@ -110,7 +112,7 @@ export function ChecklistRow({ item, onOpenEmailDraft }: Props) {
     actions.setChecklistItemState(item.id, "not_applicable", "cpa");
   };
   const onConfirmAnyway = () => {
-    actions.setChecklistItemState(item.id, "received_confirmed", "cpa");
+    confirmWithUndo(item);
   };
   const onMarkIssue = () => {
     // No-op state change — UI just keeps it as `received_issue`.
