@@ -414,7 +414,36 @@ export const mockAdapter = {
     detect: async () => {
       await delay(200);
       const count = actions.detectNewAnnouncements();
-      return { count };
+      return {
+        fetched: count,
+        new: count,
+        lowConfidence: 0,
+        matchedForFirm: count,
+      };
+    },
+    /** Mock reviewer queue — empty in mock mode. Real BE returns
+     *  low-confidence scraped notices. */
+    reviewerQueue: async () => {
+      await delay();
+      return [] as Array<{
+        id: string;
+        stateCode: string;
+        authority: string;
+        title: string;
+        summary: string;
+        type: string;
+        sourceUrl: string;
+        parseConfidence: string;
+        detectedAt: string;
+      }>;
+    },
+    approveScraped: async () => {
+      await delay();
+      return { ok: true as const };
+    },
+    rejectScraped: async () => {
+      await delay();
+      return { ok: true as const };
     },
   },
 
@@ -508,6 +537,70 @@ export const mockAdapter = {
       await delay();
       const removed = actions.undoImport(id);
       return { removed };
+    },
+    /** Mock prior-year PDF parser — deterministic by storageKey hash so
+     *  re-running gives the same answer. Real BE reads the PDF + LLM. */
+    parsePriorYearReturn: async ({ storageKey }: { storageKey: string }) => {
+      await delay(800);
+      const hash = Array.from(storageKey).reduce(
+        (h, c) => (h * 31 + c.charCodeAt(0)) | 0,
+        0,
+      );
+      const entityType =
+        hash % 3 === 0 ? "LLC" : hash % 3 === 1 ? "S-Corp" : "Individual";
+      return {
+        fields: {
+          clientName: null,
+          ein: null,
+          entityType,
+          taxYear: 2024,
+          priorAGI: null,
+          formsFiled: [],
+          k1Sources: [],
+          confidence: 0.4,
+        },
+        readyForCommit: false,
+      };
+    },
+  },
+
+  /** Mock integrations — empty list, all providers reported as
+   *  not-configured so the FE renders "Coming soon" CTAs. Real BE
+   *  reads from the integrations table + isConfigured(). */
+  integrations: {
+    list: async () => {
+      await delay();
+      return [] as Array<{
+        id: string;
+        kind: "qbo" | "xero" | "gmail" | "outlook" | "stripe";
+        status: "connected" | "disconnected" | "error";
+        externalAccountId: string | null;
+        scope: string | null;
+        lastSyncedAt: string | null;
+        lastError: string | null;
+        expiresAt: string | null;
+        configured: boolean;
+      }>;
+    },
+    catalog: async () => {
+      await delay();
+      return [
+        { kind: "qbo" as const, configured: false },
+        { kind: "xero" as const, configured: false },
+        { kind: "gmail" as const, configured: false },
+        { kind: "outlook" as const, configured: false },
+        { kind: "stripe" as const, configured: false },
+      ];
+    },
+    startConnect: async () => {
+      await delay();
+      // Mock — no real OAuth flow; throw so the FE can show the
+      // "Coming soon" state without trying to navigate.
+      throw new Error("oauth_not_configured_in_mock_mode");
+    },
+    disconnect: async () => {
+      await delay();
+      return { ok: true as const };
     },
   },
 
@@ -668,6 +761,46 @@ export const mockAdapter = {
         acceptanceRate: 105 / 121,
         totalCostCents: 487.2,
       };
+    },
+    /** Mock drift report — 8 weeks of buckets, slight downward trend
+     *  to exercise both "stable" and "alert" branches in the UI. */
+    driftReport: async () => {
+      await delay();
+      const today = new Date();
+      const weeks: Array<{
+        week: string;
+        total: number;
+        acceptanceRate: number | null;
+      }> = [];
+      // Generate the last 8 ISO weeks with a slight downtrend so the
+      // UI has data to draw. Latest week is intentionally a bit lower.
+      const baseRate = 0.88;
+      for (let i = 7; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i * 7);
+        const yr = d.getUTCFullYear();
+        // Crude ISO-week-of-year approximation; close enough for mock.
+        const week = Math.ceil(
+          ((d.getTime() - Date.UTC(yr, 0, 1)) / 86_400_000 + 1) / 7,
+        );
+        const wobble = ((i * 13) % 7) / 100; // deterministic ±3pp wobble
+        const drop = i === 0 ? 0.07 : 0; // latest week 7pp lower
+        weeks.push({
+          week: `${yr}-W${String(week).padStart(2, "0")}`,
+          total: 18 + ((i * 5) % 11),
+          acceptanceRate: baseRate + wobble - drop,
+        });
+      }
+      const latest = weeks[weeks.length - 1]?.acceptanceRate ?? null;
+      const prior = weeks
+        .slice(-5, -1)
+        .map((w) => w.acceptanceRate)
+        .filter((r): r is number => r !== null);
+      const priorMean =
+        prior.length > 0 ? prior.reduce((s, r) => s + r, 0) / prior.length : null;
+      const drift =
+        latest !== null && priorMean !== null ? latest - priorMean : null;
+      return { weeks, drift, alert: drift !== null && drift < -0.05 };
     },
   },
 

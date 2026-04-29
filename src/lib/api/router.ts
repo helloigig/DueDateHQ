@@ -231,8 +231,41 @@ export const appRouter = t.router({
       .input(jsonPassthrough)
       .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
     detect: t.procedure.mutation(
-      async (): Promise<{ count: number }> => NOT_IMPL()
+      async (): Promise<{
+        fetched: number;
+        new: number;
+        lowConfidence: number;
+        matchedForFirm: number;
+      }> => NOT_IMPL()
     ),
+    /** Reviewer queue — low-confidence scraped notices awaiting approval */
+    reviewerQueue: t.procedure.query(
+      async (): Promise<
+        Array<{
+          id: string;
+          stateCode: string;
+          authority: string;
+          title: string;
+          summary: string;
+          type: string;
+          sourceUrl: string;
+          parseConfidence: string;
+          detectedAt: string;
+        }>
+      > => NOT_IMPL()
+    ),
+    approveScraped: t.procedure
+      .input(
+        z.object({
+          id: z.string(),
+          title: z.string().optional(),
+          summary: z.string().optional(),
+        }),
+      )
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    rejectScraped: t.procedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
   }),
 
   notifications: t.router({
@@ -280,6 +313,31 @@ export const appRouter = t.router({
     undo: t.procedure
       .input(jsonPassthrough)
       .mutation(async (): Promise<{ removed: number }> => NOT_IMPL()),
+    /** Tier 3 — parse a prior-year return PDF (storageKey from
+     *  uploads.requestUrl). Returns extracted fields for reviewer
+     *  approval before write. */
+    parsePriorYearReturn: t.procedure
+      .input(
+        z.object({
+          storageKey: z.string().min(1),
+          clientId: z.string().uuid().optional(),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          fields: {
+            clientName: string | null;
+            ein: string | null;
+            entityType: string | null;
+            taxYear: number | null;
+            priorAGI: number | null;
+            formsFiled: string[];
+            k1Sources: string[];
+            confidence: number;
+          };
+          readyForCommit: boolean;
+        }> => NOT_IMPL(),
+      ),
   }),
 
   exports: t.router({
@@ -405,6 +463,61 @@ export const appRouter = t.router({
           totalCostCents: number;
         }> => NOT_IMPL()
       ),
+    /** Drift report — per-mode acceptance rate bucketed by ISO week.
+     *  Surfaces deteriorating model performance before users complain. */
+    driftReport: t.procedure
+      .input(z.object({ mode: z.string().optional() }).optional())
+      .query(
+        async (): Promise<{
+          weeks: Array<{
+            week: string;
+            total: number;
+            acceptanceRate: number | null;
+          }>;
+          drift: number | null;
+          alert: boolean;
+        }> => NOT_IMPL(),
+      ),
+  }),
+
+  /** Provider integrations — QBO/Xero/Gmail/Outlook/Stripe. The
+   *  configured field tells the FE whether the BE has client
+   *  credentials in env, so we render Connect vs Coming soon. */
+  integrations: t.router({
+    list: t.procedure.query(
+      async (): Promise<
+        Array<{
+          id: string;
+          kind: "qbo" | "xero" | "gmail" | "outlook" | "stripe";
+          status: "connected" | "disconnected" | "error";
+          externalAccountId: string | null;
+          scope: string | null;
+          lastSyncedAt: string | null;
+          lastError: string | null;
+          expiresAt: string | null;
+          configured: boolean;
+        }>
+      > => NOT_IMPL(),
+    ),
+    catalog: t.procedure.query(
+      async (): Promise<
+        Array<{
+          kind: "qbo" | "xero" | "gmail" | "outlook" | "stripe";
+          configured: boolean;
+        }>
+      > => NOT_IMPL(),
+    ),
+    startConnect: t.procedure
+      .input(
+        z.object({
+          kind: z.enum(["qbo", "xero", "gmail", "outlook"]),
+          redirectTo: z.string().url(),
+        }),
+      )
+      .mutation(async (): Promise<{ authorizeUrl: string }> => NOT_IMPL()),
+    disconnect: t.procedure
+      .input(z.object({ id: z.string().uuid() }))
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
   }),
 
   aiInsights: t.router({

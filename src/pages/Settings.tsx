@@ -25,6 +25,12 @@ import { ErrorState } from "../components/ErrorState";
 import { UpgradePrompt } from "../components/UpgradePrompt";
 import { useFeatureFlags } from "../hooks/useFeatureFlags";
 import {
+  useReviewerQueue,
+  useManualDetect,
+  useApproveScraped,
+  useRejectScraped,
+} from "../hooks/useScraperReview";
+import {
   useReminderTemplates,
   useUpdateReminderTemplate,
 } from "../hooks/useReminderTemplates";
@@ -196,27 +202,154 @@ function AlertsPanel() {
   };
 
   return (
+    <div className="space-y-6">
+      <Card
+        title="Alerts & email delivery"
+        description="How state announcement alerts reach your inbox. In-app banners fire regardless."
+      >
+        <div className="space-y-2">
+          <RadioRow
+            checked={digest === "digest_8am"}
+            onChange={() => save("digest_8am")}
+            label="Daily 8am digest"
+            hint="One email per morning with all state announcements from the last 24h."
+          />
+          <RadioRow
+            checked={digest === "per_alert"}
+            onChange={() => save("per_alert")}
+            label="Per-alert email"
+            hint="Email fires immediately when an announcement is detected."
+          />
+        </div>
+        <p className="text-2xs text-ink-500 mt-4">
+          SMS reminders are deferred to Phase 2 — we won't half-build them.
+        </p>
+      </Card>
+
+      <ReviewerQueueSection />
+    </div>
+  );
+}
+
+/**
+ * Reviewer queue — low-confidence scraped notices waiting for human
+ * approval before they project to firms. The "human review queue"
+ * the architecture spec calls for, surfaced here in Settings → Alerts.
+ *
+ * Empty state is the most common — when the regex/LLM classifier is
+ * confident, items skip review and go straight to firm projection.
+ */
+function ReviewerQueueSection() {
+  const queue = useReviewerQueue();
+  const detect = useManualDetect();
+  const approve = useApproveScraped();
+  const reject = useRejectScraped();
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const onDetect = async () => {
+    setFeedback(null);
+    try {
+      const result = await detect.mutateAsync();
+      const newCount = result.new ?? 0;
+      const lowConf = result.lowConfidence ?? 0;
+      setFeedback(
+        newCount > 0
+          ? `Found ${newCount} new notice${newCount === 1 ? "" : "s"} (${lowConf} need review).`
+          : "No new notices since last check.",
+      );
+    } catch (err) {
+      setFeedback(
+        err instanceof Error ? err.message : "Detection failed — check logs.",
+      );
+    }
+  };
+
+  return (
     <Card
-      title="Alerts & email delivery"
-      description="How state announcement alerts reach your inbox. In-app banners fire regardless."
+      title="Reviewer queue"
+      description="State notices the scraper isn't confident about. Approve to project them to your firm; reject to discard."
     >
-      <div className="space-y-2">
-        <RadioRow
-          checked={digest === "digest_8am"}
-          onChange={() => save("digest_8am")}
-          label="Daily 8am digest"
-          hint="One email per morning with all state announcements from the last 24h."
-        />
-        <RadioRow
-          checked={digest === "per_alert"}
-          onChange={() => save("per_alert")}
-          label="Per-alert email"
-          hint="Email fires immediately when an announcement is detected."
-        />
+      <div className="flex items-center gap-2 mb-3">
+        <button
+          onClick={onDetect}
+          disabled={detect.isPending}
+          className="text-xs px-3 py-1.5 rounded border border-line text-ink-700 hover:bg-sunken disabled:opacity-40"
+        >
+          {detect.isPending ? "Detecting…" : "Run detection now"}
+        </button>
+        <span className="text-2xs text-ink-500">
+          The scraper runs hourly in the background — this triggers an extra
+          cycle.
+        </span>
       </div>
-      <p className="text-2xs text-ink-500 mt-4">
-        SMS reminders are deferred to Phase 2 — we won't half-build them.
-      </p>
+      {feedback && (
+        <p className="text-2xs text-ink-700 bg-sunken/50 border border-line rounded px-2.5 py-1.5 mb-3">
+          {feedback}
+        </p>
+      )}
+
+      {queue.isLoading && (
+        <p className="text-xs text-ink-500">Loading queue…</p>
+      )}
+      {queue.error && (
+        <p className="text-xs text-danger-ink">
+          Couldn't load queue: {queue.error.message}
+        </p>
+      )}
+      {queue.data && queue.data.length === 0 && (
+        <p className="text-xs text-ink-500">
+          Queue is clear — no low-confidence notices waiting.
+        </p>
+      )}
+      {queue.data && queue.data.length > 0 && (
+        <ul className="divide-y divide-line border border-line rounded-md bg-canvas">
+          {queue.data.map((row) => (
+            <li key={row.id} className="px-3 py-2.5 flex items-start gap-3">
+              <span className="text-2xs font-mono uppercase text-ink-500 w-9 shrink-0 mt-0.5">
+                {row.stateCode}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-ink-900">{row.title}</p>
+                <p className="text-2xs text-ink-500 mt-0.5">
+                  {row.authority}
+                  {" · "}
+                  {new Date(row.detectedAt).toLocaleDateString()}
+                  {" · "}
+                  <a
+                    href={row.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline hover:text-ink-900"
+                  >
+                    source
+                  </a>
+                </p>
+                {row.summary && (
+                  <p className="text-2xs text-ink-700 mt-1 line-clamp-2">
+                    {row.summary}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={() => approve.mutate({ id: row.id })}
+                  disabled={approve.isPending}
+                  className="text-2xs px-2.5 py-1 rounded bg-ok-bg text-ok-ink border border-ok-border hover:bg-ok-bg/70 disabled:opacity-40"
+                >
+                  Approve
+                </button>
+                <button
+                  onClick={() => reject.mutate({ id: row.id })}
+                  disabled={reject.isPending}
+                  className="text-2xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken disabled:opacity-40"
+                >
+                  Reject
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </Card>
   );
 }
