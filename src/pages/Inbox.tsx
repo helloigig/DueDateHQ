@@ -25,11 +25,40 @@ export function Inbox() {
     [clients]
   );
 
+  // The cut between this surface and the task surface:
+  //   /to-review  = AI-confident routine decisions (high or medium), batchable
+  //   task pages = anything requiring context — anomaly flags, low
+  //                 confidence (AI doesn't know what it even is), or
+  //                 custom items outside the AI pipeline
+  //
+  // Why medium-confidence is in the fast lane: in real classifiers, most
+  // outputs are medium — that's normal, not "needs judgment." If AI knows
+  // it's a 1099-INT (just slightly unsure on subtype), the CPA can glance
+  // and confirm in 5 seconds without opening anything.
   const confirms = useMemo(
     () =>
       checklistItems
-        .filter((c) => c.state === "received_unreviewed")
+        .filter(
+          (c) =>
+            c.state === "received_unreviewed" &&
+            !c.flagReason && // anomaly flags require judgment
+            (c.aiConfidence === "high" || c.aiConfidence === "medium")
+        )
         .sort((a, b) => (a.receivedAt ?? "").localeCompare(b.receivedAt ?? "")),
+    [checklistItems]
+  );
+
+  // Items that genuinely need context: AI-low / no AI / anomaly-flagged.
+  // These don't appear in the fast lane — they have a callout linking out.
+  const needsContextCount = useMemo(
+    () =>
+      checklistItems.filter(
+        (c) =>
+          c.state === "received_unreviewed" &&
+          (c.flagReason ||
+            c.aiConfidence === "low" ||
+            !c.aiConfidence)
+      ).length,
     [checklistItems]
   );
 
@@ -76,29 +105,40 @@ export function Inbox() {
     <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-5">
       <header>
         <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
-          Inbox
+          To review
         </p>
         <h1 className="text-2xl font-semibold text-ink-900 mt-1">
-          Routine decisions
+          The fast lane
         </h1>
-        <p className="text-sm text-ink-500 mt-2 max-w-xl">
-          The bulk where AI-classified inbound documents and timing-driven
-          chases pile up. Batch-process when you have time — nothing here is
-          urgent.
+        <p className="text-sm text-ink-500 mt-2 max-w-2xl">
+          Routine decisions you can clear in 5 seconds each — AI is confident
+          about every item here. Anything ambiguous (low confidence, flagged,
+          custom items) waits for you on its task page where you can see the
+          context.
         </p>
       </header>
+
+      {needsContextCount > 0 && (
+        <p className="text-2xs text-ink-500">
+          Plus {needsContextCount} document
+          {needsContextCount === 1 ? "" : "s"} that{" "}
+          {needsContextCount === 1 ? "needs" : "need"} more context — flagged,
+          AI uncertain, or custom. Those live on their task pages where you can
+          see what surrounds them.
+        </p>
+      )}
 
       <div className="border-b border-line flex gap-1">
         <TabButton
           active={tab === "confirms"}
           onClick={() => setTab("confirms")}
-          label="Documents to confirm"
+          label="Confirm AI-sorted docs"
           count={confirms.length}
         />
         <TabButton
           active={tab === "chases"}
           onClick={() => setTab("chases")}
-          label="Chase ready to send"
+          label="Send scheduled reminders"
           count={chases.length}
         />
         <TabButton
@@ -118,15 +158,35 @@ export function Inbox() {
             Confirm all {confirms.length}
           </button>
           <p className="text-2xs text-ink-500">
-            Each confirmation is logged. PRD §5.3 — only the CPA can promote to
-            received_confirmed.
+            Each confirmation is logged in the activity timeline.
           </p>
         </div>
       )}
 
       {visible.length === 0 ? (
-        <div className="bg-surface border border-line rounded-md p-8 text-center text-sm text-ink-500">
-          Nothing here right now.
+        <div className="bg-surface border border-line rounded-md p-8 text-center">
+          {needsContextCount > 0 ? (
+            <>
+              <p className="text-sm text-ink-900 font-medium">
+                Fast lane is empty.
+              </p>
+              <p className="text-2xs text-ink-500 mt-1 max-w-md mx-auto">
+                The {needsContextCount} pending document
+                {needsContextCount === 1 ? "" : "s"} need
+                {needsContextCount === 1 ? "s" : ""} more context than this
+                surface offers — open the relevant task to see surrounding
+                documents and decide.
+              </p>
+              <Link
+                to="/"
+                className="inline-block mt-3 text-xs px-3 py-1.5 rounded border border-line text-ink-700 hover:bg-sunken"
+              >
+                Back to dashboard
+              </Link>
+            </>
+          ) : (
+            <p className="text-sm text-ink-500">All clear. Nothing waiting.</p>
+          )}
         </div>
       ) : (
         <div className="bg-surface border border-line rounded-md overflow-hidden">

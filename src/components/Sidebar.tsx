@@ -5,7 +5,7 @@ import {
   Users,
   Bell,
   Settings,
-  Inbox,
+  CheckSquare,
   TrendingUp,
   PanelLeftClose,
   PanelLeftOpen,
@@ -16,7 +16,7 @@ import { useStore } from "../data/store";
 
 const primary = [
   { to: "/", label: "Dashboard", Icon: LayoutDashboard, end: true },
-  { to: "/inbox", label: "Inbox", Icon: Inbox, end: false },
+  { to: "/inbox", label: "To review", Icon: CheckSquare, end: false },
   { to: "/clients", label: "Clients", Icon: Users, end: false },
   { to: "/alerts", label: "Alerts", Icon: Bell, end: false },
   { to: "/insights", label: "Insights", Icon: TrendingUp, end: false },
@@ -34,10 +34,28 @@ export function Sidebar() {
   const announcements = announcementsQuery.data ?? [];
   const session = useSession();
   const { checklistItems } = useStore();
+  const todayIso = new Date().toISOString().slice(0, 10);
   const unread = announcements.filter((a) => !a.read).length;
-  const inboxCount = checklistItems.filter(
-    (c) => c.state === "received_unreviewed"
-  ).length;
+  // Sidebar badge must match what /to-review actually shows: fast-lane
+  // confirms (AI high/medium, no flags) + scheduled chases. Otherwise the
+  // badge promises N reviews and the page delivers fewer — broken contract.
+  const inboxCount = checklistItems.filter((c) => {
+    if (
+      c.state === "received_unreviewed" &&
+      !c.flagReason &&
+      (c.aiConfidence === "high" || c.aiConfidence === "medium")
+    ) {
+      return true;
+    }
+    if (
+      c.state === "requested_waiting" &&
+      c.nextReminderAt &&
+      c.nextReminderAt <= todayIso
+    ) {
+      return true;
+    }
+    return false;
+  }).length;
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem(COLLAPSED_KEY) === "1";

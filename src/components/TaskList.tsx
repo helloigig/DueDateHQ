@@ -5,16 +5,12 @@ import {
   Clock,
   AlertTriangle,
   Mail,
-  Filter,
   ChevronRight,
   MoreHorizontal,
   CalendarClock,
   FileText,
   ChevronDown,
-  List,
-  CalendarDays,
 } from "lucide-react";
-import { CalendarGrid } from "./CalendarGrid";
 import { useStore, actions } from "../data/store";
 import { useAllOpenInsights } from "../hooks/useAiInsights";
 import { useSession } from "../data/session";
@@ -97,13 +93,12 @@ export function TaskList() {
   const insights = useAllOpenInsights();
   const session = useSession();
   const today = toIso(TODAY);
-  const [filter, setFilter] = useState<FilterKey>("all");
+  const [filter, setFilter] = useState<FilterKey>("needs_me");
   const [emailIntent, setEmailIntent] = useState<EmailDraftIntent | null>(null);
   // Pro / Team show assignee column. Solo hides it (only one user — useless).
   const showAssignee = session?.tier !== "solo";
   const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null);
   const [assigneeMenuOpen, setAssigneeMenuOpen] = useState(false);
-  const [view, setView] = useState<"list" | "grid">("list");
 
   const clientById = useMemo(
     () => new Map(clients.map((c) => [c.id, c])),
@@ -256,43 +251,14 @@ export function TaskList() {
         aria-label="Tasks"
       >
         <header className="flex items-center px-4 py-2.5 border-b border-line bg-sunken/40 gap-2 flex-wrap">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-700">
+          <h2 className="text-sm font-semibold text-ink-900">
             Your tasks
           </h2>
-          <span
-            className="text-2xs text-ink-500"
-            title="Ranked by deadline urgency, AI flags, unread alerts, and risk forecast"
-          >
-            {filtered.length} of {rows.length} ·{" "}
-            {view === "list" ? "ranked by urgency" : "due date grid"}
+          <span className="text-2xs text-ink-500 tabular-nums">
+            {filtered.length}
           </span>
           <div className="ml-auto flex items-center gap-1 flex-wrap">
-            {/* List / Grid toggle */}
-            <span className="inline-flex border border-line rounded overflow-hidden mr-1">
-              <button
-                onClick={() => setView("list")}
-                className={`px-2 py-0.5 text-2xs uppercase tracking-wide inline-flex items-center gap-1 ${
-                  view === "list"
-                    ? "bg-ink-900 text-canvas"
-                    : "text-ink-500 hover:bg-sunken"
-                }`}
-                title="List view (ranked by urgency)"
-              >
-                <List className="w-2.5 h-2.5" aria-hidden /> List
-              </button>
-              <button
-                onClick={() => setView("grid")}
-                className={`px-2 py-0.5 text-2xs uppercase tracking-wide inline-flex items-center gap-1 ${
-                  view === "grid"
-                    ? "bg-ink-900 text-canvas"
-                    : "text-ink-500 hover:bg-sunken"
-                }`}
-                title="Calendar grid view (month-at-a-glance)"
-              >
-                <CalendarDays className="w-2.5 h-2.5" aria-hidden /> Grid
-              </button>
-            </span>
-            {showAssignee && assignees.length > 1 && (
+            {showAssignee && assignees.length > 2 && (
               <div className="relative">
                 <button
                   onClick={() => setAssigneeMenuOpen((v) => !v)}
@@ -348,10 +314,6 @@ export function TaskList() {
                 )}
               </div>
             )}
-            <Filter
-              className="w-3 h-3 text-ink-400 mr-1 ml-1"
-              aria-hidden
-            />
             {FILTERS.map((f) => {
               const active = filter === f.key;
               const count =
@@ -377,11 +339,7 @@ export function TaskList() {
             })}
           </div>
         </header>
-        {view === "grid" ? (
-          <div className="bg-canvas">
-            <CalendarGrid />
-          </div>
-        ) : filtered.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-ink-500">
             Nothing matches this filter.
           </div>
