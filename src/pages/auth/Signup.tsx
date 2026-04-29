@@ -86,6 +86,13 @@ export function Signup() {
       const { data, error } = await supabase().auth.signUp({
         email: parsed.email,
         password: parsed.password,
+        options: {
+          // After the user clicks the email confirmation link, Supabase
+          // redirects them back here. supabase-js's detectSessionInUrl
+          // picks up the session token from the URL hash, and the next
+          // page render lands them in onboarding.
+          emailRedirectTo: `${window.location.origin}/onboarding/firm`,
+        },
       });
       if (error) {
         setSubmitError(error.message);
@@ -97,7 +104,9 @@ export function Signup() {
       // auth.bootstrap will 401.
       if (!data.session) {
         setSubmitError(
-          "Check your email — you need to confirm before continuing.",
+          "We sent a confirmation link to " +
+            parsed.email +
+            ". Click it to continue.",
         );
         return;
       }

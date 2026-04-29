@@ -51,11 +51,12 @@ type FilterKey = "needs_me" | "waiting" | "all";
 
 // Three filters, not five. The CPA's actual mental cuts:
 //   Needs me — flagged, unreviewed, or overdue. The pile that won't move
-//              unless I touch it.
+//              unless I touch it. AI surfaced these but never auto-confirmed
+//              anything (§5.3 invariant); the user is the decider.
 //   Waiting  — chased the client, no reply yet. Time-driven, not me-driven.
 //   All      — everything actionable.
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
-  { key: "needs_me", label: "Needs me" },
+  { key: "needs_me", label: "Needs your decision" },
   { key: "waiting", label: "Waiting on client" },
   { key: "all", label: "All" },
 ];
@@ -340,6 +341,18 @@ export function TaskList() {
             })}
           </div>
         </header>
+        {filter === "needs_me" && filtered.length > 0 && (
+          <div className="px-4 py-2 bg-info-bg/40 border-b border-info-border text-2xs text-info-ink flex items-start gap-2">
+            <span className="text-base leading-none mt-0.5" aria-hidden>
+              ◆
+            </span>
+            <span>
+              <span className="font-medium">AI noticed something on each of these.</span>{" "}
+              We never auto-confirm a checklist item — your click is the only
+              way it advances. The §5.3 invariant.
+            </span>
+          </div>
+        )}
         {filtered.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-ink-500">
             Nothing matches this filter.

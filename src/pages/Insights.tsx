@@ -13,12 +13,14 @@ import { useStore } from "../data/store";
 import { useAllOpenInsights } from "../hooks/useAiInsights";
 
 /**
- * Insights — Layer C firm intelligence destination (PRD §4.4 Layer C).
+ * Opportunities — Layer C firm-intelligence destination (PRD §4.4 Layer C),
+ * surfaced under the user-facing label "Opportunities" in the sidebar so the
+ * action is unambiguous: revenue or risk the AI noticed that a partner can
+ * act on. The internal spec name "Insights" / "Layer C" stays in the code.
  *
- * The partner-retention thesis. Year-3 vision made tangible: Mode E + cohort
- * substrate produce surfaces no individual firm can build by hand. This is
- * the layer that "makes the partner notice the product matters" and carries
- * the highest pricing power.
+ * The partner-retention thesis. Mode E + cohort substrate produce surfaces no
+ * individual firm can build by hand: "this client is underbilled," "your Q3
+ * is going to break capacity," "you've handled this edge case before."
  *
  * Three sections:
  *   1. Pricing intelligence — "$1,500 billed for Riverside, comparable LLCs $2,400"
@@ -49,19 +51,16 @@ export function Insights() {
     <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 space-y-6">
       <header>
         <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
-          Insights
+          Opportunities
         </p>
         <h1 className="text-2xl font-semibold text-ink-900 mt-1">
-          Firm intelligence
+          Revenue and risk the AI noticed
         </h1>
         <p className="text-sm text-ink-500 mt-2 max-w-2xl">
-          What you can't see by hand. Pricing, capacity, and your own
-          institutional knowledge — surfaced from your roster, your prior
-          years, and anonymous cross-firm baselines. PRD §4.4 Layer C.
-        </p>
-        <p className="text-2xs text-ink-400 mt-2 italic">
-          Year-1 buyers see Layer A (efficiency). Year-3 retention is built on
-          Layer B (advisory). Layer C is what keeps the partner past Year 5.
+          Things you'd catch if you had time to read every prior return and
+          benchmark every fee against the market. Pricing, capacity, and your
+          own institutional knowledge — surfaced from your roster, your prior
+          years, and anonymous cross-firm baselines.
         </p>
       </header>
 

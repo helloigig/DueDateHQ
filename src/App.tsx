@@ -69,7 +69,9 @@ export default function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="inbox" element={<Inbox />} />
-          <Route path="insights" element={<Insights />} />
+          <Route path="opportunities" element={<Insights />} />
+          {/* Legacy /insights route — redirect to canonical /opportunities */}
+          <Route path="insights" element={<Navigate to="/opportunities" replace />} />
           <Route path="clients" element={<Clients />} />
           <Route path="clients/:id" element={<ClientDetail />} />
           <Route path="clients/:id/tasks/:taskId" element={<TaskDetail />} />

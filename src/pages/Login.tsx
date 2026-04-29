@@ -57,12 +57,28 @@ export function Login() {
     try {
       const { error } = await supabase().auth.signInWithPassword(parsed);
       if (error) {
-        setSubmitError(error.message);
+        // Translate the most common Supabase errors to user-actionable copy.
+        // Defaults are technical ("Invalid login credentials"); ours are
+        // diagnostic.
+        const msg = error.message.toLowerCase();
+        if (msg.includes("email") && msg.includes("confirm")) {
+          setSubmitError(
+            "Check your inbox — you need to click the confirmation link before signing in.",
+          );
+        } else if (msg.includes("invalid") || msg.includes("credentials")) {
+          setSubmitError(
+            "Email or password is wrong. Forgot it? Reset below.",
+          );
+        } else {
+          setSubmitError(error.message);
+        }
         return;
       }
-      // JWT now persisted by supabase-js. Pull fresh session from BE — if the
-      // user hasn't bootstrapped a firm yet, this returns null and we route
-      // to /onboarding/firm. Otherwise we have a real session and go home.
+      // Bust any cached session response — the trpc-react-query cache may
+      // have a stale null from a prior unauthenticated render. Without this
+      // the next .fetch() returns the cached null and we wrongly route to
+      // onboarding even if the user already has a firm.
+      await trpcUtils.auth.session.invalidate();
       const remote = await trpcUtils.auth.session.fetch();
       if (!remote) {
         signIn({
