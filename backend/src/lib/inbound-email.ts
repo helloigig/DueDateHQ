@@ -19,8 +19,11 @@ import {
   activityEvents,
   checklistItems,
   tasks,
+  clients,
+  deadlines,
 } from "../db/schema.js";
 import { log, span } from "./observability.js";
+import { classifyDocument, isAiConfigured } from "./ai.js";
 
 export interface InboundEmail {
   /** RFC-5322 envelope sender */
@@ -104,31 +107,90 @@ export async function processInboundEmail(
         return null;
       }
 
-      // Find the first "not requested yet" or "waiting" item to bind
-      // this attachment to. Mode A's job is to pick which item; for
-      // the wireframe path we use a deterministic priority.
+      // Pull task context for Mode A — form type, client name, pending
+      // checklist items. Without these the classifier can only guess
+      // from filename alone.
       const items = await db
         .select()
         .from(checklistItems)
         .where(eq(checklistItems.taskId, task.id));
-      const target =
-        items.find((i) => i.state === "not_requested") ??
-        items.find((i) => i.state === "requested_waiting") ??
-        items[0];
+      const deadline = await db.query.deadlines.findFirst({
+        where: eq(deadlines.id, task.deadlineId),
+      });
+      const client = deadline
+        ? await db.query.clients.findFirst({
+            where: eq(clients.id, deadline.clientId),
+          })
+        : null;
+      const pendingItems = items
+        .filter(
+          (i) =>
+            i.state === "not_requested" || i.state === "requested_waiting",
+        )
+        .map((i) => ({ itemType: i.itemType, label: i.label }));
 
       let written = 0;
       for (const att of payload.attachments) {
+        // Mode A classifier — when AI is configured, ask it which
+        // pending item this attachment belongs to + how confident.
+        // Otherwise fall back to deterministic priority (first
+        // not_requested → first requested_waiting → first item).
+        let target: typeof items[number] | undefined;
+        let aiClassification: string | null = null;
+        let aiConfidence: number | null = null;
+        let flagReason: string | null = null;
+        if (isAiConfigured() && pendingItems.length > 0 && deadline && client) {
+          try {
+            const ai = await classifyDocument({
+              firmId: task.firmId,
+              filename: att.filename,
+              taskContext: {
+                formType: deadline.formType,
+                clientName: client.name,
+                pendingItems,
+              },
+            });
+            aiClassification = ai.guess;
+            aiConfidence =
+              ai.confidence === "high"
+                ? 0.9
+                : ai.confidence === "medium"
+                  ? 0.65
+                  : 0.35;
+            flagReason = ai.flagReason ?? null;
+            if (ai.itemType) {
+              target = items.find((i) => i.itemType === ai.itemType);
+            }
+          } catch (err) {
+            log.warn("inbound_email.ai_classify_failed", {
+              message: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+        if (!target) {
+          target =
+            items.find((i) => i.state === "not_requested") ??
+            items.find((i) => i.state === "requested_waiting") ??
+            items[0];
+        }
         if (!target) break;
+
         // Move the checklist item to received_unreviewed. §5.3 invariant
         // (DB CHECK) prevents promotion to received_confirmed by anyone
         // but a user — this auto-promotion is safe up to "unreviewed".
+        // If Mode C-style anomaly was flagged by the classifier, route
+        // to received_issue instead so the row surfaces as "needs
+        // judgment" not "fast-lane confirm".
         await db
           .update(checklistItems)
           .set({
-            state: "received_unreviewed",
+            state: flagReason ? "received_issue" : "received_unreviewed",
             receivedFilename: att.filename,
             stateChangedAt: payload.receivedAt,
             stateChangedByKind: "system",
+            aiClassification,
+            aiConfidence: aiConfidence?.toString() ?? null,
+            aiFlagReason: flagReason,
           })
           .where(
             and(
@@ -139,9 +201,11 @@ export async function processInboundEmail(
         await db.insert(activityEvents).values({
           firmId: task.firmId,
           taskId: task.id,
-          eventType: "document_received",
+          eventType: flagReason ? "document_flagged" : "document_received",
           actorKind: "system",
-          description: `Inbound: ${att.filename}`,
+          description: flagReason
+            ? `Inbound: ${att.filename} — flagged: ${flagReason}`
+            : `Inbound: ${att.filename}${aiClassification ? ` — AI: ${aiClassification}` : ""}`,
           payload: {
             providerId: payload.providerId,
             from: payload.from,
@@ -150,6 +214,9 @@ export async function processInboundEmail(
               size: att.size,
               contentType: att.contentType,
             },
+            ai: aiClassification
+              ? { classification: aiClassification, confidence: aiConfidence }
+              : null,
           },
           relatedChecklistItemId: target.id,
         });

@@ -357,19 +357,33 @@ function classify(text: string): {
 }
 
 /**
- * Stub for LLM-based parsing. Real implementation calls Anthropic /
- * Gemini with a prompt that returns structured JSON matching the
- * Announcement schema. Until the API key + budget are wired, this
- * returns null — callers fall back to the regex classifier. Exported
- * so the seam is obvious for future wiring.
+ * LLM-based announcement parser. Calls Anthropic with a structured-
+ * output prompt that returns canonical Announcement fields. Used to
+ * lift confidence on regex hits the heuristic classifier rates < 0.7.
+ *
+ * Returns null when AI isn't configured or the call fails — callers
+ * keep the regex result rather than dropping the row.
  */
-export async function parseWithLLM(
-  _html: string,
-): Promise<ScrapedNotice | null> {
-  // TODO: wire Anthropic SDK. Prompt = "Extract an Announcement from
-  // this state-revenue press release. Return JSON: {title, summary,
-  // type, oldDeadline?, newDeadline?, retroactive?}".
-  return null;
+export async function parseWithLLM(args: {
+  firmId: string;
+  title: string;
+  body: string;
+  stateCode: string;
+  authority: string;
+}): Promise<ScrapedNotice | null> {
+  const { parseAnnouncement } = await import("./ai.js");
+  const result = await parseAnnouncement(args);
+  if (!result) return null;
+  return {
+    stateCode: args.stateCode,
+    authority: args.authority,
+    title: result.title,
+    summary: result.summary,
+    sourceUrl: "", // caller fills in
+    publishedAt: new Date(),
+    parseConfidence: result.confidence,
+    type: result.type,
+  };
 }
 
 // ---------- Tiny XML helpers ----------

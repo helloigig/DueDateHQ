@@ -1,4 +1,5 @@
 import { router } from "./init.js";
+import { aiRouter } from "./routers/ai.js";
 import { aiInferencesRouter } from "./routers/aiInferences.js";
 import {
   announcementsRouter,
@@ -38,6 +39,7 @@ export const appRouter = router({
   integrations: integrationsRouter,
   imports: importsRouter,
   uploads: uploadsRouter,
+  ai: aiRouter,
   aiInferences: aiInferencesRouter,
   multistate: multistateRouter,
 });

@@ -746,6 +746,87 @@ export const mockAdapter = {
     },
   },
 
+  /** AI namespace — mock-mode dispatch. Real mode hits backend ai.* */
+  ai: {
+    status: async () => {
+      await delay();
+      // Mock mode reports AI as configured so the FE doesn't gate on it
+      // for demo purposes. Real mode reflects actual env state.
+      return { configured: true };
+    },
+    classifyDocument: async (input: {
+      filename: string;
+      itemType?: string;
+      taskContext?: {
+        pendingItems: Array<{ itemType: string; label: string }>;
+      };
+    }) => {
+      await delay(300);
+      const code =
+        input.filename.charCodeAt(0) + input.filename.length;
+      const confidence: "high" | "medium" | "low" =
+        code % 5 === 0 ? "low" : code % 3 === 0 ? "medium" : "high";
+      const guess = (input.itemType ?? "document")
+        .replace(/_/g, " ")
+        .toUpperCase();
+      return {
+        guess,
+        itemType: input.itemType ?? null,
+        confidence,
+        flagReason: undefined,
+        inferenceId: 0,
+      };
+    },
+    draftEmail: async (input: {
+      client: { name: string };
+      task: { formType: string };
+      itemLabel?: string;
+      tone: "warm" | "neutral" | "urgent";
+      cpaSignature: string;
+      forwardingEmail: string;
+    }) => {
+      await delay(700);
+      const item = input.itemLabel ?? "outstanding documents";
+      const greeting =
+        input.tone === "urgent"
+          ? `Hi ${input.client.name},\n\nTime-sensitive: `
+          : input.tone === "warm"
+            ? `Hi ${input.client.name},\n\n`
+            : `Dear ${input.client.name},\n\n`;
+      const ask =
+        input.tone === "urgent"
+          ? `I still need your ${item} to file by your deadline. Please send as soon as possible.`
+          : input.tone === "warm"
+            ? `Could you forward your ${item} when you get a chance?`
+            : `I am writing to request your ${item} so we can complete your return on schedule.`;
+      const closer =
+        input.tone === "urgent"
+          ? `\n\nThanks for jumping on this,\n${input.cpaSignature}`
+          : input.tone === "warm"
+            ? `\n\nThanks,\n${input.cpaSignature}`
+            : `\n\nKind regards,\n${input.cpaSignature}`;
+      const subject =
+        input.tone === "urgent"
+          ? `Urgent: ${item} for your ${input.task.formType}`
+          : `${item} for your ${input.task.formType}`;
+      return {
+        subject,
+        body: `${greeting}${ask}\n\nYou can reply to this email or send to ${input.forwardingEmail}.${closer}`,
+        aiSources: [
+          {
+            kind: "substrate",
+            note: `Tone defaulted to ${input.tone}; connect Gmail/Outlook to mirror your voice.`,
+          },
+          {
+            kind: "forwarding_email",
+            note: `Per-task forwarding: ${input.forwardingEmail}`,
+          },
+        ],
+        inferenceId: 0,
+      };
+    },
+  },
+
   aiInferences: {
     recordAcceptance: async () => {
       await delay();

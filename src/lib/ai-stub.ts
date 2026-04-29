@@ -1,14 +1,23 @@
 /**
- * Deterministic plausible-output stub for the five AI use modes (PRD §4.3).
- * This is the wireframe-grade replacement for a real LLM. Outputs are stable
- * across re-renders for the same inputs (cached by hash) and arrive after a
- * short simulated latency so the loading states are exercised.
+ * AI use-mode dispatcher.
  *
- * - Mode A: classifyDocument
- * - Mode B: arrivalTiming
- * - Mode C: flagAnomaly
- * - Mode D: draftEmail (the workhorse — used by EmailDraftModal everywhere)
- * - Mode E: crossYearInsights
+ * Two paths per function:
+ *   - Mock mode (env.useMockApi=true): deterministic stub. Stable
+ *     outputs across re-renders, short simulated latency. Used in
+ *     dev / preview / demo workspace.
+ *   - Real mode (env.useMockApi=false): dispatches to the BE
+ *     trpc.ai.* procedures, which call Anthropic Claude with prompt
+ *     caching and log every call to ai_inferences.
+ *
+ * Five modes (PRD §4.3):
+ *   - Mode A: classifyDocument        (real LLM in real mode)
+ *   - Mode B: arrivalTiming           (always deterministic — history math)
+ *   - Mode C: flagAnomaly             (always deterministic — statistical)
+ *   - Mode D: draftEmail              (real LLM in real mode)
+ *   - Mode E: crossYearInsights       (always deterministic — set diff)
+ *
+ * Modes B/C/E stay deterministic because their existing logic is
+ * meaningful and cheap. Modes A/D need real LLM for product feel.
  */
 
 import type {
@@ -20,6 +29,8 @@ import type {
   ImportedFact,
   Task,
 } from "../types";
+import { env } from "../config";
+import { trpcClientUntyped } from "./api/client";
 
 const cache = new Map<string, unknown>();
 
@@ -44,7 +55,34 @@ function delay(ms: number): Promise<void> {
 export async function classifyDocument(input: {
   filename: string;
   itemType: string;
+  /** Optional task context — when provided in real mode, AI gets the
+   *  pending checklist items + form type for sharper classification. */
+  taskContext?: {
+    formType: string;
+    clientName: string;
+    pendingItems: Array<{ itemType: string; label: string }>;
+  };
 }): Promise<{ guess: string; confidence: AiConfidence }> {
+  // Real mode — call BE through tRPC
+  if (!env.useMockApi) {
+    try {
+      const result = await trpcClientUntyped.ai.classifyDocument.mutate({
+        filename: input.filename,
+        itemType: input.itemType,
+        taskContext: input.taskContext,
+      });
+      return {
+        guess: result.guess,
+        confidence: result.confidence,
+      };
+    } catch (err) {
+      // BE not configured / rate-limited / other — fall through to
+      // the deterministic stub so the UI keeps working
+      console.warn("[ai] classifyDocument fell back to stub:", err);
+    }
+  }
+
+  // Mock / fallback path — deterministic stub
   await delay(300);
   return cached(input, () => {
     const code = input.filename.charCodeAt(0) + input.filename.length;
@@ -178,9 +216,64 @@ export interface DraftEmailOutput {
   aiSources: AiSource[];
 }
 
+/**
+ * Map FE tone (formal/casual/urgent/apologetic) → BE tone
+ * (warm/neutral/urgent). Apologetic uses warm + a context hint
+ * so the model knows to acknowledge prior back-and-forth.
+ */
+function mapTone(t: EmailTone): {
+  beTone: "warm" | "neutral" | "urgent";
+  contextHint?: string;
+} {
+  switch (t) {
+    case "formal":
+      return { beTone: "neutral" };
+    case "urgent":
+      return { beTone: "urgent" };
+    case "apologetic":
+      return {
+        beTone: "warm",
+        contextHint:
+          "I've asked about this before — please acknowledge that gently.",
+      };
+    case "casual":
+    default:
+      return { beTone: "warm" };
+  }
+}
+
 export async function draftEmail(
   input: DraftEmailInput
 ): Promise<DraftEmailOutput> {
+  // Real mode — call BE through tRPC. Falls back to stub on any error.
+  if (!env.useMockApi) {
+    try {
+      const { beTone, contextHint } = mapTone(input.tone);
+      const mergedContext = [input.context, contextHint]
+        .filter(Boolean)
+        .join("\n\n");
+      const result = await trpcClientUntyped.ai.draftEmail.mutate({
+        client: { name: input.client.name },
+        task: { formType: input.task.formType },
+        itemLabel: input.itemLabel,
+        itemType: input.itemType,
+        context: mergedContext || undefined,
+        tone: beTone,
+        cpaSignature: input.cpaSignature,
+        forwardingEmail: input.forwardingEmail,
+        methodBConnected: input.methodBConnected,
+      });
+      return {
+        subject: result.subject,
+        body: result.body,
+        aiSources: result.aiSources as AiSource[],
+      };
+    } catch (err) {
+      console.warn("[ai] draftEmail fell back to stub:", err);
+    }
+  }
+
+  // Mock / fallback path — deterministic stub.
   // Simulate the 5-second latency target from PRD §11.1, but capped low for
   // a wireframe build so demos don't drag.
   await delay(700 + Math.random() * 600);

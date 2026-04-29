@@ -446,6 +446,62 @@ export const appRouter = t.router({
     ),
   }),
 
+  /** AI mode dispatchers — call Anthropic via the BE in real mode. */
+  ai: t.router({
+    status: t.procedure.query(
+      async (): Promise<{ configured: boolean }> => NOT_IMPL(),
+    ),
+    classifyDocument: t.procedure
+      .input(
+        z.object({
+          filename: z.string().min(1),
+          itemType: z.string().optional(),
+          textPreview: z.string().optional(),
+          taskContext: z
+            .object({
+              formType: z.string(),
+              clientName: z.string(),
+              pendingItems: z.array(
+                z.object({ itemType: z.string(), label: z.string() }),
+              ),
+            })
+            .optional(),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          guess: string;
+          itemType: string | null;
+          confidence: "high" | "medium" | "low";
+          flagReason?: string;
+          inferenceId: number;
+        }> => NOT_IMPL(),
+      ),
+    draftEmail: t.procedure
+      .input(
+        z.object({
+          client: z.object({ name: z.string() }),
+          task: z.object({ formType: z.string() }),
+          itemLabel: z.string().optional(),
+          itemType: z.string().optional(),
+          context: z.string().optional(),
+          tone: z.enum(["warm", "neutral", "urgent"]),
+          cpaSignature: z.string(),
+          forwardingEmail: z.string(),
+          methodBConnected: z.boolean().optional(),
+          voiceSamples: z.array(z.string()).optional(),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          subject: string;
+          body: string;
+          aiSources: Array<{ kind: string; note: string }>;
+          inferenceId: number;
+        }> => NOT_IMPL(),
+      ),
+  }),
+
   aiInferences: t.router({
     recordAcceptance: t.procedure
       .input(z.object({ inferenceId: z.number(), accepted: z.boolean() }))
