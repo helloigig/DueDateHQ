@@ -12,6 +12,10 @@ export interface FirmSession {
   onboardingComplete?: boolean;
   /** Primary states served (collected in Onboarding step "firm setup"). */
   primaryStates?: string[];
+  /** Firm-wide kill switch for Phase 2 auto-send (PRD §7.3). When true,
+   *  every Phase-2-enabled template is paused regardless of per-template
+   *  state. The CPA can flip it instantly from Settings → Reminders. */
+  phase2AutoSendPaused?: boolean;
 }
 
 const KEY = "duedatehq.session.v1";

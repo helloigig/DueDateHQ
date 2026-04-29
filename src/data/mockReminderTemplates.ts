@@ -30,7 +30,9 @@ export const reminderTemplates: ReminderTemplate[] = [
     itemType: "wage_w2",
     deadlineClass: "individual_1040",
     cadence: "weekly",
-    phase: 1,
+    // Promoted to Phase 2 — Pattern Precedent met across multiple seasons.
+    // The activity timeline shows two recent auto-fires (ed-auto-001/002).
+    phase: 2,
     subject: "Following up on your W-2",
     body:
       "Hi {{client_name}},\n\nI haven't seen your W-2 yet — your filing deadline is {{deadline_date}} ({{days_until_deadline}} days). Reply with the file attached when you have a moment.\n\nThanks,\n{{cpa_signature}}",
