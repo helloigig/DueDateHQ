@@ -3,8 +3,7 @@ import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { BottomTabBar } from "./BottomTabBar";
 import { OfflineBanner } from "./OfflineBanner";
-import { useSession } from "../data/session";
-import { useStore } from "../data/store";
+import { InstallPrompt } from "./InstallPrompt";
 
 export function AppShell() {
   const session = useSession();
@@ -49,6 +48,7 @@ export function AppShell() {
         </main>
       </div>
       <BottomTabBar />
+      <InstallPrompt />
     </div>
   );
 }
