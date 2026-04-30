@@ -29,13 +29,16 @@ import { OnboardingImport } from "./pages/onboarding/OnboardingImport";
 import { OnboardingPackages } from "./pages/onboarding/OnboardingPackages";
 import { OnboardingDone } from "./pages/onboarding/OnboardingDone";
 import { SessionProvider } from "./lib/session-provider";
+import { SupabaseAuthBridge } from "./lib/supabase-auth-bridge";
 import { useSession } from "./data/session";
 
 export default function App() {
   const localSession = useSession();
 
   return (
-    <Routes>
+    <>
+      <SupabaseAuthBridge />
+      <Routes>
       {/* Public auth routes — outside the AppShell */}
       <Route path="/login" element={<Login />} />
       <Route path="/changes" element={<Changes />} />
@@ -104,6 +107,7 @@ export default function App() {
       ) : (
         <Route path="*" element={<Navigate to="/login" replace />} />
       )}
-    </Routes>
+      </Routes>
+    </>
   );
 }
