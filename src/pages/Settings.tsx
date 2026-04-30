@@ -41,6 +41,7 @@ import {
 } from "../hooks/useIntegrations";
 import { useDriftReport, useAiStatus } from "../hooks/useDriftReport";
 import { PriorYearUpload } from "../components/PriorYearUpload";
+import { PwaInstallCard } from "../components/PwaInstallCard";
 import {
   useReminderTemplates,
   useUpdateReminderTemplate,
@@ -1122,6 +1123,9 @@ function FirmPanel() {
           />
         </Field>
       </Card>
+      {/* PWA install — self-gates when not installable / already installed,
+          so the slot is invisible unless the prompt is genuinely available. */}
+      <PwaInstallCard />
     </>
   );
 }

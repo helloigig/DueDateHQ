@@ -4,31 +4,37 @@ import { ArrowRight, ArrowLeft, X, Calendar, Bell, Sparkles } from "lucide-react
 const STORAGE_KEY = "duedatehq.welcomeTour.dismissed.v1";
 
 /**
- * First-run product tour — three full-bleed slides shown once on the first
- * dashboard visit, then never again (persisted in localStorage). Pattern is
- * Linear's onboarding tour / Notion's first-time hints / Stripe's welcome
- * modal — calm, dismissible, single CTA per slide.
+ * First-run product orientation.
  *
- * The three slides map to the three value lanes:
- *   1. Hook — "Never miss a state alert or deadline"
- *   2. Core — "Every client has a brain that knows their context"
- *   3. Moat — "AI flags, you decide"
+ * Two-stage UX (revised after design critique — fullscreen modals on day-1
+ * are interruption noise, not orientation):
  *
- * Visuals are CSS-only mockups (not screenshots) — they refresh themselves
- * if the design changes, no asset pipeline. Dark sans + Substack-clean type.
+ *   1. INLINE BANNER — single-line, dismissible card above the queue. The
+ *      default first-run experience. CPAs who land on the dashboard see
+ *      their queue immediately; the banner offers a tour without blocking.
+ *
+ *   2. MODAL TOUR — three slides mapping to the three value lanes:
+ *        Hook   — never miss an alert
+ *        Core   — every client has a brain
+ *        Moat   — AI flags, you decide
+ *      Opens only when the CPA explicitly clicks "Take the tour".
+ *
+ * Either path (banner dismiss or modal completion) sets the localStorage
+ * flag; the orientation never re-fires.
  */
 export function WelcomeTour() {
   const [dismissed, setDismissed] = useState<boolean>(true);
+  const [stage, setStage] = useState<"banner" | "modal">("banner");
   const [slide, setSlide] = useState(0);
 
   // Read storage in an effect to avoid hydration mismatches and to let the
-  // session reset (sign out + sign in fresh) re-show the tour for QA.
+  // session reset (sign out + sign in fresh) re-show the orientation for QA.
   useEffect(() => {
     if (typeof window === "undefined") return;
     setDismissed(localStorage.getItem(STORAGE_KEY) === "1");
   }, []);
 
-  const close = () => {
+  const persist = () => {
     try {
       localStorage.setItem(STORAGE_KEY, "1");
     } catch {
@@ -39,9 +45,52 @@ export function WelcomeTour() {
 
   if (dismissed) return null;
 
+  // ───────────────────────────────────────────────── BANNER stage
+  if (stage === "banner") {
+    return (
+      <aside
+        className="bg-surface border border-line rounded-md px-4 py-2.5 flex items-center gap-3"
+        aria-label="Welcome"
+      >
+        <Sparkles
+          className="w-3.5 h-3.5 text-info-ink shrink-0"
+          aria-hidden
+        />
+        <p className="flex-1 min-w-0 text-xs text-ink-700">
+          <span className="text-2xs uppercase tracking-wider text-ink-500 font-semibold mr-2">
+            New here
+          </span>
+          <span className="text-ink-900">DueDateHQ surfaces what changed</span>
+          <span className="text-ink-500">
+            {" "}— state alerts, deadlines slipping past your buffer, clients
+            who&apos;ve gone quiet.{" "}
+          </span>
+        </p>
+        <button
+          onClick={() => setStage("modal")}
+          className="text-2xs text-ink-700 hover:text-ink-900 hover:bg-sunken px-2 py-1 rounded inline-flex items-center gap-1 shrink-0"
+        >
+          60-second tour <ArrowRight className="w-3 h-3" aria-hidden />
+        </button>
+        <button
+          onClick={persist}
+          className="text-ink-400 hover:text-ink-700 shrink-0"
+          aria-label="Dismiss welcome banner"
+        >
+          <X className="w-3.5 h-3.5" aria-hidden />
+        </button>
+      </aside>
+    );
+  }
+
+  // ───────────────────────────────────────────────── MODAL stage
   const slides = SLIDES;
   const current = slides[slide]!;
   const isLast = slide === slides.length - 1;
+
+  const closeModal = () => {
+    persist();
+  };
 
   return (
     <div
@@ -50,20 +99,18 @@ export function WelcomeTour() {
       aria-label="Welcome tour"
       className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 p-4"
       onMouseDown={(e) => {
-        // Click outside to dismiss — explicit, the user committed
-        if (e.target === e.currentTarget) close();
+        if (e.target === e.currentTarget) closeModal();
       }}
     >
       <div className="bg-surface border border-line rounded-lg shadow-overlay w-full max-w-lg overflow-hidden">
         <button
-          onClick={close}
+          onClick={closeModal}
           className="absolute top-3 right-3 text-ink-400 hover:text-ink-900 p-1 rounded"
           aria-label="Close tour"
         >
           <X className="w-4 h-4" />
         </button>
 
-        {/* Visual mockup area — CSS only, no image asset */}
         <div className="bg-canvas border-b border-line h-48 sm:h-56 flex items-center justify-center px-6">
           {current.visual}
         </div>
@@ -79,7 +126,6 @@ export function WelcomeTour() {
             {current.body}
           </p>
 
-          {/* Footer — progress + nav */}
           <div className="flex items-center justify-between mt-5 pt-4 border-t border-line">
             <div className="flex gap-1.5" aria-label="Tour progress">
               {slides.map((_, i) => (
@@ -102,7 +148,7 @@ export function WelcomeTour() {
                 </button>
               )}
               <button
-                onClick={isLast ? close : () => setSlide((s) => s + 1)}
+                onClick={isLast ? closeModal : () => setSlide((s) => s + 1)}
                 className="text-sm px-4 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover inline-flex items-center gap-1.5"
               >
                 {isLast ? "Got it" : "Next"}
@@ -192,7 +238,7 @@ const SLIDES: ReadonlyArray<Slide> = [
           <div className="text-2xs text-info-ink bg-info-bg/40 border border-info-border rounded px-2 py-1 mb-2 flex items-start gap-1.5">
             <Sparkles className="w-3 h-3 shrink-0 mt-0.5" aria-hidden />
             <span>
-              <span className="font-medium">AI noticed something.</span> Your
+              <span className="font-medium">A flag for your review.</span> Your
               call.
             </span>
           </div>
@@ -201,7 +247,7 @@ const SLIDES: ReadonlyArray<Slide> = [
             Personal
           </p>
           <p className="text-2xs text-ink-500 mt-0.5">
-            W-2 received. AI matched it to your "Income — W-2" checklist row.
+            W-2 received. Matched to your &quot;Income — W-2&quot; checklist row.
           </p>
           <div className="flex gap-2 mt-2.5">
             <button className="text-2xs px-2 py-1 rounded bg-accent text-canvas">

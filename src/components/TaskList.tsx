@@ -52,16 +52,19 @@ import { useSmsStatus } from "../hooks/useFilesFromClients";
  *   Ready to file — all checklist items confirmed
  */
 
-type FilterKey = "needs_me" | "waiting" | "all";
+type FilterKey = "needs_me" | "behind" | "waiting" | "all";
 
-// Three filters, not five. The CPA's actual mental cuts:
+// Four filters, not five. The CPA's actual mental cuts:
 //   Needs me — flagged, unreviewed, or overdue. The pile that won't move
 //              unless I touch it. AI surfaced these but never auto-confirmed
 //              anything (§5.3 invariant); the user is the decider.
+//   Behind   — past internal target, official deadline still ahead. Buffer
+//              eaten; decide chase-harder, file-extension, or push.
 //   Waiting  — chased the client, no reply yet. Time-driven, not me-driven.
 //   All      — everything actionable.
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: "needs_me", label: "Needs your decision" },
+  { key: "behind", label: "Behind schedule" },
   { key: "waiting", label: "Waiting on client" },
   { key: "all", label: "All" },
 ];
@@ -78,7 +81,8 @@ interface TaskRowData {
   waiting: number;
   notRequested: number;
   // Derived signals
-  isOverdue: boolean;
+  isOverdue: boolean;       // past official deadline (rare — extension territory)
+  isPastInternalTarget: boolean; // past internal target, official still ahead
   isReady: boolean;
   needsDecision: boolean;
   isWaitingOnClient: boolean;
@@ -86,7 +90,8 @@ interface TaskRowData {
   daysUntilInternal: number;
   // AI risk forecast (PRD §4.4 Layer A): predicts whether this task is
   // likely to slip past its internal target if no action is taken. Combines
-  // missing-doc count + days remaining + historical chase-velocity.
+  // missing-doc count + days remaining + historical chase-velocity. Once
+  // the slip actually happens, isPastInternalTarget supersedes this.
   isAtRisk: boolean;
   // Cross-year insights for this client (Mode E) tagged in
   insights: AiInsight[];
@@ -171,6 +176,11 @@ export function TaskList() {
       ).length;
       const totalRelevant = relevant.length;
       const isOverdue = task.officialDueDate < today;
+      // Buffer-eaten: past internal target but official is still ahead.
+      // This is the daily reality during tax season (CPAs barely miss
+      // official deadlines). Mutually exclusive with isOverdue by design.
+      const isPastInternalTarget =
+        !isOverdue && task.internalTargetDate < today;
       const isReady = totalRelevant > 0 && confirmed === totalRelevant;
       const needsDecision = unreviewed > 0 || flagged > 0;
       const isWaitingOnClient = waiting > 0 && !needsDecision;
@@ -182,11 +192,14 @@ export function TaskList() {
       // AI risk forecast: tasks at risk = missing docs + tight runway. The
       // internal target is the CPA's working deadline, so the forecast uses
       // that, not the official date. Threshold: if more docs are still
-      // outstanding than days remaining, the task is "at risk."
+      // outstanding than days remaining, the task is "at risk." Once the
+      // slip actually happens (isPastInternalTarget), the forecast turns
+      // off — the warning has materialized into a state we surface directly.
       const docsOutstanding = waiting + notRequested + unreviewed + flagged;
       const isAtRisk =
         !isReady &&
         !isOverdue &&
+        !isPastInternalTarget &&
         daysUntilInternal >= 0 &&
         daysUntilInternal <= 14 &&
         docsOutstanding > Math.max(daysUntilInternal, 1);
@@ -201,6 +214,7 @@ export function TaskList() {
         waiting,
         notRequested,
         isOverdue,
+        isPastInternalTarget,
         isReady,
         needsDecision,
         isWaitingOnClient,
@@ -229,6 +243,10 @@ export function TaskList() {
     switch (filter) {
       case "needs_me":
         return list.filter((r) => r.needsDecision || r.isOverdue);
+      case "behind":
+        return list.filter(
+          (r) => r.isPastInternalTarget || r.isOverdue,
+        );
       case "waiting":
         return list.filter((r) => r.isWaitingOnClient);
       case "all":
@@ -247,6 +265,9 @@ export function TaskList() {
   const counts = useMemo(() => {
     return {
       needs_me: rows.filter((r) => r.needsDecision || r.isOverdue).length,
+      behind: rows.filter(
+        (r) => r.isPastInternalTarget || r.isOverdue,
+      ).length,
       waiting: rows.filter((r) => r.isWaitingOnClient).length,
       all: rows.length,
     };
@@ -328,12 +349,7 @@ export function TaskList() {
             )}
             {FILTERS.map((f) => {
               const active = filter === f.key;
-              const count =
-                f.key === "all"
-                  ? counts.all
-                  : f.key === "needs_me"
-                  ? counts.needs_me
-                  : counts.waiting;
+              const count = counts[f.key];
               return (
                 <button
                   key={f.key}
@@ -506,6 +522,14 @@ function TaskRow({
                 at risk
               </span>
             )}
+            {row.isPastInternalTarget && (
+              <span
+                className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-warn-bg text-warn-ink border border-warn-border font-semibold"
+                title={behindScheduleHint(row)}
+              >
+                behind schedule
+              </span>
+            )}
             {hasUnreadAlert && (
               <span
                 className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-warn-bg text-warn-ink border border-warn-border"
@@ -529,19 +553,37 @@ function TaskRow({
           </p>
         </div>
 
-        {/* Deadline — top-right on mobile, mid-right on desktop */}
-        <span
-          className={`text-xs tabular-nums shrink-0 text-right whitespace-nowrap ${
-            row.daysUntilInternal < 0
-              ? "text-danger-ink font-semibold"
-              : row.daysUntilInternal <= 3
-              ? "text-warn-ink font-medium"
-              : "text-ink-700"
-          }`}
+        {/* Deadline column — internal target is the working deadline.
+            Show only ONE date by default; surface official runway inline
+            ONLY when the buffer is already gone (isPastInternalTarget) so
+            the CPA can decide chase / extension / push without hovering. */}
+        <div
+          className="text-right shrink-0 whitespace-nowrap"
           title={`Internal target ${row.task.internalTargetDate}\nIRS official deadline ${row.task.officialDueDate}`}
         >
-          {countdownLabel(row.task.internalTargetDate)}
-        </span>
+          <span
+            className={`text-xs tabular-nums block ${
+              row.isOverdue
+                ? "text-danger-ink font-semibold"
+                : row.isPastInternalTarget
+                ? "text-warn-ink font-semibold"
+                : row.daysUntilInternal <= 3
+                ? "text-warn-ink font-medium"
+                : "text-ink-700"
+            }`}
+          >
+            {row.isOverdue
+              ? `${-row.daysUntil}d past official`
+              : countdownLabel(row.task.internalTargetDate)}
+          </span>
+          {row.isPastInternalTarget && (
+            <span className="text-2xs text-ink-500 tabular-nums block">
+              {row.daysUntil > 0
+                ? `${row.daysUntil}d to official`
+                : "official today"}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Bottom row on mobile: assignees + action.
@@ -1139,9 +1181,37 @@ function useSmsStatusInline(): { configured: boolean } {
   return { configured: q.data?.configured ?? false };
 }
 
+/**
+ * Tooltip hint for the "behind schedule" chip. Maps the runway-to-official
+ * to the next decision the CPA needs to make:
+ *
+ *   >7 days  → chase harder; the buffer's gone but there's still working time
+ *    1–7 days → file extension OR push; decision time
+ *    0 days   → official is today; decide now
+ *   <0 days   → past official (handled by isOverdue branch elsewhere)
+ *
+ * The hint is intentionally action-oriented, not status-oriented. CPAs
+ * rarely miss official deadlines because they don't dwell on "behind" —
+ * they pick a recovery move. We surface the move.
+ */
+function behindScheduleHint(r: TaskRowData): string {
+  const lateBy = -r.daysUntilInternal;
+  if (r.daysUntil > 7) {
+    return `${lateBy}d past internal target · ${r.daysUntil}d to official — chase harder`;
+  }
+  if (r.daysUntil >= 1) {
+    return `${lateBy}d past internal target · ${r.daysUntil}d to official — file extension or push`;
+  }
+  if (r.daysUntil === 0) {
+    return `${lateBy}d past internal target · official is today — decide now`;
+  }
+  return `${lateBy}d past internal target`;
+}
+
 function urgencyScore(r: TaskRowData): number {
   let score = 0;
-  if (r.isOverdue) score += 100;
+  if (r.isOverdue) score += 100; // past official — extension territory
+  if (r.isPastInternalTarget) score += 70; // buffer eaten, official still ahead
   if (r.flagged > 0) score += 60;
   if (r.affectingAlerts.some((a) => !a.read)) score += 50;
   if (r.daysUntil <= 0 && !r.isReady) score += 40;

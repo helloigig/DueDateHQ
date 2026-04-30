@@ -4,14 +4,16 @@ import { useClients } from "../hooks/useClients";
 import { useTriageDeadlines } from "../hooks/useDeadlines";
 import { useDetectAnnouncements } from "../hooks/useAnnouncements";
 import { useRealtimeAnnouncements } from "../hooks/useRealtimeAnnouncements";
+import { useStore } from "../data/store";
+import { useSession } from "../data/session";
 import { ShortcutsModal } from "../components/ShortcutsModal";
 import { DashboardSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
 import {
-  bucketOf,
   TODAY,
   toIso,
-  formatLongDate,
+  daysBetween,
+  parseDate,
   hoursSince,
   escalationTier,
 } from "../data/dateHelpers";
@@ -19,23 +21,41 @@ import { useDashboardPreferences } from "../data/preferences";
 import { AnnouncementBanner } from "../components/AnnouncementBanner";
 import { ChaseBanner } from "../components/ChaseBanner";
 import { BlockingAlertsDialog } from "../components/BlockingAlertsDialog";
-import { ExportModal } from "../components/ExportModal";
 import { OnboardingLayer2Widget } from "../components/OnboardingLayer2Widget";
 import { TaskList } from "../components/TaskList";
-import { AdvisoryPeek } from "../components/AdvisoryPeek";
 import { WelcomeTour } from "../components/WelcomeTour";
-import { PwaInstallCard } from "../components/PwaInstallCard";
 import { CapacityStrip } from "../components/CapacityStrip";
-import { DigestPanel } from "../components/DigestPanel";
-import type { Announcement, Deadline } from "../types";
+import type { Announcement } from "../types";
 
-const HIDE_STATUSES = new Set(["completed", "filed_extension"]);
+const DONE_STATUSES = new Set(["completed", "filed_extension"]);
 
+/**
+ * Dashboard — the morning glance.
+ *
+ * Two zones above the fold:
+ *   1. State-alert band — conditional, vanishes when no actionable alerts
+ *   2. The queue — TaskList (urgency-sorted, with chase actions inline)
+ *
+ * Below the fold: capacity strip (≥3-staff firms only).
+ *
+ * Editorial rules:
+ *   • CPAs barely miss official deadlines — so "past official" is rare and
+ *     gets a calm-but-clear callout only when nonzero. The operational
+ *     signal is "past internal target" (the firm's 1-week buffer is being
+ *     eaten), which fires regularly during tax season.
+ *   • No big greeting cards or hero stat strips. A thin top strip with the
+ *     date and a one-line summary; the queue starts immediately below.
+ *   • Welcome tour, PWA install, advisory peek, digest panel are NOT on
+ *     this surface (they were noise — moved to Settings, /to-review, or
+ *     surfaced via per-row actions in the queue).
+ */
 export function Dashboard() {
+  const session = useSession();
   const clientsQuery = useClients();
   const triageQuery = useTriageDeadlines();
   const announcementsQuery = useRealtimeAnnouncements();
   const detectMutation = useDetectAnnouncements();
+  const { tasks } = useStore();
 
   // One-shot: run the detector on mount (simulates 24h SLA scrape)
   useEffect(() => {
@@ -44,22 +64,12 @@ export function Dashboard() {
   }, []);
 
   const { prefs, update } = useDashboardPreferences();
-  const [dayFilter, setDayFilter] = useState<string | null>(null);
-  const [exportOpen, setExportOpen] = useState(false);
 
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   useShortcuts([
-    {
-      key: "j",
-      description: "Next row",
-      handler: () => focusAdjacentRow(1),
-    },
-    {
-      key: "k",
-      description: "Previous row",
-      handler: () => focusAdjacentRow(-1),
-    },
+    { key: "j", description: "Next row", handler: () => focusAdjacentRow(1) },
+    { key: "k", description: "Previous row", handler: () => focusAdjacentRow(-1) },
     {
       key: "?",
       shift: true,
@@ -70,42 +80,9 @@ export function Dashboard() {
 
   const clients = clientsQuery.data?.items ?? [];
   const announcements = announcementsQuery.data ?? [];
-  const triage = triageQuery.data;
-
-  const active = useMemo(() => {
-    if (!triage) return [] as Deadline[];
-    return [
-      ...triage.overdue,
-      ...triage.thisWeek,
-      ...triage.thisMonth,
-      ...triage.longTerm,
-    ].filter((d) => !HIDE_STATUSES.has(d.status));
-  }, [triage]);
-
-  const filtered = useMemo(
-    () => (dayFilter ? active.filter((d) => d.officialDueDate === dayFilter) : active),
-    [active, dayFilter]
-  );
-
-  const byBucket = useMemo(() => {
-    const buckets = {
-      overdue: [] as Deadline[],
-      this_week: [] as Deadline[],
-      this_month: [] as Deadline[],
-      long_term: [] as Deadline[],
-    };
-    for (const d of filtered) buckets[bucketOf(d.officialDueDate)].push(d);
-    const byDate = (a: Deadline, b: Deadline) =>
-      a.officialDueDate.localeCompare(b.officialDueDate);
-    buckets.overdue.sort(byDate);
-    buckets.this_week.sort(byDate);
-    buckets.this_month.sort(byDate);
-    buckets.long_term.sort(byDate);
-    return buckets;
-  }, [filtered]);
 
   const activeBanners = announcements.filter(
-    (a) => !a.dismissed && a.affectedClientIds.length > 0
+    (a) => !a.dismissed && a.affectedClientIds.length > 0,
   );
 
   const alertsByTier = useMemo(() => {
@@ -126,22 +103,38 @@ export function Dashboard() {
     alertsByTier.blocking.length > 0 && !alertsSnoozedToday;
   const [blockingDismissed, setBlockingDismissed] = useState(false);
 
-  const greeting = useMemo(() => {
-    const dayName = TODAY.toLocaleDateString("en-US", {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-    });
-    return `${dayName} · Good morning, Sarah`;
-  }, []);
-
+  // Operational summary. Two distinct signals:
+  //   • pastInternalTarget — task is past its internal target date (1-week
+  //     buffer eaten). Daily-relevant. The signal Sarah actually feels.
+  //   • pastOfficial — task is past the government deadline. Rare. Means
+  //     extension territory. Almost always 0 in a healthy firm.
+  // Plus: dueThisWeek — calendar context. Always shown.
   const summary = useMemo(() => {
-    const overdueCount = byBucket.overdue.length;
-    const weekCount = byBucket.this_week.length;
+    const open = tasks.filter((t) => !DONE_STATUSES.has(t.status));
+    const todayIso = toIso(TODAY);
+    const pastInternalTarget = open.filter(
+      (t) => t.internalTargetDate < todayIso && t.officialDueDate >= todayIso,
+    ).length;
+    const pastOfficial = open.filter(
+      (t) => t.officialDueDate < todayIso,
+    ).length;
+    const dueThisWeek = open.filter((t) => {
+      const days = daysBetween(TODAY, parseDate(t.officialDueDate));
+      return days >= 0 && days <= 7;
+    }).length;
     const activeClients = clients.filter((c) => c.status === "active").length;
-    const inProgress = active.filter((d) => d.status === "in_progress").length;
-    return { overdueCount, weekCount, activeClients, inProgress };
-  }, [byBucket, clients, active]);
+    return { pastInternalTarget, pastOfficial, dueThisWeek, activeClients };
+  }, [tasks, clients]);
+
+  const todayLabel = useMemo(
+    () =>
+      TODAY.toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      }),
+    [],
+  );
 
   const hasNoClients = clients.length === 0;
 
@@ -174,9 +167,13 @@ export function Dashboard() {
           title="Let's get your clients in."
           actions={
             <>
-              <EmptyStateButton to="/import" primary>Import CSV</EmptyStateButton>
+              <EmptyStateButton to="/import" primary>
+                Import CSV
+              </EmptyStateButton>
               <EmptyStateButton to="/clients">Add 5 manually</EmptyStateButton>
-              <EmptyStateButton to="/import?demo=1">Try demo data</EmptyStateButton>
+              <EmptyStateButton to="/import?demo=1">
+                Try demo data
+              </EmptyStateButton>
             </>
           }
         />
@@ -184,98 +181,100 @@ export function Dashboard() {
     );
   }
 
+  const firmName = session?.firmName ?? "";
+
   return (
-    <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-5">
-      {/* First-run product tour — three slides shown once, then never again */}
+    <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-4">
+      {/* Thin top strip — date + firm name. No big greeting. */}
+      <header className="flex items-baseline gap-2 text-xs flex-wrap">
+        <span className="text-ink-500">{todayLabel}</span>
+        {firmName && (
+          <>
+            <span className="text-ink-300">·</span>
+            <span className="text-ink-700 font-medium">{firmName}</span>
+          </>
+        )}
+      </header>
+
+      {/* One-line operational summary. Two-tier urgency: warn for past
+          internal target (common), danger for past official (rare). Both
+          conditional — no zero-counts shouted at the CPA. */}
+      <p
+        className="text-sm text-ink-700 flex items-center flex-wrap gap-x-3 gap-y-1 tabular-nums"
+        aria-label="Firm summary"
+      >
+        <span>
+          <span className="text-ink-900 font-semibold">
+            {summary.activeClients}
+          </span>{" "}
+          <span className="text-ink-500">active clients</span>
+        </span>
+        <span className="text-ink-300">·</span>
+        <span>
+          <span className="text-ink-900 font-semibold">
+            {summary.dueThisWeek}
+          </span>{" "}
+          <span className="text-ink-500">due this week</span>
+        </span>
+        {summary.pastInternalTarget > 0 && (
+          <>
+            <span className="text-ink-300">·</span>
+            <span className="text-warn-ink">
+              <span className="font-semibold">{summary.pastInternalTarget}</span>{" "}
+              past internal target
+            </span>
+          </>
+        )}
+        {summary.pastOfficial > 0 && (
+          <>
+            <span className="text-ink-300">·</span>
+            <span className="text-danger-ink">
+              <span className="font-semibold">{summary.pastOfficial}</span>{" "}
+              past official — file extension
+            </span>
+          </>
+        )}
+      </p>
+
+      {/* First-run welcome — inline banner now, click to expand into
+          three-slide modal. Day-1 modal interruption was wrong. */}
       <WelcomeTour />
 
+      {/* ────────────────────────────────────────── ZONE 1: alerts band */}
+      {/* AnnouncementBanner + ChaseBanner self-vanish when empty, so the
+          page stays clean on quiet mornings. No "no alerts today" placeholders. */}
       <AnnouncementBanner announcements={activeBanners} />
       <ChaseBanner />
 
-      {/* PWA install prompt — only shows day 2-3 after signup, dismissible */}
-      <PwaInstallCard />
+      {/* ────────────────────────────────────────── ZONE 2: the queue */}
+      <TaskList />
 
+      {/* Below the fold: capacity (≥3-staff firms only — gate inside the
+          component). Solo Sarah never sees this; mid-firm Yan Jing always does. */}
+      <CapacityStrip />
+
+      {/* Onboarding layer-2 nudges (e.g., set up forwarding email, connect
+          QBO). Self-gated to fade out once the firm has wired the basics. */}
+      <OnboardingLayer2Widget />
+
+      {/* Blocking-alerts overlay — fires only at >72h escalation. Stays as
+          a modal because the spec demands a forced ack at that tier. */}
       {showBlockingDialog && !blockingDismissed && (
         <BlockingAlertsDialog
           alerts={alertsByTier.blocking}
           onSnooze={(reason) => {
             update({ alerts_snoozed_until: toIso(TODAY) });
             if (reason) {
-              console.info(
-                "[alerts] snooze logged",
-                { date: toIso(TODAY), reason }
-              );
+              console.info("[alerts] snooze logged", {
+                date: toIso(TODAY),
+                reason,
+              });
             }
             setBlockingDismissed(true);
           }}
           onClose={() => setBlockingDismissed(true)}
         />
       )}
-
-      <header>
-        <h1 className="text-2xl font-semibold text-ink-900">
-          {greeting}
-        </h1>
-        <p className="text-sm text-ink-500 mt-2 max-w-2xl">
-          {anchoringStatement(summary, activeBanners.length)}
-        </p>
-        {/* Calm inline strip — no big stat cards. Period-separated, conversational. */}
-        <p className="mt-3 text-sm text-ink-700 flex items-center flex-wrap gap-x-3 gap-y-1 tabular-nums">
-          <span>
-            <span className="text-ink-900 font-semibold">{summary.activeClients}</span>{" "}
-            <span className="text-ink-500">active clients</span>
-          </span>
-          {summary.overdueCount > 0 && (
-            <>
-              <span className="text-ink-300">·</span>
-              <span className="text-danger-ink">
-                <span className="font-semibold">{summary.overdueCount}</span> overdue
-              </span>
-            </>
-          )}
-          <span className="text-ink-300">·</span>
-          <span>
-            <span className="text-ink-900 font-semibold">{summary.weekCount}</span>{" "}
-            <span className="text-ink-500">due this week</span>
-          </span>
-          {summary.inProgress > 0 && (
-            <>
-              <span className="text-ink-300">·</span>
-              <span>
-                <span className="text-ink-900 font-semibold">{summary.inProgress}</span>{" "}
-                <span className="text-ink-500">in progress</span>
-              </span>
-            </>
-          )}
-        </p>
-      </header>
-
-      <AdvisoryPeek />
-      <CapacityStrip />
-      <DigestPanel />
-      <TaskList />
-      <OnboardingLayer2Widget />
-
-      {dayFilter && (
-        <div className="bg-info-bg border border-info-border text-info-ink rounded-md px-3 py-2 text-sm flex items-center">
-          <span>Filtered to {formatLongDate(dayFilter)}</span>
-          <button
-            onClick={() => setDayFilter(null)}
-            className="ml-auto text-xs underline"
-          >
-            Clear
-          </button>
-        </div>
-      )}
-
-
-      <ExportModal
-        open={exportOpen}
-        deadlines={filtered}
-        clients={clients}
-        title="Export deadlines"
-        onClose={() => setExportOpen(false)}
-      />
 
       <ShortcutsModal
         open={shortcutsOpen}
@@ -297,7 +296,9 @@ export function Dashboard() {
           onClick={() => setShortcutsOpen(true)}
           className="hover:text-ink-700 flex items-center gap-1"
         >
-          <kbd className="px-1 py-0.5 border border-line rounded font-mono">?</kbd>
+          <kbd className="px-1 py-0.5 border border-line rounded font-mono">
+            ?
+          </kbd>
           for shortcuts
         </button>
       </div>
@@ -307,7 +308,7 @@ export function Dashboard() {
 
 function focusAdjacentRow(direction: 1 | -1) {
   const rows = Array.from(
-    document.querySelectorAll<HTMLElement>("[data-deadline-row]")
+    document.querySelectorAll<HTMLElement>("[data-deadline-row]"),
   );
   if (rows.length === 0) return;
   const active = document.activeElement as HTMLElement | null;
@@ -357,23 +358,3 @@ function EmptyStateButton({
     </a>
   );
 }
-
-function anchoringStatement(
-  summary: { overdueCount: number; weekCount: number; inProgress: number; activeClients: number },
-  newAlertCount: number
-): string {
-  // The headline answers Sarah's actual question: "what changed while I was
-  // off, and what needs me to decide right now?" — not "what's the calendar."
-  // Picks one register from the firm's current state.
-  if (summary.overdueCount > 0) {
-    return `${summary.overdueCount} overdue ${summary.overdueCount === 1 ? "task needs" : "tasks need"} attention first. The rest can wait.`;
-  }
-  if (newAlertCount > 0) {
-    return `${newAlertCount} new state ${newAlertCount === 1 ? "alert" : "alerts"} since you last looked. Review affected clients first.`;
-  }
-  if (summary.weekCount === 0) {
-    return "Quiet week ahead. Use the time to clear the inbox below.";
-  }
-  return `Nothing blocking. Scan the cards below to see what AI surfaced while you were off.`;
-}
-
