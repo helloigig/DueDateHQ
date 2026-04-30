@@ -979,6 +979,8 @@ function ClientAiInsightsCard({ clientId }: { clientId: string }) {
   const insights = useAiInsightsForClient(clientId);
   const facts = useImportedFactsForClient(clientId);
   const open = insights.filter((i) => i.status === "open");
+  const clientQuery = useClient(clientId);
+  const client = clientQuery.data;
 
   // Layer B advisory triggers — derive from Mode E. Tag insights by
   // category for visual grouping. PRD §4.4 Layer B.
@@ -988,7 +990,19 @@ function ClientAiInsightsCard({ clientId }: { clientId: string }) {
   // counts as "at risk" when the client has open insights AND no recent
   // confirmed activity. Real implementation reads ImportedFact + activity.
   const churnRiskScore = computeChurnRiskScore(clientId, open.length);
-  const showChurnRisk = churnRiskScore >= 2;
+  // Suppress churn-risk for newly-added clients — there's no engagement
+  // history to flag yet, so any "elevated" signal is noise. 30-day grace
+  // window aligns with the response-time-trend rolling window the real
+  // implementation will use (PRD §4.4 Layer B).
+  const isNewClient = (() => {
+    if (!client?.addedAt) return true;
+    const added = parseDate(client.addedAt);
+    if (Number.isNaN(added.getTime())) return true;
+    const daysSinceAdded =
+      (TODAY.getTime() - added.getTime()) / (24 * 60 * 60 * 1000);
+    return daysSinceAdded < 30;
+  })();
+  const showChurnRisk = churnRiskScore >= 2 && !isNewClient;
 
   if (open.length === 0 && facts.length === 0 && !showChurnRisk) {
     return (
