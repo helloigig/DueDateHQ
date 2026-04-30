@@ -38,9 +38,14 @@ export function Sidebar() {
   const { checklistItems } = useStore();
   const todayIso = new Date().toISOString().slice(0, 10);
   const unread = announcements.filter((a) => !a.read).length;
-  // Sidebar badge must match what /to-review actually shows: fast-lane
-  // confirms (AI high/medium, no flags) + scheduled chases. Otherwise the
-  // badge promises N reviews and the page delivers fewer — broken contract.
+  const STALLED_HOURS = 14 * 24;
+  const hoursSinceIso = (iso: string) =>
+    (Date.now() - new Date(iso).getTime()) / (60 * 60 * 1000);
+  // Sidebar badge must match what /to-review actually shows. The cut:
+  //   - Confirms: AI high/medium, not flagged
+  //   - Chases:  due today, NOT stalled >14d (those are Quiet-Clients
+  //              dashboard concerns — surfacing them here too would
+  //              double-count and inflate the badge into a wall)
   const inboxCount = checklistItems.filter((c) => {
     if (
       c.state === "received_unreviewed" &&
@@ -52,7 +57,8 @@ export function Sidebar() {
     if (
       c.state === "requested_waiting" &&
       c.nextReminderAt &&
-      c.nextReminderAt <= todayIso
+      c.nextReminderAt <= todayIso &&
+      (!c.lastReminderAt || hoursSinceIso(c.lastReminderAt) < STALLED_HOURS)
     ) {
       return true;
     }

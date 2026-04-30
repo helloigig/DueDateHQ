@@ -120,6 +120,14 @@ export function Inbox() {
     [checklistItems]
   );
 
+  // Chases that belong in the fast lane: due today on routine cadence.
+  // Stalled cases (>14 days post-reminder, no response) are excluded —
+  // they need a phone call, not another email, and the Dashboard's
+  // Quiet-Clients banner already surfaces them. Without this cut, the
+  // same item shows in two places and bloats the badge into a wall.
+  const STALLED_HOURS = 14 * 24;
+  const hoursSinceIso = (iso: string) =>
+    (Date.now() - new Date(iso).getTime()) / (60 * 60 * 1000);
   const chases = useMemo(
     () =>
       checklistItems
@@ -127,7 +135,9 @@ export function Inbox() {
           (c) =>
             c.state === "requested_waiting" &&
             c.nextReminderAt &&
-            c.nextReminderAt <= today
+            c.nextReminderAt <= today &&
+            (!c.lastReminderAt ||
+              hoursSinceIso(c.lastReminderAt) < STALLED_HOURS)
         )
         .filter(matchesFilters)
         .sort((a, b) =>
@@ -135,6 +145,22 @@ export function Inbox() {
         ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [checklistItems, today, staffFilter, stateFilter, window],
+  );
+
+  // Items we excluded from chases because they're quiet-client cases
+  // (>14 days since last reminder, no response). Surface a one-line
+  // callout pointing to the Dashboard's Quiet-Clients banner so the
+  // CPA knows where those items went — they need a phone call, not
+  // another email.
+  const quietClientCount = useMemo(
+    () =>
+      checklistItems.filter(
+        (c) =>
+          c.state === "requested_waiting" &&
+          c.lastReminderAt &&
+          hoursSinceIso(c.lastReminderAt) >= STALLED_HOURS
+      ).length,
+    [checklistItems]
   );
 
   const visible =
@@ -176,14 +202,29 @@ export function Inbox() {
         </p>
       </header>
 
-      {needsContextCount > 0 && (
-        <p className="text-2xs text-ink-500">
-          Plus {needsContextCount} document
-          {needsContextCount === 1 ? "" : "s"} that{" "}
-          {needsContextCount === 1 ? "needs" : "need"} more context — flagged,
-          AI uncertain, or custom. Those live on their task pages where you can
-          see what surrounds them.
-        </p>
+      {(needsContextCount > 0 || quietClientCount > 0) && (
+        <div className="text-2xs text-ink-500 space-y-0.5">
+          {needsContextCount > 0 && (
+            <p>
+              Plus {needsContextCount} document
+              {needsContextCount === 1 ? "" : "s"} that{" "}
+              {needsContextCount === 1 ? "needs" : "need"} more context —
+              flagged, AI uncertain, or custom. Those live on their task pages
+              where you can see what surrounds them.
+            </p>
+          )}
+          {quietClientCount > 0 && (
+            <p>
+              Plus {quietClientCount} chase
+              {quietClientCount === 1 ? "" : "s"} where the client has been
+              quiet for over two weeks — those are surfaced on the{" "}
+              <Link to="/" className="underline hover:text-ink-900">
+                dashboard's Quiet Clients banner
+              </Link>{" "}
+              because email reminders aren't moving the needle anymore.
+            </p>
+          )}
+        </div>
       )}
 
       <div className="border-b border-line flex gap-1">
