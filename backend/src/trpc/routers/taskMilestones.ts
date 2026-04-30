@@ -13,10 +13,13 @@ import { z } from "zod";
 import { firmProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
 import {
+  clients,
+  deadlines,
   taskMilestones,
   taskMilestoneEvents,
   tasks,
 } from "../../db/schema.js";
+import { predictMilestoneTargetDates } from "../../lib/ai.js";
 
 const MILESTONE_TYPE = [
   "initial_meeting",
@@ -128,6 +131,88 @@ export const taskMilestonesRouter = router({
         .where(eq(taskMilestones.id, input.id))
         .returning();
       return updated;
+    }),
+
+  /**
+   * Mode B propose-and-seed — calls predictMilestoneTargetDates and inserts
+   * 5 default milestones for the task. Idempotent: if any milestones already
+   * exist for the task, returns them unchanged (CPA edits land via `update`).
+   *
+   * Per PRD §9.4.1: AI authority is yellow-zone — proposals only; CPA reviews
+   * + accepts. proposedBy is set to "ai" so the FE can render an "AI proposed"
+   * badge and let the CPA accept/edit/dismiss.
+   */
+  proposeForTask: firmProcedure
+    .input(z.object({ taskId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      // Load task → deadline → client for the LLM context.
+      const [row] = await db
+        .select({
+          taskId: tasks.id,
+          formType: deadlines.formType,
+          officialDueDate: deadlines.officialDueDate,
+          clientName: clients.name,
+          clientTier: clients.tier,
+        })
+        .from(tasks)
+        .innerJoin(deadlines, eq(deadlines.id, tasks.deadlineId))
+        .innerJoin(clients, eq(clients.id, deadlines.clientId))
+        .where(
+          and(eq(tasks.id, input.taskId), eq(tasks.firmId, ctx.firmId)),
+        );
+      if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+
+      // Idempotency — return existing milestones unchanged on repeat call.
+      const existing = await db
+        .select()
+        .from(taskMilestones)
+        .where(
+          and(
+            eq(taskMilestones.firmId, ctx.firmId),
+            eq(taskMilestones.taskId, input.taskId),
+          ),
+        );
+      if (existing.length > 0) {
+        return { proposed: false, milestones: existing };
+      }
+
+      // Mode B prediction. Falls back to substrate when LLM unavailable
+      // (predictMilestoneTargetDates handles the fallback internally — never
+      // returns null when officialDueDate is supplied).
+      const result = await predictMilestoneTargetDates({
+        firmId: ctx.firmId,
+        taskId: input.taskId,
+        formType: row.formType,
+        officialDueDate: row.officialDueDate,
+        clientName: row.clientName,
+        clientTier:
+          row.clientTier === "premium" || row.clientTier === "basic"
+            ? row.clientTier
+            : "standard",
+      });
+      if (!result) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Insert one row per proposal. display_order = 0..4 in milestone order.
+      const inserted = await db
+        .insert(taskMilestones)
+        .values(
+          result.proposals.map((p, idx) => ({
+            firmId: ctx.firmId,
+            taskId: input.taskId,
+            milestoneType: p.milestoneType,
+            targetDate: p.targetDate,
+            displayOrder: idx,
+            proposedBy: "ai" as const,
+            status: "not_started" as const,
+          })),
+        )
+        .returning();
+      return {
+        proposed: true,
+        milestones: inserted,
+        overallConfidence: result.overallConfidence,
+        basisOfEstimate: result.basisOfEstimate,
+      };
     }),
 
   /** Add a custom milestone (P2 firm-custom milestone types per §9.4.1). */

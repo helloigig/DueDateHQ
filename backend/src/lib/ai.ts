@@ -564,6 +564,187 @@ export async function predictArrivalTiming(
   }
 }
 
+// ───────── Mode B — TaskMilestone target_date prediction ─────────
+//
+// Per PRD §9.4.1: Mode B can WRITE proposed target_date values for each
+// milestone (yellow zone — CPA reviews). Mirrors `predictArrivalTiming`
+// but at the task-milestone level rather than the per-checklist-item
+// arrival level. The firm — not the client — is the primary predicate
+// (firms have characteristic internal cadence; clients drive arrival).
+
+const MILESTONE_DATES_SYSTEM_PROMPT = `You propose target dates for the 5 default tax-task milestones, given the form type, official due date, and any prior-year history for the firm.
+
+The 5 milestones (in order):
+1. initial_meeting — kickoff / engagement signed / scope confirmed
+2. collect_materials — client has sent everything we need
+3. prepare_workpapers — internal preparation complete
+4. internal_review — second-CPA review complete
+5. file — return / extension submitted to authority
+
+Output strict JSON:
+{
+  "proposals": [
+    {
+      "milestoneType": "initial_meeting" | "collect_materials" | "prepare_workpapers" | "internal_review" | "file",
+      "targetDate": "<YYYY-MM-DD>",
+      "confidence": "high" | "medium" | "low",
+      "rationale": "<one short clause>"
+    },
+    ... (5 entries total, one per milestone, in order)
+  ],
+  "overallConfidence": "high" | "medium" | "low",
+  "basisOfEstimate": "<one short sentence — firm history vs. substrate fallback>"
+}
+
+Rules:
+- targetDate must be ON or BEFORE officialDueDate. The "file" milestone targetDate equals officialDueDate by default unless prior history shows the firm files earlier.
+- Spacing must be monotonically increasing — initial_meeting < collect_materials < prepare_workpapers < internal_review < file.
+- "high" requires ≥2 prior-year matched-form milestone histories for this firm
+- "medium" requires 1 prior year OR substrate-with-firm-tier-known
+- "low" for substrate-only (no firm history available)
+- Substrate defaults (per PRD §4.2 cold-start; offset from officialDueDate):
+  - initial_meeting: -90 days
+  - collect_materials: -60 days
+  - prepare_workpapers: -21 days
+  - internal_review: -7 days
+  - file: 0 days (= officialDueDate)
+- These are starting points — adjust based on form complexity (1065 partnership tighter than 1040), client tier (premium often pushes earlier), and firm history when supplied.
+- Output ONLY valid JSON.`;
+
+export interface PredictMilestoneDatesInput {
+  firmId: string;
+  taskId: string;
+  formType: string;
+  officialDueDate: string; // YYYY-MM-DD
+  clientName?: string;
+  clientTier?: "premium" | "standard" | "basic";
+  /** Prior-year milestone history for this firm × form_type. Each entry:
+   *  {year, milestoneType, targetDate, completedDate}. Recent first. */
+  priorYearHistory?: Array<{
+    year: number;
+    milestoneType: string;
+    targetDate?: string | null;
+    completedDate?: string | null;
+  }>;
+}
+
+export interface MilestoneProposal {
+  milestoneType:
+    | "initial_meeting"
+    | "collect_materials"
+    | "prepare_workpapers"
+    | "internal_review"
+    | "file";
+  targetDate: string;
+  confidence: "high" | "medium" | "low";
+  rationale: string;
+}
+
+export interface PredictMilestoneDatesOutput {
+  proposals: MilestoneProposal[];
+  overallConfidence: "high" | "medium" | "low";
+  basisOfEstimate: string;
+  inferenceId: number;
+}
+
+export async function predictMilestoneTargetDates(
+  input: PredictMilestoneDatesInput,
+): Promise<PredictMilestoneDatesOutput | null> {
+  if (!isAiConfigured()) return substrateMilestoneDates(input);
+  const userPrompt = JSON.stringify({
+    formType: input.formType,
+    officialDueDate: input.officialDueDate,
+    clientTier: input.clientTier ?? "standard",
+    priorYearHistoryCount: input.priorYearHistory?.length ?? 0,
+    priorYearHistory: input.priorYearHistory ?? [],
+  });
+  try {
+    const { text, inferenceId } = await callLLM({
+      firmId: input.firmId,
+      mode: "B",
+      model: HAIKU_MODEL,
+      systemPrompt: MILESTONE_DATES_SYSTEM_PROMPT,
+      userPrompt,
+      maxTokens: 768,
+      context: {
+        taskId: input.taskId,
+        formType: input.formType,
+        officialDueDate: input.officialDueDate,
+      },
+    });
+    const parsed = JSON.parse(text) as Omit<
+      PredictMilestoneDatesOutput,
+      "inferenceId"
+    >;
+    if (!Array.isArray(parsed.proposals) || parsed.proposals.length !== 5) {
+      log.warn("ai.predictMilestoneTargetDates.bad_shape", {
+        textPreview: text.slice(0, 200),
+      });
+      return substrateMilestoneDates(input);
+    }
+    return { ...parsed, inferenceId };
+  } catch (err) {
+    log.warn("ai.predictMilestoneTargetDates.failed", {
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return substrateMilestoneDates(input);
+  }
+}
+
+/**
+ * Substrate fallback — used when no API key is configured, the LLM call
+ * fails, or the response can't be parsed. Returns the PRD §4.2 cold-start
+ * defaults so the FE always gets something to render.
+ */
+function substrateMilestoneDates(
+  input: PredictMilestoneDatesInput,
+): PredictMilestoneDatesOutput {
+  const due = new Date(input.officialDueDate);
+  const offset = (days: number) => {
+    const d = new Date(due);
+    d.setDate(d.getDate() - days);
+    return d.toISOString().slice(0, 10);
+  };
+  return {
+    proposals: [
+      {
+        milestoneType: "initial_meeting",
+        targetDate: offset(90),
+        confidence: "low",
+        rationale: "substrate default (no firm history)",
+      },
+      {
+        milestoneType: "collect_materials",
+        targetDate: offset(60),
+        confidence: "low",
+        rationale: "substrate default (no firm history)",
+      },
+      {
+        milestoneType: "prepare_workpapers",
+        targetDate: offset(21),
+        confidence: "low",
+        rationale: "substrate default (no firm history)",
+      },
+      {
+        milestoneType: "internal_review",
+        targetDate: offset(7),
+        confidence: "low",
+        rationale: "substrate default (no firm history)",
+      },
+      {
+        milestoneType: "file",
+        targetDate: input.officialDueDate,
+        confidence: "low",
+        rationale: "official due date — substrate default",
+      },
+    ],
+    overallConfidence: "low",
+    basisOfEstimate:
+      "PRD §4.2 cold-start substrate (no firm × form-type history available)",
+    inferenceId: 0,
+  };
+}
+
 // ───────── Mode C — anomaly detection on financial values ─────────
 
 const ANOMALY_SYSTEM_PROMPT = `You detect anomalies in client tax/financial data. Statistical outliers (e.g. income jumped 80% YoY) are easy; the value of an LLM here is contextual judgment — "income jumped 80% but the client mentioned a one-time stock sale, so this is fine."

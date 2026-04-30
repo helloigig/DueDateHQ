@@ -29,6 +29,33 @@ import type {
 const delay = (ms = 150) =>
   new Promise((r) => setTimeout(r, ms + Math.random() * 100));
 
+// In-memory mock store for taskMilestones — survives across calls within a
+// page session, cleared on reload. Supports `proposeForTask` round-trips so
+// TaskMiniTimeline can demo the Mode B propose flow without a backend.
+type MockMilestoneRow = {
+  id: string;
+  firmId: string;
+  taskId: string;
+  milestoneType: string;
+  customLabel: string | null;
+  targetDate: string | null;
+  completedDate: string | null;
+  status: "not_started" | "in_progress" | "blocked" | "done" | "overdue";
+  blockerReason: string | null;
+  displayOrder: number;
+  proposedBy: "user" | "ai" | "system";
+};
+const mockMilestoneStore = new Map<string, MockMilestoneRow[]>();
+
+function nextApril15(): string {
+  const now = new Date();
+  const year =
+    now.getMonth() < 3 || (now.getMonth() === 3 && now.getDate() < 15)
+      ? now.getFullYear()
+      : now.getFullYear() + 1;
+  return `${year}-04-15`;
+}
+
 function sessionOrDefault() {
   const s = getSession();
   return {
@@ -580,18 +607,66 @@ export const mockAdapter = {
     },
   },
 
-  // taskMilestones — mock returns empty arrays + no-op mutations. Real wiring
-  // happens against the backend when VITE_USE_MOCK_API=false. The mock keeps
-  // returning [] so TaskMiniTimeline falls back to its heuristic derivation
-  // from existing Task fields (clientPrepDate/internalTargetDate/officialDueDate).
+  // taskMilestones — mock simulates Mode B target_date proposals so the FE
+  // round-trip works in mock mode. proposeForTask synthesizes 5 substrate-
+  // default milestones (per PRD §4.2 cold-start: -90/-60/-21/-7/0 days from
+  // due_date) and stashes them in mockMilestoneStore so subsequent listForTask
+  // calls return them. Real wiring happens against the backend when
+  // VITE_USE_MOCK_API=false — the BE calls predictMilestoneTargetDates.
   taskMilestones: {
-    listForTask: async (_input: { taskId: string }) => {
+    listForTask: async (input: { taskId: string }) => {
       await delay();
-      return [] as unknown[];
+      return mockMilestoneStore.get(input.taskId) ?? [];
     },
     fleetStack: async (_input?: { waitingOnly?: boolean; limit?: number }) => {
       await delay();
-      return [] as unknown[];
+      // Flatten everything we've synthesized so far for the cross-client view
+      return Array.from(mockMilestoneStore.values()).flat();
+    },
+    proposeForTask: async (input: { taskId: string }) => {
+      await delay();
+      const existing = mockMilestoneStore.get(input.taskId);
+      if (existing && existing.length > 0) {
+        return { proposed: false, milestones: existing };
+      }
+      // Synthesize 5 substrate milestones from the task's due date if known.
+      // The mock store doesn't have task data; default to ~April 15 of next
+      // year as a reasonable filing-due anchor for demo purposes. Real BE
+      // looks up officialDueDate from the deadline row.
+      const due = nextApril15();
+      const offsetDays = (days: number) => {
+        const d = new Date(due);
+        d.setDate(d.getDate() - days);
+        return d.toISOString().slice(0, 10);
+      };
+      const stages = [
+        { type: "initial_meeting", offset: 90 },
+        { type: "collect_materials", offset: 60 },
+        { type: "prepare_workpapers", offset: 21 },
+        { type: "internal_review", offset: 7 },
+        { type: "file", offset: 0 },
+      ] as const;
+      const synthesized = stages.map((s, idx) => ({
+        id: `mock-mil-${input.taskId}-${idx}`,
+        firmId: "mock-firm",
+        taskId: input.taskId,
+        milestoneType: s.type,
+        customLabel: null,
+        targetDate: s.offset === 0 ? due : offsetDays(s.offset),
+        completedDate: null,
+        status: "not_started" as const,
+        blockerReason: null,
+        displayOrder: idx,
+        proposedBy: "ai" as const,
+      }));
+      mockMilestoneStore.set(input.taskId, synthesized);
+      return {
+        proposed: true,
+        milestones: synthesized,
+        overallConfidence: "low" as const,
+        basisOfEstimate:
+          "mock substrate (PRD §4.2 cold-start defaults — no firm history)",
+      };
     },
     update: async (_input: unknown) => {
       await delay();

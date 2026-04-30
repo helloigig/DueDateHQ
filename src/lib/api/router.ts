@@ -420,6 +420,18 @@ export const appRouter = t.router({
           .optional(),
       )
       .query(async (): Promise<TaskMilestoneRow[]> => NOT_IMPL()),
+    /** Mode B propose-and-seed — calls predictMilestoneTargetDates and inserts
+     *  5 default milestones. Idempotent — returns existing on repeat call. */
+    proposeForTask: t.procedure
+      .input(z.object({ taskId: z.string().uuid() }))
+      .mutation(
+        async (): Promise<{
+          proposed: boolean;
+          milestones: TaskMilestoneRow[];
+          overallConfidence?: "high" | "medium" | "low";
+          basisOfEstimate?: string;
+        }> => NOT_IMPL(),
+      ),
     update: t.procedure
       .input(jsonPassthrough)
       .mutation(async (): Promise<TaskMilestoneRow> => NOT_IMPL()),

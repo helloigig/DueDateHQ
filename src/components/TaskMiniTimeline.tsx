@@ -1,5 +1,7 @@
 import { useMemo } from "react";
+import { Sparkles } from "lucide-react";
 import type { Task, ChecklistItem } from "../types";
+import { trpc } from "../lib/api/client";
 
 // TaskMiniTimeline — per IA v0.7 amendment §3.4.
 //
@@ -12,11 +14,12 @@ import type { Task, ChecklistItem } from "../types";
 // target_date, completed_date, status (not_started / in_progress / blocked /
 // done / overdue).
 //
-// Phase 2 implementation: derives waypoint dates from existing Task fields
-// (clientPrepDate, internalTargetDate, officialDueDate) plus sensible
-// defaults. Real TaskMilestone schema (with explicit `initial_meeting_date`
-// and per-milestone status) lands in Phase 2 backend; this UI is forward-
-// compatible.
+// Wired to live BE: trpc.taskMilestones.listForTask returns Mode B-proposed
+// milestones when present; falls back to heuristic derivation from existing
+// Task fields when no rows exist (lets the timeline render before Mode B has
+// proposed). The "Propose dates" button calls trpc.taskMilestones.proposeForTask
+// which runs Mode B + inserts 5 rows. Once proposed, the heuristic stops
+// firing and live data drives the visualization.
 
 type Status = "done" | "in_progress" | "not_started" | "overdue";
 
@@ -36,9 +39,21 @@ interface Props {
 }
 
 export function TaskMiniTimeline({ task, checklist = [] }: Props) {
+  const milestonesQuery = trpc.taskMilestones.listForTask.useQuery({
+    taskId: task.id,
+  });
+  const proposeForTask = trpc.taskMilestones.proposeForTask.useMutation({
+    onSuccess: () => {
+      void milestonesQuery.refetch();
+    },
+  });
+  const liveMilestones = milestonesQuery.data ?? [];
+  const hasLive = liveMilestones.length > 0;
+
   const waypoints = useMemo(() => {
+    if (hasLive) return milestonesToWaypoints(liveMilestones, checklist);
     return deriveWaypoints(task, checklist);
-  }, [task, checklist]);
+  }, [hasLive, liveMilestones, task, checklist]);
 
   return (
     <section
@@ -52,8 +67,28 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
         >
           Path to filing
         </h3>
-        <span className="text-2xs text-ink-400">
+        <span className="text-2xs text-ink-400 flex items-center gap-2">
           5 milestones · today → due {task.officialDueDate}
+          {hasLive ? (
+            <span
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-info-bg/60 text-info-ink"
+              title="Mode B proposed dates persisted to task_milestones (PRD §9.4.1)"
+            >
+              <Sparkles className="w-3 h-3" aria-hidden />
+              Mode B
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => proposeForTask.mutate({ taskId: task.id })}
+              disabled={proposeForTask.isPending}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-line text-ink-700 hover:bg-sunken disabled:opacity-50"
+              title="Run Mode B to propose target dates per milestone (yellow zone — you review)"
+            >
+              <Sparkles className="w-3 h-3" aria-hidden />
+              {proposeForTask.isPending ? "proposing…" : "Propose dates"}
+            </button>
+          )}
         </span>
       </header>
 
@@ -69,6 +104,77 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
       </div>
     </section>
   );
+}
+
+type LiveMilestone = {
+  milestoneType: string;
+  targetDate: string | null;
+  completedDate: string | null;
+  status: "not_started" | "in_progress" | "blocked" | "done" | "overdue";
+  displayOrder: number;
+};
+
+// Map BE TaskMilestone rows → 5 fixed Waypoints for the visualization.
+// We canonicalize the milestone_type names: BE uses `collect_materials` /
+// `prepare_workpapers` / `internal_review`; the FE waypoint type is the
+// shorter form. Missing types fall back to status=not_started + no date.
+function milestonesToWaypoints(
+  rows: LiveMilestone[],
+  checklist: ChecklistItem[],
+): Waypoint[] {
+  const byType = new Map(
+    rows.map((r) => [canonicalize(r.milestoneType), r] as const),
+  );
+  const stages: Array<{
+    type: Waypoint["type"];
+    label: string;
+    canonical: string;
+  }> = [
+    { type: "initial_meeting", label: "Initial mtg", canonical: "initial_meeting" },
+    { type: "collect", label: "Collect", canonical: "collect_materials" },
+    { type: "prepare", label: "Prepare", canonical: "prepare_workpapers" },
+    { type: "review", label: "Review", canonical: "internal_review" },
+    { type: "file", label: "File", canonical: "file" },
+  ];
+  const waiting = checklist.filter(
+    (c) =>
+      c.state === "requested_waiting" || c.state === "not_requested",
+  ).length;
+  const reviewPending = checklist.filter(
+    (c) => c.state === "received_unreviewed" || c.state === "received_issue",
+  ).length;
+  return stages.map((s) => {
+    const row = byType.get(s.canonical);
+    const status: Status =
+      row?.status === "done"
+        ? "done"
+        : row?.status === "in_progress" || row?.status === "blocked"
+          ? "in_progress"
+          : row?.status === "overdue"
+            ? "overdue"
+            : "not_started";
+    let missingBadge: number | undefined;
+    if (status === "in_progress" || status === "overdue") {
+      if (s.canonical === "collect_materials") missingBadge = waiting || undefined;
+      else if (s.canonical === "prepare_workpapers")
+        missingBadge = reviewPending || undefined;
+    }
+    return {
+      type: s.type,
+      label: s.label,
+      targetDate: row?.targetDate ?? undefined,
+      status,
+      missingBadge,
+    };
+  });
+}
+
+function canonicalize(milestoneType: string): string {
+  // BE has the canonical names; this guard catches any short-form drift.
+  if (milestoneType === "collect") return "collect_materials";
+  if (milestoneType === "prepare") return "prepare_workpapers";
+  if (milestoneType === "review") return "internal_review";
+  return milestoneType;
 }
 
 function Waypoint({
