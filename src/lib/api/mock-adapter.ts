@@ -599,6 +599,108 @@ export const mockAdapter = {
     },
   },
 
+  /** Files-from-clients — digest + SMS + cover sheet handlers.
+   *  Mock mode synthesizes data from the local store. */
+  filesFromClients: {
+    digestForClient: async (input: {
+      clientId: string;
+      cpaSignature: string;
+      tone?: "warm" | "neutral" | "urgent";
+    }) => {
+      await delay(400);
+      const state = getState();
+      const client = state.clients.find((c) => c.id === input.clientId);
+      if (!client) return null;
+      // Find this client's pending checklist items across all tasks
+      const clientTasks = state.tasks.filter((t) => t.clientId === input.clientId);
+      const taskBundles = clientTasks
+        .map((task) => {
+          const items = state.checklistItems.filter(
+            (c) =>
+              c.taskId === task.id &&
+              (c.state === "not_requested" ||
+                c.state === "requested_waiting" ||
+                c.state === "received_issue"),
+          );
+          if (items.length === 0) return null;
+          return {
+            taskId: task.id,
+            formType: task.formType,
+            forwardingEmail: task.forwardingEmail,
+            pendingItems: items.map((i) => ({
+              itemType: i.itemType,
+              label: i.label,
+            })),
+          };
+        })
+        .filter((b): b is NonNullable<typeof b> => b !== null);
+      if (taskBundles.length === 0) return null;
+      const formTypes = [...new Set(taskBundles.map((b) => b.formType))].join(" + ");
+      const allLabels = [
+        ...new Set(taskBundles.flatMap((b) => b.pendingItems.map((p) => p.label))),
+      ];
+      const firstName = client.name.split(/\s+/)[0] ?? client.name;
+      return {
+        clientId: client.id,
+        clientName: client.name,
+        clientEmail: client.contactEmail ?? null,
+        tasks: taskBundles,
+        draft: {
+          subject: `Open items for your ${formTypes}`,
+          body: `Hi ${firstName},\n\nQuick consolidated note — I still need ${allLabels.slice(0, 3).join(", ")}${allLabels.length > 3 ? `, and ${allLabels.length - 3} more` : ""}. Reply with whatever you have or send to ${taskBundles[0]?.forwardingEmail}.\n\nThanks,\n${input.cpaSignature}`,
+          aiSources: [
+            {
+              kind: "digest",
+              note: `Consolidated ${taskBundles.length} task${taskBundles.length === 1 ? "" : "s"} into one email`,
+            },
+          ],
+          inferenceId: 0,
+        },
+      };
+    },
+    digestForFirm: async (input: {
+      cpaSignature: string;
+      tone?: "warm" | "neutral" | "urgent";
+    }) => {
+      await delay(800);
+      // Reuse digestForClient for each client with pending items
+      const state = getState();
+      const out: Array<NonNullable<Awaited<ReturnType<typeof mockAdapter.filesFromClients.digestForClient>>>> = [];
+      for (const c of state.clients) {
+        const digest = await mockAdapter.filesFromClients.digestForClient({
+          clientId: c.id,
+          cpaSignature: input.cpaSignature,
+          tone: input.tone,
+        });
+        if (digest) out.push(digest);
+      }
+      return out;
+    },
+    smsStatus: async () => {
+      await delay();
+      // Mock mode reports SMS as not-configured so the FE shows the
+      // proper "coming soon" CTA. Real BE checks env vars.
+      return { configured: false };
+    },
+    sendChaseSms: async () => {
+      await delay();
+      throw new Error("sms_not_configured_in_mock_mode");
+    },
+    composeChaseSms: async (input: {
+      clientFirstName: string;
+      cpaName: string;
+      formType: string;
+      missingItem?: string;
+      forwardingEmail: string;
+    }) => {
+      await delay();
+      const item = input.missingItem ?? "tax docs";
+      return {
+        body: `Hi ${input.clientFirstName} — ${input.cpaName} here. Still need ${item} for your ${input.formType}. Reply with photo or email ${input.forwardingEmail}. Thanks!`,
+      };
+    },
+  },
+
   /** Mock integrations — empty list, all providers reported as
    *  not-configured so the FE renders "Coming soon" CTAs. Real BE
    *  reads from the integrations table + isConfigured(). */

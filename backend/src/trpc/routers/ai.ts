@@ -71,6 +71,15 @@ export const aiRouter = router({
         forwardingEmail: z.string(),
         methodBConnected: z.boolean().optional(),
         voiceSamples: z.array(z.string()).optional(),
+        missingDocs: z
+          .array(
+            z.object({
+              itemType: z.string(),
+              label: z.string(),
+              lastYearArrival: z.string().optional(),
+            }),
+          )
+          .optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {

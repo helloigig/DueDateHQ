@@ -1,6 +1,7 @@
 import { router } from "./init.js";
 import { aiRouter } from "./routers/ai.js";
 import { aiInferencesRouter } from "./routers/aiInferences.js";
+import { filesFromClientsRouter } from "./routers/digest-sms.js";
 import {
   announcementsRouter,
   notificationsRouter,
@@ -41,6 +42,7 @@ export const appRouter = router({
   uploads: uploadsRouter,
   ai: aiRouter,
   aiInferences: aiInferencesRouter,
+  filesFromClients: filesFromClientsRouter,
   multistate: multistateRouter,
 });
 

@@ -167,7 +167,7 @@ export function flagAnomaly(
 
 interface DraftEmailInput {
   task: Task;
-  client: Pick<Client, "name" | "contactEmail">;
+  client: Pick<Client, "name" | "contactEmail" | "id">;
   itemLabel?: string;
   itemType?: string;
   tone: EmailTone;
@@ -179,6 +179,14 @@ interface DraftEmailInput {
   context?: string;
   /** Has the CPA connected Method B (Gmail/Outlook OAuth)? */
   methodBConnected?: boolean;
+  /** Smart chase — every still-pending doc on this task. When supplied,
+   *  the draft asks specifically (W-2 + 1099-INT) instead of generically.
+   *  lastYearArrival anchors expectations naturally without being preachy. */
+  missingDocs?: Array<{
+    itemType: string;
+    label: string;
+    lastYearArrival?: string;
+  }>;
 }
 
 const TONE_INTROS: Record<EmailTone, string> = {
@@ -262,6 +270,7 @@ export async function draftEmail(
         cpaSignature: input.cpaSignature,
         forwardingEmail: input.forwardingEmail,
         methodBConnected: input.methodBConnected,
+        missingDocs: input.missingDocs,
       });
       return {
         subject: result.subject,

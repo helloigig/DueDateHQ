@@ -22,8 +22,9 @@ import {
   clients,
   deadlines,
 } from "../db/schema.js";
-import { log, span } from "./observability.js";
+import { log, span, captureException } from "./observability.js";
 import { classifyDocument, isAiConfigured } from "./ai.js";
+import { sendEmail } from "./email-out.js";
 
 export interface InboundEmail {
   /** RFC-5322 envelope sender */
@@ -221,6 +222,43 @@ export async function processInboundEmail(
           relatedChecklistItemId: target.id,
         });
         written++;
+
+        // Validation auto-reply — when Mode A flags an inbound (wrong
+        // year, redacted, partial, name mismatch), notify the client
+        // immediately. Without this the CPA gets the flag, the client
+        // never knows, and the same wrong doc sits as the supposed
+        // answer until the CPA manually replies.
+        // CPA is CC'd on every auto-reply so they see the loop close.
+        if (flagReason && payload.from && client) {
+          try {
+            await sendEmail({
+              firmId: task.firmId,
+              to: payload.from,
+              replyTo: `${task.forwardingEmailLocalPart}@inbound.duedatehq.com`,
+              subject: `Quick clarification on ${att.filename}`,
+              body: buildValidationReply({
+                clientFirstName: client.name.split(/\s+/)[0] ?? "",
+                filename: att.filename,
+                flagReason,
+                expectedItem: target.label,
+                forwardingEmail: `${task.forwardingEmailLocalPart}@inbound.duedatehq.com`,
+              }),
+              taskId: task.id,
+            });
+            log.info("inbound_email.validation_reply_sent", {
+              taskId: task.id,
+              flagReason,
+              filename: att.filename,
+            });
+          } catch (err) {
+            // Don't fail the whole inbound on a send error — the doc
+            // is already recorded; the CPA can manually reply.
+            captureException(err, {
+              ctx: "validation_auto_reply",
+              taskId: task.id,
+            });
+          }
+        }
       }
 
       // Body-only emails still record activity so the CPA sees the reply
@@ -294,4 +332,29 @@ export function fromPostmark(body: unknown): InboundEmail | null {
     receivedAt: typeof b.Date === "string" ? new Date(b.Date) : new Date(),
     providerId: String(b.MessageID ?? `postmark-${Date.now()}`),
   };
+}
+
+/**
+ * Build the validation auto-reply body. Tone is warm-but-direct;
+ * client gets a clear ask without feeling scolded. CPA is implied
+ * (the email comes from the firm's domain) but signs as the firm
+ * for branding.
+ */
+function buildValidationReply(args: {
+  clientFirstName: string;
+  filename: string;
+  flagReason: string;
+  expectedItem: string;
+  forwardingEmail: string;
+}): string {
+  const greeting = args.clientFirstName ? `Hi ${args.clientFirstName},` : "Hi,";
+  return [
+    greeting,
+    "",
+    `Thanks for sending ${args.filename}. Quick note: ${args.flagReason}. We need ${args.expectedItem} for the right tax year — could you forward the correct one when you get a chance?`,
+    "",
+    `Just reply to this email or send to ${args.forwardingEmail} and it'll route automatically.`,
+    "",
+    "Thanks!",
+  ].join("\n");
 }

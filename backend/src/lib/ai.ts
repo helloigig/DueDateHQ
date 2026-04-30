@@ -270,6 +270,18 @@ export interface DraftEmailInput {
   /** Optional voice samples (last 3 emails to this client, redacted)
    *  for tone mirroring when methodBConnected. */
   voiceSamples?: string[];
+  /** Specific docs the client still owes us. When supplied, the model
+   *  drafts a targeted ask ("I still need W-2 + 1099-INT") rather
+   *  than a generic chase. lastYearArrival anchors expectations without
+   *  being preachy. Empty array → generic chase. */
+  missingDocs?: Array<{
+    itemType: string;
+    label: string;
+    /** ISO date the same item arrived in a prior year — used by the
+     *  prompt to reference history naturally ("you usually send the
+     *  W-2 in early March"). Omit when no prior. */
+    lastYearArrival?: string;
+  }>;
 }
 
 export interface DraftEmailOutput {
@@ -289,11 +301,14 @@ Output strict JSON:
 
 Rules:
 - Tone: 'warm' = friendly, conversational. 'neutral' = professional, brief. 'urgent' = direct, deadline-aware.
-- Subject names the form and the ask (e.g. "W-2 for your 1040" not "Tax docs needed")
+- Subject names the form and the ask (e.g. "W-2 + 1099-INT for your 1040" not "Tax docs needed")
 - Body opens with greeting using client's first name. State what you need + why + how to send. Mention the per-task forwarding address. Close with the CPA's signature.
 - 3-5 sentences max. CPAs hate verbose drafts.
 - No bullet points unless asked. No legal disclaimers.
 - If voiceSamples are provided, mirror sentence length + register; do NOT copy specific phrases.
+- If missingDocs has multiple items, list them naturally in the body ("I still need your W-2 and 1099-INT") rather than itemizing.
+- If missingDocs[i].lastYearArrival is set, reference it gently ("you usually send the W-2 in early March") to anchor expectations without being preachy.
+- If missingDocs is empty, fall back to a generic doc-request closer.
 - Output ONLY valid JSON.`;
 
 export async function draftEmail(
@@ -313,6 +328,7 @@ export async function draftEmail(
     cpaSignature: input.cpaSignature,
     forwardingEmail: input.forwardingEmail,
     voiceSamples: input.methodBConnected ? input.voiceSamples : undefined,
+    missingDocs: input.missingDocs ?? [],
   });
 
   const { text, inferenceId } = await callLLM({

@@ -503,6 +503,15 @@ export const appRouter = t.router({
           forwardingEmail: z.string(),
           methodBConnected: z.boolean().optional(),
           voiceSamples: z.array(z.string()).optional(),
+          missingDocs: z
+            .array(
+              z.object({
+                itemType: z.string(),
+                label: z.string(),
+                lastYearArrival: z.string().optional(),
+              }),
+            )
+            .optional(),
         }),
       )
       .mutation(
@@ -638,6 +647,90 @@ export const appRouter = t.router({
           alert: boolean;
         }> => NOT_IMPL(),
       ),
+  }),
+
+  /** Files-from-clients channels — digests, SMS, cover sheets. The
+   *  through-line of the product. */
+  filesFromClients: t.router({
+    digestForClient: t.procedure
+      .input(
+        z.object({
+          clientId: z.string(),
+          cpaSignature: z.string(),
+          tone: z.enum(["warm", "neutral", "urgent"]).optional(),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          clientId: string;
+          clientName: string;
+          clientEmail: string | null;
+          tasks: Array<{
+            taskId: string;
+            formType: string;
+            forwardingEmail: string;
+            pendingItems: Array<{ itemType: string; label: string }>;
+          }>;
+          draft: {
+            subject: string;
+            body: string;
+            aiSources: Array<{ kind: string; note: string }>;
+            inferenceId: number;
+          } | null;
+        } | null> => NOT_IMPL(),
+      ),
+    digestForFirm: t.procedure
+      .input(
+        z.object({
+          cpaSignature: z.string(),
+          tone: z.enum(["warm", "neutral", "urgent"]).optional(),
+        }),
+      )
+      .mutation(
+        async (): Promise<
+          Array<{
+            clientId: string;
+            clientName: string;
+            clientEmail: string | null;
+            tasks: Array<{
+              taskId: string;
+              formType: string;
+              forwardingEmail: string;
+              pendingItems: Array<{ itemType: string; label: string }>;
+            }>;
+            draft: unknown;
+          }>
+        > => NOT_IMPL(),
+      ),
+    smsStatus: t.procedure.query(
+      async (): Promise<{ configured: boolean }> => NOT_IMPL(),
+    ),
+    sendChaseSms: t.procedure
+      .input(
+        z.object({
+          to: z.string().min(8),
+          body: z.string().min(1).max(160),
+          taskId: z.string().uuid().optional(),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          ok: true;
+          provider: "twilio";
+          providerMessageId: string;
+        }> => NOT_IMPL(),
+      ),
+    composeChaseSms: t.procedure
+      .input(
+        z.object({
+          clientFirstName: z.string(),
+          cpaName: z.string(),
+          formType: z.string(),
+          missingItem: z.string().optional(),
+          forwardingEmail: z.string(),
+        }),
+      )
+      .query(async (): Promise<{ body: string }> => NOT_IMPL()),
   }),
 
   /** Provider integrations — QBO/Xero/Gmail/Outlook/Stripe. The

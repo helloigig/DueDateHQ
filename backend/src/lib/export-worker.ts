@@ -286,22 +286,37 @@ async function processOne(): Promise<boolean> {
           await writeFile(path, body, "utf-8");
           bytes = Buffer.byteLength(body);
         } else if (row.kind === "audit_trail_pdf") {
-          // Phase 1: write a stub PDF wrapping the JSON body. Real
-          // production composes a typeset PDF from the audit data.
-          const scope = row.scope as { taskId?: string };
+          // Two PDF flavors discriminated by scope.sheet:
+          //   "cover"  → per-task cover sheet for chase attachments
+          //   default  → full audit-trail packer
+          const scope = row.scope as { taskId?: string; sheet?: string };
           if (!scope?.taskId) throw new Error("audit_trail_requires_taskId");
-          const json = await generateAuditTrailJson(row.firmId, scope.taskId);
-          const stub = generateDeadlinesPdf(
-            json.slice(0, 4000).split("\n").map((line, i) => ({
-              client: `line-${i}`,
-              formType: line.slice(0, 30),
-              officialDueDate: "",
-              state: "",
-              status: "",
-            })),
-          );
-          await writeFile(path, stub);
-          bytes = stub.length;
+          if (scope.sheet === "cover") {
+            const buf = await generateTaskCoverSheetPdf(
+              row.firmId,
+              scope.taskId,
+            );
+            await writeFile(path, buf);
+            bytes = buf.length;
+          } else {
+            // Phase 1: write a stub PDF wrapping the JSON body. Real
+            // production composes a typeset PDF from the audit data.
+            const json = await generateAuditTrailJson(
+              row.firmId,
+              scope.taskId,
+            );
+            const stub = generateDeadlinesPdf(
+              json.slice(0, 4000).split("\n").map((line, i) => ({
+                client: `line-${i}`,
+                formType: line.slice(0, 30),
+                officialDueDate: "",
+                state: "",
+                status: "",
+              })),
+            );
+            await writeFile(path, stub);
+            bytes = stub.length;
+          }
         } else {
           throw new Error(`unknown_kind:${row.kind}`);
         }
@@ -332,6 +347,62 @@ async function processOne(): Promise<boolean> {
     },
     { id: row.id, kind: row.kind },
   );
+}
+
+/**
+ * Per-task cover sheet — a single-page PDF the CPA can attach to a
+ * chase email or mail. Lists pending docs + the per-task forwarding
+ * address client-friendly. Reuses the minimal text-PDF generator;
+ * production swaps for a templated render with the firm's logo.
+ */
+async function generateTaskCoverSheetPdf(
+  firmId: string,
+  taskId: string,
+): Promise<Buffer> {
+  const task = await db.query.tasks.findFirst({
+    where: and(eq(tasks.id, taskId), eq(tasks.firmId, firmId)),
+  });
+  if (!task) throw new Error("task_not_found");
+  const deadline = await db.query.deadlines.findFirst({
+    where: eq(deadlines.id, task.deadlineId),
+  });
+  const client = deadline
+    ? await db.query.clients.findFirst({
+        where: eq(clients.id, deadline.clientId),
+      })
+    : null;
+  const items = await db
+    .select()
+    .from(checklistItems)
+    .where(eq(checklistItems.taskId, taskId));
+  const pending = items.filter(
+    (i) =>
+      i.state === "not_requested" ||
+      i.state === "requested_waiting" ||
+      i.state === "received_issue",
+  );
+
+  // Compose a deadlines-style row list — generateDeadlinesPdf accepts
+  // DeadlineRow[]; use it for the body. Each row = one pending doc.
+  const rows: DeadlineRow[] = [
+    {
+      client: client?.name ?? "—",
+      formType: deadline?.formType ?? "—",
+      officialDueDate: deadline?.officialDueDate
+        ? String(deadline.officialDueDate)
+        : "",
+      state: deadline?.jurisdiction ?? "",
+      status: `Send to: ${task.forwardingEmailLocalPart}@inbound.duedatehq.com`,
+    },
+    ...pending.map((i) => ({
+      client: "  →",
+      formType: i.label,
+      officialDueDate: "",
+      state: "",
+      status: i.state.replace(/_/g, " "),
+    })),
+  ];
+  return generateDeadlinesPdf(rows);
 }
 
 function extFor(kind: string): string {
