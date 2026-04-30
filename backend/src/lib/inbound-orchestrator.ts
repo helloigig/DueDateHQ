@@ -29,6 +29,8 @@
 import type {
   InboundReplyInsert,
 } from "../db/schema.js";
+import { callLLM, HAIKU_MODEL, isAiConfigured } from "./ai.js";
+import { log } from "./observability.js";
 
 export type InboundEmail = {
   gmailMessageId: string;
@@ -252,29 +254,212 @@ export function classifyInboundHeuristic(
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// LLM classifier hook — wire to Anthropic Claude / OpenAI when keys land.
+// LLM classifier — Mode A 7-class top-level + 5-intent sub-classifier.
 //
-// Per PRD §4.7 the LLM classifier is the production target; the heuristic
-// above is the ship-today fallback for the eval set + dev experience.
+// Per PRD §4.7 this is the production target — eval target ≥ 92% precision
+// on the 7-class top-level + ≥ 90% on the 5 sub-intents (≤ 3% false-positive
+// on `timeline_pushback` specifically — extension proposals are high-cost
+// CPA-trust failures).
+//
+// The heuristic above remains as the fallback path: when ANTHROPIC_API_KEY
+// is missing, the LLM call fails to parse, or the LLM throws. Dev runs
+// without a key continue to work (heuristic 7-class returns sensible defaults).
 // ════════════════════════════════════════════════════════════════════════
 
+const INBOUND_SYSTEM_PROMPT = `You classify inbound emails for a CPA workflow tool. Every email arriving at a per-task forwarding address (Method A) or via the CPA's own Gmail/Outlook (Method B) flows through you.
+
+Step 1 — assign ONE top-level class from the 7-class taxonomy:
+
+| Class | Definition |
+|---|---|
+| client_document | Client sent us a tax document (W-2, 1099, K-1, prior return, receipt PDF). Must have an attachment AND text affirming the doc ("here's my W-2", "attached the K-1"). |
+| client_reply_intent | Client is communicating but did NOT send a clean document — pushback, question, vacation reply, off-topic. May have an attachment that's wrong/mismatched. |
+| agency_correspondence | IRS, state DOR, Treasury notice — high priority, official tax authority. Sender domain = irs.gov / *.tax.* / *.dor.* / ftb.ca.gov / treasury.* etc. |
+| third_party_data | Document from issuer (W-2 from ADP, 1099 from broker, K-1 from fund manager). Sender = adp/paychex/gusto/fidelity/vanguard/schwab. Has attachment. |
+| payment_confirm | Payment confirmation receipt (Stripe/CPACharge/PayPal/Square/Venmo). NOT money movement — just notifications. |
+| vendor_notification | SaaS vendor email (QuickBooks/Xero/SharePoint admin). Low priority. |
+| spam | Marketing, phishing, scam. Quiet-archive. |
+
+Step 2 — IF AND ONLY IF topLevelClass = "client_reply_intent", assign one of 5 sub-intents:
+
+| Intent | Signal |
+|---|---|
+| document_provided | Attachment + text affirms ("here's my W-2"). |
+| timeline_pushback | Client wants to delay ("not ready until July", "can you extend?"). HIGH BAR — only fire if explicit. False-positive cost is severe (auto-extension proposal). |
+| question_asked | Contains a question + no attachment. |
+| off_topic | Vacation reply, autoresponder, generic chat. |
+| mismatched_attachment | Has attachment but wrong year/type/client. |
+| acknowledgment | "thanks", "got it", "confirmed". No attachment, no question. |
+
+Confidence calibration:
+- 0.90+ = unambiguous (clear domain + clear text + clear attachment status)
+- 0.70-0.89 = strong signal but some ambiguity
+- 0.50-0.69 = uncertain — surface for CPA review
+- below 0.50 = guess; CPA should treat as unmatched
+
+Output STRICT JSON only, no preamble:
+{
+  "topLevelClass": "<one of the 7>",
+  "replyIntent": "<one of the 5 OR null if topLevelClass != client_reply_intent>",
+  "confidence": <0.0-1.0>,
+  "suggestedAction": <object or null — populate per below>
+}
+
+suggestedAction by class:
+- agency_correspondence → { "urgency": "high", "review_required": true }
+- payment_confirm → { "action": "log_payment_activity", "sourceProvider": "<domain>" }
+- third_party_data → { "action": "match_to_checklist" }
+- client_document → { "action": "match_to_checklist" }
+- client_reply_intent + timeline_pushback → { "action": "propose_extension" }
+- client_reply_intent + question_asked → { "action": "draft_reply" }
+- otherwise null`;
+
+const TOP_LEVEL_CLASSES = new Set<ClassificationResult["topLevelClass"]>([
+  "client_document",
+  "client_reply_intent",
+  "agency_correspondence",
+  "third_party_data",
+  "payment_confirm",
+  "vendor_notification",
+  "spam",
+]);
+
+const REPLY_INTENTS = new Set<NonNullable<ClassificationResult["replyIntent"]>>([
+  "document_provided",
+  "timeline_pushback",
+  "question_asked",
+  "off_topic",
+  "mismatched_attachment",
+  "acknowledgment",
+]);
+
+/**
+ * Real LLM-backed classifier. Calls Haiku 4.5 with a structured-output
+ * prompt. Falls back to the heuristic on:
+ *   - no API key configured (dev environments without ANTHROPIC_API_KEY)
+ *   - LLM call throws (transport error / rate limit / model outage)
+ *   - LLM returns text that doesn't parse as the expected JSON shape
+ *   - LLM returns class/intent values outside the taxonomy
+ *
+ * Caller passes firmId so per-call cost + latency lands in ai_inferences
+ * for offline eval (PRD §4.7 acceptance-rate measurement).
+ */
 export async function classifyInboundLLM(
   email: InboundEmail,
-  apiKey: string | undefined,
+  opts: { firmId: string },
 ): Promise<ClassificationResult> {
-  if (!apiKey) {
-    // Graceful degradation: if no LLM key configured, fall back to heuristic.
-    // Production: this branch should be unreachable. Dev/test: it's the
-    // expected path until ANTHROPIC_API_KEY is set in env.
+  if (!isAiConfigured()) {
     return classifyInboundHeuristic(email);
   }
-  // TODO(P0 follow-up): wire @anthropic-ai/sdk call here. Prompt template:
-  //   - System: 7-class top-level taxonomy + 5 sub-intent taxonomy
-  //   - User: from + subject + body excerpt + attachment metadata
-  //   - JSON schema response: { topLevelClass, replyIntent?, confidence }
-  // Eval set lives at backend/eval/inbound-classifier-v1.jsonl (NOT YET
-  // CREATED — backend Phase 2 follow-up per `feedback_no_manual_file_shuffle`).
-  return classifyInboundHeuristic(email);
+
+  // User prompt — compact JSON of the email metadata + a body excerpt.
+  // Body capped at ~3KB to stay well under Haiku context + cost. Strip
+  // base64/quoted-printable noise to keep the model focused on signal.
+  const bodyExcerpt = (email.bodyText ?? "")
+    .replace(/=\r?\n/g, "") // soft-wraps from quoted-printable
+    .slice(0, 3000);
+  const userPrompt = JSON.stringify({
+    from: email.fromAddress,
+    to: email.toAddress,
+    subject: email.subject ?? "",
+    bodyExcerpt,
+    attachmentCount: email.attachmentMetadata.length,
+    attachmentSummary: email.attachmentMetadata.slice(0, 5).map((a) => ({
+      filename: a.filename,
+      mimeType: a.mimeType ?? "unknown",
+      sizeKb: a.size ? Math.round(a.size / 1024) : null,
+    })),
+  });
+
+  try {
+    const { text } = await callLLM({
+      firmId: opts.firmId,
+      mode: "A", // Per PRD §4.3, the inbound classifier IS Mode A's primary application
+      model: HAIKU_MODEL,
+      systemPrompt: INBOUND_SYSTEM_PROMPT,
+      userPrompt,
+      maxTokens: 512,
+      context: {
+        gmailMessageId: email.gmailMessageId,
+        fromDomain: domain(email.fromAddress),
+        hasAttachment: email.attachmentMetadata.length > 0,
+      },
+    });
+
+    const parsed = parseLLMResponse(text);
+    if (!parsed) {
+      log.warn("inbound_classifier.llm_parse_failed_fallback_to_heuristic", {
+        gmailMessageId: email.gmailMessageId,
+        textPreview: text.slice(0, 200),
+      });
+      return classifyInboundHeuristic(email);
+    }
+    return parsed;
+  } catch (err) {
+    log.warn("inbound_classifier.llm_throw_fallback_to_heuristic", {
+      gmailMessageId: email.gmailMessageId,
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return classifyInboundHeuristic(email);
+  }
+}
+
+function parseLLMResponse(text: string): ClassificationResult | null {
+  // Try direct JSON parse first; some models wrap in ```json fences which
+  // we strip when present. The system prompt says "no preamble" but we
+  // defend against drift.
+  const stripped = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stripped);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const obj = parsed as Record<string, unknown>;
+
+  const topLevelClass = obj.topLevelClass as ClassificationResult["topLevelClass"];
+  if (!TOP_LEVEL_CLASSES.has(topLevelClass)) return null;
+
+  const replyIntentRaw = obj.replyIntent;
+  let replyIntent: ClassificationResult["replyIntent"];
+  if (
+    topLevelClass === "client_reply_intent" &&
+    typeof replyIntentRaw === "string" &&
+    REPLY_INTENTS.has(replyIntentRaw as NonNullable<ClassificationResult["replyIntent"]>)
+  ) {
+    replyIntent = replyIntentRaw as ClassificationResult["replyIntent"];
+  } else {
+    replyIntent = undefined;
+  }
+
+  // Confidence: clamp to [0, 1], reject NaN. Guard against the model
+  // returning "high"/"medium"/"low" by accident — convert to numeric.
+  let confidence: number;
+  if (typeof obj.confidence === "number" && Number.isFinite(obj.confidence)) {
+    confidence = Math.max(0, Math.min(1, obj.confidence));
+  } else if (typeof obj.confidence === "string") {
+    const map: Record<string, number> = { high: 0.9, medium: 0.7, low: 0.5 };
+    confidence = map[obj.confidence.toLowerCase()] ?? 0.5;
+  } else {
+    return null;
+  }
+
+  const suggestedAction =
+    obj.suggestedAction && typeof obj.suggestedAction === "object"
+      ? (obj.suggestedAction as Record<string, unknown>)
+      : undefined;
+
+  return {
+    topLevelClass,
+    replyIntent,
+    confidence,
+    suggestedAction,
+  };
 }
 
 /**

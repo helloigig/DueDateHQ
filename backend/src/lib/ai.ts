@@ -52,12 +52,16 @@ export function isAiConfigured(): boolean {
 const HAIKU_MODEL = "claude-haiku-4-5";
 const SONNET_MODEL = "claude-sonnet-4-5";
 
+// Re-export model constants so other libs (inbound-orchestrator) pick the
+// same defaults without re-spelling them.
+export { HAIKU_MODEL, SONNET_MODEL };
+
 /**
  * Generic LLM call wrapper. Handles error normalization, latency
  * measurement, and ai_inferences row insertion. Returns the raw
  * model output for caller-specific parsing.
  */
-async function callLLM(args: {
+export async function callLLM(args: {
   firmId: string;
   mode: "A" | "B" | "C" | "D" | "E" | "F";
   model: string;

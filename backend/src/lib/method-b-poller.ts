@@ -403,7 +403,7 @@ export async function pollMethodBOnce(args: {
           };
           const classification = await classifyInboundLLM(
             orchestratorPayload,
-            process.env.ANTHROPIC_API_KEY,
+            { firmId: args.firmId },
           );
           const reply = buildInboundReplyInsert(
             args.firmId,

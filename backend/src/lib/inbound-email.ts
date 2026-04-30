@@ -27,7 +27,7 @@ import { classifyDocument, isAiConfigured } from "./ai.js";
 import { sendEmail } from "./email-out.js";
 import {
   buildInboundReplyInsert,
-  classifyInboundHeuristic,
+  classifyInboundLLM,
   type InboundEmail as OrchestratorInbound,
 } from "./inbound-orchestrator.js";
 import { inboundReplies } from "../db/schema.js";
@@ -302,7 +302,9 @@ export async function processInboundEmail(
             attachmentIndex: i,
           })),
         };
-        const classification = classifyInboundHeuristic(orchestratorPayload);
+        const classification = await classifyInboundLLM(orchestratorPayload, {
+          firmId: task.firmId,
+        });
         const reply = buildInboundReplyInsert(
           task.firmId,
           orchestratorPayload,
