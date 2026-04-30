@@ -157,14 +157,14 @@ export function TopBar() {
               Settings
             </button>
             <button
-              onClick={async () => {
+              onClick={() => {
                 setUserMenuOpen(false);
-                // signOut() is the single source of truth — it clears
-                // Supabase tokens FIRST (so the App.tsx auth-pending check
-                // doesn't trap us on the loader), then the local session.
-                // Awaiting it keeps the navigate from racing the cleanup.
-                await signOut();
-                navigate("/login", { replace: true });
+                // signOut() handles everything: clear Supabase, clear
+                // local session, hard-reload to /login. We do NOT call
+                // navigate() here — that would render /login mid-flight
+                // (with stale React state) and crash before the reload
+                // fires, which the user experiences as a frozen page.
+                void signOut();
               }}
               className="w-full text-left px-3 py-2 text-sm text-ink-700 hover:bg-sunken flex items-center gap-2"
             >

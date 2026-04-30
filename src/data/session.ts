@@ -98,65 +98,58 @@ export function signIn(input: {
 }
 
 /**
- * Clears both Supabase auth and the local FirmSession.
+ * Sign out: clears Supabase auth + local FirmSession, then HARD-RELOADS
+ * the page to /login.
  *
- * Synchronous-first design: we clear localStorage (sb-*-auth-token + the
- * local FirmSession) BEFORE we await anything. That way React re-renders
- * the app to /login immediately — no chance of getting trapped on the
- * "Signing you in…" loader, no chance of the network-bound Supabase API
- * call hanging the UI.
+ * Why hard reload: every gentler approach failed in production. The
+ * SupabaseAuthBridge's auth-state listener kept catching post-signout
+ * events and re-populating the session via INITIAL_SESSION before the
+ * router could settle. Hard reload guarantees:
+ *   - All React state is destroyed
+ *   - All cached tRPC / React Query data is destroyed
+ *   - All subscriber lists are cleared
+ *   - Page boots fresh with empty localStorage and empty Supabase storage
  *
- * The Supabase server-side revoke is best-effort, fire-and-forget: we use
- * scope: 'local' so it doesn't make a network round-trip, and we don't
- * await it. If the user is offline or Supabase is slow, sign-out still
- * completes instantly.
+ * The user may briefly see a flash of white during reload — acceptable
+ * trade for "logout actually works."
  */
 export async function signOut() {
-  if (typeof window === "undefined") {
-    write(null);
-    return;
-  }
-  // Step 1 (sync): purge every Supabase token from localStorage. This must
-  // happen before any await — otherwise a slow `supabase.auth.signOut()`
-  // call leaves the tokens visible to App.tsx's isSupabaseAuthPending
-  // check during the await window, freezing the UI on the loader.
-  for (const key of Object.keys(window.localStorage)) {
-    if (key.startsWith("sb-") && key.endsWith("-auth-token")) {
-      window.localStorage.removeItem(key);
-    }
-  }
-  // Step 2 (sync): clear the local FirmSession + notify subscribers.
+  // Synchronous local clear — fires subscribers and updates the UI on the
+  // same tick, so any pre-reload render shows the signed-out state.
   write(null);
 
   // Step 3 (background): tell Supabase. scope:'local' skips the network
   // round-trip; we still call it so the auth client tears down its
   // in-memory session and stops auto-refreshing.
   try {
-    // Inline env check (no config import — would be circular). Real auth
-    // requires both Supabase keys set AND useMockAuth not explicitly true.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ie = (import.meta as any).env ?? {};
-    const haveSupabaseKeys = !!ie.VITE_SUPABASE_URL && !!ie.VITE_SUPABASE_ANON_KEY;
-    const authOverride = ie.VITE_USE_MOCK_AUTH;
-    const legacy = ie.VITE_USE_MOCK_API;
-    const useMockAuth = !haveSupabaseKeys
-      ? true
-      : authOverride === undefined
-        ? legacy !== "false"
-        : authOverride !== "false";
-    if (!useMockAuth) {
+    const useMockApi =
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (import.meta as any).env?.VITE_USE_MOCK_API !== "false";
+    if (!useMockApi) {
       const { supabase } = await import("../lib/supabase");
-      // Don't await — we already cleared local state, and a hang here
-      // would block our caller's navigate("/login").
-      void supabase()
-        .auth.signOut({ scope: "local" })
-        .catch(() => {
-          /* ignore — local already cleared */
-        });
+      // Clear Supabase auth from localStorage. The SDK persists tokens
+      // under sb-<project>-auth-token; this nukes them.
+      await supabase().auth.signOut();
+    }
+  } catch {
+    /* ignore — we'll force-clear via the hard reload below */
+  }
+  // Belt-and-suspenders: nuke any leftover Supabase auth keys directly.
+  // If supabase.auth.signOut() hung or errored, this still clears the
+  // tokens so the post-reload page can't re-auth from cached JWT.
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (k.startsWith("sb-") && k.endsWith("-auth-token")) {
+        localStorage.removeItem(k);
+      }
     }
   } catch {
     /* ignore */
   }
+  // Hard reload — bypasses all SPA state. window.location.replace so the
+  // /login page can't be back-button'd into the signed-in state.
+  window.location.replace("/login");
 }
 
 export function updateSession(patch: Partial<FirmSession>) {

@@ -237,10 +237,19 @@ if (env.NODE_ENV !== "test") {
 }
 
 serve(
-  { fetch: app.fetch, port: env.PORT },
+  {
+    fetch: app.fetch,
+    port: env.PORT,
+    // Bind to 0.0.0.0 so Fly's proxy can reach the container. Without
+    // this Hono defaults to localhost (::1 / 127.0.0.1) which Fly's
+    // load balancer can't connect to → "not listening on expected
+    // address" warning, requests time out at the edge.
+    hostname: "0.0.0.0",
+  },
   (info) => {
     log.info("backend.listening", {
       port: info.port,
+      address: info.address,
       env: env.NODE_ENV,
       scraperDisabled: process.env.SCRAPER_DISABLED === "1",
     });
