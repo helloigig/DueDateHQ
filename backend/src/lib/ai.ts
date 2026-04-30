@@ -1113,3 +1113,197 @@ export async function generateCrossYearInsights(
     return null;
   }
 }
+
+// ───────── Mode E — TaskMilestone blocker detection ─────────
+//
+// Per PRD §9.4.1: Mode E can WRITE proposed `status = blocked` with
+// `blocker_reason` (yellow zone — CPA confirms or dismisses). Detects
+// at-risk milestones so the CPA sees a flag before the deadline slips.
+//
+// Inputs blend three signals:
+//   - Mode B target_date vs. today (proximity)
+//   - ChecklistItem state (waiting on client / awaiting CPA review)
+//   - Prior-year completion patterns ("this client historically misses
+//     Collect by 5d") via importedFacts when available
+//
+// AI authority is yellow zone — proposes only; never auto-blocks. CPA
+// sees the proposal in TaskMiniTimeline (red dot + reason tooltip), can
+// accept (status stays blocked) or dismiss (back to in_progress).
+
+const MILESTONE_BLOCKERS_SYSTEM_PROMPT = `You detect at-risk tax-task milestones, given target dates, checklist state, and prior-year history. The CPA uses your output to focus attention on milestones where intervention is needed.
+
+Return STRICT JSON. For each milestone provided in the input, return one decision:
+{
+  "decisions": [
+    {
+      "milestoneId": "<the input id, verbatim>",
+      "shouldBlock": <bool>,
+      "blockerReason": "<one short clause — only when shouldBlock is true; otherwise empty string>",
+      "confidence": "high" | "medium" | "low"
+    },
+    ... (one decision per input milestone, same order)
+  ]
+}
+
+Rules for "shouldBlock":
+- TRUE when one of:
+  (a) target_date is today or earlier AND status is not "done" — the milestone is overdue or about-to-overdue
+  (b) target_date is within 7 days AND a dependency is unmet (e.g., Collect target in 3 days but 5 checklist items still in requested_waiting)
+  (c) prior-year history shows the same milestone consistently slipped 5+ days for this client AND target_date is within 14 days
+  (d) status is already "in_progress" but no progress has happened (no checklist items moved to received_* state in 7+ days) AND target is within 10 days
+- FALSE for milestones where status="done" — never re-block completed work
+- FALSE for milestones beyond 14-day horizon — too speculative; this is yellow zone, not red
+
+Confidence calibration:
+- "high" — overdue OR clear pattern match (rule a or c with strong history)
+- "medium" — within 7 days + unmet dependency (rule b)
+- "low" — softer signals (rule d) — CPA may dismiss freely
+
+Blocker reason guidance:
+- Be specific: "5 client docs still waiting; collect target in 3d" beats "behind schedule"
+- Reference data when possible: "client missed Collect by 6d in 2024; on similar pace this year"
+- ≤ 80 chars; this surfaces in the milestone tooltip
+
+Output ONLY valid JSON.`;
+
+export interface MilestoneInput {
+  id: string;
+  milestoneType: string;
+  targetDate: string | null;
+  status: string;
+  completedDate: string | null;
+}
+
+export interface DetectMilestoneBlockersInput {
+  firmId: string;
+  taskId: string;
+  formType: string;
+  officialDueDate: string;
+  today: string;
+  milestones: MilestoneInput[];
+  /** Per-checklist-item state summary — drives rule (b) ("dependency unmet"). */
+  checklistSummary: {
+    waitingCount: number; // requested_waiting or not_requested
+    underReviewCount: number; // received_unreviewed or received_issue
+    confirmedCount: number;
+  };
+  /** Prior-year milestone slip history when available — drives rule (c). */
+  priorYearSlippage?: Array<{
+    year: number;
+    milestoneType: string;
+    targetDate?: string | null;
+    completedDate?: string | null;
+    slippageDays?: number; // completedDate - targetDate, positive = late
+  }>;
+}
+
+export interface MilestoneBlockerDecision {
+  milestoneId: string;
+  shouldBlock: boolean;
+  blockerReason: string;
+  confidence: "high" | "medium" | "low";
+}
+
+export interface DetectMilestoneBlockersOutput {
+  decisions: MilestoneBlockerDecision[];
+  inferenceId: number;
+}
+
+export async function detectMilestoneBlockers(
+  input: DetectMilestoneBlockersInput,
+): Promise<DetectMilestoneBlockersOutput | null> {
+  if (!isAiConfigured()) return heuristicMilestoneBlockers(input);
+  const userPrompt = JSON.stringify({
+    formType: input.formType,
+    officialDueDate: input.officialDueDate,
+    today: input.today,
+    milestones: input.milestones,
+    checklistSummary: input.checklistSummary,
+    priorYearSlippage: input.priorYearSlippage ?? [],
+  });
+  try {
+    const { text, inferenceId } = await callLLM({
+      firmId: input.firmId,
+      mode: "E",
+      model: HAIKU_MODEL,
+      systemPrompt: MILESTONE_BLOCKERS_SYSTEM_PROMPT,
+      userPrompt,
+      maxTokens: 1024,
+      context: {
+        taskId: input.taskId,
+        milestoneCount: input.milestones.length,
+        priorYearCount: input.priorYearSlippage?.length ?? 0,
+      },
+    });
+    const parsed = JSON.parse(text) as {
+      decisions?: MilestoneBlockerDecision[];
+    };
+    if (!Array.isArray(parsed.decisions)) {
+      log.warn("ai.detectMilestoneBlockers.bad_shape", {
+        textPreview: text.slice(0, 200),
+      });
+      return heuristicMilestoneBlockers(input);
+    }
+    // Sanity — only return decisions for milestone IDs we actually sent in.
+    const validIds = new Set(input.milestones.map((m) => m.id));
+    const decisions = parsed.decisions
+      .filter((d) => validIds.has(d.milestoneId))
+      .map((d) => ({
+        milestoneId: d.milestoneId,
+        shouldBlock: !!d.shouldBlock,
+        blockerReason: d.blockerReason ?? "",
+        confidence: (["high", "medium", "low"].includes(d.confidence)
+          ? d.confidence
+          : "low") as "high" | "medium" | "low",
+      }));
+    return { decisions, inferenceId };
+  } catch (err) {
+    log.warn("ai.detectMilestoneBlockers.failed", {
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return heuristicMilestoneBlockers(input);
+  }
+}
+
+/**
+ * Heuristic fallback — only fires rule (a) (overdue) since the others
+ * need LLM judgment. Returns shouldBlock=true for not-done milestones
+ * whose target_date is past.
+ */
+function heuristicMilestoneBlockers(
+  input: DetectMilestoneBlockersInput,
+): DetectMilestoneBlockersOutput {
+  const todayMs = new Date(input.today).getTime();
+  const decisions: MilestoneBlockerDecision[] = input.milestones.map((m) => {
+    if (m.status === "done") {
+      return {
+        milestoneId: m.id,
+        shouldBlock: false,
+        blockerReason: "",
+        confidence: "high",
+      };
+    }
+    if (m.targetDate) {
+      const overdue = new Date(m.targetDate).getTime() < todayMs;
+      if (overdue) {
+        const daysLate = Math.round(
+          (todayMs - new Date(m.targetDate).getTime()) /
+            (24 * 60 * 60 * 1000),
+        );
+        return {
+          milestoneId: m.id,
+          shouldBlock: true,
+          blockerReason: `target was ${daysLate}d ago; status still ${m.status}`,
+          confidence: "high",
+        };
+      }
+    }
+    return {
+      milestoneId: m.id,
+      shouldBlock: false,
+      blockerReason: "",
+      confidence: "low",
+    };
+  });
+  return { decisions, inferenceId: 0 };
+}

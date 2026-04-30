@@ -623,6 +623,53 @@ export const mockAdapter = {
       // Flatten everything we've synthesized so far for the cross-client view
       return Array.from(mockMilestoneStore.values()).flat();
     },
+    detectBlockers: async (input: { taskId: string }) => {
+      await delay(400);
+      const existing = mockMilestoneStore.get(input.taskId) ?? [];
+      if (existing.length === 0) {
+        return { decisions: [], appliedCount: 0 };
+      }
+      // Heuristic-only mock: block any not-done milestone whose target_date
+      // is in the past. Mirrors the backend heuristic fallback so dev
+      // demos see meaningful Mode E behavior without an API key.
+      const todayMs = Date.now();
+      let appliedCount = 0;
+      const decisions = existing.map((m) => {
+        if (m.status === "done") {
+          return {
+            milestoneId: m.id,
+            shouldBlock: false,
+            blockerReason: "",
+            confidence: "high" as const,
+          };
+        }
+        if (m.targetDate && new Date(m.targetDate).getTime() < todayMs) {
+          const daysLate = Math.round(
+            (todayMs - new Date(m.targetDate).getTime()) /
+              (24 * 60 * 60 * 1000),
+          );
+          // Apply the block to the in-memory store so listForTask reflects it
+          if (m.status !== "blocked") {
+            m.status = "blocked";
+            m.blockerReason = `target was ${daysLate}d ago; status still ${m.status}`;
+            appliedCount++;
+          }
+          return {
+            milestoneId: m.id,
+            shouldBlock: true,
+            blockerReason: `target was ${daysLate}d ago`,
+            confidence: "high" as const,
+          };
+        }
+        return {
+          milestoneId: m.id,
+          shouldBlock: false,
+          blockerReason: "",
+          confidence: "low" as const,
+        };
+      });
+      return { decisions, appliedCount };
+    },
     proposeForTask: async (input: { taskId: string }) => {
       await delay();
       const existing = mockMilestoneStore.get(input.taskId);

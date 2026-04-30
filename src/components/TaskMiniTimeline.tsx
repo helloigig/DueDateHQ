@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { Sparkles } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Sparkles, AlertOctagon } from "lucide-react";
 import type { Task, ChecklistItem } from "../types";
 import { trpc } from "../lib/api/client";
 
@@ -21,7 +21,7 @@ import { trpc } from "../lib/api/client";
 // which runs Mode B + inserts 5 rows. Once proposed, the heuristic stops
 // firing and live data drives the visualization.
 
-type Status = "done" | "in_progress" | "not_started" | "overdue";
+type Status = "done" | "in_progress" | "not_started" | "overdue" | "blocked";
 
 type Waypoint = {
   type: "initial_meeting" | "collect" | "prepare" | "review" | "file";
@@ -31,6 +31,8 @@ type Waypoint = {
   // count badge — shows missing checklist items at the current stage
   // per `feedback_gap_over_fill` (mini-timeline waypoint badge for waiting)
   missingBadge?: number;
+  // Mode E blocker reason — shown in tooltip + tinted dot when status=blocked
+  blockerReason?: string;
 };
 
 interface Props {
@@ -47,13 +49,35 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
       void milestonesQuery.refetch();
     },
   });
+  const detectBlockers = trpc.taskMilestones.detectBlockers.useMutation({
+    onSuccess: () => {
+      void milestonesQuery.refetch();
+    },
+  });
+  const [lastBlockerSummary, setLastBlockerSummary] = useState<string | null>(
+    null,
+  );
   const liveMilestones = milestonesQuery.data ?? [];
   const hasLive = liveMilestones.length > 0;
+  const blockedCount = liveMilestones.filter((m) => m.status === "blocked").length;
 
   const waypoints = useMemo(() => {
     if (hasLive) return milestonesToWaypoints(liveMilestones, checklist);
     return deriveWaypoints(task, checklist);
   }, [hasLive, liveMilestones, task, checklist]);
+
+  const onCheckBlockers = async () => {
+    const result = await detectBlockers.mutateAsync({ taskId: task.id });
+    const blocked = result.decisions.filter((d) => d.shouldBlock).length;
+    setLastBlockerSummary(
+      result.appliedCount > 0
+        ? `Mode E flagged ${blocked} milestone${blocked === 1 ? "" : "s"} as blocked`
+        : blocked > 0
+          ? "Mode E confirmed existing blocks; no new flags"
+          : "Mode E found no blockers — on track",
+    );
+    setTimeout(() => setLastBlockerSummary(null), 8000);
+  };
 
   return (
     <section
@@ -67,16 +91,36 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
         >
           Path to filing
         </h3>
-        <span className="text-2xs text-ink-400 flex items-center gap-2">
+        <span className="text-2xs text-ink-400 flex items-center gap-2 flex-wrap justify-end">
           5 milestones · today → due {task.officialDueDate}
           {hasLive ? (
-            <span
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-info-bg/60 text-info-ink"
-              title="Mode B proposed dates persisted to task_milestones (PRD §9.4.1)"
-            >
-              <Sparkles className="w-3 h-3" aria-hidden />
-              Mode B
-            </span>
+            <>
+              <span
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-info-bg/60 text-info-ink"
+                title="Mode B proposed dates persisted to task_milestones (PRD §9.4.1)"
+              >
+                <Sparkles className="w-3 h-3" aria-hidden />
+                Mode B
+              </span>
+              <button
+                type="button"
+                onClick={onCheckBlockers}
+                disabled={detectBlockers.isPending}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border ${
+                  blockedCount > 0
+                    ? "border-danger-border bg-danger-bg/40 text-danger-ink"
+                    : "border-line text-ink-700 hover:bg-sunken"
+                } disabled:opacity-50`}
+                title="Run Mode E to detect at-risk milestones (yellow zone — proposal only; you can dismiss)"
+              >
+                <AlertOctagon className="w-3 h-3" aria-hidden />
+                {detectBlockers.isPending
+                  ? "checking…"
+                  : blockedCount > 0
+                    ? `${blockedCount} blocker${blockedCount === 1 ? "" : "s"} flagged`
+                    : "Check for blockers"}
+              </button>
+            </>
           ) : (
             <button
               type="button"
@@ -91,6 +135,12 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
           )}
         </span>
       </header>
+
+      {lastBlockerSummary && (
+        <div className="mb-2 -mt-1 text-2xs text-info-ink bg-info-bg/40 border border-info-border rounded px-2 py-1">
+          {lastBlockerSummary}
+        </div>
+      )}
 
       <div className="flex items-start gap-1">
         {waypoints.map((wp, i) => (
@@ -111,6 +161,7 @@ type LiveMilestone = {
   targetDate: string | null;
   completedDate: string | null;
   status: "not_started" | "in_progress" | "blocked" | "done" | "overdue";
+  blockerReason?: string | null;
   displayOrder: number;
 };
 
@@ -148,13 +199,15 @@ function milestonesToWaypoints(
     const status: Status =
       row?.status === "done"
         ? "done"
-        : row?.status === "in_progress" || row?.status === "blocked"
-          ? "in_progress"
-          : row?.status === "overdue"
-            ? "overdue"
-            : "not_started";
+        : row?.status === "blocked"
+          ? "blocked"
+          : row?.status === "in_progress"
+            ? "in_progress"
+            : row?.status === "overdue"
+              ? "overdue"
+              : "not_started";
     let missingBadge: number | undefined;
-    if (status === "in_progress" || status === "overdue") {
+    if (status === "in_progress" || status === "overdue" || status === "blocked") {
       if (s.canonical === "collect_materials") missingBadge = waiting || undefined;
       else if (s.canonical === "prepare_workpapers")
         missingBadge = reviewPending || undefined;
@@ -165,6 +218,7 @@ function milestonesToWaypoints(
       targetDate: row?.targetDate ?? undefined,
       status,
       missingBadge,
+      blockerReason: row?.blockerReason ?? undefined,
     };
   });
 }
@@ -194,10 +248,15 @@ function Waypoint({
         return "bg-warning-solid ring-2 ring-warning-border ring-offset-2 ring-offset-surface";
       case "overdue":
         return "bg-danger-solid";
+      case "blocked":
+        return "bg-danger-solid ring-2 ring-danger-border ring-offset-2 ring-offset-surface animate-pulse";
       default:
         return "bg-line";
     }
   })();
+  const tooltipText = wp.blockerReason
+    ? `${wp.label} — BLOCKED: ${wp.blockerReason}${wp.targetDate ? ` · target ${wp.targetDate}` : ""}`
+    : `${wp.label} — ${wp.status.replace("_", " ")}${wp.targetDate ? ` · target ${wp.targetDate}` : ""}`;
 
   return (
     <div className="flex-1 flex flex-col items-center min-w-0 relative">
@@ -226,7 +285,7 @@ function Waypoint({
       {/* Dot */}
       <div
         className={`relative z-10 w-3 h-3 rounded-full shrink-0 ${dotClasses}`}
-        title={`${wp.label} — ${wp.status.replace("_", " ")}${wp.targetDate ? ` · target ${wp.targetDate}` : ""}`}
+        title={tooltipText}
       />
 
       {/* Label + date */}

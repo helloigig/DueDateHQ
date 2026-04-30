@@ -432,6 +432,21 @@ export const appRouter = t.router({
           basisOfEstimate?: string;
         }> => NOT_IMPL(),
       ),
+    /** Mode E blocker detection — proposes status="blocked" for at-risk
+     *  milestones (yellow zone). CPA dismisses via update mutation. */
+    detectBlockers: t.procedure
+      .input(z.object({ taskId: z.string().uuid() }))
+      .mutation(
+        async (): Promise<{
+          decisions: Array<{
+            milestoneId: string;
+            shouldBlock: boolean;
+            blockerReason: string;
+            confidence: "high" | "medium" | "low";
+          }>;
+          appliedCount: number;
+        }> => NOT_IMPL(),
+      ),
     update: t.procedure
       .input(jsonPassthrough)
       .mutation(async (): Promise<TaskMilestoneRow> => NOT_IMPL()),

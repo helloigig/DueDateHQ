@@ -13,13 +13,18 @@ import { z } from "zod";
 import { firmProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
 import {
+  checklistItems,
   clients,
   deadlines,
+  importedFacts,
   taskMilestones,
   taskMilestoneEvents,
   tasks,
 } from "../../db/schema.js";
-import { predictMilestoneTargetDates } from "../../lib/ai.js";
+import {
+  detectMilestoneBlockers,
+  predictMilestoneTargetDates,
+} from "../../lib/ai.js";
 
 const MILESTONE_TYPE = [
   "initial_meeting",
@@ -213,6 +218,177 @@ export const taskMilestonesRouter = router({
         overallConfidence: result.overallConfidence,
         basisOfEstimate: result.basisOfEstimate,
       };
+    }),
+
+  /**
+   * Mode E blocker detection — calls detectMilestoneBlockers, then writes
+   * status="blocked" + blocker_reason for each decision with shouldBlock=true.
+   * Returns the proposal set so the FE can show what the LLM proposed (CPA
+   * sees the blocked dot + reason in TaskMiniTimeline; can dismiss via update
+   * mutation back to in_progress).
+   *
+   * Per PRD §9.4.1: yellow zone — Mode E proposes; CPA confirms or dismisses.
+   * Idempotent on repeat: re-detects + re-applies (decisions may change as
+   * checklist state evolves — e.g. a milestone unblocks when client sends
+   * the missing docs).
+   */
+  detectBlockers: firmProcedure
+    .input(z.object({ taskId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      // Load task → deadline → client for context.
+      const [taskRow] = await db
+        .select({
+          taskId: tasks.id,
+          formType: deadlines.formType,
+          officialDueDate: deadlines.officialDueDate,
+          clientId: clients.id,
+        })
+        .from(tasks)
+        .innerJoin(deadlines, eq(deadlines.id, tasks.deadlineId))
+        .innerJoin(clients, eq(clients.id, deadlines.clientId))
+        .where(
+          and(eq(tasks.id, input.taskId), eq(tasks.firmId, ctx.firmId)),
+        );
+      if (!taskRow) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const milestones = await db
+        .select()
+        .from(taskMilestones)
+        .where(
+          and(
+            eq(taskMilestones.firmId, ctx.firmId),
+            eq(taskMilestones.taskId, input.taskId),
+          ),
+        )
+        .orderBy(asc(taskMilestones.displayOrder));
+      if (milestones.length === 0) {
+        return { decisions: [], appliedCount: 0 };
+      }
+
+      // Checklist summary — fuels rule (b) "dependency unmet"
+      const items = await db
+        .select({ state: checklistItems.state })
+        .from(checklistItems)
+        .where(
+          and(
+            eq(checklistItems.firmId, ctx.firmId),
+            eq(checklistItems.taskId, input.taskId),
+          ),
+        );
+      const checklistSummary = {
+        waitingCount: items.filter(
+          (i) => i.state === "requested_waiting" || i.state === "not_requested",
+        ).length,
+        underReviewCount: items.filter(
+          (i) => i.state === "received_unreviewed" || i.state === "received_issue",
+        ).length,
+        confirmedCount: items.filter(
+          (i) => i.state === "received_confirmed",
+        ).length,
+      };
+
+      // Prior-year slippage — fuels rule (c) "client historically misses".
+      // Looks at imported_facts for fact_type='milestone_slippage' if any
+      // (none today; placeholder for future ImportedFact extraction expansion).
+      const priorYearFacts = await db
+        .select()
+        .from(importedFacts)
+        .where(
+          and(
+            eq(importedFacts.firmId, ctx.firmId),
+            eq(importedFacts.clientId, taskRow.clientId),
+            eq(importedFacts.factType, "milestone_slippage"),
+          ),
+        );
+      const priorYearSlippage = priorYearFacts
+        .map((f) => f.value as Record<string, unknown>)
+        .map((v) => ({
+          year: typeof v.year === "number" ? v.year : 0,
+          milestoneType: typeof v.milestoneType === "string" ? v.milestoneType : "",
+          targetDate: typeof v.targetDate === "string" ? v.targetDate : null,
+          completedDate:
+            typeof v.completedDate === "string" ? v.completedDate : null,
+          slippageDays:
+            typeof v.slippageDays === "number" ? v.slippageDays : undefined,
+        }))
+        .filter((s) => s.year > 0 && s.milestoneType);
+
+      const today = new Date().toISOString().slice(0, 10);
+      const result = await detectMilestoneBlockers({
+        firmId: ctx.firmId,
+        taskId: input.taskId,
+        formType: taskRow.formType,
+        officialDueDate: taskRow.officialDueDate,
+        today,
+        milestones: milestones.map((m) => ({
+          id: m.id,
+          milestoneType: m.milestoneType,
+          targetDate: m.targetDate,
+          status: m.status,
+          completedDate: m.completedDate,
+        })),
+        checklistSummary,
+        priorYearSlippage:
+          priorYearSlippage.length > 0 ? priorYearSlippage : undefined,
+      });
+      if (!result) {
+        return { decisions: [], appliedCount: 0 };
+      }
+
+      // Apply blockings — only flip status when shouldBlock=true AND status
+      // wasn't already "done". Log audit-trail row per transition. CPA can
+      // dismiss via update mutation (status=in_progress + clear blocker_reason).
+      let appliedCount = 0;
+      for (const d of result.decisions) {
+        const m = milestones.find((x) => x.id === d.milestoneId);
+        if (!m) continue;
+        if (m.status === "done") continue;
+        if (d.shouldBlock && m.status !== "blocked") {
+          await db
+            .update(taskMilestones)
+            .set({
+              status: "blocked",
+              blockerReason: d.blockerReason,
+              proposedBy: "ai",
+              updatedAt: new Date(),
+            })
+            .where(eq(taskMilestones.id, m.id));
+          await db.insert(taskMilestoneEvents).values({
+            firmId: ctx.firmId,
+            milestoneId: m.id,
+            fromStatus: m.status,
+            toStatus: "blocked",
+            actorKind: "ai",
+            reason: `mode_e: ${d.blockerReason} (${d.confidence})`,
+          });
+          appliedCount++;
+        } else if (
+          !d.shouldBlock &&
+          m.status === "blocked" &&
+          m.proposedBy === "ai"
+        ) {
+          // Mode E previously blocked but no longer thinks so → unblock back
+          // to in_progress. Only when AI was the one to block; CPA-blocked
+          // milestones aren't auto-unblocked.
+          await db
+            .update(taskMilestones)
+            .set({
+              status: "in_progress",
+              blockerReason: null,
+              updatedAt: new Date(),
+            })
+            .where(eq(taskMilestones.id, m.id));
+          await db.insert(taskMilestoneEvents).values({
+            firmId: ctx.firmId,
+            milestoneId: m.id,
+            fromStatus: "blocked",
+            toStatus: "in_progress",
+            actorKind: "ai",
+            reason: "mode_e_unblock_on_redetect",
+          });
+        }
+      }
+      return { decisions: result.decisions, appliedCount };
     }),
 
   /** Add a custom milestone (P2 firm-custom milestone types per §9.4.1). */
