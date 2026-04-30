@@ -62,15 +62,24 @@ const PROVIDERS: Record<ProviderKind, ProviderConfig> = {
   gmail: {
     authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
-    // Phase 1: send-only. Phase 2 (Method B) widens to full read.
-    scopes: ["https://www.googleapis.com/auth/gmail.send"],
+    // Phase 2 (Method B): send + read. Read scope is required for the
+    // Method B inbound poller — watching the user's inbox for client
+    // emails so attachments route to checklist items WITHOUT requiring
+    // the client to know the per-task forwarding address.
+    // Pass `scopes: ["https://www.googleapis.com/auth/gmail.send"]` to
+    // startConnect() to opt back to Phase 1 send-only.
+    scopes: [
+      "https://www.googleapis.com/auth/gmail.send",
+      "https://www.googleapis.com/auth/gmail.readonly",
+    ],
     envPrefix: "GMAIL",
   },
   outlook: {
     authorizeUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
     tokenUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-    // Phase 1: send-only. Phase 2 widens to Mail.Read.
-    scopes: ["offline_access", "Mail.Send"],
+    // Phase 2 (Method B): send + read. Same logic as Gmail — Mail.Read
+    // is required for inbound polling.
+    scopes: ["offline_access", "Mail.Send", "Mail.Read"],
     envPrefix: "OUTLOOK",
   },
 };

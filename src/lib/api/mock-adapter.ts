@@ -637,6 +637,18 @@ export const mockAdapter = {
       await delay();
       return { ok: true as const };
     },
+    /** Method B poll — mock returns zeros (no real Gmail/Outlook
+     *  in mock mode). Real BE polls the inbox, classifies attachments,
+     *  writes checklist items. */
+    pollMethodB: async () => {
+      await delay(400);
+      return {
+        messagesScanned: 0,
+        matched: 0,
+        attachmentsClassified: 0,
+        errors: 0,
+      };
+    },
   },
 
   exports: {
@@ -809,6 +821,49 @@ export const mockAdapter = {
         itemType: input.itemType ?? null,
         confidence,
         flagReason: undefined,
+        inferenceId: 0,
+      };
+    },
+    /** Mock Mode B — returns the deterministic stub's window. Real
+     *  BE calls Claude with prior arrival dates. */
+    predictArrivalTiming: async () => {
+      await delay();
+      return {
+        windowStart: "03-01",
+        windowEnd: "03-15",
+        confidence: "medium" as const,
+        reasoning: "Based on a 2-year historical pattern.",
+        inferenceId: 0,
+      };
+    },
+    /** Mock Mode C — returns no-anomaly. Real BE has the contextual
+     *  judgment branch. */
+    detectAnomaly: async () => {
+      await delay();
+      return {
+        isAnomaly: false,
+        severity: "low" as const,
+        reason: "Within 15% of prior-year mean.",
+        likelyExplanation: "",
+        needsCpaJudgment: false,
+        inferenceId: 0,
+      };
+    },
+    /** Mock Mode E — returns one example insight so the FE flow has
+     *  shape to render. Real BE generates from multi-year context. */
+    generateCrossYearInsights: async () => {
+      await delay(400);
+      return {
+        insights: [
+          {
+            category: "missing_item" as const,
+            title: "K-1 from Apex Fund expected",
+            detail:
+              "Last 3 years a K-1 from Apex Fund arrived in early March. Not yet seen this year — worth a chase.",
+            confidence: "high" as const,
+            priorYearsEvidence: [2022, 2023, 2024],
+          },
+        ],
         inferenceId: 0,
       };
     },

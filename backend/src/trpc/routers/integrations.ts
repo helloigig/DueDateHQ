@@ -9,6 +9,7 @@ import {
   startConnect as startOauthConnect,
   type ProviderKind,
 } from "../../lib/oauth.js";
+import { pollMethodBOnce } from "../../lib/method-b-poller.js";
 
 const KIND = ["qbo", "xero", "gmail", "outlook", "stripe"] as const;
 const OAUTH_KIND = ["qbo", "xero", "gmail", "outlook"] as const;
@@ -104,5 +105,27 @@ export const integrationsRouter = router({
           ),
         );
       return { ok: true as const };
+    }),
+
+  /**
+   * Method B on-demand poll — useful when the CPA wants to check for
+   * new client emails right now rather than wait for the next 5min
+   * tick. Returns counts so the FE can render "Found 3 new docs from
+   * 2 clients" feedback.
+   */
+  pollMethodB: firmProcedure
+    .input(z.object({ provider: z.enum(["gmail", "outlook"]) }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await pollMethodBOnce({
+          firmId: ctx.firmId,
+          provider: input.provider,
+        });
+      } catch (err) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: err instanceof Error ? err.message : "method_b_poll_failed",
+        });
+      }
     }),
 });

@@ -11,6 +11,7 @@ import { fromPostmark, processInboundEmail } from "./lib/inbound-email.js";
 import { handleCallback } from "./lib/oauth.js";
 import { startScraperScheduler } from "./lib/scraper.js";
 import { startExportWorker, ARTIFACT_DIR } from "./lib/export-worker.js";
+import { startMethodBPoller } from "./lib/method-b-poller.js";
 import { log, captureException } from "./lib/observability.js";
 
 const app = new Hono();
@@ -121,6 +122,11 @@ if (env.NODE_ENV !== "test") {
   // dev when you don't want network calls on every server restart.
   if (process.env.SCRAPER_DISABLED !== "1") {
     startScraperScheduler();
+  }
+  // Method B poller — gated by env so dev runs don't burn quota
+  // against the user's real Gmail. Production sets METHOD_B_ENABLED=1.
+  if (process.env.METHOD_B_ENABLED === "1") {
+    startMethodBPoller();
   }
 }
 

@@ -461,3 +461,272 @@ export async function parseAnnouncement(
     return null;
   }
 }
+
+// ───────── Mode B — per-client arrival timing prediction ─────────
+
+const ARRIVAL_TIMING_SYSTEM_PROMPT = `You predict when a client is likely to send a tax document, given their prior history. The CPA uses your prediction to time chase emails — too early is annoying, too late risks the deadline.
+
+Output strict JSON:
+{
+  "windowStart": "<MM-DD>",
+  "windowEnd": "<MM-DD>",
+  "confidence": "high" | "medium" | "low",
+  "reasoning": "<one short sentence — what in the history drove this>",
+  "anomalyHint": "<only if the doc is overdue vs prior pattern, otherwise omit>"
+}
+
+Rules:
+- "high" confidence requires ≥3 prior years of arrival data
+- "medium" requires 2 prior years
+- "low" for 0-1 prior years (substrate fallback — return cohort timing window)
+- windowStart/windowEnd are MM-DD only (year doesn't matter — it's a recurrence pattern)
+- The window should be tight enough to be useful (≤30 days) but wide enough to catch normal variation
+- If the current date is past windowEnd and the doc hasn't arrived, set anomalyHint to flag it
+- Output ONLY valid JSON.`;
+
+export interface ArrivalTimingInput {
+  firmId: string;
+  clientId: string;
+  itemType: string;
+  /** Historical arrival dates for this (client × item_type) pair —
+   *  ISO date strings, oldest first. */
+  priorArrivals: string[];
+  /** Today's date in ISO — used by the model to detect overdue cases */
+  today: string;
+  /** Optional cohort baseline for low-history fallback */
+  cohortWindow?: { start: string; end: string };
+}
+
+export interface ArrivalTimingOutput {
+  windowStart: string | null;
+  windowEnd: string | null;
+  confidence: "high" | "medium" | "low";
+  reasoning: string;
+  anomalyHint?: string;
+  inferenceId: number;
+}
+
+export async function predictArrivalTiming(
+  input: ArrivalTimingInput,
+): Promise<ArrivalTimingOutput | null> {
+  if (!isAiConfigured()) return null;
+  const userPrompt = JSON.stringify({
+    itemType: input.itemType,
+    priorArrivals: input.priorArrivals,
+    today: input.today,
+    cohortWindow: input.cohortWindow,
+  });
+  try {
+    const { text, inferenceId } = await callLLM({
+      firmId: input.firmId,
+      mode: "B",
+      model: HAIKU_MODEL,
+      systemPrompt: ARRIVAL_TIMING_SYSTEM_PROMPT,
+      userPrompt,
+      maxTokens: 512,
+      context: {
+        clientId: input.clientId,
+        itemType: input.itemType,
+        priorYearCount: input.priorArrivals.length,
+      },
+    });
+    const parsed = JSON.parse(text) as Omit<
+      ArrivalTimingOutput,
+      "inferenceId"
+    >;
+    return { ...parsed, inferenceId };
+  } catch (err) {
+    log.warn("ai.predictArrivalTiming.failed", {
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
+// ───────── Mode C — anomaly detection on financial values ─────────
+
+const ANOMALY_SYSTEM_PROMPT = `You detect anomalies in client tax/financial data. Statistical outliers (e.g. income jumped 80% YoY) are easy; the value of an LLM here is contextual judgment — "income jumped 80% but the client mentioned a one-time stock sale, so this is fine."
+
+Output strict JSON:
+{
+  "isAnomaly": <bool>,
+  "severity": "low" | "medium" | "high",
+  "reason": "<short — why is this anomalous?>",
+  "likelyExplanation": "<short — what could legitimately cause it?>",
+  "needsCpaJudgment": <bool — true if the explanation isn't conclusive>
+}
+
+Rules:
+- Cap "high" severity for cases that suggest fraud, undisclosed income, or material misstatement
+- "medium" for unexpected swings without obvious explanation in the supplied context
+- "low" for swings within normal year-over-year variance for that entity type
+- needsCpaJudgment=false ONLY when the supplied context conclusively explains the anomaly
+- Output ONLY valid JSON.`;
+
+export interface DetectAnomalyInput {
+  firmId: string;
+  clientId: string;
+  fieldLabel: string;
+  currentValue: number;
+  priorValues: number[];
+  /** Free-form context — recent activity events, notes, prior-year facts.
+   *  Helps the model distinguish "anomaly" from "expected one-time event." */
+  context?: string;
+  entityType?: string;
+}
+
+export interface DetectAnomalyOutput {
+  isAnomaly: boolean;
+  severity: "low" | "medium" | "high";
+  reason: string;
+  likelyExplanation: string;
+  needsCpaJudgment: boolean;
+  inferenceId: number;
+}
+
+export async function detectAnomaly(
+  input: DetectAnomalyInput,
+): Promise<DetectAnomalyOutput | null> {
+  if (!isAiConfigured()) return null;
+  // Cheap prefilter — if the swing is < 15% from prior mean and there
+  // are ≥3 priors, skip the LLM call. The deterministic threshold
+  // already catches these cases without the round-trip cost.
+  if (input.priorValues.length >= 3) {
+    const mean =
+      input.priorValues.reduce((a, b) => a + b, 0) / input.priorValues.length;
+    if (mean > 0 && Math.abs(input.currentValue - mean) / mean < 0.15) {
+      return null;
+    }
+  }
+  const userPrompt = JSON.stringify({
+    fieldLabel: input.fieldLabel,
+    currentValue: input.currentValue,
+    priorValues: input.priorValues,
+    entityType: input.entityType,
+    context: input.context?.slice(0, 4000),
+  });
+  try {
+    const { text, inferenceId } = await callLLM({
+      firmId: input.firmId,
+      mode: "C",
+      model: HAIKU_MODEL,
+      systemPrompt: ANOMALY_SYSTEM_PROMPT,
+      userPrompt,
+      maxTokens: 512,
+      context: {
+        clientId: input.clientId,
+        fieldLabel: input.fieldLabel,
+      },
+    });
+    const parsed = JSON.parse(text) as Omit<DetectAnomalyOutput, "inferenceId">;
+    return { ...parsed, inferenceId };
+  } catch (err) {
+    log.warn("ai.detectAnomaly.failed", {
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
+// ───────── Mode E — cross-year insights ─────────
+
+const CROSS_YEAR_SYSTEM_PROMPT = `You analyze a client's multi-year tax history to surface advisory opportunities. The CPA uses your output to identify:
+  - missing items (last year had X, this year doesn't)
+  - structural opportunities (e.g. PTET election eligible this year, qualified small business stock holding period crossing a threshold)
+  - regression risk (e.g. AGI dropped — does the client know they may now qualify for credits they didn't last year?)
+
+Output strict JSON:
+{
+  "insights": [
+    {
+      "category": "missing_item" | "election_opportunity" | "credit_eligibility" | "structural" | "regression_risk",
+      "title": "<short — what to surface>",
+      "detail": "<2-3 sentences — why this matters, what action the CPA might take>",
+      "confidence": "high" | "medium" | "low",
+      "priorYearsEvidence": [<array of years that support this>]
+    }
+  ]
+}
+
+Rules:
+- Surface AT MOST 5 insights, ranked by importance
+- "high" confidence requires evidence in 2+ prior years
+- Include the priorYearsEvidence array — the CPA needs to see what your reasoning is grounded in
+- Don't surface insights that just describe the data ("their AGI is $X") — every insight should imply a CPA action
+- Output ONLY valid JSON. Empty array is fine if nothing material.`;
+
+export interface CrossYearInsightsInput {
+  firmId: string;
+  clientId: string;
+  clientName: string;
+  entityType: string;
+  primaryState: string;
+  /** Per-year facts: { year: 2023, items: [{itemType, value}, ...] } */
+  yearlyFacts: Array<{
+    year: number;
+    items: Array<{ itemType: string; value?: number; label?: string }>;
+  }>;
+  /** Current-year checklist (items expected this year) */
+  currentChecklist: Array<{ itemType: string; label: string; state: string }>;
+}
+
+export interface CrossYearInsight {
+  category:
+    | "missing_item"
+    | "election_opportunity"
+    | "credit_eligibility"
+    | "structural"
+    | "regression_risk";
+  title: string;
+  detail: string;
+  confidence: "high" | "medium" | "low";
+  priorYearsEvidence: number[];
+}
+
+export interface CrossYearInsightsOutput {
+  insights: CrossYearInsight[];
+  inferenceId: number;
+}
+
+export async function generateCrossYearInsights(
+  input: CrossYearInsightsInput,
+): Promise<CrossYearInsightsOutput | null> {
+  if (!isAiConfigured()) return null;
+  // Skip for cold-start clients — Mode E is only meaningful with ≥2
+  // prior years of data
+  if (input.yearlyFacts.length < 2) return null;
+
+  const userPrompt = JSON.stringify({
+    client: {
+      name: input.clientName,
+      entityType: input.entityType,
+      primaryState: input.primaryState,
+    },
+    yearlyFacts: input.yearlyFacts,
+    currentChecklist: input.currentChecklist,
+  });
+  try {
+    const { text, inferenceId } = await callLLM({
+      firmId: input.firmId,
+      mode: "E",
+      // Sonnet for cross-year — multi-year reasoning is worth the cost
+      // (~$0.05/client). Volume is one call per client per audit pass,
+      // not per row.
+      model: SONNET_MODEL,
+      systemPrompt: CROSS_YEAR_SYSTEM_PROMPT,
+      userPrompt,
+      maxTokens: 2048,
+      context: {
+        clientId: input.clientId,
+        priorYearCount: input.yearlyFacts.length,
+      },
+    });
+    const parsed = JSON.parse(text) as { insights: CrossYearInsight[] };
+    return { insights: parsed.insights ?? [], inferenceId };
+  } catch (err) {
+    log.warn("ai.generateCrossYearInsights.failed", {
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}

@@ -513,6 +513,97 @@ export const appRouter = t.router({
           inferenceId: number;
         }> => NOT_IMPL(),
       ),
+    /** Mode B — arrival timing prediction for chase scheduling */
+    predictArrivalTiming: t.procedure
+      .input(
+        z.object({
+          clientId: z.string(),
+          itemType: z.string(),
+          priorArrivals: z.array(z.string()),
+          today: z.string(),
+          cohortWindow: z
+            .object({ start: z.string(), end: z.string() })
+            .optional(),
+        }),
+      )
+      .query(
+        async (): Promise<{
+          windowStart: string | null;
+          windowEnd: string | null;
+          confidence: "high" | "medium" | "low";
+          reasoning: string;
+          anomalyHint?: string;
+          inferenceId: number;
+        } | null> => NOT_IMPL(),
+      ),
+    /** Mode C — contextual anomaly detection on financial values */
+    detectAnomaly: t.procedure
+      .input(
+        z.object({
+          clientId: z.string(),
+          fieldLabel: z.string(),
+          currentValue: z.number(),
+          priorValues: z.array(z.number()),
+          context: z.string().optional(),
+          entityType: z.string().optional(),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          isAnomaly: boolean;
+          severity: "low" | "medium" | "high";
+          reason: string;
+          likelyExplanation: string;
+          needsCpaJudgment: boolean;
+          inferenceId: number;
+        } | null> => NOT_IMPL(),
+      ),
+    /** Mode E — cross-year advisory insights */
+    generateCrossYearInsights: t.procedure
+      .input(
+        z.object({
+          clientId: z.string(),
+          clientName: z.string(),
+          entityType: z.string(),
+          primaryState: z.string(),
+          yearlyFacts: z.array(
+            z.object({
+              year: z.number(),
+              items: z.array(
+                z.object({
+                  itemType: z.string(),
+                  value: z.number().optional(),
+                  label: z.string().optional(),
+                }),
+              ),
+            }),
+          ),
+          currentChecklist: z.array(
+            z.object({
+              itemType: z.string(),
+              label: z.string(),
+              state: z.string(),
+            }),
+          ),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          insights: Array<{
+            category:
+              | "missing_item"
+              | "election_opportunity"
+              | "credit_eligibility"
+              | "structural"
+              | "regression_risk";
+            title: string;
+            detail: string;
+            confidence: "high" | "medium" | "low";
+            priorYearsEvidence: number[];
+          }>;
+          inferenceId: number;
+        } | null> => NOT_IMPL(),
+      ),
   }),
 
   aiInferences: t.router({
@@ -587,6 +678,17 @@ export const appRouter = t.router({
     disconnect: t.procedure
       .input(z.object({ id: z.string().uuid() }))
       .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    /** Method B on-demand poll for Gmail/Outlook inbox */
+    pollMethodB: t.procedure
+      .input(z.object({ provider: z.enum(["gmail", "outlook"]) }))
+      .mutation(
+        async (): Promise<{
+          messagesScanned: number;
+          matched: number;
+          attachmentsClassified: number;
+          errors: number;
+        }> => NOT_IMPL(),
+      ),
   }),
 
   aiInsights: t.router({

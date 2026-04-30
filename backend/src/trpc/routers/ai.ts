@@ -21,6 +21,9 @@ import {
   classifyDocument,
   draftEmail,
   isAiConfigured,
+  predictArrivalTiming,
+  detectAnomaly,
+  generateCrossYearInsights,
 } from "../../lib/ai.js";
 
 export const aiRouter = router({
@@ -78,5 +81,89 @@ export const aiRouter = router({
         });
       }
       return draftEmail({ firmId: ctx.firmId, ...input });
+    }),
+
+  /**
+   * Mode B — predict when a client is likely to send a doc, based on
+   * their prior arrival history. Used by the chase scheduler to time
+   * reminders ("don't bug them yet — they typically send by March 12").
+   */
+  predictArrivalTiming: firmProcedure
+    .input(
+      z.object({
+        clientId: z.string().uuid(),
+        itemType: z.string(),
+        priorArrivals: z.array(z.string()),
+        today: z.string(),
+        cohortWindow: z
+          .object({ start: z.string(), end: z.string() })
+          .optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      if (!isAiConfigured()) return null;
+      return predictArrivalTiming({ firmId: ctx.firmId, ...input });
+    }),
+
+  /**
+   * Mode C — anomaly detection on financial values. Statistical
+   * thresholds are pre-filtered server-side (skip LLM if swing <15%
+   * with ≥3 priors); the LLM call lifts contextual judgment ("income
+   * jumped but client mentioned a stock sale — explain why").
+   */
+  detectAnomaly: firmProcedure
+    .input(
+      z.object({
+        clientId: z.string().uuid(),
+        fieldLabel: z.string(),
+        currentValue: z.number(),
+        priorValues: z.array(z.number()),
+        context: z.string().optional(),
+        entityType: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!isAiConfigured()) return null;
+      return detectAnomaly({ firmId: ctx.firmId, ...input });
+    }),
+
+  /**
+   * Mode E — cross-year insights. Walks 2+ years of facts + current
+   * checklist; surfaces missing items, election opportunities, credit
+   * eligibility, structural changes, regression risk. The advisory
+   * lever — Year-1 efficiency buyers convert to Year-3 retention via
+   * the strength of these.
+   */
+  generateCrossYearInsights: firmProcedure
+    .input(
+      z.object({
+        clientId: z.string().uuid(),
+        clientName: z.string(),
+        entityType: z.string(),
+        primaryState: z.string(),
+        yearlyFacts: z.array(
+          z.object({
+            year: z.number(),
+            items: z.array(
+              z.object({
+                itemType: z.string(),
+                value: z.number().optional(),
+                label: z.string().optional(),
+              }),
+            ),
+          }),
+        ),
+        currentChecklist: z.array(
+          z.object({
+            itemType: z.string(),
+            label: z.string(),
+            state: z.string(),
+          }),
+        ),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!isAiConfigured()) return null;
+      return generateCrossYearInsights({ firmId: ctx.firmId, ...input });
     }),
 });

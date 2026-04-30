@@ -12,6 +12,7 @@ import {
   type ClientInsert,
 } from "../../db/schema.js";
 import { generateDeadlinesForClient } from "../../lib/deadline-generator.js";
+import { seedChecklistsForTasks } from "../../lib/checklist-seeder.js";
 import { log } from "../../lib/observability.js";
 
 /**
@@ -243,6 +244,7 @@ export const importsRouter = router({
       const year = new Date().getFullYear();
       let deadlinesCreated = 0;
       let tasksCreated = 0;
+      let checklistItemsCreated = 0;
       const ids: string[] = [];
 
       for (let i = 0; i < input.rows.length; i++) {
@@ -284,6 +286,19 @@ export const importsRouter = router({
             const existingTaskDeadlines = new Set(
               existingTasks.map((t) => t.deadlineId),
             );
+            // Pull deadline → service_template map so we can seed
+            // each new task's checklist from the template's
+            // standardChecklist payload.
+            const deadlineToTemplate = await db
+              .select({
+                id: deadlines.id,
+                serviceTemplateId: deadlines.serviceTemplateId,
+              })
+              .from(deadlines)
+              .where(eq(deadlines.firmId, ctx.firmId));
+            const templateByDeadline = new Map(
+              deadlineToTemplate.map((d) => [d.id, d.serviceTemplateId]),
+            );
             const taskRows = newDeadlines
               .filter((d) => !existingTaskDeadlines.has(d.id))
               .map((d) => ({
@@ -295,8 +310,28 @@ export const importsRouter = router({
                 ),
               }));
             if (taskRows.length > 0) {
-              await db.insert(tasks).values(taskRows);
-              tasksCreated += taskRows.length;
+              const inserted = await db
+                .insert(tasks)
+                .values(taskRows)
+                .returning({
+                  id: tasks.id,
+                  deadlineId: tasks.deadlineId,
+                });
+              tasksCreated += inserted.length;
+              // Seed baseline checklist items from each task's
+              // service_template.standardChecklist. Without this,
+              // tasks land empty and the inbound classifier has
+              // nothing to match attachments against — the entire
+              // files-from-clients loop breaks here.
+              const seeded = await seedChecklistsForTasks(
+                inserted.map((t) => ({
+                  firmId: ctx.firmId,
+                  taskId: t.id,
+                  serviceTemplateId:
+                    templateByDeadline.get(t.deadlineId) ?? null,
+                })),
+              );
+              checklistItemsCreated += seeded.created;
             }
           }
         }
@@ -310,6 +345,7 @@ export const importsRouter = router({
         skipped: skippedIndices.length,
         deadlinesCreated,
         tasksCreated,
+        checklistItemsCreated,
         source: input.source ?? null,
       });
 
@@ -320,6 +356,7 @@ export const importsRouter = router({
         skippedCount: skippedIndices.length + (input.skippedCount ?? 0),
         deadlinesCreated,
         tasksCreated,
+        checklistItemsCreated,
       };
     }),
 
