@@ -751,6 +751,18 @@ export const mockAdapter = {
         errors: 0,
       };
     },
+    /** Mock sync — returns zeros (mock mode has no real QBO/Xero).
+     *  Real BE pulls Customers and upserts Clients. */
+    syncNow: async () => {
+      await delay(500);
+      return {
+        fetched: 0,
+        inserted: 0,
+        updated: 0,
+        skipped: 0,
+        errors: 0,
+      };
+    },
   },
 
   exports: {

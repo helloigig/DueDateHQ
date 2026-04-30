@@ -787,6 +787,18 @@ export const appRouter = t.router({
           errors: number;
         }> => NOT_IMPL(),
       ),
+    /** On-demand sync — pull QBO/Xero customers into clients now */
+    syncNow: t.procedure
+      .input(z.object({ provider: z.enum(["qbo", "xero"]) }))
+      .mutation(
+        async (): Promise<{
+          fetched: number;
+          inserted: number;
+          updated: number;
+          skipped: number;
+          errors: number;
+        }> => NOT_IMPL(),
+      ),
   }),
 
   aiInsights: t.router({

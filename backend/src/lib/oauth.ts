@@ -266,6 +266,25 @@ export async function handleCallback(
     provider: stash.provider,
   });
 
+  // Kick off the first sync IMMEDIATELY after connect — but don't
+  // block the redirect on it. The user wants to see "Connected!" fast,
+  // then watch their clients populate. Fire-and-forget; failures are
+  // captured and surfaced via integrations.lastError.
+  if (stash.provider === "qbo") {
+    void (async () => {
+      try {
+        const { syncFirm } = await import("./sync/qbo.js");
+        await syncFirm(stash.firmId);
+      } catch (err) {
+        captureException(err, {
+          firmId: stash.firmId,
+          provider: stash.provider,
+          ctx: "post_connect_initial_sync",
+        });
+      }
+    })();
+  }
+
   return {
     redirectAfter:
       ((stash as Record<string, unknown>).redirectAfter as string) ?? "/",

@@ -69,6 +69,22 @@ export function useDisconnect() {
 }
 
 /**
+ * On-demand sync — pull QBO/Xero customers into clients NOW. The
+ * scheduled job runs every 30 minutes; this lets the CPA force a
+ * refresh after they edited a customer in QBO. Invalidates the
+ * clients list on success so the FE rerenders.
+ */
+export function useSyncNow() {
+  const utils = trpc.useUtils();
+  return trpc.integrations.syncNow.useMutation({
+    onSuccess: () => {
+      void utils.clients.list.invalidate();
+      void utils.integrations.list.invalidate();
+    },
+  });
+}
+
+/**
  * Listens for the OAuth callback's postMessage (when the BE wraps the
  * callback in a small HTML page that posts back to opener). Falls back
  * to the polling approach above when no message is received.

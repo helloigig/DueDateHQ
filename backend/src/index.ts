@@ -12,6 +12,7 @@ import { handleCallback } from "./lib/oauth.js";
 import { startScraperScheduler } from "./lib/scraper.js";
 import { startExportWorker, ARTIFACT_DIR } from "./lib/export-worker.js";
 import { startMethodBPoller } from "./lib/method-b-poller.js";
+import { startQboSyncScheduler } from "./lib/sync/qbo.js";
 import { log, captureException } from "./lib/observability.js";
 
 const app = new Hono();
@@ -127,6 +128,14 @@ if (env.NODE_ENV !== "test") {
   // against the user's real Gmail. Production sets METHOD_B_ENABLED=1.
   if (process.env.METHOD_B_ENABLED === "1") {
     startMethodBPoller();
+  }
+  // QBO sync scheduler — gated by env so dev runs don't burn QBO
+  // sandbox quota. Production sets QBO_SYNC_ENABLED=1. Walks every
+  // connected QBO integration on a 30-minute cycle for incremental
+  // sync; first-sync-after-connect runs immediately via the OAuth
+  // callback path so the user sees clients populate without waiting.
+  if (process.env.QBO_SYNC_ENABLED === "1") {
+    startQboSyncScheduler();
   }
 }
 

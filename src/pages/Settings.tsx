@@ -37,6 +37,7 @@ import {
   useIntegrationCatalog,
   useStartConnect,
   useDisconnect,
+  useSyncNow,
 } from "../hooks/useIntegrations";
 import { useDriftReport, useAiStatus } from "../hooks/useDriftReport";
 import {
@@ -1661,6 +1662,8 @@ function IntegrationsPanel() {
   const catalog = useIntegrationCatalog();
   const startConnect = useStartConnect();
   const disconnect = useDisconnect();
+  const syncNow = useSyncNow();
+  const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
   // Index live integrations by kind for fast lookup
   const byKind = useMemo(() => {
     const m = new Map<string, NonNullable<typeof list.data>[number]>();
@@ -1673,6 +1676,26 @@ function IntegrationsPanel() {
       kind,
       redirectTo: window.location.href,
     });
+  };
+
+  const onSync = async (provider: "qbo" | "xero") => {
+    setSyncFeedback(null);
+    try {
+      const result = await syncNow.mutateAsync({ provider });
+      const msg =
+        result.fetched === 0
+          ? "Already up to date."
+          : `Synced ${result.fetched} customer${
+              result.fetched === 1 ? "" : "s"
+            } — ${result.inserted} new, ${result.updated} updated${
+              result.errors > 0 ? `, ${result.errors} error(s)` : ""
+            }.`;
+      setSyncFeedback(msg);
+    } catch (err) {
+      setSyncFeedback(
+        err instanceof Error ? err.message : "Sync failed",
+      );
+    }
   };
 
   return (
@@ -1691,11 +1714,20 @@ function IntegrationsPanel() {
             Connect failed: {startConnect.error.message}
           </p>
         )}
+        {syncFeedback && (
+          <p className="text-xs text-ink-700 bg-sunken/50 border border-line rounded px-2.5 py-1.5 mb-3">
+            {syncFeedback}
+          </p>
+        )}
         <ul className="divide-y divide-line">
           {TIER_0_PROVIDERS.map((p) => {
             const live = byKind.get(p.kind);
             const cat = catalog.data?.find((c) => c.kind === p.kind);
             const configured = cat?.configured ?? false;
+            // Sync button only for QBO/Xero rows that are connected.
+            // Gmail/Outlook are send-only (Method A) and the inbox
+            // poller (Method B) has its own on-demand button elsewhere.
+            const supportsSync = p.kind === "qbo" || p.kind === "xero";
             return (
               <IntegrationRow
                 key={p.kind}
@@ -1707,8 +1739,14 @@ function IntegrationsPanel() {
                 onDisconnect={() =>
                   live && disconnect.mutate({ id: live.id })
                 }
+                onSync={
+                  supportsSync && live?.status === "connected"
+                    ? () => onSync(p.kind as "qbo" | "xero")
+                    : undefined
+                }
                 connecting={startConnect.isPending}
                 disconnecting={disconnect.isPending}
+                syncing={syncNow.isPending}
               />
             );
           })}
@@ -1753,8 +1791,10 @@ function IntegrationRow({
   configured,
   onConnect,
   onDisconnect,
+  onSync,
   connecting,
   disconnecting,
+  syncing,
 }: {
   name: string;
   blurb: string;
@@ -1771,8 +1811,13 @@ function IntegrationRow({
   configured: boolean;
   onConnect: () => void;
   onDisconnect: () => void;
+  /** When set, renders a "Sync now" button next to Disconnect. Only
+   *  meaningful for QBO/Xero (data-pull providers); Gmail/Outlook
+   *  use Method B's own poll button elsewhere. */
+  onSync?: () => void;
   connecting: boolean;
   disconnecting: boolean;
+  syncing?: boolean;
 }) {
   // Three states: connected, disconnected (or never connected), error.
   // The visual hierarchy puts the action button on the right, mirroring
@@ -1842,13 +1887,25 @@ function IntegrationRow({
         )}
       </div>
       {status === "connected" ? (
-        <button
-          onClick={onDisconnect}
-          disabled={disconnecting}
-          className="text-xs px-3 py-1 rounded border border-line text-ink-700 hover:bg-sunken disabled:opacity-40"
-        >
-          {disconnecting ? "Disconnecting…" : "Disconnect"}
-        </button>
+        <span className="flex items-center gap-1.5 shrink-0">
+          {onSync && (
+            <button
+              onClick={onSync}
+              disabled={syncing}
+              className="text-xs px-3 py-1 rounded bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40"
+              title="Pull latest customers from this provider into your client list"
+            >
+              {syncing ? "Syncing…" : "Sync now"}
+            </button>
+          )}
+          <button
+            onClick={onDisconnect}
+            disabled={disconnecting}
+            className="text-xs px-3 py-1 rounded border border-line text-ink-700 hover:bg-sunken disabled:opacity-40"
+          >
+            {disconnecting ? "Disconnecting…" : "Disconnect"}
+          </button>
+        </span>
       ) : (
         <button
           onClick={onConnect}
