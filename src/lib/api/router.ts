@@ -698,7 +698,12 @@ export const appRouter = t.router({
               forwardingEmail: string;
               pendingItems: Array<{ itemType: string; label: string }>;
             }>;
-            draft: unknown;
+            draft: {
+              subject: string;
+              body: string;
+              aiSources: Array<{ kind: string; note: string }>;
+              inferenceId: number;
+            } | null;
           }>
         > => NOT_IMPL(),
       ),

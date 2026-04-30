@@ -33,6 +33,8 @@ import { EmailDraftModal, type EmailDraftIntent } from "./EmailDraftModal";
 import { AuthorityChip } from "./AuthorityChip";
 import { BottomSheet } from "./BottomSheet";
 import { useIsTouchViewport } from "../hooks/useIsTouchViewport";
+import { SmsChaseDialog } from "./SmsChaseDialog";
+import { useSmsStatus } from "../hooks/useFilesFromClients";
 
 /**
  * Task-centric dashboard. AI lives at Layer 4 *inside* each task per PRD §3
@@ -924,6 +926,8 @@ function PrimaryAction({
     return (
       <AskClientMenu
         item={lead}
+        task={row.task}
+        client={row.client}
         forwardingEmail={row.task.forwardingEmail}
         onCustom={() => onSendChase(lead)}
       />
@@ -966,18 +970,32 @@ function PrimaryAction({
  */
 function AskClientMenu({
   item,
+  task,
+  client,
   forwardingEmail,
   onCustom,
 }: {
   item: ChecklistItem;
+  task: Task;
+  client: Client;
   forwardingEmail: string;
   onCustom: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [smsOpen, setSmsOpen] = useState(false);
+  const smsStatus = useSmsStatusInline();
+  const session = useSession();
   const isTouch = useIsTouchViewport();
 
   const close = () => setOpen(false);
+  const tier = session?.tier ?? "solo";
+  // SMS option visibility: tier-gated (Pro/Team) AND BE-configured.
+  // Solo firms see no SMS option at all (they can't send anyway).
+  // Pro/Team without BE config see a disabled hint so they know it
+  // exists but isn't wired yet.
+  const canSendSms = tier !== "solo" && smsStatus.configured;
+  const showSmsRow = tier !== "solo";
 
   const onQuickChase = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1014,6 +1032,36 @@ function AskClientMenu({
         }}
         hint="Edit before sending"
       />
+      {showSmsRow && (
+        <MenuItem
+          icon={
+            <span
+              className={[
+                "w-4 h-4 inline-flex items-center justify-center text-2xs font-mono rounded",
+                canSendSms
+                  ? "bg-info-bg text-info-ink"
+                  : "bg-sunken text-ink-400 border border-line",
+              ].join(" ")}
+              aria-hidden
+            >
+              SMS
+            </span>
+          }
+          label={canSendSms ? "Send SMS chase…" : "Send SMS chase (not configured)"}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (canSendSms) {
+              setSmsOpen(true);
+              close();
+            }
+          }}
+          hint={
+            canSendSms
+              ? "Often 5-10x response rate vs email"
+              : "Wire TWILIO_* env vars to enable"
+          }
+        />
+      )}
       <div className="border-t border-line my-1" />
       <MenuItem
         icon={<Mail className="w-4 h-4 text-ink-500" aria-hidden />}
@@ -1061,7 +1109,7 @@ function AskClientMenu({
               }}
             />
             <div
-              className="absolute right-0 top-full mt-1 z-40 bg-surface border border-line rounded-md shadow-overlay py-1 w-56"
+              className="absolute right-0 top-full mt-1 z-40 bg-surface border border-line rounded-md shadow-overlay py-1 w-64"
               role="menu"
             >
               {items}
@@ -1069,8 +1117,26 @@ function AskClientMenu({
           </>
         )
       )}
+
+      <SmsChaseDialog
+        open={smsOpen}
+        onClose={() => setSmsOpen(false)}
+        task={task}
+        client={client}
+        item={item}
+      />
     </span>
   );
+}
+
+/**
+ * Inline wrapper around useSmsStatus that returns a stable shape even
+ * when the query is loading or errored. Lets callers branch on
+ * .configured without nullable juggling.
+ */
+function useSmsStatusInline(): { configured: boolean } {
+  const q = useSmsStatus();
+  return { configured: q.data?.configured ?? false };
 }
 
 function urgencyScore(r: TaskRowData): number {

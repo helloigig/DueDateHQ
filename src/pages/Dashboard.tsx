@@ -26,6 +26,7 @@ import { AdvisoryPeek } from "../components/AdvisoryPeek";
 import { WelcomeTour } from "../components/WelcomeTour";
 import { PwaInstallCard } from "../components/PwaInstallCard";
 import { CapacityStrip } from "../components/CapacityStrip";
+import { DigestPanel } from "../components/DigestPanel";
 import type { Announcement, Deadline } from "../types";
 
 const HIDE_STATUSES = new Set(["completed", "filed_extension"]);
@@ -251,6 +252,7 @@ export function Dashboard() {
 
       <AdvisoryPeek />
       <CapacityStrip />
+      <DigestPanel />
       <TaskList />
       <OnboardingLayer2Widget />
 
