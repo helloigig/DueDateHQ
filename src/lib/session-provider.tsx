@@ -38,6 +38,11 @@ export function useMaybeServerSession(): ServerSession | null {
  * Reads the server-side session via tRPC (auth.session). If absent, redirects
  * to /login. While the request is in flight, shows a full-page skeleton.
  *
+ * Fallback: when the BE is unreachable (network error) but a local session
+ * exists, synthesize a ServerSession from the local one so the app still
+ * runs against in-memory store data. Without this, every page render with
+ * a dead backend strands a signed-in user on /login.
+ *
  * In mock mode the adapter answers based on the local session; on real
  * backend this becomes the source of truth (cookies, etc.).
  */
@@ -57,7 +62,35 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return <DashboardSkeleton />;
   }
 
-  if (!remote.data) {
+  // BE-offline fallback — synthesize a ServerSession from the local one so
+  // the user can still use the app. The local session was created by the
+  // auth-bridge when Supabase confirmed the user, so trusting it here is
+  // safe; the backend will replace this with authoritative data on its
+  // next reachable refetch.
+  const synthesized: ServerSession | null =
+    !remote.data && local
+      ? {
+          user: {
+            id: `local-${local.userEmail}`,
+            email: local.userEmail,
+            displayName: local.userName,
+            role: "owner",
+            createdAt: local.signedInAt,
+          } as User,
+          firm: {
+            id: `local-${local.firmName}`,
+            name: local.firmName,
+            tier: local.tier,
+            trialEndsAt: local.trialEndsAt ?? null,
+            createdAt: local.signedInAt,
+          } as Firm,
+          tier: local.tier,
+        }
+      : null;
+
+  const session = remote.data ?? synthesized;
+
+  if (!session) {
     const next = location.pathname + location.search;
     return (
       <Navigate
@@ -68,7 +101,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <SessionContext.Provider value={remote.data}>
+    <SessionContext.Provider value={session}>
       {children}
     </SessionContext.Provider>
   );

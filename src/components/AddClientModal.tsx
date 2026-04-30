@@ -65,15 +65,15 @@ export function AddClientModal({
   // Real-mode package suggestion. Re-runs when entity/state changes.
   const suggestQuery = trpc.servicePackages.suggestForClient.useQuery(
     { entityType: entity, primaryState: state },
-    { enabled: !env.useMockApi && open, staleTime: 60_000 },
+    { enabled: !env.useMockData && open, staleTime: 60_000 },
   );
 
   const suggestedPackageName = useMemo(() => {
-    if (env.useMockApi) return localSuggestBundle(entity, state);
+    if (env.useMockData) return localSuggestBundle(entity, state);
     return suggestQuery.data?.name ?? null;
   }, [entity, state, suggestQuery.data?.name]);
 
-  const suggestedPackageId = env.useMockApi ? null : suggestQuery.data?.id ?? null;
+  const suggestedPackageId = env.useMockData ? null : suggestQuery.data?.id ?? null;
 
   const createMut = trpc.clients.create.useMutation();
   const assignMut = trpc.servicePackages.assignToClient.useMutation();
@@ -124,7 +124,7 @@ export function AddClientModal({
     setSubmitError(null);
     setSubmitting(true);
     try {
-      if (env.useMockApi) {
+      if (env.useMockData) {
         const id = actions.addClient({
           name: name.trim(),
           entityType: entity,
@@ -219,7 +219,7 @@ export function AddClientModal({
             setPhone={setPhone}
             errors={errors}
             suggestedPackageName={suggestedPackageName}
-            suggestionLoading={!env.useMockApi && suggestQuery.isLoading}
+            suggestionLoading={!env.useMockData && suggestQuery.isLoading}
           />
         )}
 
@@ -232,7 +232,7 @@ export function AddClientModal({
             email={email}
             phone={phone}
             suggestedPackageName={suggestedPackageName}
-            hasPackage={!!suggestedPackageId || env.useMockApi}
+            hasPackage={!!suggestedPackageId || env.useMockData}
           />
         )}
 

@@ -233,7 +233,7 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
  */
 function CoverSheetButton({ taskId }: { taskId: string }) {
   const sheet = useCoverSheet();
-  const isMock = env.useMockApi;
+  const isMock = env.useMockData;
 
   // Open the URL once it transitions to ready
   if (sheet.status.state === "ready" && sheet.status.url) {

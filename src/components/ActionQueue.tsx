@@ -49,7 +49,7 @@ export function ActionQueue() {
   // Don't fall back to MOCK_TODO_ITEMS or the user sees fake "actions" come
   // from nowhere. Mock fallback is only useful in design-demo / mock mode
   // where the BE can't talk to a database.
-  const isMock = env.useMockApi;
+  const isMock = env.useMockData;
   const useMockFallback = isMock && live.length === 0;
   const sorted: TodoItem[] = (useMockFallback
     ? MOCK_TODO_ITEMS

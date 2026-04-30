@@ -46,7 +46,7 @@ export function ForgotPassword() {
       setError(parsed.error.issues[0]?.message ?? "Invalid email");
       return;
     }
-    if (env.useMockApi) {
+    if (env.useMockAuth) {
       mockForgot.mutate(parsed.data);
     } else {
       void realForgot(parsed.data);

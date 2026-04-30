@@ -1,53 +1,40 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { z } from "zod";
 import {
   Mail,
   ShieldCheck,
   Sparkles,
   Inbox,
-  Eye,
-  EyeOff,
+  ArrowLeft,
 } from "lucide-react";
-import { trpc } from "../../lib/api/client";
-import { signupSchema, type SignupInput } from "../../types/schemas";
 import { signIn } from "../../data/session";
+import { actions } from "../../data/store";
 import { authInputClass } from "./AuthShell";
 import { env } from "../../config";
 import { supabase } from "../../lib/supabase";
 
 /**
- * Sign-up — minimum-viable entry: just email + password (or SSO). The firm
- * name, your name, plan tier, and states all happen in onboarding. We
- * pre-fill them from the email domain there. No duplicated input.
+ * Sign-UP — passwordless magic-link, first-time users only.
  *
- * Trial defaults to Pro. The user can downgrade to Solo / upgrade to Team
- * in Settings → Billing once their roster is in.
+ * Email → magic link → click → land on /onboarding/firm. Onboarding is
+ * REQUIRED for new accounts (firm name, primary states, import path).
+ * Existing users belong on /login, not here. Supabase enforces this via
+ * `shouldCreateUser: true` — if the email already has an account, the
+ * magic link signs them in but lands them on /onboarding/firm anyway, and
+ * the bridge will route them through to dashboard if onboarding is already
+ * complete.
+ *
+ * Mock mode: no real email; we sign in directly with `_pending` firm and
+ * `actions.resetToEmpty()` so the new account starts clean (no leftover
+ * demo seeds from a prior session in the same browser). Then route to
+ * /onboarding/firm.
  */
 export function Signup() {
   const navigate = useNavigate();
+  const [step, setStep] = useState<"email" | "sent">("email");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState<Partial<Record<keyof SignupInput, string>>>({});
-  const [submitError, setSubmitError] = useState<string | null>(null);
-
-  const passwordStrength = scorePassword(password);
-
-  // Pre-fill firm + name from email — happens at onboarding/firm.
-  // Wireframe: detect a known domain so the "Request to join" UX shows.
-  const knownDomain = (() => {
-    const at = email.indexOf("@");
-    if (at < 0) return null;
-    const domain = email.slice(at + 1).trim().toLowerCase();
-    if (!domain) return null;
-    const KNOWN: Record<string, { firmName: string; ownerName: string }> = {
-      "mitchellcpa.com": { firmName: "Mitchell CPA", ownerName: "Sarah Mitchell" },
-    };
-    return KNOWN[domain] ?? null;
-  })();
-
   const [pending, setPending] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   function inferNames(emailValue: string) {
     const at = emailValue.indexOf("@");
@@ -65,82 +52,126 @@ export function Signup() {
     return { userName, firmName };
   }
 
-  function afterSuccess() {
-    const { userName, firmName } = inferNames(email);
-    signIn({ firmName, userName, userEmail: email, tier: "pro" });
-    navigate("/onboarding/firm", { replace: true });
-  }
+  // Pre-fill firm + name from email — happens at onboarding/firm.
+  // Wireframe: detect a known domain so the "Request to join" UX shows.
+  const knownDomain = (() => {
+    const at = email.indexOf("@");
+    if (at < 0) return null;
+    const domain = email.slice(at + 1).trim().toLowerCase();
+    if (!domain) return null;
+    const KNOWN: Record<string, { firmName: string; ownerName: string }> = {
+      "mitchellcpa.com": { firmName: "Mitchell CPA", ownerName: "Sarah Mitchell" },
+    };
+    return KNOWN[domain] ?? null;
+  })();
 
-  // Mock signup goes through trpc.auth.signup → mock adapter. Real signup
-  // calls Supabase Auth; the firm + public.users row aren't created here —
-  // OnboardingFirm calls auth.bootstrap once the user has supplied a name.
-  const mockSignup = trpc.auth.signup.useMutation({
-    onSuccess: afterSuccess,
-    onError: (err) => setSubmitError(err.message),
-  });
-
-  const realSignup = async (parsed: { email: string; password: string }) => {
-    setPending(true);
+  const sendLink = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSubmitError(null);
+    if (!email.includes("@")) {
+      setSubmitError("Enter a valid email.");
+      return;
+    }
+    setPending(true);
     try {
-      const { data, error } = await supabase().auth.signUp({
-        email: parsed.email,
-        password: parsed.password,
+      if (env.useMockAuth) {
+        // Mock: clean store first so the new account doesn't inherit
+        // demo data that may be left in localStorage from a prior session.
+        actions.resetToEmpty();
+        const { userName, firmName } = inferNames(email);
+        signIn({
+          firmName: "_pending",
+          userName: userName || (email.split("@")[0] ?? ""),
+          userEmail: email,
+          tier: "pro",
+        });
+        // Persist the inferred firm name so OnboardingFirm pre-fills.
+        const raw = localStorage.getItem("duedatehq.session.v1");
+        if (raw) {
+          try {
+            const s = JSON.parse(raw);
+            s.onboardingComplete = false;
+            s.suggestedFirmName = firmName;
+            localStorage.setItem("duedatehq.session.v1", JSON.stringify(s));
+          } catch {
+            /* ignore */
+          }
+        }
+        navigate("/onboarding/firm", { replace: true });
+        return;
+      }
+      const { error } = await supabase().auth.signInWithOtp({
+        email,
         options: {
-          // After the user clicks the email confirmation link, Supabase
-          // redirects them back here. supabase-js's detectSessionInUrl
-          // picks up the session token from the URL hash, and the next
-          // page render lands them in onboarding.
+          shouldCreateUser: true,
           emailRedirectTo: `${window.location.origin}/onboarding/firm`,
         },
       });
       if (error) {
-        setSubmitError(error.message);
+        const msg = error.message.toLowerCase();
+        if (msg.includes("rate") || msg.includes("too many")) {
+          setSubmitError(
+            "Too many sign-up attempts in the last hour. Wait ~60 minutes or contact support.",
+          );
+        } else {
+          setSubmitError(error.message);
+        }
         return;
       }
-      // If Supabase requires email confirmation (default), data.session is
-      // null until the user clicks the confirmation link. Surface that
-      // honestly rather than silently routing them into onboarding where
-      // auth.bootstrap will 401.
-      if (!data.session) {
-        setSubmitError(
-          "We sent a confirmation link to " +
-            parsed.email +
-            ". Click it to continue.",
-        );
-        return;
-      }
-      afterSuccess();
+      setStep("sent");
     } finally {
       setPending(false);
     }
   };
 
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitError(null);
-    const parsed = signupSchema.safeParse({
-      email,
-      password,
-      firmName: "_pending",
-      userName: "_pending",
-      tier: "pro",
-    });
-    if (!parsed.success) {
-      const flat: typeof errors = {};
-      for (const issue of (parsed.error as z.ZodError).issues) {
-        const k = issue.path[0] as keyof SignupInput;
-        if (k === "email" || k === "password") flat[k] = issue.message;
-      }
-      setErrors(flat);
-      return;
-    }
-    if (env.useMockApi) {
-      mockSignup.mutate(parsed.data);
-    } else {
-      void realSignup({ email: parsed.data.email, password: parsed.data.password });
-    }
-  };
+  if (step === "sent") {
+    return (
+      <div className="min-h-screen bg-canvas flex items-center justify-center p-6">
+        <div className="w-full max-w-md bg-surface border border-line rounded-md p-8 text-center">
+          <button
+            onClick={() => {
+              setStep("email");
+              setSubmitError(null);
+            }}
+            className="text-xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-1"
+          >
+            <ArrowLeft className="w-3 h-3" aria-hidden /> Use a different email
+          </button>
+          <div className="w-14 h-14 rounded-full bg-info-bg border border-info-border flex items-center justify-center text-info-ink mx-auto mt-3">
+            <Mail className="w-6 h-6" aria-hidden />
+          </div>
+          <h1 className="text-xl font-semibold text-ink-900 mt-4">
+            Check your email
+          </h1>
+          <p className="text-sm text-ink-500 mt-2">
+            We sent a sign-up link to{" "}
+            <span className="font-medium text-ink-900">{email}</span>. Click
+            the link — we'll set up your firm in the next step.
+          </p>
+
+          {submitError && (
+            <div className="text-xs text-danger-ink bg-danger-bg border border-danger-border rounded px-3 py-2 mt-4">
+              {submitError}
+            </div>
+          )}
+
+          <p className="text-2xs text-ink-400 mt-6 pt-4 border-t border-line">
+            Didn't get it? Check spam, or{" "}
+            <button
+              onClick={() =>
+                sendLink(new Event("submit") as unknown as React.FormEvent)
+              }
+              className="underline hover:no-underline"
+              disabled={pending}
+            >
+              {pending ? "resending…" : "resend the link"}
+            </button>
+            .
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-canvas grid grid-cols-1 lg:grid-cols-2">
@@ -158,52 +189,27 @@ export function Signup() {
           </h1>
           <p className="text-sm text-ink-500 mt-2">
             We'll set up your firm workspace in the next step. Teammates join
-            via invite later. No credit card to start; after day 30 you pay or
-            your data goes read-only.
+            via invite later. No credit card; after day 30 you pay or your
+            data goes read-only.
           </p>
 
-          <form onSubmit={onSubmit} className="space-y-3 text-sm mt-6">
-            <Field label="Email" error={errors.email}>
+          <form onSubmit={sendLink} className="space-y-3 text-sm mt-6">
+            <label className="block">
+              <span className="text-xs font-medium text-ink-700 mb-1 block">
+                Email
+              </span>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
-                  setErrors((er) => ({ ...er, email: undefined }));
                   setSubmitError(null);
                 }}
                 placeholder="you@yourfirm.com"
                 className={authInputClass}
                 autoFocus
               />
-            </Field>
-            <Field label="Password" error={errors.password}>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setErrors((er) => ({ ...er, password: undefined }));
-                    setSubmitError(null);
-                  }}
-                  className={authInputClass + " pr-10"}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-700 p-0.5"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? (
-                    <EyeOff className="w-3.5 h-3.5" aria-hidden />
-                  ) : (
-                    <Eye className="w-3.5 h-3.5" aria-hidden />
-                  )}
-                </button>
-              </div>
-              <PasswordStrength score={passwordStrength} length={password.length} />
-            </Field>
+            </label>
 
             {/* Firm-already-exists detection (PRD: domain-based discovery) */}
             {knownDomain && (
@@ -233,32 +239,24 @@ export function Signup() {
 
             <button
               type="submit"
-              disabled={mockSignup.isPending || pending}
+              disabled={pending || !email}
               className="w-full text-sm px-3 py-2 rounded-md bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 mt-2"
             >
-              {mockSignup.isPending || pending ? "Creating…" : "Continue → set up firm"}
+              {pending
+                ? "Sending link…"
+                : env.useMockAuth
+                  ? "Continue → set up firm"
+                  : "Send sign-up link"}
             </button>
             <p className="text-2xs text-ink-400 text-center">
               By continuing you agree to the Terms and Privacy Policy.
             </p>
           </form>
 
-          {/* Magic-link affordance — secondary path. The user types email, we
-              send a one-time sign-in link. No password to remember. Keeps
-              parity with how Notion / Linear / GitHub all let you in. */}
-          <p className="text-xs text-center text-ink-500 mt-3">
-            Don't want a password?{" "}
-            <Link to="/magic-link" className="text-ink-900 underline">
-              Email me a sign-in link instead
-            </Link>
-          </p>
-
           <div className="mt-6 pt-6 border-t border-line space-y-3">
             {/* Joining an existing firm — email-link is primary. Owner clicks
                 "invite Alice" in Settings → Team, Alice gets an email, click
-                takes her to /accept-invite/<token>. The 6-char paste-in code
-                stays as a fallback for the case where the invite email
-                bounced or got lost. */}
+                takes her to /accept-invite/<token>. */}
             <p className="text-xs text-ink-500">
               Joining an existing firm? Look for an invite email from your firm
               owner — the link takes you straight in.{" "}
@@ -329,96 +327,6 @@ export function Signup() {
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  children,
-  error,
-  hint,
-}: {
-  label: string;
-  children: React.ReactNode;
-  error?: string;
-  hint?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="text-xs font-medium text-ink-700 mb-1 block">{label}</span>
-      {children}
-      {hint && !error && (
-        <span className="text-2xs text-ink-400 mt-1 block">{hint}</span>
-      )}
-      {error && (
-        <span className="text-2xs text-danger-ink mt-1 block">{error}</span>
-      )}
-    </label>
-  );
-}
-
-/**
- * 0-4 password score. Cheap heuristic — production should use zxcvbn.
- * 0: empty / too short. 1: weak. 2: ok. 3: strong. 4: very strong.
- */
-function scorePassword(p: string): number {
-  if (!p) return 0;
-  if (p.length < 8) return 0;
-  let score = 1;
-  if (/[A-Z]/.test(p)) score++;
-  if (/[0-9]/.test(p)) score++;
-  if (/[^A-Za-z0-9]/.test(p)) score++;
-  if (p.length >= 12) score = Math.min(4, score + 1);
-  return Math.min(4, score);
-}
-
-function PasswordStrength({ score, length }: { score: number; length: number }) {
-  if (length === 0) {
-    return (
-      <p className="text-2xs text-ink-400 mt-1">
-        Minimum 8 characters. Mix in numbers and symbols for safety.
-      </p>
-    );
-  }
-  if (length < 8) {
-    return (
-      <p className="text-2xs text-warn-ink mt-1">
-        {8 - length} more character{8 - length === 1 ? "" : "s"} needed.
-      </p>
-    );
-  }
-  const labels = ["—", "Weak", "OK", "Strong", "Very strong"];
-  const colors = [
-    "bg-line",
-    "bg-warn-solid",
-    "bg-warn-solid",
-    "bg-ok-solid",
-    "bg-ok-solid",
-  ];
-  return (
-    <div className="mt-1.5">
-      <div className="flex gap-1">
-        {[1, 2, 3, 4].map((i) => (
-          <span
-            key={i}
-            className={`h-1 flex-1 rounded-full ${
-              i <= score ? colors[score] : "bg-line"
-            }`}
-          />
-        ))}
-      </div>
-      <p
-        className={`text-2xs mt-1 ${
-          score >= 3
-            ? "text-ok-ink"
-            : score >= 2
-            ? "text-warn-ink"
-            : "text-warn-ink"
-        }`}
-      >
-        Strength: {labels[score]}
-      </p>
     </div>
   );
 }

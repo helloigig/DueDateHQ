@@ -27,7 +27,7 @@ export async function requestUploadUrl(opts: {
   contentType: string;
 }): Promise<SignedUpload> {
   // Mock mode shortcut so we don't need a server round-trip.
-  if (env.useMockApi) {
+  if (env.useMockData) {
     return {
       uploadUrl: `data:mock/${opts.kind};${encodeURIComponent(opts.filename)}`,
       storageKey: `${opts.kind}/${Date.now()}-${opts.filename}`,

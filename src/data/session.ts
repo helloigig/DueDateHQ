@@ -98,34 +98,64 @@ export function signIn(input: {
 }
 
 /**
- * Clears both Supabase auth (when not in mock mode) AND the local FirmSession.
+ * Clears both Supabase auth and the local FirmSession.
  *
- * Without the Supabase signOut, the SupabaseAuthBridge's INITIAL_SESSION
- * listener sees a still-valid Supabase session on the next render and
- * re-populates the local session — user gets signed back in immediately.
+ * Synchronous-first design: we clear localStorage (sb-*-auth-token + the
+ * local FirmSession) BEFORE we await anything. That way React re-renders
+ * the app to /login immediately — no chance of getting trapped on the
+ * "Signing you in…" loader, no chance of the network-bound Supabase API
+ * call hanging the UI.
  *
- * Async because supabase.auth.signOut() is async; callers can await or
- * fire-and-forget. We swallow Supabase errors (network down, already signed
- * out) — the local session always clears regardless.
- *
- * Lazy-import of supabase to avoid circular dep at module-load time
- * (data/session is imported by many places that don't need supabase).
+ * The Supabase server-side revoke is best-effort, fire-and-forget: we use
+ * scope: 'local' so it doesn't make a network round-trip, and we don't
+ * await it. If the user is offline or Supabase is slow, sign-out still
+ * completes instantly.
  */
 export async function signOut() {
-  // Local clear first — this fires our subscribers immediately so any
-  // subscriber-driven UI updates (TopBar avatar, etc.) flip on the same tick.
+  if (typeof window === "undefined") {
+    write(null);
+    return;
+  }
+  // Step 1 (sync): purge every Supabase token from localStorage. This must
+  // happen before any await — otherwise a slow `supabase.auth.signOut()`
+  // call leaves the tokens visible to App.tsx's isSupabaseAuthPending
+  // check during the await window, freezing the UI on the loader.
+  for (const key of Object.keys(window.localStorage)) {
+    if (key.startsWith("sb-") && key.endsWith("-auth-token")) {
+      window.localStorage.removeItem(key);
+    }
+  }
+  // Step 2 (sync): clear the local FirmSession + notify subscribers.
   write(null);
-  if (typeof window === "undefined") return;
+
+  // Step 3 (background): tell Supabase. scope:'local' skips the network
+  // round-trip; we still call it so the auth client tears down its
+  // in-memory session and stops auto-refreshing.
   try {
-    // Inline check for VITE_USE_MOCK_API to avoid importing config (circular).
-    const useMockApi =
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (import.meta as any).env?.VITE_USE_MOCK_API !== "false";
-    if (useMockApi) return;
-    const { supabase } = await import("../lib/supabase");
-    await supabase().auth.signOut();
+    // Inline env check (no config import — would be circular). Real auth
+    // requires both Supabase keys set AND useMockAuth not explicitly true.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ie = (import.meta as any).env ?? {};
+    const haveSupabaseKeys = !!ie.VITE_SUPABASE_URL && !!ie.VITE_SUPABASE_ANON_KEY;
+    const authOverride = ie.VITE_USE_MOCK_AUTH;
+    const legacy = ie.VITE_USE_MOCK_API;
+    const useMockAuth = !haveSupabaseKeys
+      ? true
+      : authOverride === undefined
+        ? legacy !== "false"
+        : authOverride !== "false";
+    if (!useMockAuth) {
+      const { supabase } = await import("../lib/supabase");
+      // Don't await — we already cleared local state, and a hang here
+      // would block our caller's navigate("/login").
+      void supabase()
+        .auth.signOut({ scope: "local" })
+        .catch(() => {
+          /* ignore — local already cleared */
+        });
+    }
   } catch {
-    /* ignore — local already cleared */
+    /* ignore */
   }
 }
 

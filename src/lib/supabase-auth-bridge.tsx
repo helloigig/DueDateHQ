@@ -3,14 +3,12 @@
  *
  * Without this bridge: clicking a magic-link in email leaves Supabase signed
  * in (tokens in URL hash) but the local FirmSession (data/session.ts) empty
- * → SessionProvider redirects back to /login. The OTP-code path inside
- * MagicLink.tsx works because it calls signIn() manually after verifyOtp.
- * This bridge picks up Supabase auth events from any source (magic link,
- * OAuth callback, OTP) and creates the local session uniformly.
+ * → SessionProvider redirects back to /login. This bridge picks up Supabase
+ * auth events from any source (magic link, OAuth callback) and creates the
+ * local session uniformly.
  *
  * Fires on:
- *   - SIGNED_IN — magic-link tokens extracted from URL hash, OAuth callback,
- *     OTP verifyOtp success
+ *   - SIGNED_IN — magic-link tokens extracted from URL hash, OAuth callback
  *   - INITIAL_SESSION — page load with persisted Supabase session
  *   - SIGNED_OUT — supabase.auth.signOut() called from anywhere
  *
@@ -35,8 +33,8 @@ export function SupabaseAuthBridge() {
   const trpcUtils = trpc.useUtils();
 
   useEffect(() => {
-    // Mock mode: nothing to bridge — local session is the source of truth.
-    if (env.useMockApi) return;
+    // Mock auth: nothing to bridge — local session is the source of truth.
+    if (env.useMockAuth) return;
 
     const { data: subscription } = supabase().auth.onAuthStateChange(
       async (event, session) => {
@@ -48,9 +46,8 @@ export function SupabaseAuthBridge() {
           (event === "SIGNED_IN" || event === "INITIAL_SESSION") &&
           session?.user
         ) {
-          // Skip if local session already matches — covers the OTP path
-          // (MagicLink.tsx already called signIn) and avoids redundant
-          // remote fetches on every page reload.
+          // Skip if local session already matches — avoids redundant remote
+          // fetches on every page reload.
           const localSession = getSession();
           if (
             localSession &&
@@ -107,10 +104,28 @@ export function SupabaseAuthBridge() {
               }
             }
           } catch (err) {
-            // Don't crash the app on a one-off bridge failure — the OTP path
-            // can still complete sign-in manually if needed.
+            // BE unreachable (offline backend, network blip). Don't strand
+            // the user on /login — Supabase confirms the auth, so we can
+            // honour the sign-in locally with a _pending firm and route
+            // them through onboarding. Once the BE comes back, the next
+            // session.fetch will populate the real firm.
             // eslint-disable-next-line no-console
             console.error("supabase-auth-bridge.fetch_session_failed", err);
+            signIn({
+              firmName: "_pending",
+              userName,
+              userEmail,
+              tier: "pro",
+            });
+            const path = window.location.pathname;
+            if (
+              path === "/login" ||
+              path === "/signup" ||
+              path.startsWith("/magic-link") ||
+              path.startsWith("/auth/")
+            ) {
+              navigate("/onboarding/firm", { replace: true });
+            }
           }
         }
       },

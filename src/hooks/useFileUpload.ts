@@ -50,7 +50,7 @@ export function useFileUpload() {
       // Mock mode shortcut — the BE returns a `data:mock/...` URL we
       // recognize and skip. Real mode does a real PUT to Supabase.
       const isMockUrl = signed.uploadUrl.startsWith("data:mock/");
-      if (isMockUrl || env.useMockApi) {
+      if (isMockUrl || env.useMockData) {
         setProgress({
           state: "done",
           pct: 100,

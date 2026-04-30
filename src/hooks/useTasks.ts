@@ -19,10 +19,10 @@ export function useTask(taskId: string | undefined): Task | undefined {
   const { tasks: storeTasks, deadlines } = useStore();
   const remote = trpc.tasks.get.useQuery(
     { id: taskId ?? "" },
-    { enabled: !!taskId && !env.useMockApi, staleTime: 30_000 },
+    { enabled: !!taskId && !env.useMockData, staleTime: 30_000 },
   );
   if (!taskId) return undefined;
-  if (!env.useMockApi) return remote.data ?? undefined;
+  if (!env.useMockData) return remote.data ?? undefined;
 
   // Mock-mode lookup with the lazy-build fallback.
   const task = storeTasks.find((t) => t.id === taskId);
@@ -55,7 +55,7 @@ export function useUpdateTaskStatus() {
     },
   });
   return (taskId: string, status: TaskStatus) => {
-    if (env.useMockApi) {
+    if (env.useMockData) {
       // Optimistic store update so the FE feels instant in mock mode.
       actions.updateTaskStatus(taskId, status);
     }

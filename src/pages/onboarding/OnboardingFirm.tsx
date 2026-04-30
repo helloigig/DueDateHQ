@@ -118,7 +118,7 @@ export function OnboardingFirm() {
 
   const next = async () => {
     setSubmitError(null);
-    if (!env.useMockApi) {
+    if (!env.useMockData) {
       try {
         await bootstrap.mutateAsync({
           firmName: firmName.trim(),
