@@ -1,4 +1,4 @@
-import { Sparkles, Snowflake, Calendar, Bell, X } from "lucide-react";
+import { Sparkles, Snowflake, Calendar, Bell, X, AlertTriangle } from "lucide-react";
 import type {
   AiInsight,
   ChecklistItem,
@@ -8,6 +8,7 @@ import type {
 } from "../types";
 import { arrivalTiming, crossYearInsights } from "../lib/ai-stub";
 import { actions } from "../data/store";
+import { trpc } from "../lib/api/client";
 
 interface Props {
   task?: Task;
@@ -35,6 +36,13 @@ export function AiInsightsPanel({
 }: Props) {
   const hasHistory = facts.length > 0;
   const openInsights = insights.filter((i) => i.status === "open");
+  // Cross-fact consistency — Mode C-style flags when same fact has multiple
+  // sources with disagreeing values (PRD §9.6 v0.8 amendment). Renders below
+  // cross-year insights as its own section.
+  const consistencyQuery = trpc.imports.factConsistency.useQuery({
+    clientId: client.id,
+  });
+  const consistencyFlags = consistencyQuery.data?.flags ?? [];
 
   const taskItemTypes = task
     ? Array.from(
@@ -63,6 +71,66 @@ export function AiInsightsPanel({
           Mode B · C · E
         </span>
       </header>
+
+      {/* Cross-fact consistency — Mode C flags */}
+      {consistencyFlags.length > 0 && (
+        <div className="border-b border-line">
+          <SectionTitle>Fact consistency (Mode C)</SectionTitle>
+          <ul className="divide-y divide-line">
+            {consistencyFlags.map((flag, i) => (
+              <li
+                key={`${flag.factType}-${flag.taxYear}-${i}`}
+                className={
+                  flag.severity === "high"
+                    ? "px-4 py-3 bg-danger-bg/30"
+                    : flag.severity === "medium"
+                      ? "px-4 py-3 bg-warning-bg/30"
+                      : "px-4 py-3"
+                }
+              >
+                <div className="flex items-start gap-2">
+                  <AlertTriangle
+                    className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${
+                      flag.severity === "high"
+                        ? "text-danger-solid"
+                        : "text-warning-solid"
+                    }`}
+                    aria-hidden
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-ink-900">
+                      {flag.factType.replace(/_/g, " ")}{" "}
+                      <span className="text-ink-500 font-normal">
+                        · TY {flag.taxYear}
+                      </span>
+                    </p>
+                    <p className="text-xs text-ink-700 mt-0.5">{flag.reason}</p>
+                    <ul className="mt-2 space-y-1 text-2xs text-ink-500">
+                      {flag.values.map((v) => (
+                        <li
+                          key={v.factId}
+                          className="flex items-baseline gap-2"
+                        >
+                          <span className="font-mono tabular-nums text-ink-700">
+                            {Array.isArray(v.value)
+                              ? `[${(v.value as string[]).join(", ")}]`
+                              : typeof v.value === "number"
+                                ? `$${v.value.toLocaleString()}`
+                                : String(v.value)}
+                          </span>
+                          <span className="text-ink-400">
+                            from {v.sourceGmailMessageId ?? "(unknown source)"} · {v.confidence}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {!hasHistory && (
         <div className="px-4 py-4 text-xs text-ink-500 bg-info-bg border-b border-info-border">

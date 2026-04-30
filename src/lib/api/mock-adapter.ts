@@ -1073,6 +1073,97 @@ export const mockAdapter = {
       if (input.fields.ein) factTypes.push("ein");
       return { inserted: factTypes.length, factTypes };
     },
+    /** Cross-fact consistency — mock returns one illustrative flag per
+     *  client (when clientId provided) so the AiInsightsPanel surface
+     *  renders meaningfully in mock mode. Real BE walks imported_facts
+     *  and flags actual discrepancies. */
+    factConsistency: async (input?: { clientId?: string }) => {
+      await delay();
+      if (!input?.clientId) return { flags: [] };
+      // Hash the clientId so different clients show different flag types
+      // in mock — variety for design review.
+      const hash = Array.from(input.clientId).reduce(
+        (h, c) => (h * 31 + c.charCodeAt(0)) | 0,
+        0,
+      );
+      const m = Math.abs(hash) % 4;
+      // 1 in 4 mock clients shows no flags (the healthy case).
+      if (m === 0) return { flags: [] };
+      const flag =
+        m === 1
+          ? {
+              clientId: input.clientId,
+              taxYear: 2024,
+              factType: "prior_agi",
+              severity: "medium" as const,
+              reason:
+                "prior_agi spreads 12% across sources ($142,000 → $159,000)",
+              values: [
+                {
+                  factId: 1001,
+                  value: 142000,
+                  sourceGmailMessageId: "gm-1040-pdf-2024",
+                  extractionVersion: "v1",
+                  confidence: "high",
+                },
+                {
+                  factId: 1002,
+                  value: 159000,
+                  sourceGmailMessageId: "gm-irs-transcript-2024",
+                  extractionVersion: "v1",
+                  confidence: "medium",
+                },
+              ],
+            }
+          : m === 2
+            ? {
+                clientId: input.clientId,
+                taxYear: 2023,
+                factType: "forms_filed",
+                severity: "medium" as const,
+                reason: "forms_filed: 1 item present in some sources but not others",
+                values: [
+                  {
+                    factId: 2001,
+                    value: ["1040", "Schedule C", "Schedule E"],
+                    sourceGmailMessageId: "gm-1040-pdf-2023",
+                    extractionVersion: "v1",
+                    confidence: "high",
+                  },
+                  {
+                    factId: 2002,
+                    value: ["1040", "Schedule C"],
+                    sourceGmailMessageId: "gm-summary-2023",
+                    extractionVersion: "v1",
+                    confidence: "medium",
+                  },
+                ],
+              }
+            : {
+                clientId: input.clientId,
+                taxYear: 2024,
+                factType: "entity_type",
+                severity: "high" as const,
+                reason: "entity_type extracted as 2 different values across sources",
+                values: [
+                  {
+                    factId: 3001,
+                    value: "S-Corp",
+                    sourceGmailMessageId: "gm-articles-2024",
+                    extractionVersion: "v1",
+                    confidence: "high",
+                  },
+                  {
+                    factId: 3002,
+                    value: "LLC",
+                    sourceGmailMessageId: "gm-1120s-cover-2024",
+                    extractionVersion: "v1",
+                    confidence: "medium",
+                  },
+                ],
+              };
+      return { flags: [flag] };
+    },
   },
 
   /** Files-from-clients — digest + SMS + cover sheet handlers.

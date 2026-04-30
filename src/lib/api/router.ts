@@ -599,6 +599,29 @@ export const appRouter = t.router({
           factTypes: string[];
         }> => NOT_IMPL(),
       ),
+    /** Cross-fact consistency check — Mode C-style flag list for ImportedFact
+     *  rows where the same (client × year × fact_type) has multiple sources
+     *  with values that disagree beyond tolerance. */
+    factConsistency: t.procedure
+      .input(z.object({ clientId: z.string().uuid().optional() }).optional())
+      .query(
+        async (): Promise<{
+          flags: Array<{
+            clientId: string;
+            taxYear: number;
+            factType: string;
+            severity: "low" | "medium" | "high";
+            reason: string;
+            values: Array<{
+              factId: number;
+              value: unknown;
+              sourceGmailMessageId: string | null;
+              extractionVersion: string;
+              confidence: string;
+            }>;
+          }>;
+        }> => NOT_IMPL(),
+      ),
   }),
 
   exports: t.router({

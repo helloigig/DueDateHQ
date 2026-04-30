@@ -16,6 +16,7 @@ import {
 import { generateDeadlinesForClient } from "../../lib/deadline-generator.js";
 import { seedChecklistsForTasks } from "../../lib/checklist-seeder.js";
 import { seedMilestonesForTasks } from "../../lib/milestone-seeder.js";
+import { findFactInconsistencies } from "../../lib/fact-consistency.js";
 import { log } from "../../lib/observability.js";
 
 /**
@@ -633,6 +634,30 @@ export const importsRouter = router({
         inserted: inserted.length,
         factTypes: inserted.map((r) => r.factType),
       };
+    }),
+
+  /**
+   * Cross-fact consistency check — per PRD §9.6 v0.8 amendment.
+   *
+   * Surfaces ImportedFact rows where the same (client × year × fact_type)
+   * has multiple sources with values that disagree beyond tolerance. Mode C-
+   * style flag — CPA picks the canonical value. Optional clientId scopes
+   * the check to one client; without it, walks the whole firm.
+   */
+  factConsistency: firmProcedure
+    .input(
+      z
+        .object({
+          clientId: z.string().uuid().optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      const flags = await findFactInconsistencies({
+        firmId: ctx.firmId,
+        clientId: input?.clientId,
+      });
+      return { flags };
     }),
 });
 
