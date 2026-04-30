@@ -12,6 +12,7 @@
     "db:migrate": "tsx --env-file-if-exists=.env.local src/db/migrate.ts",
     "db:seed": "tsx --env-file-if-exists=.env.local src/db/seed.ts",
     "db:probe": "tsx --env-file-if-exists=.env.local src/db/probe.ts",
+    "eval:inbound": "tsx --env-file-if-exists=.env.local eval/run.ts",
     "lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
