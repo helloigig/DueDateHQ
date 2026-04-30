@@ -52,6 +52,13 @@ const TOP_LEVEL_TARGET = 0.92;
 const INTENT_TARGET = 0.9;
 const PUSHBACK_FPR_CEILING = 0.03;
 
+// Nil UUID — used as the firm_id when calling the classifier from the eval
+// runner. The ai_inferences table requires a UUID; this sentinel value
+// satisfies the column type without colliding with real firm IDs (which are
+// uuid v4 random). Eval rows can be filtered out via `firm_id =
+// '00000000-...'` when computing production drift metrics.
+const EVAL_FIRM_UUID = "00000000-0000-0000-0000-000000000000";
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const evalPath = join(__dirname, "inbound-classifier-v1.jsonl");
 
@@ -103,7 +110,7 @@ async function main(): Promise<void> {
     try {
       if (usingLLM) {
         predicted = await classifyInboundLLM(ex.input, {
-          firmId: "eval-firm",
+          firmId: EVAL_FIRM_UUID,
         });
       } else {
         predicted = classifyInboundHeuristic(ex.input);
