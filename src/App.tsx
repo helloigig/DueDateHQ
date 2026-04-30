@@ -31,9 +31,44 @@ import { OnboardingDone } from "./pages/onboarding/OnboardingDone";
 import { SessionProvider } from "./lib/session-provider";
 import { SupabaseAuthBridge } from "./lib/supabase-auth-bridge";
 import { useSession } from "./data/session";
+import { env } from "./config";
+
+/**
+ * Synchronously detect "Supabase has a session, local FirmSession doesn't" —
+ * the window between the magic-link click landing on the page and the
+ * SupabaseAuthBridge useEffect firing to populate the local session.
+ *
+ * Without this gate, the catch-all <Navigate to="/login"> renders FIRST
+ * (synchronous), the bridge fires SECOND (post-render), and the user lands
+ * on /login with the auth tokens already lost during the redirect.
+ *
+ * Returns true when:
+ *   - URL hash has access_token (Supabase JS hasn't yet read+stored it), OR
+ *   - localStorage has a sb-*-auth-token entry (Supabase JS already stored)
+ *
+ * Triggers a "Signing you in…" loading state in App.tsx until the bridge
+ * resolves and the local session populates.
+ */
+function isSupabaseAuthPending(): boolean {
+  if (env.useMockApi) return false;
+  if (typeof window === "undefined") return false;
+  if (window.location.hash.includes("access_token=")) return true;
+  try {
+    const keys = Object.keys(window.localStorage);
+    return keys.some(
+      (k) =>
+        k.startsWith("sb-") &&
+        k.endsWith("-auth-token") &&
+        !!window.localStorage.getItem(k),
+    );
+  } catch {
+    return false;
+  }
+}
 
 export default function App() {
   const localSession = useSession();
+  const supabaseAuthPending = isSupabaseAuthPending();
 
   return (
     <>
@@ -104,6 +139,24 @@ export default function App() {
           <Route path="settings/*" element={<Settings />} />
           <Route path="*" element={<Placeholder name="Not found" />} />
         </Route>
+      ) : supabaseAuthPending ? (
+        // Supabase has auth (URL hash or stored token) but local session
+        // hasn't been bridged yet. Show a non-redirecting loading screen so
+        // the SupabaseAuthBridge useEffect has time to fire + populate the
+        // local session, after which this branch unmounts and the protected
+        // routes render normally. Without this gate the catch-all <Navigate>
+        // races the bridge and wins, dropping the auth tokens.
+        <Route
+          path="*"
+          element={
+            <div className="min-h-screen flex items-center justify-center bg-canvas">
+              <div className="text-center">
+                <div className="w-10 h-10 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto" />
+                <p className="text-sm text-ink-500 mt-4">Signing you in…</p>
+              </div>
+            </div>
+          }
+        />
       ) : (
         <Route path="*" element={<Navigate to="/login" replace />} />
       )}
