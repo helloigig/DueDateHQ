@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
+import { NavLink, Route, Routes } from "react-router-dom";
 import {
   Mail,
   Bell,
@@ -155,12 +155,12 @@ function Row({
 
 function ProfilePanel() {
   const session = useSession();
-  const navigate = useNavigate();
   if (!session) return null;
 
   const onSignOut = () => {
-    signOut();
-    navigate("/login", { replace: true });
+    // signOut handles the hard-reload to /login. No navigate needed —
+    // a render between signOut and navigate can crash on stale state.
+    void signOut();
   };
 
   return (

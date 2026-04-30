@@ -5,8 +5,6 @@ import { AddClientModal } from "./AddClientModal";
 import { BellDropdown } from "./BellDropdown";
 import { CommandPaletteStub } from "./CommandPaletteStub";
 import { signOut, useSession } from "../data/session";
-import { supabase } from "../lib/supabase";
-import { env } from "../config";
 
 export function TopBar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -159,23 +157,14 @@ export function TopBar() {
               Settings
             </button>
             <button
-              onClick={async () => {
+              onClick={() => {
                 setUserMenuOpen(false);
-                // Clear Supabase session FIRST. Without this, the
-                // SupabaseAuthBridge listener sees INITIAL_SESSION on the
-                // next render and re-populates the local session — user
-                // gets signed back in immediately. Calling signOut on
-                // both Supabase + local in this order ensures both are
-                // gone and the bridge fires SIGNED_OUT cleanly.
-                if (!env.useMockApi) {
-                  try {
-                    await supabase().auth.signOut();
-                  } catch {
-                    // If Supabase is unreachable, still clear local + navigate.
-                  }
-                }
-                signOut();
-                navigate("/login", { replace: true });
+                // signOut() handles everything: clear Supabase, clear
+                // local session, hard-reload to /login. We do NOT call
+                // navigate() here — that would render /login mid-flight
+                // (with stale React state) and crash before the reload
+                // fires, which the user experiences as a frozen page.
+                void signOut();
               }}
               className="w-full text-left px-3 py-2 text-sm text-ink-700 hover:bg-sunken flex items-center gap-2"
             >

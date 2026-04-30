@@ -98,35 +98,55 @@ export function signIn(input: {
 }
 
 /**
- * Clears both Supabase auth (when not in mock mode) AND the local FirmSession.
+ * Sign out: clears Supabase auth + local FirmSession, then HARD-RELOADS
+ * the page to /login.
  *
- * Without the Supabase signOut, the SupabaseAuthBridge's INITIAL_SESSION
- * listener sees a still-valid Supabase session on the next render and
- * re-populates the local session — user gets signed back in immediately.
+ * Why hard reload: every gentler approach failed in production. The
+ * SupabaseAuthBridge's auth-state listener kept catching post-signout
+ * events and re-populating the session via INITIAL_SESSION before the
+ * router could settle. Hard reload guarantees:
+ *   - All React state is destroyed
+ *   - All cached tRPC / React Query data is destroyed
+ *   - All subscriber lists are cleared
+ *   - Page boots fresh with empty localStorage and empty Supabase storage
  *
- * Async because supabase.auth.signOut() is async; callers can await or
- * fire-and-forget. We swallow Supabase errors (network down, already signed
- * out) — the local session always clears regardless.
- *
- * Lazy-import of supabase to avoid circular dep at module-load time
- * (data/session is imported by many places that don't need supabase).
+ * The user may briefly see a flash of white during reload — acceptable
+ * trade for "logout actually works."
  */
 export async function signOut() {
-  // Local clear first — this fires our subscribers immediately so any
-  // subscriber-driven UI updates (TopBar avatar, etc.) flip on the same tick.
+  // Synchronous local clear — fires subscribers and updates the UI on the
+  // same tick, so any pre-reload render shows the signed-out state.
   write(null);
   if (typeof window === "undefined") return;
   try {
-    // Inline check for VITE_USE_MOCK_API to avoid importing config (circular).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const useMockApi =
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (import.meta as any).env?.VITE_USE_MOCK_API !== "false";
-    if (useMockApi) return;
-    const { supabase } = await import("../lib/supabase");
-    await supabase().auth.signOut();
+    if (!useMockApi) {
+      const { supabase } = await import("../lib/supabase");
+      // Clear Supabase auth from localStorage. The SDK persists tokens
+      // under sb-<project>-auth-token; this nukes them.
+      await supabase().auth.signOut();
+    }
   } catch {
-    /* ignore — local already cleared */
+    /* ignore — we'll force-clear via the hard reload below */
   }
+  // Belt-and-suspenders: nuke any leftover Supabase auth keys directly.
+  // If supabase.auth.signOut() hung or errored, this still clears the
+  // tokens so the post-reload page can't re-auth from cached JWT.
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (k.startsWith("sb-") && k.endsWith("-auth-token")) {
+        localStorage.removeItem(k);
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  // Hard reload — bypasses all SPA state. window.location.replace so the
+  // /login page can't be back-button'd into the signed-in state.
+  window.location.replace("/login");
 }
 
 export function updateSession(patch: Partial<FirmSession>) {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Mail, ArrowLeft } from "lucide-react";
 import { authInputClass } from "./AuthShell";
@@ -6,7 +6,6 @@ import { env } from "../../config";
 import { supabase } from "../../lib/supabase";
 import { signIn } from "../../data/session";
 import { actions } from "../../data/store";
-import { trpc } from "../../lib/api/client";
 
 /**
  * Passwordless sign-in via email OTP — the primary auth path.
@@ -36,18 +35,10 @@ import { trpc } from "../../lib/api/client";
  */
 export function MagicLink() {
   const navigate = useNavigate();
-  const trpcUtils = trpc.useUtils();
   const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const codeInputRef = useRef<HTMLInputElement>(null);
-
-  // Auto-focus the code input when we move to step 2
-  useEffect(() => {
-    if (step === "code") codeInputRef.current?.focus();
-  }, [step]);
 
   const sendCode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,8 +50,9 @@ export function MagicLink() {
     setPending(true);
     try {
       if (env.useMockApi) {
-        // Mock: skip Supabase, advance to code step. Any 6 digits will work.
-        setStep("code");
+        // Mock: skip Supabase entirely — just sign the user in directly
+        // (no real email goes out from local dev anyway).
+        mockSignIn();
         return;
       }
       const { error } = await supabase().auth.signInWithOtp({
@@ -82,178 +74,70 @@ export function MagicLink() {
     }
   };
 
-  const verifyCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    const cleaned = code.replace(/\D/g, "");
-    if (cleaned.length !== 6) {
-      setError("The code is 6 digits.");
-      return;
+  // Mock-mode local-dev shortcut. Production sign-in flow is purely
+  // link-based (SupabaseAuthBridge handles SIGNED_IN events).
+  const mockSignIn = () => {
+    if (!env.useMockApi) return;
+    actions.resetToSeeds();
+    signIn({
+      firmName: "Mitchell CPA (demo)",
+      userName: email.split("@")[0] ?? "you",
+      userEmail: email,
+      tier: "pro",
+    });
+    const raw = localStorage.getItem("duedatehq.session.v1");
+    if (raw) {
+      try {
+        const s = JSON.parse(raw);
+        s.onboardingComplete = true;
+        s.primaryStates = ["CA"];
+        localStorage.setItem("duedatehq.session.v1", JSON.stringify(s));
+      } catch {
+        /* ignore */
+      }
     }
-    setPending(true);
-    try {
-      if (env.useMockApi) {
-        // Mock: any 6-digit value succeeds. Sign in as the email-localpart
-        // user; reset to seeds so they get a populated demo.
-        actions.resetToSeeds();
-        signIn({
-          firmName: "Mitchell CPA (demo)",
-          userName: email.split("@")[0] ?? "you",
-          userEmail: email,
-          tier: "pro",
-        });
-        // Persist onboardingComplete so they land on dashboard, not wizard
-        const raw = localStorage.getItem("duedatehq.session.v1");
-        if (raw) {
-          try {
-            const s = JSON.parse(raw);
-            s.onboardingComplete = true;
-            s.primaryStates = ["CA"];
-            localStorage.setItem("duedatehq.session.v1", JSON.stringify(s));
-          } catch {
-            /* ignore */
-          }
-        }
-        navigate("/", { replace: true });
-        return;
-      }
-      const { error } = await supabase().auth.verifyOtp({
-        email,
-        token: cleaned,
-        type: "email",
-      });
-      if (error) {
-        setError(error.message);
-        return;
-      }
-      // JWT is now persisted by supabase-js. Pull fresh session from BE.
-      await trpcUtils.auth.session.invalidate();
-      const remote = await trpcUtils.auth.session.fetch();
-      if (!remote) {
-        signIn({
-          firmName: "_pending",
-          userName: email.split("@")[0] ?? "",
-          userEmail: email,
-          tier: "pro",
-        });
-        navigate("/onboarding/firm", { replace: true });
-        return;
-      }
-      signIn({
-        firmName: remote.firm.name,
-        userName: remote.user.displayName ?? remote.user.email,
-        userEmail: remote.user.email,
-        tier: remote.firm.tier,
-      });
-      navigate("/", { replace: true });
-    } finally {
-      setPending(false);
-    }
+    navigate("/", { replace: true });
   };
 
   if (step === "code") {
-    // Link-only path per UX feedback — skip the 6-digit OTP input entirely.
-    // Users click the link in their email; SupabaseAuthBridge catches the
-    // SIGNED_IN event on redirect and signs them in. Mock mode (which can't
-    // send real emails) keeps the OTP fallback below for local testing.
-    //
-    // Build-time gate via import.meta.env.DEV instead of runtime env check —
-    // Vite replaces this with literal `false` in prod builds, so the entire
-    // OTP form below gets tree-shaken out. Guarantees prod cannot render
-    // the OTP form regardless of misconfigured env vars or cache.
-    if (!import.meta.env.DEV || !env.useMockApi) {
-      return (
-        <div className="min-h-screen bg-canvas flex items-center justify-center p-6">
-          <div className="w-full max-w-md bg-surface border border-line rounded-md p-8 text-center">
-            <button
-              onClick={() => {
-                setStep("email");
-                setError(null);
-              }}
-              className="text-xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-1 absolute"
-            >
-              <ArrowLeft className="w-3 h-3" aria-hidden /> Use a different email
-            </button>
-            <div className="w-14 h-14 rounded-full bg-info-bg border border-info-border flex items-center justify-center text-info-ink mx-auto mt-2">
-              <Mail className="w-6 h-6" aria-hidden />
-            </div>
-            <h1 className="text-xl font-semibold text-ink-900 mt-5">
-              Check your email
-            </h1>
-            <p className="text-sm text-ink-500 mt-2">
-              We sent a sign-in link to{" "}
-              <span className="font-medium text-ink-900">{email}</span>.
-              Click the link to continue — you'll come back signed in.
-            </p>
-
-            <p className="text-2xs text-ink-400 mt-6 pt-4 border-t border-line">
-              Didn't get it? Check spam, or{" "}
-              <button
-                onClick={() => sendCode(new Event("submit") as unknown as React.FormEvent)}
-                className="underline hover:no-underline"
-                disabled={pending}
-              >
-                {pending ? "resending…" : "resend the link"}
-              </button>
-              .
-            </p>
-          </div>
-        </div>
-      );
-    }
-    // Mock-mode fallback — keeps the OTP form so local testing still works
-    // without a real Supabase email send.
+    // Link-only path. The OTP form is permanently removed — every previous
+    // attempt to gate it (env.useMockApi, import.meta.env.DEV) failed to
+    // tree-shake the dead branch. The simplest fix: there is no else.
     return (
       <div className="min-h-screen bg-canvas flex items-center justify-center p-6">
-        <div className="w-full max-w-md bg-surface border border-line rounded-md p-8">
+        <div className="w-full max-w-md bg-surface border border-line rounded-md p-8 text-center">
           <button
             onClick={() => {
               setStep("email");
-              setCode("");
               setError(null);
             }}
-            className="text-xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-1"
+            className="text-xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-1 absolute"
           >
             <ArrowLeft className="w-3 h-3" aria-hidden /> Use a different email
           </button>
-          <div className="w-12 h-12 rounded-full bg-info-bg border border-info-border flex items-center justify-center text-info-ink mx-auto mt-3">
-            <Mail className="w-5 h-5" aria-hidden />
+          <div className="w-14 h-14 rounded-full bg-info-bg border border-info-border flex items-center justify-center text-info-ink mx-auto mt-2">
+            <Mail className="w-6 h-6" aria-hidden />
           </div>
-          <h1 className="text-xl font-semibold text-ink-900 mt-4 text-center">
-            Check your email (mock)
+          <h1 className="text-xl font-semibold text-ink-900 mt-5">
+            Check your email
           </h1>
-          <p className="text-sm text-ink-500 mt-2 text-center">
-            Mock mode — type any 6 digits below to sign in as a demo user.
+          <p className="text-sm text-ink-500 mt-2">
+            We sent a sign-in link to{" "}
+            <span className="font-medium text-ink-900">{email}</span>.
+            Click the link to continue — you'll come back signed in.
           </p>
 
-          <form onSubmit={verifyCode} className="space-y-3 mt-6">
-            <input
-              ref={codeInputRef}
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={6}
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-              placeholder="000000"
-              className="w-full text-center text-2xl tracking-[0.4em] font-mono py-3 border border-line rounded bg-canvas focus:outline-none focus:border-accent"
-              autoComplete="one-time-code"
-            />
-
-            {error && (
-              <div className="text-xs text-danger-ink bg-danger-bg border border-danger-border rounded px-3 py-2">
-                {error}
-              </div>
-            )}
-
+          <p className="text-2xs text-ink-400 mt-6 pt-4 border-t border-line">
+            Didn't get it? Check spam, or{" "}
             <button
-              type="submit"
-              disabled={pending || code.length !== 6}
-              className="w-full text-sm px-3 py-2 rounded-md bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40"
+              onClick={() => sendCode(new Event("submit") as unknown as React.FormEvent)}
+              className="underline hover:no-underline"
+              disabled={pending}
             >
-              {pending ? "Verifying…" : "Verify and continue"}
+              {pending ? "resending…" : "resend the link"}
             </button>
-          </form>
+            .
+          </p>
         </div>
       </div>
     );
