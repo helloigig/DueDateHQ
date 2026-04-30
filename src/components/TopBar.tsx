@@ -5,8 +5,6 @@ import { AddClientModal } from "./AddClientModal";
 import { BellDropdown } from "./BellDropdown";
 import { CommandPaletteStub } from "./CommandPaletteStub";
 import { signOut, useSession } from "../data/session";
-import { supabase } from "../lib/supabase";
-import { env } from "../config";
 
 export function TopBar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -161,20 +159,11 @@ export function TopBar() {
             <button
               onClick={async () => {
                 setUserMenuOpen(false);
-                // Clear Supabase session FIRST. Without this, the
-                // SupabaseAuthBridge listener sees INITIAL_SESSION on the
-                // next render and re-populates the local session — user
-                // gets signed back in immediately. Calling signOut on
-                // both Supabase + local in this order ensures both are
-                // gone and the bridge fires SIGNED_OUT cleanly.
-                if (!env.useMockApi) {
-                  try {
-                    await supabase().auth.signOut();
-                  } catch {
-                    // If Supabase is unreachable, still clear local + navigate.
-                  }
-                }
-                signOut();
+                // signOut() is the single source of truth — it clears
+                // Supabase tokens FIRST (so the App.tsx auth-pending check
+                // doesn't trap us on the loader), then the local session.
+                // Awaiting it keeps the navigate from racing the cleanup.
+                await signOut();
                 navigate("/login", { replace: true });
               }}
               className="w-full text-left px-3 py-2 text-sm text-ink-700 hover:bg-sunken flex items-center gap-2"
@@ -216,9 +205,9 @@ function TrialBadge() {
 
   if (!status) return null;
   // The default state uses sunken-tone neutral, NOT info-blue. Info-blue
-  // is reserved for AI-decided surfaces (AdvisoryPeek, OTP step, "AI
-  // noticed" banner) — overloading it on the trial pill made every
-  // info-toned thing on screen feel like the same kind of signal.
+  // is reserved for AI-decided surfaces (AdvisoryPeek, "AI noticed"
+  // banner) — overloading it on the trial pill made every info-toned
+  // thing on screen feel like the same kind of signal.
   // Warn + danger keep their tones — those are real alerts.
   const toneClass =
     status.tone === "danger"

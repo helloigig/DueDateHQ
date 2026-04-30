@@ -27,6 +27,7 @@ import { WelcomeTour } from "../components/WelcomeTour";
 import { CapacityStrip } from "../components/CapacityStrip";
 import { ModeFHealth } from "../components/ModeFHealth";
 import { ActionQueue } from "../components/ActionQueue";
+import { AiUsageInfo } from "../components/AiUsageInfo";
 import { useLocation } from "react-router-dom";
 import type { Announcement } from "../types";
 
@@ -169,7 +170,10 @@ export function Dashboard() {
 
   if (hasNoClients) {
     return (
-      <div className="max-w-5xl mx-auto px-6 py-12">
+      <div className="max-w-5xl mx-auto px-6 py-12 space-y-6">
+        <div className="flex justify-end">
+          <AiUsageInfo />
+        </div>
         <EmptyState
           title="Let's get your clients in."
           actions={
@@ -192,7 +196,7 @@ export function Dashboard() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-4">
-      {/* Thin top strip — date + firm name. No big greeting. */}
+      {/* Thin top strip — date + firm name + AI affordance. No big greeting. */}
       <header className="flex items-baseline gap-2 text-xs flex-wrap">
         <span className="text-ink-500">{todayLabel}</span>
         {firmName && (
@@ -201,6 +205,9 @@ export function Dashboard() {
             <span className="text-ink-700 font-medium">{firmName}</span>
           </>
         )}
+        <span className="ml-auto self-center">
+          <AiUsageInfo />
+        </span>
       </header>
 
       {/* One-line operational summary. Two-tier urgency: warn for past

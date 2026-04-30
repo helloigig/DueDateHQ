@@ -17,14 +17,14 @@ export function ResetPassword() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [recoveryReady, setRecoveryReady] = useState(env.useMockApi);
+  const [recoveryReady, setRecoveryReady] = useState(env.useMockAuth);
 
   // Real mode: wait for supabase-js to parse the URL hash. It fires
   // PASSWORD_RECOVERY when the recovery link is valid; we also fall back to
   // checking the current session in case the event has already fired
   // before this mount.
   useEffect(() => {
-    if (env.useMockApi) return;
+    if (env.useMockAuth) return;
     let active = true;
     void supabase().auth.getSession().then(({ data }) => {
       if (active && data.session) setRecoveryReady(true);
@@ -62,7 +62,7 @@ export function ResetPassword() {
     }
   };
 
-  if (env.useMockApi && !mockToken) {
+  if (env.useMockAuth && !mockToken) {
     return (
       <AuthShell title="Reset link missing">
         <p className="text-sm text-ink-700">
@@ -76,7 +76,7 @@ export function ResetPassword() {
     );
   }
 
-  if (!env.useMockApi && !recoveryReady) {
+  if (!env.useMockAuth && !recoveryReady) {
     return (
       <AuthShell title="Verifying reset link…">
         <p className="text-sm text-ink-700">
@@ -106,7 +106,7 @@ export function ResetPassword() {
       setError(parsed.error.issues[0]?.message ?? "Invalid password");
       return;
     }
-    if (env.useMockApi) {
+    if (env.useMockAuth) {
       mockReset.mutate(parsed.data);
     } else {
       void realReset();

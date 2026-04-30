@@ -13,10 +13,10 @@ export function useAiInsightsForClient(
   const { aiInsights } = useStore();
   const remote = trpc.aiInsights.listForClient.useQuery(
     { clientId: clientId ?? "" },
-    { enabled: !!clientId && !env.useMockApi, staleTime: 60_000 },
+    { enabled: !!clientId && !env.useMockData, staleTime: 60_000 },
   );
   if (!clientId) return [];
-  if (!env.useMockApi) return remote.data ?? [];
+  if (!env.useMockData) return remote.data ?? [];
   return aiInsights.filter((i) => i.clientId === clientId);
 }
 

@@ -4,7 +4,7 @@
  * loading states are exercised during development.
  *
  * When the backend ships, this file goes away — or stays in place, guarded by
- * `env.useMockApi`, for offline-demo / Storybook use.
+ * `env.useMockData`, for offline-demo / Storybook use.
  */
 import { actions, getState } from "../../data/store";
 import {

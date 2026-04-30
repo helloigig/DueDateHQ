@@ -34,7 +34,7 @@ export function supabase(): SupabaseClient {
  * session is fresh.
  */
 export async function getAccessToken(): Promise<string | null> {
-  if (env.useMockApi) return null;
+  if (env.useMockAuth) return null;
   const { data } = await supabase().auth.getSession();
   return data.session?.access_token ?? null;
 }

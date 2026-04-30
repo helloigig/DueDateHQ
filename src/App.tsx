@@ -51,7 +51,7 @@ import { env } from "./config";
  * resolves and the local session populates.
  */
 function isSupabaseAuthPending(): boolean {
-  if (env.useMockApi) return false;
+  if (env.useMockAuth) return false;
   if (typeof window === "undefined") return false;
   if (window.location.hash.includes("access_token=")) return true;
   try {

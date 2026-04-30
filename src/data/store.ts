@@ -761,6 +761,11 @@ export const actions = {
     emit();
   },
 
+  resetToEmpty() {
+    state = emptyState();
+    emit();
+  },
+
   assignBundle(clientId: string, bundleId: string) {
     const client = state.clients.find((c) => c.id === clientId);
     const bundle = bundleById(bundleId);
