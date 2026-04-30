@@ -644,6 +644,187 @@ export async function detectAnomaly(
   }
 }
 
+// ───────── Prior-year return PDF extraction ─────────
+
+const PRIOR_YEAR_SYSTEM_PROMPT = `You extract structured fields from a prior-year tax return PDF. The CPA uses these to seed a new year's checklist + identify cross-year patterns (Mode E).
+
+Output strict JSON:
+{
+  "clientName": "<from header — owner / business name>",
+  "ein": "<XX-XXXXXXX format if present, else null>",
+  "entityType": "individual" | "llc" | "s_corp" | "c_corp" | "partnership" | "trust" | "non_profit" | null,
+  "taxYear": <integer year, from form header>,
+  "priorAGI": <number, AGI from line 11 (1040) or comparable, else null>,
+  "formsFiled": [<list of form numbers visible: "1040", "Schedule C", "Schedule E", "8606", etc.>],
+  "k1Sources": [<list of partnership/S-corp/trust names from K-1s, if any>],
+  "confidence": <number 0-1, your confidence the extraction is right>
+}
+
+Rules:
+- "high" confidence (≥0.8) requires: clear form header + legible numerical fields + extractable entity name
+- "medium" (0.5-0.8): some fields obscured/scanned poorly but core fields readable
+- "low" (<0.5): scan quality is bad or document is partial; CPA review required
+- Don't invent values. If a field isn't visible, return null.
+- Output ONLY valid JSON.`;
+
+export interface ParsePriorYearInput {
+  firmId: string;
+  /** Storage key — BE downloads the PDF bytes from Supabase Storage */
+  storageKey: string;
+  /** Optional client id for context — when set, Mode E can chain
+   *  this extraction into cross-year-insights generation. */
+  clientId?: string;
+}
+
+export interface ParsePriorYearOutput {
+  clientName: string | null;
+  ein: string | null;
+  entityType: string | null;
+  taxYear: number | null;
+  priorAGI: number | null;
+  formsFiled: string[];
+  k1Sources: string[];
+  confidence: number;
+  inferenceId: number;
+}
+
+export async function parsePriorYearReturnPdf(
+  input: ParsePriorYearInput,
+): Promise<ParsePriorYearOutput | null> {
+  if (!isAiConfigured()) return null;
+  // Lazy-import to avoid circular dep at module-load (storage → ai → storage)
+  const { getBytes } = await import("./storage.js");
+  let pdfBytes: Buffer;
+  try {
+    pdfBytes = await getBytes(input.storageKey);
+  } catch (err) {
+    log.warn("ai.parsePriorYearReturnPdf.fetch_failed", {
+      storageKey: input.storageKey,
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+
+  // Hard cap — Claude has a context limit, and very large PDFs are
+  // usually scans we'd have to OCR separately anyway. 32MB is the
+  // practical Anthropic limit for document attachments today.
+  const MAX_PDF_BYTES = 32 * 1024 * 1024;
+  if (pdfBytes.byteLength > MAX_PDF_BYTES) {
+    log.warn("ai.parsePriorYearReturnPdf.pdf_too_large", {
+      storageKey: input.storageKey,
+      bytes: pdfBytes.byteLength,
+    });
+    return null;
+  }
+
+  const start = Date.now();
+  try {
+    // Claude's document attachment support — pass PDF as base64 in a
+    // content block of type "document". Sonnet 4.5 reads multi-page
+    // PDFs natively (no OCR needed for digitally-generated forms);
+    // scanned forms still benefit but accuracy depends on scan quality.
+    const result = await client().messages.create({
+      model: SONNET_MODEL,
+      max_tokens: 2048,
+      system: [
+        {
+          type: "text",
+          text: PRIOR_YEAR_SYSTEM_PROMPT,
+          cache_control: { type: "ephemeral" },
+        },
+      ],
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "document",
+              source: {
+                type: "base64",
+                media_type: "application/pdf",
+                data: pdfBytes.toString("base64"),
+              },
+            },
+            {
+              type: "text",
+              text: "Extract the structured fields from this prior-year tax return.",
+            },
+          ],
+        },
+      ],
+    });
+    const block = result.content.find((b) => b.type === "text");
+    const text = block && "text" in block ? block.text : "";
+    const durationMs = Date.now() - start;
+
+    // Cost: Sonnet $3/M input + $15/M output. PDF tokens scale with
+    // page count; ~1500 tokens/page typical. A 5-page return with
+    // ~700 output tokens ≈ $0.04 per extraction.
+    const inputTokens = result.usage.input_tokens ?? 0;
+    const outputTokens = result.usage.output_tokens ?? 0;
+    const costCents =
+      (inputTokens / 1_000_000) * 300 + (outputTokens / 1_000_000) * 1500;
+
+    // Log to ai_inferences via the same pipeline as other modes
+    let inferenceId = 0;
+    try {
+      const { createHash } = await import("node:crypto");
+      const inputHash = createHash("sha256")
+        .update(input.storageKey)
+        .digest("hex");
+      const [row] = await db
+        .insert(aiInferences)
+        .values({
+          firmId: input.firmId,
+          mode: "E",
+          model: SONNET_MODEL,
+          latencyMs: durationMs,
+          costCents: costCents.toString(),
+          inputHash,
+          output: { text, storageKey: input.storageKey },
+        })
+        .returning({ id: aiInferences.id });
+      inferenceId = row?.id ?? 0;
+    } catch (err) {
+      log.warn("ai.parsePriorYearReturnPdf.log_failed", {
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    let parsed: Partial<ParsePriorYearOutput> = {};
+    try {
+      parsed = JSON.parse(text) as Partial<ParsePriorYearOutput>;
+    } catch {
+      log.warn("ai.parsePriorYearReturnPdf.parse_failed", {
+        textPreview: text.slice(0, 200),
+      });
+    }
+
+    log.info("ai.parsePriorYearReturnPdf.done", {
+      firmId: input.firmId,
+      durationMs,
+      costCents: Number(costCents.toFixed(4)),
+      pages: Math.ceil(pdfBytes.byteLength / 100_000),
+      confidence: parsed.confidence,
+    });
+
+    return {
+      clientName: parsed.clientName ?? null,
+      ein: parsed.ein ?? null,
+      entityType: parsed.entityType ?? null,
+      taxYear: parsed.taxYear ?? null,
+      priorAGI: parsed.priorAGI ?? null,
+      formsFiled: parsed.formsFiled ?? [],
+      k1Sources: parsed.k1Sources ?? [],
+      confidence: parsed.confidence ?? 0.4,
+      inferenceId,
+    };
+  } catch (err) {
+    captureException(err, { ctx: "parse_prior_year_pdf" });
+    return null;
+  }
+}
+
 // ───────── Mode E — cross-year insights ─────────
 
 const CROSS_YEAR_SYSTEM_PROMPT = `You analyze a client's multi-year tax history to surface advisory opportunities. The CPA uses your output to identify:

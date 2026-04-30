@@ -40,6 +40,7 @@ import {
   useSyncNow,
 } from "../hooks/useIntegrations";
 import { useDriftReport, useAiStatus } from "../hooks/useDriftReport";
+import { PriorYearUpload } from "../components/PriorYearUpload";
 import {
   useReminderTemplates,
   useUpdateReminderTemplate,
@@ -693,15 +694,18 @@ function ImportsPanel() {
 
   if (imports.length === 0) {
     return (
-      <Card title="Imports">
-        <p className="text-sm text-ink-500">
-          No CSV imports yet. Try{" "}
-          <NavLink to="/import" className="text-ink-900 underline">
-            importing clients
-          </NavLink>
-          .
-        </p>
-      </Card>
+      <div className="space-y-6">
+        <PriorYearUpload />
+        <Card title="Imports">
+          <p className="text-sm text-ink-500">
+            No CSV imports yet. Try{" "}
+            <NavLink to="/import" className="text-ink-900 underline">
+              importing clients
+            </NavLink>
+            .
+          </p>
+        </Card>
+      </div>
     );
   }
 
@@ -709,6 +713,7 @@ function ImportsPanel() {
 
   return (
     <>
+      <PriorYearUpload />
       <Card
         title="Import history"
         description="Undo is available for 7 days after an import."

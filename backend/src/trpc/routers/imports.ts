@@ -481,8 +481,26 @@ export const importsRouter = router({
         clientId: z.string().uuid().optional(),
       }),
     )
-    .mutation(async ({ input }) => {
-      const extracted = await extractPriorYearFields(input.storageKey);
+    .mutation(async ({ ctx, input }) => {
+      // Tenant safety — storage key must start with caller's firm id.
+      // Defense-in-depth on top of bucket RLS.
+      if (!input.storageKey.startsWith(`${ctx.firmId}/`)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "storage_key_outside_firm",
+        });
+      }
+      // Real path — Sonnet 4.5 reads the PDF directly via document
+      // attachment support. Falls back to deterministic stub when AI
+      // or storage isn't configured (e.g. dev without keys).
+      const { parsePriorYearReturnPdf } = await import("../../lib/ai.js");
+      const real = await parsePriorYearReturnPdf({
+        firmId: ctx.firmId,
+        storageKey: input.storageKey,
+        clientId: input.clientId,
+      });
+      const extracted =
+        real ?? (await extractPriorYearFields(input.storageKey));
       return {
         fields: extracted,
         readyForCommit: extracted.confidence >= 0.7,

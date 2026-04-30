@@ -370,12 +370,38 @@ export const appRouter = t.router({
   }),
 
   uploads: t.router({
+    status: t.procedure.query(
+      async (): Promise<{ configured: boolean }> => NOT_IMPL(),
+    ),
     requestUrl: t.procedure
-      .input(jsonPassthrough)
+      .input(
+        z.object({
+          kind: z.enum([
+            "firm_logo",
+            "avatar",
+            "inbound_attachment",
+            "prior_year_return",
+            "client_doc",
+          ]),
+          filename: z.string().min(1).max(200),
+          contentType: z.string().min(1).max(100),
+        }),
+      )
       .mutation(
-        async (): Promise<{ uploadUrl: string; storageKey: string }> =>
-          NOT_IMPL()
+        async (): Promise<{
+          uploadUrl: string;
+          storageKey: string;
+          expiresAt: string | Date;
+        }> => NOT_IMPL(),
       ),
+    downloadUrl: t.procedure
+      .input(
+        z.object({
+          storageKey: z.string().min(1),
+          ttlSeconds: z.number().int().min(60).max(86400).optional(),
+        }),
+      )
+      .query(async (): Promise<{ url: string }> => NOT_IMPL()),
   }),
 
   team: t.router({

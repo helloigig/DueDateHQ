@@ -777,12 +777,27 @@ export const mockAdapter = {
   },
 
   uploads: {
+    /** Mock storage status — reports configured=false so the FE can
+     *  surface "Upload not yet wired" honestly when no real Supabase
+     *  Storage credentials are present. */
+    status: async () => {
+      await delay();
+      return { configured: false };
+    },
     requestUrl: async (input: { kind: string; filename: string }) => {
       await delay();
+      // In mock mode the upload URL is a synthetic data: URI — the
+      // FE upload component recognizes this and skips the real PUT,
+      // calling the follow-up procedure with the mock storageKey.
       return {
         uploadUrl: `data:mock/${input.kind};${input.filename}`,
-        storageKey: `${input.kind}/${Date.now()}-${input.filename}`,
+        storageKey: `mock-firm/${input.kind}/${Date.now()}-${input.filename}`,
+        expiresAt: new Date(Date.now() + 3600_000).toISOString(),
       };
+    },
+    downloadUrl: async (input: { storageKey: string }) => {
+      await delay();
+      return { url: `data:mock/${input.storageKey}` };
     },
   },
 
