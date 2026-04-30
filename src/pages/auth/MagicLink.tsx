@@ -8,30 +8,9 @@ import { signIn } from "../../data/session";
 import { actions } from "../../data/store";
 
 /**
- * Passwordless sign-in via email OTP — the primary auth path.
- *
- * Two-step flow:
- *   1. User types email → we call Supabase signInWithOtp, which emails them
- *      a 6-digit code AND a magic-link URL. Either works.
- *   2. User types the code back into the app → we verify it via
- *      verifyOtp({ type: "email" }) and they're in.
- *
- * Why OTP code, not magic link as primary:
- *   - Cross-device safe (laptop sign-in, phone email, no clicking in the
- *     wrong device's browser)
- *   - Phishing-resistant (the code only works if you enter it in the
- *     legit tab — magic links can be ridden by attackers who intercept
- *     the URL)
- *   - Faster on mobile (paste 6 digits vs tap link → opens browser →
- *     extra round-trip)
- *   - Familiar muscle memory (bank, brokerage, Stripe Express all use it)
- *
- * The route is still /magic-link for URL stability; the form is OTP-first
- * but the email also contains a clickable link, so users who prefer that
- * path can still use it.
- *
- * In mock mode this is a sham: pressing "Send code" + entering any 6-digit
- * value signs them in as a demo Sarah. Useful for testing without Supabase.
+ * /magic-link is deprecated. The unified passwordless flow now lives at
+ * /login (sign in) and /signup (new account). This route stays in App.tsx
+ * to avoid 404s from old emails or bookmarks; it just redirects.
  */
 export function MagicLink() {
   const navigate = useNavigate();

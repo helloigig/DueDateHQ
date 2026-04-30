@@ -20,7 +20,7 @@ export function useEmailDrafts(filter?: {
     { enabled: !!filter?.taskId, staleTime: 15_000 },
   );
 
-  if (env.useMockApi) {
+  if (env.useMockData) {
     if (!filter) return storeDrafts;
     return storeDrafts.filter((d) => {
       if (filter.taskId && d.taskId !== filter.taskId) return false;
@@ -49,7 +49,7 @@ export function useSaveEmailDraft() {
       status?: EmailDraft["status"];
     },
   ) => {
-    if (env.useMockApi) return actions.saveEmailDraft(d);
+    if (env.useMockData) return actions.saveEmailDraft(d);
     mutation.mutate(d as never);
     return d.id ?? "";
   };
@@ -64,7 +64,7 @@ export function useSendEmail() {
     },
   });
   return (id: string) => {
-    if (env.useMockApi) return actions.sendEmail(id);
+    if (env.useMockData) return actions.sendEmail(id);
     mutation.mutate({ id });
   };
 }
@@ -77,7 +77,7 @@ export function useDiscardDraft() {
     },
   });
   return (id: string) => {
-    if (env.useMockApi) return actions.discardEmailDraft(id);
+    if (env.useMockData) return actions.discardEmailDraft(id);
     mutation.mutate({ id });
   };
 }

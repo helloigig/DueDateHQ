@@ -13,12 +13,12 @@ import { env } from "../config";
 export function useChecklist(taskId: string | undefined): ChecklistItem[] {
   const remote = trpc.checklists.listForTask.useQuery(
     { taskId: taskId ?? "" },
-    { enabled: !!taskId && !env.useMockApi, staleTime: 15_000 },
+    { enabled: !!taskId && !env.useMockData, staleTime: 15_000 },
   );
   const { checklistItems, tasks, deadlines } = useStore();
 
   if (!taskId) return [];
-  if (!env.useMockApi) return remote.data ?? [];
+  if (!env.useMockData) return remote.data ?? [];
 
   const items = checklistItems
     .filter((c) => c.taskId === taskId)
@@ -57,7 +57,7 @@ export function useSetChecklistItemState() {
     next: DocumentState,
     actor: "cpa" | "ai" | "system" = "cpa",
   ) => {
-    if (env.useMockApi) {
+    if (env.useMockData) {
       actions.setChecklistItemState(itemId, next, actor);
       return;
     }

@@ -205,9 +205,9 @@ function TrialBadge() {
 
   if (!status) return null;
   // The default state uses sunken-tone neutral, NOT info-blue. Info-blue
-  // is reserved for AI-decided surfaces (AdvisoryPeek, OTP step, "AI
-  // noticed" banner) — overloading it on the trial pill made every
-  // info-toned thing on screen feel like the same kind of signal.
+  // is reserved for AI-decided surfaces (AdvisoryPeek, "AI noticed"
+  // banner) — overloading it on the trial pill made every info-toned
+  // thing on screen feel like the same kind of signal.
   // Warn + danger keep their tones — those are real alerts.
   const toneClass =
     status.tone === "danger"

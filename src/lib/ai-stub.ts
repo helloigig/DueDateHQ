@@ -2,10 +2,10 @@
  * AI use-mode dispatcher.
  *
  * Two paths per function:
- *   - Mock mode (env.useMockApi=true): deterministic stub. Stable
+ *   - Mock mode (env.useMockData=true): deterministic stub. Stable
  *     outputs across re-renders, short simulated latency. Used in
  *     dev / preview / demo workspace.
- *   - Real mode (env.useMockApi=false): dispatches to the BE
+ *   - Real mode (env.useMockData=false): dispatches to the BE
  *     trpc.ai.* procedures, which call Anthropic Claude with prompt
  *     caching and log every call to ai_inferences.
  *
@@ -64,7 +64,7 @@ export async function classifyDocument(input: {
   };
 }): Promise<{ guess: string; confidence: AiConfidence }> {
   // Real mode — call BE through tRPC
-  if (!env.useMockApi) {
+  if (!env.useMockData) {
     try {
       const result = await trpcClientUntyped.ai.classifyDocument.mutate({
         filename: input.filename,
@@ -254,7 +254,7 @@ export async function draftEmail(
   input: DraftEmailInput
 ): Promise<DraftEmailOutput> {
   // Real mode — call BE through tRPC. Falls back to stub on any error.
-  if (!env.useMockApi) {
+  if (!env.useMockData) {
     try {
       const { beTone, contextHint } = mapTone(input.tone);
       const mergedContext = [input.context, contextHint]

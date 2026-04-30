@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Sparkles, ArrowRight, ArrowLeft, Mail } from "lucide-react";
-import { trpc } from "../lib/api/client";
 import { signIn } from "../data/session";
 import { actions } from "../data/store";
 import { authInputClass } from "./auth/AuthShell";
@@ -9,49 +8,34 @@ import { env } from "../config";
 import { supabase } from "../lib/supabase";
 
 /**
- * Sign-in / sign-up — UNIFIED OTP-only flow.
+ * Sign-IN — passwordless magic-link flow for existing users only.
  *
- * One path, no passwords. The user types email → we email them a 6-digit
- * code → they type it back → they're in (existing user) or onboarding-bound
- * (new user). Same as Substack, sigma B2B norm.
+ * Email → magic link → click → land on dashboard (skip onboarding). New
+ * users belong on /signup, not here. Supabase enforces this via
+ * `shouldCreateUser: false`, which surfaces an "account not found" error
+ * if the email has never signed up.
  *
- * Why no password at all:
- *   - Password resets are the primary auth-failure mode for SMB users
- *     ("forgot my password" + email-deliverability issues = locked out)
- *   - One path is simpler than "OTP primary, password collapsed"
- *   - Supabase's signInWithOtp works for accounts that originally signed up
- *     with password — they just stop needing the password
+ * Mock mode: no real email; we sign in directly. Demo emails
+ * (`demo@duedatehq.com`, `sarah@mitchellcpa.com`) load the seeded
+ * 49-client demo. All other emails reuse whatever's already in localStorage
+ * (their data) without resetting.
  *
- * Why OTP code (not magic link):
- *   - Cross-device safe (laptop sign-in, phone email — type code anywhere)
- *   - Phishing-resistant (the code only works in the legit tab)
- *   - Familiar from banking
+ * Demo workspace button: shortcut that skips even the email step.
  *
- * Demo workspace path: only in mock mode, lets prospects skip auth entirely.
- *
- * Invitation flow: ?invite=<token> tells the page the user is joining an
- * existing firm, not creating a new one. Banner adjusts; routes to
- * /accept-invite after verify.
+ * Invitation flow: ?invite=<token> means the user is joining an existing
+ * firm. Banner adjusts; routes to /accept-invite after verify.
  */
 export function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const inviteToken = searchParams.get("invite");
 
-  const [step, setStep] = useState<"email" | "code">("email");
+  const [step, setStep] = useState<"email" | "sent">("email");
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
   const [pending, setPending] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const trpcUtils = trpc.useUtils();
-  const codeInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (step === "code") codeInputRef.current?.focus();
-  }, [step]);
-
-  const sendCode = async (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
     if (!email.includes("@")) {
@@ -60,16 +44,46 @@ export function Login() {
     }
     setPending(true);
     try {
-      if (env.useMockApi) {
-        // Mock: skip Supabase, advance to code step. Any 6 digits will work.
-        setStep("code");
+      if (env.useMockAuth) {
+        // Local sign-in path. We don't have a remote auth service, so we
+        // accept the email as-is and route by intent: this page is sign-IN
+        // (existing user) → land on the dashboard, skip onboarding. Demo
+        // emails reload the seeded 49-client workspace; everything else
+        // reuses whatever's already in the store.
+        const isDemoEmail =
+          email === "demo@duedatehq.com" || email === "sarah@mitchellcpa.com";
+        if (isDemoEmail) actions.resetToSeeds();
+        signIn({
+          firmName: isDemoEmail ? "Mitchell CPA (demo)" : "Your firm",
+          userName: email.split("@")[0] ?? "you",
+          userEmail: email,
+          tier: "pro",
+        });
+        const raw = localStorage.getItem("duedatehq.session.v1");
+        if (raw) {
+          try {
+            const s = JSON.parse(raw);
+            s.onboardingComplete = true;
+            if (isDemoEmail) s.primaryStates = ["CA"];
+            localStorage.setItem("duedatehq.session.v1", JSON.stringify(s));
+          } catch {
+            /* ignore */
+          }
+        }
+        navigate(
+          inviteToken ? `/accept-invite?token=${inviteToken}` : "/",
+          { replace: true },
+        );
         return;
       }
       const { error } = await supabase().auth.signInWithOtp({
         email,
         options: {
-          shouldCreateUser: true,
-          emailRedirectTo: `${window.location.origin}/onboarding/firm`,
+          // Sign-IN only — refuse to create a new user. Users without an
+          // account get an "Email not confirmed / not found" error and
+          // should head to /signup instead.
+          shouldCreateUser: false,
+          emailRedirectTo: `${window.location.origin}${inviteToken ? `/accept-invite?token=${inviteToken}` : "/"}`,
         },
       });
       if (error) {
@@ -81,105 +95,20 @@ export function Login() {
           setSubmitError(
             "Too many sign-in attempts in the last hour. Wait ~60 minutes or contact support.",
           );
+        } else if (
+          msg.includes("signup") ||
+          msg.includes("not found") ||
+          msg.includes("user not")
+        ) {
+          setSubmitError(
+            "No account for that email. Sign up first.",
+          );
         } else {
           setSubmitError(error.message);
         }
         return;
       }
-      setStep("code");
-    } finally {
-      setPending(false);
-    }
-  };
-
-  const verifyCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitError(null);
-    const cleaned = code.replace(/\D/g, "");
-    if (cleaned.length !== 6) {
-      setSubmitError("The code is 6 digits.");
-      return;
-    }
-    setPending(true);
-    try {
-      if (env.useMockApi) {
-        // Mock: any 6-digit value succeeds. Demo email shortcut goes to
-        // demo workspace; everything else is treated as a fresh signup.
-        if (
-          email === "demo@duedatehq.com" ||
-          email === "sarah@mitchellcpa.com"
-        ) {
-          actions.resetToSeeds();
-          signIn({
-            firmName: "Mitchell CPA (demo)",
-            userName: email.split("@")[0] ?? "you",
-            userEmail: email,
-            tier: "pro",
-          });
-          const raw = localStorage.getItem("duedatehq.session.v1");
-          if (raw) {
-            try {
-              const s = JSON.parse(raw);
-              s.onboardingComplete = true;
-              s.primaryStates = ["CA"];
-              localStorage.setItem("duedatehq.session.v1", JSON.stringify(s));
-            } catch {
-              /* ignore */
-            }
-          }
-          navigate("/", { replace: true });
-        } else {
-          signIn({
-            firmName: "_pending",
-            userName: email.split("@")[0] ?? "",
-            userEmail: email,
-            tier: "pro",
-          });
-          navigate(
-            inviteToken ? `/accept-invite?token=${inviteToken}` : "/onboarding/firm",
-            { replace: true },
-          );
-        }
-        return;
-      }
-      const { error } = await supabase().auth.verifyOtp({
-        email,
-        token: cleaned,
-        type: "email",
-      });
-      if (error) {
-        setSubmitError(error.message);
-        return;
-      }
-      await trpcUtils.auth.session.invalidate();
-      const remote = await trpcUtils.auth.session.fetch();
-      if (inviteToken) {
-        signIn({
-          firmName: "_pending",
-          userName: email.split("@")[0] ?? "",
-          userEmail: email,
-          tier: "pro",
-        });
-        navigate(`/accept-invite?token=${inviteToken}`, { replace: true });
-        return;
-      }
-      if (!remote) {
-        signIn({
-          firmName: "_pending",
-          userName: email.split("@")[0] ?? "",
-          userEmail: email,
-          tier: "pro",
-        });
-        navigate("/onboarding/firm", { replace: true });
-        return;
-      }
-      signIn({
-        firmName: remote.firm.name,
-        userName: remote.user.displayName ?? remote.user.email,
-        userEmail: remote.user.email,
-        tier: remote.firm.tier,
-      });
-      navigate("/", { replace: true });
+      setStep("sent");
     } finally {
       setPending(false);
     }
@@ -207,77 +136,48 @@ export function Login() {
     navigate("/", { replace: true });
   };
 
-  // Code-entry view
-  if (step === "code") {
+  // Link-sent confirmation view
+  if (step === "sent") {
     return (
       <div className="min-h-screen bg-canvas flex items-center justify-center p-6">
-        <div className="w-full max-w-md bg-surface border border-line rounded-md p-8">
+        <div className="w-full max-w-md bg-surface border border-line rounded-md p-8 text-center">
           <button
             onClick={() => {
               setStep("email");
-              setCode("");
               setSubmitError(null);
             }}
             className="text-xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-1"
           >
             <ArrowLeft className="w-3 h-3" aria-hidden /> Use a different email
           </button>
-          <div className="w-12 h-12 rounded-full bg-info-bg border border-info-border flex items-center justify-center text-info-ink mx-auto mt-3">
-            <Mail className="w-5 h-5" aria-hidden />
+          <div className="w-14 h-14 rounded-full bg-info-bg border border-info-border flex items-center justify-center text-info-ink mx-auto mt-3">
+            <Mail className="w-6 h-6" aria-hidden />
           </div>
-          <h1 className="text-xl font-semibold text-ink-900 mt-4 text-center">
+          <h1 className="text-xl font-semibold text-ink-900 mt-4">
             Check your email
           </h1>
-          <p className="text-sm text-ink-500 mt-2 text-center">
-            We sent a 6-digit code to{" "}
-            <span className="font-medium text-ink-900">{email}</span>. Type it
-            below — or click the link in the email if that's easier.
+          <p className="text-sm text-ink-500 mt-2">
+            We sent a sign-in link to{" "}
+            <span className="font-medium text-ink-900">{email}</span>. Click
+            the link to continue — you'll come back signed in.
           </p>
-          {env.useMockApi && (
-            <p className="text-2xs text-warn-ink bg-warn-bg border border-warn-border rounded px-2 py-1 mt-3 text-center">
-              Mock mode: any 6 digits will work (e.g., 000000).
-            </p>
+
+          {submitError && (
+            <div className="text-xs text-danger-ink bg-danger-bg border border-danger-border rounded px-3 py-2 mt-4">
+              {submitError}
+            </div>
           )}
 
-          <form onSubmit={verifyCode} className="space-y-3 mt-6">
-            <input
-              ref={codeInputRef}
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={6}
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-              placeholder="000000"
-              className="w-full text-center text-2xl tracking-[0.4em] font-mono py-3 border border-line rounded bg-canvas focus:outline-none focus:border-accent"
-              autoComplete="one-time-code"
-            />
-
-            {submitError && (
-              <div className="text-xs text-danger-ink bg-danger-bg border border-danger-border rounded px-3 py-2">
-                {submitError}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={pending || code.length !== 6}
-              className="w-full text-sm px-3 py-2 rounded-md bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40"
-            >
-              {pending ? "Verifying…" : "Verify and continue"}
-            </button>
-          </form>
-
-          <p className="text-2xs text-ink-400 mt-4 pt-4 border-t border-line text-center">
+          <p className="text-2xs text-ink-400 mt-6 pt-4 border-t border-line">
             Didn't get it? Check spam, or{" "}
             <button
               onClick={() =>
-                sendCode(new Event("submit") as unknown as React.FormEvent)
+                onSubmit(new Event("submit") as unknown as React.FormEvent)
               }
               className="underline hover:no-underline"
               disabled={pending}
             >
-              resend the code
+              {pending ? "resending…" : "resend the link"}
             </button>
             .
           </p>
@@ -299,13 +199,13 @@ export function Login() {
           </h1>
           <p className="text-sm text-ink-500 mt-1">
             {inviteToken
-              ? "You've been invited. Type your email — we'll send a code."
-              : env.useMockApi
-                ? "Type any email to start. We'll email you a 6-digit code."
-                : "Type your email — we'll send a 6-digit code. New here? We'll set you up."}
+              ? "You've been invited. Type your email — we'll send a sign-in link."
+              : env.useMockAuth
+                ? "Type any email — mock mode signs you in instantly. New here? Use Sign up."
+                : "Type your email — we'll send a sign-in link."}
           </p>
 
-          <form onSubmit={sendCode} className="space-y-3 text-sm mt-6">
+          <form onSubmit={onSubmit} className="space-y-3 text-sm mt-6">
             <label className="block">
               <span className="text-xs font-medium text-ink-700 mb-1 block">
                 Email
@@ -331,19 +231,21 @@ export function Login() {
               disabled={pending || !email}
               className="w-full text-sm px-3 py-2 rounded-md bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40"
             >
-              {pending ? "Sending code…" : "Send sign-in code"}
+              {pending ? "Sending link…" : "Send sign-in link"}
             </button>
           </form>
 
           <p className="text-2xs text-ink-400 mt-4 text-center">
-            No password — just a code. New users get an account
-            automatically.{" "}
-            <span className="text-ink-500">30-day Pro trial, no card.</span>
+            No password — just a link.{" "}
+            <Link to="/signup" className="text-ink-700 underline hover:no-underline">
+              New here? Sign up
+            </Link>
+            <span className="text-ink-500"> · 30-day Pro trial, no card.</span>
           </p>
         </div>
 
         {/* Demo workspace — only in mock mode + not for invited users */}
-        {env.useMockApi && !inviteToken && (
+        {env.useMockData && !inviteToken && (
           <button
             onClick={tryDemo}
             className="w-full mt-3 bg-surface border border-line hover:border-accent rounded-md p-4 text-left transition-colors group"

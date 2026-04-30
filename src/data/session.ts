@@ -117,7 +117,10 @@ export async function signOut() {
   // Synchronous local clear — fires subscribers and updates the UI on the
   // same tick, so any pre-reload render shows the signed-out state.
   write(null);
-  if (typeof window === "undefined") return;
+
+  // Step 3 (background): tell Supabase. scope:'local' skips the network
+  // round-trip; we still call it so the auth client tears down its
+  // in-memory session and stops auto-refreshing.
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const useMockApi =

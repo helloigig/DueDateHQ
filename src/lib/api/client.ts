@@ -27,7 +27,7 @@ function realLink() {
 }
 
 function buildLinks() {
-  return env.useMockApi ? [mockLink] : [realLink()];
+  return env.useMockData ? [mockLink] : [realLink()];
 }
 
 export function createTrpcClient() {

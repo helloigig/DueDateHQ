@@ -317,15 +317,52 @@ export function AnnouncementDetail() {
           <h2 className="text-sm font-semibold text-slate-700">
             🎯 AFFECTED CLIENTS ({ann.affectedClientIds.length})
           </h2>
-          <button
-            onClick={toggleAll}
-            className="ml-auto text-xs text-indigo-600 hover:underline"
-          >
-            {selected.size === (ann.affectedClientIds ?? []).length
-              ? "Deselect all"
-              : "Select all"}
-          </button>
+          {ann.affectedClientIds.length > 0 && (
+            <button
+              onClick={toggleAll}
+              className="ml-auto text-xs text-indigo-600 hover:underline"
+            >
+              {selected.size === (ann.affectedClientIds ?? []).length
+                ? "Deselect all"
+                : "Select all"}
+            </button>
+          )}
         </div>
+        {ann.affectedClientIds.length === 0 ? (
+          // Empty state: no one in the firm matches this alert. Common when:
+          //   - The firm has zero clients yet (fresh sign-up)
+          //   - The alert's state/county/entity filters don't intersect the
+          //     current roster (e.g. CA disaster alert, no CA clients)
+          // We still keep the alert page reachable so the CPA can read what
+          // happened and dismiss it explicitly — but the action surface
+          // collapses (no batch buttons, no list).
+          <div className="px-4 py-10 text-center">
+            <div className="w-10 h-10 rounded-full bg-slate-100 mx-auto flex items-center justify-center text-lg">
+              ✓
+            </div>
+            <p className="text-sm font-medium text-slate-900 mt-3">
+              None of your clients are affected.
+            </p>
+            <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+              This {ann.stateCode} alert doesn't match anyone in your roster.
+              No deadlines need to move, and no notifications are queued.
+            </p>
+            <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
+              <Link
+                to="/clients"
+                className="text-xs px-3 py-1.5 rounded border border-slate-200 text-slate-700 hover:bg-slate-50"
+              >
+                Review your client list
+              </Link>
+              <button
+                onClick={() => setDismissOpen(true)}
+                className="text-xs px-3 py-1.5 rounded text-slate-500 hover:bg-slate-50"
+              >
+                Dismiss this alert
+              </button>
+            </div>
+          </div>
+        ) : null}
         <ul className="divide-y divide-slate-100">
           {(ann.affectedClientIds ?? []).map((cid) => {
             const c = clientsById.get(cid);
@@ -372,6 +409,7 @@ export function AnnouncementDetail() {
         </ul>
       </section>
 
+      {ann.affectedClientIds.length > 0 && (
       <section className="mt-5 bg-white border border-slate-200 rounded-lg p-4 flex flex-wrap gap-2 sticky bottom-0">
         <button
           onClick={() => setConfirm("batch")}
@@ -408,6 +446,7 @@ export function AnnouncementDetail() {
           Not applicable — dismiss
         </button>
       </section>
+      )}
 
       <BatchApplyProgress
         open={!!progress}
