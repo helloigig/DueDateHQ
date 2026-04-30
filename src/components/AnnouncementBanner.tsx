@@ -78,20 +78,10 @@ export function AnnouncementBanner({
   // research suggests CPAs want one anchor, not a stack.
   if (announcements.length === 0) return null;
 
-  return (
-    <div className="space-y-2">
-      <BannerCard ann={head} />
-      {restCount > 0 && (
-        <Link
-          to="/alerts"
-          className="block text-2xs text-ink-500 hover:text-ink-900 px-1 flex items-center gap-1"
-        >
-          + {restCount} more state {restCount === 1 ? "alert" : "alerts"} in the bell + Alerts feed
-        </Link>
-      )}
-    </div>
-  );
-}
+  // ── State for the calm-dashboard refactor (was orphaned during merge) ─
+  const [showNews, setShowNews] = useState(false);
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const visible = announcements.filter((a) => !dismissedIds.has(a.id));
 
   // ── Principled cut: relevance, not recency ───────────────────────────
   //
@@ -223,7 +213,7 @@ export function AnnouncementBanner({
             </button>
           )}
           <Link
-            to={`/alerts/${ann.id}`}
+            to="/alerts"
             className="block hover:underline"
           >
             All alerts <ChevronRight className="w-3 h-3" aria-hidden />
@@ -305,7 +295,7 @@ function AlertRow({
       <div className="flex-1 min-w-0">
         <Link
           to={`/alerts/${ann.id}`}
-          className={`text-sm font-medium flex items-center gap-1 shrink-0 px-2.5 py-1 rounded hover:bg-surface/60 ${TONE_SUB_CLASSES[tone]}`}
+          className={`text-sm font-medium flex items-center gap-1 shrink-0 px-2.5 py-1 rounded hover:bg-surface/60 ${TONE_TEXT[tone]}`}
           title="Review affected clients and apply the new deadline"
         >
           <span className="font-semibold">{ann.stateCode}:</span>

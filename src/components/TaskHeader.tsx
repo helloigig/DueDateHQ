@@ -12,6 +12,8 @@ import type { Client, Task, TaskStatus } from "../types";
 import { actions, useStore } from "../data/store";
 import { bundleById } from "../data/bundles";
 import { exportAuditTrailJson, exportAuditTrailPdfStub } from "../lib/audit-trail";
+import { useCoverSheet } from "../hooks/useFilesFromClients";
+import { env } from "../config";
 import { simulateInboundDocument } from "../lib/simulate-inbound";
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -192,9 +194,11 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
           )}
         </button>
         <span className="text-ink-400 ml-1">
-          Replies route here. Inbound parses with Mode A · flagged by Mode C.
+          Replies route here. Documents are sorted automatically and flagged
+          for your review.
         </span>
         <span className="ml-auto flex items-center gap-2">
+          <CoverSheetButton taskId={task.id} />
           <button
             onClick={() => simulateInboundDocument(task.id, client.name)}
             className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken inline-flex items-center gap-1.5"
@@ -208,13 +212,65 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
               exportAuditTrailPdfStub(task);
             }}
             className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken inline-flex items-center gap-1.5"
-            title="IRS audit-trail compliant export per PRD §15.4"
+            title="IRS audit-trail compliant export"
           >
             <FileDown className="w-3 h-3" aria-hidden /> Audit trail
           </button>
         </span>
       </div>
     </header>
+  );
+}
+
+/**
+ * Cover sheet button — generates a per-task PDF the CPA can attach to
+ * a chase email or print to mail. Async: requests an export, polls
+ * until ready, opens the URL in a new tab.
+ *
+ * In mock mode the export-worker isn't running so the button is
+ * disabled with a tooltip explaining why. Real mode: 1-3 second
+ * generation depending on the export-worker queue depth.
+ */
+function CoverSheetButton({ taskId }: { taskId: string }) {
+  const sheet = useCoverSheet();
+  const isMock = env.useMockApi;
+
+  // Open the URL once it transitions to ready
+  if (sheet.status.state === "ready" && sheet.status.url) {
+    const url = sheet.status.url;
+    // window.open synchronously here triggers Safari popup blocker;
+    // use a useEffect-style guard via setTimeout to defer to next tick
+    setTimeout(() => {
+      window.open(url, "_blank", "noopener");
+      sheet.reset();
+    }, 0);
+  }
+
+  const onClick = () => {
+    if (isMock) return;
+    void sheet.generate(taskId);
+  };
+
+  const label =
+    sheet.status.state === "queued"
+      ? "Generating…"
+      : sheet.status.state === "failed"
+        ? "Retry cover sheet"
+        : "Cover sheet";
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={isMock || sheet.status.state === "queued"}
+      className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+      title={
+        isMock
+          ? "Cover sheet generation runs on the BE export worker — not available in mock mode"
+          : "Generate a per-task cover sheet PDF — attach to chase emails or mail it"
+      }
+    >
+      <FileDown className="w-3 h-3" aria-hidden /> {label}
+    </button>
   );
 }
 

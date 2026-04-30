@@ -9,6 +9,7 @@ import {
   TrendingUp,
   PanelLeftClose,
   PanelLeftOpen,
+  CalendarDays,
 } from "lucide-react";
 import { useAnnouncements } from "../hooks/useAnnouncements";
 import { useSession } from "../data/session";
@@ -16,10 +17,11 @@ import { useStore } from "../data/store";
 
 const primary = [
   { to: "/", label: "Dashboard", Icon: LayoutDashboard, end: true },
-  { to: "/inbox", label: "To review", Icon: CheckSquare, end: false },
+  { to: "/to-review", label: "To review", Icon: CheckSquare, end: false },
   { to: "/clients", label: "Clients", Icon: Users, end: false },
+  { to: "/calendar", label: "Calendar", Icon: CalendarDays, end: false },
   { to: "/alerts", label: "Alerts", Icon: Bell, end: false },
-  { to: "/insights", label: "Insights", Icon: TrendingUp, end: false },
+  { to: "/opportunities", label: "Opportunities", Icon: TrendingUp, end: false },
 ];
 
 const COLLAPSED_KEY = "duedatehq.sidebar_collapsed.v1";
@@ -82,30 +84,10 @@ export function Sidebar() {
         collapsed ? "w-14" : "w-56",
       ].join(" ")}
     >
-      <div
-        className={[
-          "h-14 flex items-center border-b border-line",
-          collapsed ? "px-3 justify-center" : "px-5",
-        ].join(" ")}
-      >
-        {collapsed ? (
-          <span
-            className="w-7 h-7 rounded-md bg-accent text-canvas flex items-center justify-center text-2xs font-semibold"
-            title={session?.firmName ?? "Your firm"}
-          >
-            {(session?.firmName ?? "DD").slice(0, 2).toUpperCase()}
-          </span>
-        ) : (
-          <div className="flex flex-col justify-center min-w-0 flex-1">
-            <span className="font-semibold text-ink-900 text-sm leading-tight">
-              DueDateHQ
-            </span>
-            <span className="text-2xs text-ink-500 leading-tight truncate">
-              {session?.firmName ?? "Your firm"}
-            </span>
-          </div>
-        )}
-      </div>
+      <WorkspaceHeader
+        collapsed={collapsed}
+        firmName={session?.firmName ?? "Your firm"}
+      />
 
       <nav className="flex-1 py-4 px-2 space-y-1">
         {primary.map(({ to, label, Icon, end }) => (
@@ -146,12 +128,12 @@ export function Sidebar() {
                   unread > 0 && (
                     <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-danger-solid" />
                   )}
-                {!collapsed && to === "/inbox" && inboxCount > 0 && (
+                {!collapsed && to === "/to-review" && inboxCount > 0 && (
                   <span className="ml-auto bg-sunken text-ink-700 text-2xs rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center tabular-nums border border-line">
                     {inboxCount}
                   </span>
                 )}
-                {collapsed && to === "/inbox" && inboxCount > 0 && (
+                {collapsed && to === "/to-review" && inboxCount > 0 && (
                   <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-info-solid" />
                 )}
               </>
@@ -213,5 +195,108 @@ export function Sidebar() {
         </button>
       </div>
     </aside>
+  );
+}
+
+/**
+ * Workspace header — firm name + chevron that opens a (currently single-firm)
+ * picker. The picker UI is intentional: it makes the multi-firm affordance
+ * discoverable now even though the BE doesn't support multiple firms per
+ * user yet. When BE adds firm_memberships (P1), this dropdown lights up
+ * with the user's other firms + an "Invite to a different firm" option.
+ *
+ * Until then it shows: current firm (checked) + a stub "Add another firm"
+ * link that opens a not-yet-implemented modal explaining the roadmap.
+ */
+function WorkspaceHeader({
+  collapsed,
+  firmName,
+}: {
+  collapsed: boolean;
+  firmName: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (collapsed) {
+    return (
+      <div className="h-14 flex items-center justify-center border-b border-line px-3">
+        <span
+          className="w-7 h-7 rounded-md bg-accent text-canvas flex items-center justify-center text-2xs font-semibold"
+          title={firmName}
+        >
+          {firmName.slice(0, 2).toUpperCase()}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative h-14 flex items-center border-b border-line px-3">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 w-full hover:bg-sunken rounded px-2 py-1.5 -mx-1 group"
+        aria-expanded={open}
+      >
+        <span className="w-7 h-7 rounded-md bg-accent text-canvas flex items-center justify-center text-2xs font-semibold shrink-0">
+          {firmName.slice(0, 2).toUpperCase()}
+        </span>
+        <div className="flex flex-col justify-center min-w-0 flex-1 text-left">
+          <span className="font-semibold text-ink-900 text-sm leading-tight truncate">
+            {firmName}
+          </span>
+          <span className="text-2xs text-ink-500 leading-tight">
+            DueDateHQ
+          </span>
+        </div>
+        <span className="text-ink-400 group-hover:text-ink-700 text-xs shrink-0">
+          ⌄
+        </span>
+      </button>
+
+      {open && (
+        <>
+          <span
+            className="fixed inset-0 z-30"
+            onClick={() => setOpen(false)}
+          />
+          <div className="absolute left-2 right-2 top-full z-40 bg-surface border border-line rounded-md shadow-overlay py-1.5 mt-0.5">
+            <p className="px-3 pt-1 pb-1.5 text-2xs uppercase tracking-wider text-ink-400 font-semibold">
+              Current workspace
+            </p>
+            <div className="px-3 py-2 flex items-center gap-2 bg-sunken/40 mx-1 rounded">
+              <span className="w-5 h-5 rounded bg-accent text-canvas flex items-center justify-center text-2xs font-semibold">
+                {firmName.slice(0, 2).toUpperCase()}
+              </span>
+              <span className="text-sm font-medium text-ink-900 truncate flex-1">
+                {firmName}
+              </span>
+              <span className="text-2xs text-ink-500">✓</span>
+            </div>
+
+            <div className="border-t border-line my-1.5" />
+
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                alert(
+                  "Multi-firm membership ships in P1 (next quarter). Today, one user = one firm. If you need to manage two firms, sign up with a different email per firm — we'll merge them when membership lands.",
+                );
+              }}
+              className="w-full text-left px-3 py-2 text-xs text-ink-500 hover:bg-sunken hover:text-ink-900 flex items-center gap-2"
+            >
+              <span className="text-base leading-none">+</span>
+              <span>Add another firm…</span>
+              <span className="ml-auto text-2xs text-ink-400">P1</span>
+            </button>
+
+            <p className="px-3 pt-1 pb-1.5 text-2xs text-ink-400 leading-relaxed">
+              Bookkeepers, fractional CFOs, and merged firms get
+              firm-membership in the next quarter — see roadmap.
+            </p>
+          </div>
+        </>
+      )}
+    </div>
   );
 }

@@ -11,14 +11,21 @@
 import { initTRPC } from "@trpc/server";
 import { z } from "zod";
 import type {
+  ActivityEntry,
+  AiInsight,
   Announcement,
+  ChecklistItem,
   Client,
   Deadline,
+  DocumentState,
+  EmailDraft,
   Firm,
   FirmTier,
   ImportRun,
   Notification,
+  ReminderTemplate,
   ServicePackage,
+  Task,
   User,
 } from "../../types";
 
@@ -224,8 +231,41 @@ export const appRouter = t.router({
       .input(jsonPassthrough)
       .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
     detect: t.procedure.mutation(
-      async (): Promise<{ count: number }> => NOT_IMPL()
+      async (): Promise<{
+        fetched: number;
+        new: number;
+        lowConfidence: number;
+        matchedForFirm: number;
+      }> => NOT_IMPL()
     ),
+    /** Reviewer queue — low-confidence scraped notices awaiting approval */
+    reviewerQueue: t.procedure.query(
+      async (): Promise<
+        Array<{
+          id: string;
+          stateCode: string;
+          authority: string;
+          title: string;
+          summary: string;
+          type: string;
+          sourceUrl: string;
+          parseConfidence: string;
+          detectedAt: string;
+        }>
+      > => NOT_IMPL()
+    ),
+    approveScraped: t.procedure
+      .input(
+        z.object({
+          id: z.string(),
+          title: z.string().optional(),
+          summary: z.string().optional(),
+        }),
+      )
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    rejectScraped: t.procedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
   }),
 
   notifications: t.router({
@@ -260,12 +300,25 @@ export const appRouter = t.router({
       .mutation(async (): Promise<unknown> => NOT_IMPL()),
     preview: t.procedure
       .input(jsonPassthrough)
-      .mutation(async (): Promise<unknown> => NOT_IMPL()),
+      .mutation(
+        async (): Promise<{
+          newClients: number;
+          duplicates: number;
+          withPackage: number;
+          unmatchedPackages: string[];
+        }> => NOT_IMPL(),
+      ),
     commit: t.procedure
       .input(jsonPassthrough)
       .mutation(
-        async (): Promise<{ importId: string; ids: string[] }> =>
-          NOT_IMPL()
+        async (): Promise<{
+          importId: string;
+          ids: string[];
+          clientsCreated?: number;
+          skippedCount?: number;
+          deadlinesCreated?: number;
+          tasksCreated?: number;
+        }> => NOT_IMPL()
       ),
     listHistory: t.procedure.query(
       async (): Promise<ImportRun[]> => NOT_IMPL()
@@ -273,6 +326,31 @@ export const appRouter = t.router({
     undo: t.procedure
       .input(jsonPassthrough)
       .mutation(async (): Promise<{ removed: number }> => NOT_IMPL()),
+    /** Tier 3 — parse a prior-year return PDF (storageKey from
+     *  uploads.requestUrl). Returns extracted fields for reviewer
+     *  approval before write. */
+    parsePriorYearReturn: t.procedure
+      .input(
+        z.object({
+          storageKey: z.string().min(1),
+          clientId: z.string().uuid().optional(),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          fields: {
+            clientName: string | null;
+            ein: string | null;
+            entityType: string | null;
+            taxYear: number | null;
+            priorAGI: number | null;
+            formsFiled: string[];
+            k1Sources: string[];
+            confidence: number;
+          };
+          readyForCommit: boolean;
+        }> => NOT_IMPL(),
+      ),
   }),
 
   exports: t.router({
@@ -292,12 +370,38 @@ export const appRouter = t.router({
   }),
 
   uploads: t.router({
+    status: t.procedure.query(
+      async (): Promise<{ configured: boolean }> => NOT_IMPL(),
+    ),
     requestUrl: t.procedure
-      .input(jsonPassthrough)
+      .input(
+        z.object({
+          kind: z.enum([
+            "firm_logo",
+            "avatar",
+            "inbound_attachment",
+            "prior_year_return",
+            "client_doc",
+          ]),
+          filename: z.string().min(1).max(200),
+          contentType: z.string().min(1).max(100),
+        }),
+      )
       .mutation(
-        async (): Promise<{ uploadUrl: string; storageKey: string }> =>
-          NOT_IMPL()
+        async (): Promise<{
+          uploadUrl: string;
+          storageKey: string;
+          expiresAt: string | Date;
+        }> => NOT_IMPL(),
       ),
+    downloadUrl: t.procedure
+      .input(
+        z.object({
+          storageKey: z.string().min(1),
+          ttlSeconds: z.number().int().min(60).max(86400).optional(),
+        }),
+      )
+      .query(async (): Promise<{ url: string }> => NOT_IMPL()),
   }),
 
   team: t.router({
@@ -311,6 +415,474 @@ export const appRouter = t.router({
     remove: t.procedure
       .input(jsonPassthrough)
       .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+  }),
+
+  tasks: t.router({
+    list: t.procedure
+      .input(z.object({ clientId: z.string().optional() }).optional())
+      .query(async (): Promise<Task[]> => NOT_IMPL()),
+    get: t.procedure
+      .input(z.object({ id: z.string() }))
+      .query(async (): Promise<Task | null> => NOT_IMPL()),
+    updateStatus: t.procedure
+      .input(jsonPassthrough)
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    createForDeadline: t.procedure
+      .input(z.object({ deadlineId: z.string() }))
+      .mutation(
+        async (): Promise<{ id: string; alreadyExists: boolean }> =>
+          NOT_IMPL()
+      ),
+  }),
+
+  checklists: t.router({
+    listForTask: t.procedure
+      .input(z.object({ taskId: z.string() }))
+      .query(async (): Promise<ChecklistItem[]> => NOT_IMPL()),
+    setState: t.procedure
+      .input(
+        z.object({
+          id: z.string(),
+          state: z.string() as z.ZodType<DocumentState>,
+        })
+      )
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+  }),
+
+  activity: t.router({
+    listForTask: t.procedure
+      .input(z.object({ taskId: z.string(), limit: z.number().optional() }))
+      .query(async (): Promise<ActivityEntry[]> => NOT_IMPL()),
+  }),
+
+  emails: t.router({
+    listForTask: t.procedure
+      .input(z.object({ taskId: z.string() }))
+      .query(async (): Promise<EmailDraft[]> => NOT_IMPL()),
+    saveDraft: t.procedure
+      .input(jsonPassthrough)
+      .mutation(async (): Promise<{ id: string }> => NOT_IMPL()),
+    send: t.procedure
+      .input(z.object({ id: z.string() }))
+      .mutation(
+        async (): Promise<{
+          id: string;
+          sentAt: string;
+          recallWindowExpiresAt: string;
+        }> => NOT_IMPL()
+      ),
+    recall: t.procedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    discard: t.procedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+  }),
+
+  reminderTemplates: t.router({
+    list: t.procedure.query(
+      async (): Promise<ReminderTemplate[]> => NOT_IMPL()
+    ),
+  }),
+
+  /** AI mode dispatchers — call Anthropic via the BE in real mode. */
+  ai: t.router({
+    status: t.procedure.query(
+      async (): Promise<{ configured: boolean }> => NOT_IMPL(),
+    ),
+    classifyDocument: t.procedure
+      .input(
+        z.object({
+          filename: z.string().min(1),
+          itemType: z.string().optional(),
+          textPreview: z.string().optional(),
+          taskContext: z
+            .object({
+              formType: z.string(),
+              clientName: z.string(),
+              pendingItems: z.array(
+                z.object({ itemType: z.string(), label: z.string() }),
+              ),
+            })
+            .optional(),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          guess: string;
+          itemType: string | null;
+          confidence: "high" | "medium" | "low";
+          flagReason?: string;
+          inferenceId: number;
+        }> => NOT_IMPL(),
+      ),
+    draftEmail: t.procedure
+      .input(
+        z.object({
+          client: z.object({ name: z.string() }),
+          task: z.object({ formType: z.string() }),
+          itemLabel: z.string().optional(),
+          itemType: z.string().optional(),
+          context: z.string().optional(),
+          tone: z.enum(["warm", "neutral", "urgent"]),
+          cpaSignature: z.string(),
+          forwardingEmail: z.string(),
+          methodBConnected: z.boolean().optional(),
+          voiceSamples: z.array(z.string()).optional(),
+          missingDocs: z
+            .array(
+              z.object({
+                itemType: z.string(),
+                label: z.string(),
+                lastYearArrival: z.string().optional(),
+              }),
+            )
+            .optional(),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          subject: string;
+          body: string;
+          aiSources: Array<{ kind: string; note: string }>;
+          inferenceId: number;
+        }> => NOT_IMPL(),
+      ),
+    /** Mode B — arrival timing prediction for chase scheduling */
+    predictArrivalTiming: t.procedure
+      .input(
+        z.object({
+          clientId: z.string(),
+          itemType: z.string(),
+          priorArrivals: z.array(z.string()),
+          today: z.string(),
+          cohortWindow: z
+            .object({ start: z.string(), end: z.string() })
+            .optional(),
+        }),
+      )
+      .query(
+        async (): Promise<{
+          windowStart: string | null;
+          windowEnd: string | null;
+          confidence: "high" | "medium" | "low";
+          reasoning: string;
+          anomalyHint?: string;
+          inferenceId: number;
+        } | null> => NOT_IMPL(),
+      ),
+    /** Mode C — contextual anomaly detection on financial values */
+    detectAnomaly: t.procedure
+      .input(
+        z.object({
+          clientId: z.string(),
+          fieldLabel: z.string(),
+          currentValue: z.number(),
+          priorValues: z.array(z.number()),
+          context: z.string().optional(),
+          entityType: z.string().optional(),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          isAnomaly: boolean;
+          severity: "low" | "medium" | "high";
+          reason: string;
+          likelyExplanation: string;
+          needsCpaJudgment: boolean;
+          inferenceId: number;
+        } | null> => NOT_IMPL(),
+      ),
+    /** Mode E — cross-year advisory insights */
+    generateCrossYearInsights: t.procedure
+      .input(
+        z.object({
+          clientId: z.string(),
+          clientName: z.string(),
+          entityType: z.string(),
+          primaryState: z.string(),
+          yearlyFacts: z.array(
+            z.object({
+              year: z.number(),
+              items: z.array(
+                z.object({
+                  itemType: z.string(),
+                  value: z.number().optional(),
+                  label: z.string().optional(),
+                }),
+              ),
+            }),
+          ),
+          currentChecklist: z.array(
+            z.object({
+              itemType: z.string(),
+              label: z.string(),
+              state: z.string(),
+            }),
+          ),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          insights: Array<{
+            category:
+              | "missing_item"
+              | "election_opportunity"
+              | "credit_eligibility"
+              | "structural"
+              | "regression_risk";
+            title: string;
+            detail: string;
+            confidence: "high" | "medium" | "low";
+            priorYearsEvidence: number[];
+          }>;
+          inferenceId: number;
+        } | null> => NOT_IMPL(),
+      ),
+  }),
+
+  aiInferences: t.router({
+    recordAcceptance: t.procedure
+      .input(z.object({ inferenceId: z.number(), accepted: z.boolean() }))
+      .mutation(
+        async (): Promise<{ ok: boolean; reason?: string }> => NOT_IMPL()
+      ),
+    summary: t.procedure
+      .input(z.object({ mode: z.string().optional() }).optional())
+      .query(
+        async (): Promise<{
+          total: number;
+          actedOn: number;
+          accepted: number;
+          acceptanceRate: number | null;
+          totalCostCents: number;
+        }> => NOT_IMPL()
+      ),
+    /** Drift report — per-mode acceptance rate bucketed by ISO week.
+     *  Surfaces deteriorating model performance before users complain. */
+    driftReport: t.procedure
+      .input(z.object({ mode: z.string().optional() }).optional())
+      .query(
+        async (): Promise<{
+          weeks: Array<{
+            week: string;
+            total: number;
+            acceptanceRate: number | null;
+          }>;
+          drift: number | null;
+          alert: boolean;
+        }> => NOT_IMPL(),
+      ),
+  }),
+
+  /** Files-from-clients channels — digests, SMS, cover sheets. The
+   *  through-line of the product. */
+  filesFromClients: t.router({
+    digestForClient: t.procedure
+      .input(
+        z.object({
+          clientId: z.string(),
+          cpaSignature: z.string(),
+          tone: z.enum(["warm", "neutral", "urgent"]).optional(),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          clientId: string;
+          clientName: string;
+          clientEmail: string | null;
+          tasks: Array<{
+            taskId: string;
+            formType: string;
+            forwardingEmail: string;
+            pendingItems: Array<{ itemType: string; label: string }>;
+          }>;
+          draft: {
+            subject: string;
+            body: string;
+            aiSources: Array<{ kind: string; note: string }>;
+            inferenceId: number;
+          } | null;
+        } | null> => NOT_IMPL(),
+      ),
+    digestForFirm: t.procedure
+      .input(
+        z.object({
+          cpaSignature: z.string(),
+          tone: z.enum(["warm", "neutral", "urgent"]).optional(),
+        }),
+      )
+      .mutation(
+        async (): Promise<
+          Array<{
+            clientId: string;
+            clientName: string;
+            clientEmail: string | null;
+            tasks: Array<{
+              taskId: string;
+              formType: string;
+              forwardingEmail: string;
+              pendingItems: Array<{ itemType: string; label: string }>;
+            }>;
+            draft: {
+              subject: string;
+              body: string;
+              aiSources: Array<{ kind: string; note: string }>;
+              inferenceId: number;
+            } | null;
+          }>
+        > => NOT_IMPL(),
+      ),
+    smsStatus: t.procedure.query(
+      async (): Promise<{ configured: boolean }> => NOT_IMPL(),
+    ),
+    sendChaseSms: t.procedure
+      .input(
+        z.object({
+          to: z.string().min(8),
+          body: z.string().min(1).max(160),
+          taskId: z.string().uuid().optional(),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          ok: true;
+          provider: "twilio";
+          providerMessageId: string;
+        }> => NOT_IMPL(),
+      ),
+    composeChaseSms: t.procedure
+      .input(
+        z.object({
+          clientFirstName: z.string(),
+          cpaName: z.string(),
+          formType: z.string(),
+          missingItem: z.string().optional(),
+          forwardingEmail: z.string(),
+        }),
+      )
+      .query(async (): Promise<{ body: string }> => NOT_IMPL()),
+  }),
+
+  /** Provider integrations — QBO/Xero/Gmail/Outlook/Stripe. The
+   *  configured field tells the FE whether the BE has client
+   *  credentials in env, so we render Connect vs Coming soon. */
+  integrations: t.router({
+    list: t.procedure.query(
+      async (): Promise<
+        Array<{
+          id: string;
+          kind: "qbo" | "xero" | "gmail" | "outlook" | "stripe";
+          status: "connected" | "disconnected" | "error";
+          externalAccountId: string | null;
+          scope: string | null;
+          lastSyncedAt: string | null;
+          lastError: string | null;
+          expiresAt: string | null;
+          configured: boolean;
+        }>
+      > => NOT_IMPL(),
+    ),
+    catalog: t.procedure.query(
+      async (): Promise<
+        Array<{
+          kind: "qbo" | "xero" | "gmail" | "outlook" | "stripe";
+          configured: boolean;
+        }>
+      > => NOT_IMPL(),
+    ),
+    startConnect: t.procedure
+      .input(
+        z.object({
+          kind: z.enum(["qbo", "xero", "gmail", "outlook"]),
+          redirectTo: z.string().url(),
+        }),
+      )
+      .mutation(async (): Promise<{ authorizeUrl: string }> => NOT_IMPL()),
+    disconnect: t.procedure
+      .input(z.object({ id: z.string().uuid() }))
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    /** Method B on-demand poll for Gmail/Outlook inbox */
+    pollMethodB: t.procedure
+      .input(z.object({ provider: z.enum(["gmail", "outlook"]) }))
+      .mutation(
+        async (): Promise<{
+          messagesScanned: number;
+          matched: number;
+          attachmentsClassified: number;
+          errors: number;
+        }> => NOT_IMPL(),
+      ),
+    /** On-demand sync — pull QBO/Xero customers into clients now */
+    syncNow: t.procedure
+      .input(z.object({ provider: z.enum(["qbo", "xero"]) }))
+      .mutation(
+        async (): Promise<{
+          fetched: number;
+          inserted: number;
+          updated: number;
+          skipped: number;
+          errors: number;
+        }> => NOT_IMPL(),
+      ),
+  }),
+
+  aiInsights: t.router({
+    listForClient: t.procedure
+      .input(z.object({ clientId: z.string() }))
+      .query(async (): Promise<AiInsight[]> => NOT_IMPL()),
+  }),
+
+  multistate: t.router({
+    preview: t.procedure
+      .input(
+        z.object({
+          stateCodes: z.array(z.string()),
+          includeFederal: z.boolean().default(true),
+          year: z.number().int().optional(),
+        })
+      )
+      .query(
+        async (): Promise<{
+          groups: Array<{
+            jurisdiction: string;
+            templateCount: number;
+            deadlineCount: number;
+            deadlines: Array<{
+              templateId: string;
+              formType: string;
+              jurisdiction: string;
+              period: string;
+              officialDueDate: string;
+              adjustedDueDate: string;
+            }>;
+          }>;
+          totalDeadlines: number;
+          totalTemplates: number;
+          statesWithoutTemplates: string[];
+        }> => NOT_IMPL()
+      ),
+    commit: t.procedure
+      .input(
+        z.object({
+          clientId: z.string(),
+          stateCodes: z.array(z.string()),
+          includeFederal: z.boolean().default(true),
+          year: z.number().int().optional(),
+          excludedTemplateIds: z.array(z.string()).default([]),
+          saveAsPackage: z.boolean().default(false),
+          customPackageName: z.string().optional(),
+        })
+      )
+      .mutation(
+        async (): Promise<{
+          ok: true;
+          createdDeadlines: number;
+          createdTasks: number;
+          createdChecklistItems: number;
+          createdPackageId: string | null;
+        }> => NOT_IMPL()
+      ),
   }),
 });
 

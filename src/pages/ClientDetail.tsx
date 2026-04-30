@@ -27,6 +27,8 @@ import { ExportModal } from "../components/ExportModal";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { STATE_NAMES, type StateCode } from "../types";
 import { BUNDLES } from "../data/bundles";
+import { MultiStateWizard } from "../components/multistate/MultiStateWizard";
+import { DocumentMatrixPreview } from "../components/DocumentMatrixPreview";
 import type {
   ActivityEntry,
   ActivityType,
@@ -133,10 +135,10 @@ export function ClientDetail() {
   if (!client) {
     return (
       <div className="max-w-4xl mx-auto px-4 md:px-6 py-10">
-        <Link to="/clients" className="text-sm text-slate-500 hover:underline">
+        <Link to="/clients" className="text-sm text-ink-500 hover:underline">
           ‹ Clients
         </Link>
-        <p className="mt-6 text-slate-600">Client not found.</p>
+        <p className="mt-6 text-ink-700">Client not found.</p>
       </div>
     );
   }
@@ -155,14 +157,14 @@ export function ClientDetail() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 md:px-6 py-6">
-      <Link to="/clients" className="text-sm text-slate-500 hover:underline">
+      <Link to="/clients" className="text-sm text-ink-500 hover:underline">
         ‹ Clients
       </Link>
 
       <div className="mt-3 flex items-start gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-semibold text-slate-900">
+            <h1 className="text-2xl font-semibold text-ink-900">
               {client.name}
             </h1>
             <StateChipGroup
@@ -175,27 +177,27 @@ export function ClientDetail() {
               </span>
             )}
           </div>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-ink-500 mt-1">
             {client.entityType} · {primaryStateName}
             {client.nexusStates.length > 0 && ` + ${client.nexusStates.length} nexus`} ·
             <span className="capitalize"> {client.status}</span> · Added {addedAtLabel}
           </p>
           {client.servicePackages.length > 0 && (
             <div className="mt-2 flex items-center flex-wrap gap-1.5">
-              <span className="text-2xs uppercase tracking-wider text-slate-500 font-semibold">
+              <span className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
                 Service package{client.servicePackages.length === 1 ? "" : "s"}:
               </span>
               {client.servicePackages.map((p) => (
                 <Link
                   key={p}
                   to="/settings/packages"
-                  className="text-xs px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                  className="text-xs px-2 py-0.5 rounded border border-line bg-sunken/40 text-ink-700 hover:bg-sunken"
                   title={`${p} — generates this client's deadlines automatically. Click to view.`}
                 >
                   {p}
                 </Link>
               ))}
-              <span className="text-2xs text-slate-400">
+              <span className="text-2xs text-ink-400">
                 · {clientDeadlines.length} deadline{clientDeadlines.length === 1 ? "" : "s"} auto-generated
               </span>
             </div>
@@ -203,20 +205,20 @@ export function ClientDetail() {
         </div>
         <button
           onClick={() => setExportOpen(true)}
-          className="text-sm px-3 py-1.5 rounded border border-slate-200 hover:bg-slate-50"
+          className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40"
         >
           Export
         </button>
         <button
           onClick={() => setEditOpen(true)}
-          className="text-sm px-3 py-1.5 rounded border border-slate-200 hover:bg-slate-50"
+          className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40"
         >
           Edit
         </button>
         <button
           onClick={() => setArchiveOpen(true)}
           disabled={client.status === "archived"}
-          className="text-sm px-3 py-1.5 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Archive
         </button>
@@ -224,7 +226,7 @@ export function ClientDetail() {
 
       <ClientAiInsightsCard clientId={client.id} />
 
-      <div className="mt-5 border-b border-slate-200 flex gap-1 flex-wrap">
+      <div className="mt-5 border-b border-line flex gap-1 flex-wrap">
         {(
           [
             ["deadlines", `Tasks (${clientDeadlines.filter((d) => d.status !== "completed" && d.status !== "filed_extension").length})`],
@@ -240,8 +242,8 @@ export function ClientDetail() {
             onClick={() => setTab(key)}
             className={`px-4 py-2 text-sm ${
               tab === key
-                ? "text-slate-900 border-b-2 border-slate-900 font-medium"
-                : "text-slate-500 hover:text-slate-700"
+                ? "text-ink-900 border-b-2 border-ink-900 font-medium"
+                : "text-ink-500 hover:text-ink-700"
             }`}
           >
             {label}
@@ -259,6 +261,7 @@ export function ClientDetail() {
             extensions={extensions}
             allDeadlines={clientDeadlines}
             onAddDeadline={() => setAddDeadlineOpen(true)}
+            onOpenDocuments={() => setTab("documents")}
           />
         )}
         {tab === "documents" && <DocumentsTab client={client} />}
@@ -288,7 +291,7 @@ export function ClientDetail() {
               from dashboard counts. Their history is retained for 7 years.
             </p>
             {activeDeadlineCount > 0 && (
-              <p className="mt-2 text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+              <p className="mt-2 text-warn-ink bg-warn-bg border border-warn-border rounded px-3 py-2">
                 This client has {activeDeadlineCount} active deadline
                 {activeDeadlineCount === 1 ? "" : "s"}. They'll disappear from
                 your triage immediately. You can unarchive anytime.
@@ -336,6 +339,7 @@ function DeadlinesTab({
   extensions,
   allDeadlines,
   onAddDeadline,
+  onOpenDocuments,
 }: {
   client: Client;
   upcoming: Deadline[];
@@ -344,6 +348,7 @@ function DeadlinesTab({
   extensions: Deadline[];
   allDeadlines: Deadline[];
   onAddDeadline: () => void;
+  onOpenDocuments: () => void;
 }) {
   const [yearOpen, setYearOpen] = useState(false);
   const [completedOpen, setCompletedOpen] = useState(false);
@@ -364,10 +369,10 @@ function DeadlinesTab({
       <BundleManager client={client} />
 
       {nextUpcoming && (
-        <div className="bg-white border border-slate-200 rounded-lg p-4 text-sm">
-          <span className="text-slate-500">Next up: </span>
-          <span className="text-slate-900 font-medium">{nextLabel}</span>
-          <span className="text-slate-500">
+        <div className="bg-surface border border-line rounded-lg p-4 text-sm">
+          <span className="text-ink-500">Next up: </span>
+          <span className="text-ink-900 font-medium">{nextLabel}</span>
+          <span className="text-ink-500">
             {" "}
             ·{" "}
             {nextDaysRaw === 0
@@ -379,19 +384,28 @@ function DeadlinesTab({
         </div>
       )}
 
+      {/* Promoted from buried in the Documents tab — the multi-year doc
+          lens is one of the strongest IA ideas in the product, but
+          burying it 1 click deep meant CPAs rarely saw it. Here the
+          compact preview surfaces top doc types × current+2 priors. */}
+      <DocumentMatrixPreview
+        clientId={client.id}
+        onOpenFull={onOpenDocuments}
+      />
+
       <Section
         title={`Upcoming (${upcoming.length})`}
         actions={
           <button
             onClick={onAddDeadline}
-            className="text-xs px-2.5 py-1 rounded bg-slate-900 text-white hover:bg-slate-800"
+            className="text-xs px-2.5 py-1 rounded bg-ink-900 text-white hover:bg-ink-900"
           >
             + Deadline
           </button>
         }
       >
         {upcoming.length === 0 ? (
-          <div className="px-4 py-4 text-sm text-slate-500">
+          <div className="px-4 py-4 text-sm text-ink-500">
             Nothing upcoming.
           </div>
         ) : (
@@ -438,7 +452,7 @@ function DeadlinesTab({
       {client.relatedClientIds && client.relatedClientIds.length > 0 && (
         <Section title="🔗 Related clients">
           {client.relatedClientIds.map((id) => (
-            <div key={id} className="px-4 py-2 text-sm text-slate-600">
+            <div key={id} className="px-4 py-2 text-sm text-ink-700">
               {id}
             </div>
           ))}
@@ -463,21 +477,21 @@ function ExtensionRow({
     : null;
 
   return (
-    <div className="px-4 py-3 border-b border-slate-100 last:border-b-0">
+    <div className="px-4 py-3 border-b border-line/60 last:border-b-0">
       <div className="flex items-start gap-3">
-        <span className="text-slate-400 text-lg leading-none pt-1">⏳</span>
+        <span className="text-ink-400 text-lg leading-none pt-1">⏳</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-slate-900">
+            <span className="text-sm font-medium text-ink-900">
               {original.form}
             </span>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-ink-500">
               original due {formatLongDate(original.officialDueDate)}
             </span>
             {linked && (
               <>
-                <span className="text-slate-300">→</span>
-                <span className="text-sm text-slate-900 font-medium">
+                <span className="text-ink-300">→</span>
+                <span className="text-sm text-ink-900 font-medium">
                   {formatLongDate(linked.officialDueDate)}
                 </span>
               </>
@@ -493,7 +507,7 @@ function ExtensionRow({
               }
               tone={submitted ? "filled" : "muted"}
             />
-            <span className="text-slate-300">·</span>
+            <span className="text-ink-300">·</span>
             <StatusPill
               label={
                 approved
@@ -502,7 +516,7 @@ function ExtensionRow({
               }
               tone={approved ? "success" : "pending"}
             />
-            <span className="text-slate-300">·</span>
+            <span className="text-ink-300">·</span>
             <StatusPill
               label={
                 linked
@@ -517,7 +531,7 @@ function ExtensionRow({
         {!approved && submitted && (
           <button
             onClick={() => actions.markExtensionApproved(original.id)}
-            className="text-xs px-2.5 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700 shrink-0"
+            className="text-xs px-2.5 py-1 rounded bg-ok-solid text-white hover:bg-ok-solid shrink-0"
             title="Simulate IRS/state approval"
           >
             Mark approved
@@ -537,12 +551,12 @@ function StatusPill({
 }) {
   const cls =
     tone === "success"
-      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+      ? "bg-ok-bg text-ok-ink border-ok-border"
       : tone === "pending"
-      ? "bg-amber-50 text-amber-700 border-amber-200"
+      ? "bg-warn-bg text-warn-ink border-warn-border"
       : tone === "filled"
-      ? "bg-slate-100 text-slate-700 border-slate-200"
-      : "bg-white text-slate-400 border-slate-200";
+      ? "bg-sunken text-ink-700 border-line"
+      : "bg-surface text-ink-400 border-line";
   return (
     <span className={`px-1.5 py-0.5 rounded border text-[11px] ${cls}`}>
       {label}
@@ -574,8 +588,8 @@ function NotesTab({ client }: { client: Client }) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white border border-slate-200 rounded-lg p-4">
-        <label className="block text-xs font-medium text-slate-600 mb-1">
+      <div className="bg-surface border border-line rounded-lg p-4">
+        <label className="block text-xs font-medium text-ink-700 mb-1">
           New note
         </label>
         <textarea
@@ -583,16 +597,16 @@ function NotesTab({ client }: { client: Client }) {
           onChange={(e) => setDraft(e.target.value)}
           rows={3}
           placeholder="e.g. Called client; waiting on W-2 copies by Friday."
-          className="w-full px-3 py-2 rounded border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm resize-none"
+          className="w-full px-3 py-2 rounded border border-line focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm resize-none"
         />
         <div className="flex items-center justify-between mt-2">
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-ink-400">
             Notes are firm-internal — clients never see them.
           </span>
           <button
             onClick={onAdd}
             disabled={!draft.trim()}
-            className="text-xs px-3 py-1.5 rounded bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40"
+            className="text-xs px-3 py-1.5 rounded bg-ink-900 text-white hover:bg-ink-900 disabled:opacity-40"
           >
             Add note
           </button>
@@ -604,15 +618,15 @@ function NotesTab({ client }: { client: Client }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search notes…"
-          className="flex-1 text-sm px-3 py-1.5 rounded border border-slate-200 bg-white"
+          className="flex-1 text-sm px-3 py-1.5 rounded border border-line bg-surface"
         />
-        <span className="text-xs text-slate-400">
+        <span className="text-xs text-ink-400">
           {filtered.length} of {notes.length}
         </span>
       </div>
 
       {filtered.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-lg p-6 text-center text-sm text-slate-500">
+        <div className="bg-surface border border-line rounded-lg p-6 text-center text-sm text-ink-500">
           {notes.length === 0
             ? "No notes yet. Add your first above."
             : `No notes match "${query}".`}
@@ -638,42 +652,42 @@ function NoteItem({
   const ts = new Date(note.createdAt);
   return (
     <li
-      className={`bg-white border rounded-lg p-3 ${
-        note.pinned ? "border-amber-300" : "border-slate-200"
+      className={`bg-surface border rounded-lg p-3 ${
+        note.pinned ? "border-warn-border" : "border-line"
       }`}
     >
-      <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
+      <div className="flex items-center gap-2 text-xs text-ink-500 mb-1">
         {note.pinned && (
-          <span className="text-amber-700 font-medium">📌 Pinned</span>
+          <span className="text-warn-ink font-medium">📌 Pinned</span>
         )}
         <span>{ts.toLocaleString("en-US")}</span>
         <span>·</span>
         <span>{note.authorName}</span>
         <button
           onClick={() => actions.toggleNotePin(clientId, note.id)}
-          className="ml-auto text-slate-400 hover:text-amber-700"
+          className="ml-auto text-ink-400 hover:text-warn-ink"
           title={note.pinned ? "Unpin" : "Pin"}
         >
           {note.pinned ? "Unpin" : "Pin"}
         </button>
         <button
           onClick={() => actions.deleteNote(clientId, note.id)}
-          className="text-slate-400 hover:text-red-600"
+          className="text-ink-400 hover:text-danger-ink"
           title="Delete"
         >
           Delete
         </button>
       </div>
-      <p className="text-sm text-slate-700 whitespace-pre-wrap">{note.body}</p>
+      <p className="text-sm text-ink-700 whitespace-pre-wrap">{note.body}</p>
     </li>
   );
 }
 
 function ContactsTab({ client }: { client: Client }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-5 space-y-2">
-      <h3 className="text-sm font-semibold text-slate-700">Primary contact</h3>
-      <div className="text-sm text-slate-600">
+    <div className="bg-surface border border-line rounded-lg p-5 space-y-2">
+      <h3 className="text-sm font-semibold text-ink-700">Primary contact</h3>
+      <div className="text-sm text-ink-700">
         <div>
           <a
             href={`mailto:${client.contactEmail}`}
@@ -684,7 +698,7 @@ function ContactsTab({ client }: { client: Client }) {
         </div>
         {client.contactPhone && <div>{client.contactPhone}</div>}
       </div>
-      <p className="text-xs text-slate-500 pt-2">
+      <p className="text-xs text-ink-500 pt-2">
         All automated reminders go to this address. Client replies land in your
         own inbox — we don't thread or store them.
       </p>
@@ -716,13 +730,13 @@ function ActivityTab({ client }: { client: Client }) {
   const activity = client.activity ?? [];
   if (activity.length === 0) {
     return (
-      <div className="bg-white border border-slate-200 rounded-lg p-6 text-center text-sm text-slate-500">
+      <div className="bg-surface border border-line rounded-lg p-6 text-center text-sm text-ink-500">
         No activity yet.
       </div>
     );
   }
   return (
-    <ul className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
+    <ul className="bg-surface border border-line rounded-lg divide-y divide-slate-100">
       {activity.map((a) => (
         <ActivityItem key={a.id} entry={a} />
       ))}
@@ -735,10 +749,10 @@ function ActivityItem({ entry }: { entry: ActivityEntry }) {
   const icon = ACTIVITY_ICONS[entry.type] ?? "·";
   return (
     <li className="px-4 py-2.5 flex items-start gap-3">
-      <span className="w-5 text-center text-slate-400">{icon}</span>
+      <span className="w-5 text-center text-ink-400">{icon}</span>
       <div className="flex-1 min-w-0 text-sm">
-        <div className="text-slate-700">{entry.summary}</div>
-        <div className="text-xs text-slate-500 mt-0.5">
+        <div className="text-ink-700">{entry.summary}</div>
+        <div className="text-xs text-ink-500 mt-0.5">
           {ts.toLocaleString("en-US")} · {entry.actorName}
         </div>
       </div>
@@ -756,9 +770,9 @@ function Section({
   actions?: React.ReactNode;
 }) {
   return (
-    <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-      <div className="flex items-center px-4 py-3 border-b border-slate-100">
-        <h3 className="text-sm font-semibold text-slate-700 flex-1">{title}</h3>
+    <section className="bg-surface border border-line rounded-lg overflow-hidden">
+      <div className="flex items-center px-4 py-3 border-b border-line/60">
+        <h3 className="text-sm font-semibold text-ink-700 flex-1">{title}</h3>
         {actions}
       </div>
       <div>{children}</div>
@@ -778,13 +792,13 @@ function CollapsibleSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+    <section className="bg-surface border border-line rounded-lg overflow-hidden">
       <button
         onClick={onToggle}
-        className="w-full flex items-center px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        className="w-full flex items-center px-4 py-3 text-sm font-semibold text-ink-700 hover:bg-sunken/40"
       >
         <span className="flex-1 text-left">{title}</span>
-        <span className="text-slate-400">{open ? "▾" : "▸"}</span>
+        <span className="text-ink-400">{open ? "▾" : "▸"}</span>
       </button>
       {open && <div>{children}</div>}
     </section>
@@ -794,6 +808,7 @@ function CollapsibleSection({
 function BundleManager({ client }: { client: Client }) {
   const [picking, setPicking] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [multistateOpen, setMultistateOpen] = useState(false);
 
   const assigned = client.servicePackages;
   const available = BUNDLES.filter(
@@ -801,6 +816,14 @@ function BundleManager({ client }: { client: Client }) {
       b.entityTypes.includes(client.entityType) &&
       !assigned.includes(b.name)
   );
+
+  // Multi-state-eligible entity types per Q1 of the wizard shape brief.
+  // Trust + Individual stay on single-state package picker.
+  const isMultiStateEligible =
+    client.entityType === "LLC" ||
+    client.entityType === "S-Corp" ||
+    client.entityType === "C-Corp" ||
+    client.entityType === "Partnership";
 
   const onAssign = (id: string) => {
     actions.assignBundle(client.id, id);
@@ -814,28 +837,39 @@ function BundleManager({ client }: { client: Client }) {
 
   return (
     <>
-      <div className="bg-white border border-slate-200 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold text-slate-700">
+      <div className="bg-surface border border-line rounded-lg p-4">
+        <div className="flex items-center justify-between mb-2 gap-2">
+          <h3 className="text-sm font-semibold text-ink-700">
             Filing bundles
           </h3>
-          {available.length > 0 && (
-            <button
-              onClick={() => setPicking((v) => !v)}
-              className="text-xs px-2 py-1 rounded border border-slate-200 hover:bg-slate-50"
-            >
-              {picking ? "Cancel" : "+ Assign"}
-            </button>
-          )}
+          <div className="flex items-center gap-1.5">
+            {isMultiStateEligible && (
+              <button
+                onClick={() => setMultistateOpen(true)}
+                className="text-xs px-2 py-1 rounded border border-line hover:bg-sunken/40 text-ink-700"
+                title="Pick multiple states; we'll generate the deadlines for federal + each picked state."
+              >
+                + Multi-state…
+              </button>
+            )}
+            {available.length > 0 && (
+              <button
+                onClick={() => setPicking((v) => !v)}
+                className="text-xs px-2 py-1 rounded border border-line hover:bg-sunken/40"
+              >
+                {picking ? "Cancel" : "+ Assign"}
+              </button>
+            )}
+          </div>
         </div>
 
         {assigned.length === 0 ? (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-ink-500">
             No filing bundle assigned. Deadlines won't auto-generate until one
             is assigned.
           </p>
         ) : (
-          <ul className="text-sm text-slate-600 space-y-1">
+          <ul className="text-sm text-ink-700 space-y-1">
             {assigned.map((pkg) => {
               const bundle = bundleFromName(pkg);
               return (
@@ -843,16 +877,16 @@ function BundleManager({ client }: { client: Client }) {
                   key={pkg}
                   className="flex items-center gap-2 py-1"
                 >
-                  <span className="text-slate-900">{pkg}</span>
+                  <span className="text-ink-900">{pkg}</span>
                   {bundle && (
-                    <span className="text-2xs text-slate-500">
+                    <span className="text-2xs text-ink-500">
                       · {bundle.description}
                     </span>
                   )}
                   {bundle && (
                     <button
                       onClick={() => setRemoving(pkg)}
-                      className="ml-auto text-2xs text-slate-400 hover:text-red-600"
+                      className="ml-auto text-2xs text-ink-400 hover:text-danger-ink"
                     >
                       Remove
                     </button>
@@ -864,28 +898,28 @@ function BundleManager({ client }: { client: Client }) {
         )}
 
         {picking && available.length > 0 && (
-          <div className="mt-3 border-t border-slate-100 pt-3">
-            <p className="text-2xs text-slate-500 mb-2">
+          <div className="mt-3 border-t border-line/60 pt-3">
+            <p className="text-2xs text-ink-500 mb-2">
               Available bundles for {client.entityType} clients:
             </p>
             <ul className="space-y-1">
               {available.map((b) => (
                 <li
                   key={b.id}
-                  className="flex items-center gap-2 p-2 rounded hover:bg-slate-50"
+                  className="flex items-center gap-2 p-2 rounded hover:bg-sunken/40"
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm text-slate-900 font-medium">
+                    <div className="text-sm text-ink-900 font-medium">
                       {b.name}
                     </div>
-                    <div className="text-2xs text-slate-500">
+                    <div className="text-2xs text-ink-500">
                       {b.description} · {b.templates.length} deadline template
                       {b.templates.length === 1 ? "" : "s"}
                     </div>
                   </div>
                   <button
                     onClick={() => onAssign(b.id)}
-                    className="text-xs px-2.5 py-1 rounded bg-slate-900 text-white hover:bg-slate-800 shrink-0"
+                    className="text-xs px-2.5 py-1 rounded bg-ink-900 text-white hover:bg-ink-900 shrink-0"
                   >
                     Assign
                   </button>
@@ -908,7 +942,7 @@ function BundleManager({ client }: { client: Client }) {
                 deleted. Anything already in progress, completed, or deferred
                 stays.
               </p>
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-ink-500">
                 This is recorded in the client activity log.
               </p>
             </>
@@ -922,6 +956,16 @@ function BundleManager({ client }: { client: Client }) {
           }
           setRemoving(null);
         }}
+      />
+      <MultiStateWizard
+        open={multistateOpen}
+        onClose={() => setMultistateOpen(false)}
+        clientId={client.id}
+        clientName={client.name}
+        initialStates={[
+          client.primaryState,
+          ...(client.nexusStates ?? []),
+        ]}
       />
     </>
   );
@@ -948,7 +992,7 @@ function ClientAiInsightsCard({ clientId }: { clientId: string }) {
 
   if (open.length === 0 && facts.length === 0 && !showChurnRisk) {
     return (
-      <div className="mt-4 bg-blue-50 border border-blue-200 rounded-md px-4 py-2 text-xs text-blue-900">
+      <div className="mt-4 bg-info-bg border border-info-border rounded-md px-4 py-2 text-xs text-info-ink">
         AI insights unlock once you import a prior-year return for this client.
       </div>
     );
@@ -966,7 +1010,7 @@ function ClientAiInsightsCard({ clientId }: { clientId: string }) {
               Advisory opportunities
             </span>
             <span className="text-2xs text-info-ink/70">
-              Mode E · {advisoryTriggers.length} open · Layer B
+              {advisoryTriggers.length} open
             </span>
           </header>
           <ul className="divide-y divide-info-border/40">
@@ -992,7 +1036,7 @@ function ClientAiInsightsCard({ clientId }: { clientId: string }) {
               Churn risk
             </span>
             <span className="text-2xs text-warn-ink/70">
-              {churnRiskScore >= 4 ? "high" : "elevated"} · Layer B
+              {churnRiskScore >= 4 ? "high" : "elevated"}
             </span>
           </div>
           <p className="text-sm text-ink-900 font-medium mt-1">
@@ -1066,7 +1110,7 @@ function DocumentsTab({ client }: { client: Client }) {
 
   if (types.length === 0) {
     return (
-      <div className="bg-white border border-slate-200 rounded-lg p-6 text-center text-sm text-slate-500">
+      <div className="bg-surface border border-line rounded-lg p-6 text-center text-sm text-ink-500">
         No document history yet.
         <p className="mt-1 text-xs">
           Connect QuickBooks or import a prior-year return to populate this view.
@@ -1093,27 +1137,27 @@ function DocumentsTab({ client }: { client: Client }) {
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-200">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-700">
+    <div className="bg-surface border border-line rounded-lg overflow-hidden">
+      <div className="px-4 py-3 border-b border-line">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-700">
           Documents · longitudinal view
         </h3>
-        <p className="text-xs text-slate-500 mt-1">
+        <p className="text-xs text-ink-500 mt-1">
           Rows are document types. Columns are tax years. Highlights gaps where
           last year had a doc and this year doesn't (Mode E).
         </p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200">
+          <thead className="bg-sunken/40 border-b border-line">
             <tr>
-              <th className="text-left px-4 py-2 text-xs uppercase tracking-wider text-slate-500 font-semibold w-1/3">
+              <th className="text-left px-4 py-2 text-xs uppercase tracking-wider text-ink-500 font-semibold w-1/3">
                 Document
               </th>
               {years.map((y) => (
                 <th
                   key={y}
-                  className="text-center px-4 py-2 text-xs uppercase tracking-wider text-slate-500 font-semibold"
+                  className="text-center px-4 py-2 text-xs uppercase tracking-wider text-ink-500 font-semibold"
                 >
                   {y === currentYear ? `${y} (current)` : y}
                 </th>
@@ -1123,19 +1167,19 @@ function DocumentsTab({ client }: { client: Client }) {
           <tbody className="divide-y divide-slate-100">
             {types.map(([itemType, label]) => (
               <tr key={itemType}>
-                <td className="px-4 py-2 text-slate-900 capitalize">{label}</td>
+                <td className="px-4 py-2 text-ink-900 capitalize">{label}</td>
                 {years.map((y) => {
                   const c = cellFor(itemType, y);
                   return (
                     <td key={y} className="px-4 py-2 text-center">
                       {c === "received" && (
-                        <span className="text-emerald-700">●</span>
+                        <span className="text-ok-ink">●</span>
                       )}
                       {c === "current" && (
-                        <span className="text-blue-600">●</span>
+                        <span className="text-info-ink">●</span>
                       )}
                       {c === "missing" && (
-                        <span className="text-slate-300">○</span>
+                        <span className="text-ink-300">○</span>
                       )}
                     </td>
                   );
@@ -1145,15 +1189,15 @@ function DocumentsTab({ client }: { client: Client }) {
           </tbody>
         </table>
       </div>
-      <div className="px-4 py-2 text-2xs text-slate-400 border-t border-slate-200 flex items-center gap-3">
+      <div className="px-4 py-2 text-2xs text-ink-400 border-t border-line flex items-center gap-3">
         <span>
-          <span className="text-emerald-700">●</span> received (prior)
+          <span className="text-ok-ink">●</span> received (prior)
         </span>
         <span>
-          <span className="text-blue-600">●</span> received (this year)
+          <span className="text-info-ink">●</span> received (this year)
         </span>
         <span>
-          <span className="text-slate-300">○</span> missing
+          <span className="text-ink-300">○</span> missing
         </span>
       </div>
     </div>
@@ -1177,7 +1221,7 @@ function HistoryTab({
 
   if (closed.length === 0) {
     return (
-      <div className="bg-white border border-slate-200 rounded-lg p-6 text-center text-sm text-slate-500">
+      <div className="bg-surface border border-line rounded-lg p-6 text-center text-sm text-ink-500">
         No closed tasks for {client.name} yet.
       </div>
     );
@@ -1197,10 +1241,10 @@ function HistoryTab({
       {years.map((year) => (
         <div
           key={year}
-          className="bg-white border border-slate-200 rounded-lg overflow-hidden"
+          className="bg-surface border border-line rounded-lg overflow-hidden"
         >
-          <header className="px-4 py-2 border-b border-slate-200 bg-slate-50">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-700">
+          <header className="px-4 py-2 border-b border-line bg-sunken/40">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-700">
               {year} ({byYear.get(year)!.length})
             </h3>
           </header>
@@ -1212,11 +1256,11 @@ function HistoryTab({
               >
                 <Link
                   to={`/clients/${client.id}/tasks/t-${d.id}`}
-                  className="text-slate-900 hover:underline"
+                  className="text-ink-900 hover:underline"
                 >
                   {d.form}
                 </Link>
-                <div className="flex items-center gap-3 text-xs text-slate-500">
+                <div className="flex items-center gap-3 text-xs text-ink-500">
                   <span>{d.officialDueDate}</span>
                   <span className="capitalize">{d.status.replace(/_/g, " ")}</span>
                 </div>

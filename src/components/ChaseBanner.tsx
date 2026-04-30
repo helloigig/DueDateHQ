@@ -193,7 +193,7 @@ export function ChaseBanner() {
           {hiddenCount > 0 && (
             <li>
               <Link
-                to="/inbox"
+                to="/to-review"
                 className="w-full px-4 py-2 text-2xs text-ink-500 hover:text-ink-900 hover:bg-sunken/30 inline-flex items-center gap-1.5"
               >
                 <ChevronRight className="w-3 h-3" aria-hidden />

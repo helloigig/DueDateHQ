@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Sparkles, ArrowRight, X } from "lucide-react";
+import { TrendingUp, ArrowRight, X } from "lucide-react";
 import { useStore } from "../data/store";
 import { useAllOpenInsights } from "../hooks/useAiInsights";
 import { useState } from "react";
@@ -44,7 +44,7 @@ export function AdvisoryPeek() {
       className="bg-info-bg/40 border border-info-border rounded-md px-4 py-2.5 flex items-center gap-3"
       aria-label="Advisory opportunities"
     >
-      <Sparkles className="w-3.5 h-3.5 text-info-ink shrink-0" aria-hidden />
+      <TrendingUp className="w-3.5 h-3.5 text-info-ink shrink-0" aria-hidden />
       <div className="flex-1 min-w-0 text-xs">
         <span className="text-ink-500 uppercase tracking-wider text-2xs font-semibold mr-2">
           Advisory

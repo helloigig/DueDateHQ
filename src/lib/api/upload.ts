@@ -9,7 +9,12 @@
 import { trpcClientUntyped } from "./client";
 import { env } from "../../config";
 
-export type UploadKind = "csv_import" | "firm_logo";
+export type UploadKind =
+  | "firm_logo"
+  | "avatar"
+  | "inbound_attachment"
+  | "prior_year_return"
+  | "client_doc";
 
 export interface SignedUpload {
   uploadUrl: string;

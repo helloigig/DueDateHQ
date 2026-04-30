@@ -7,18 +7,20 @@ import {
   BookOpen,
   ArrowUpRight,
   AlertTriangle,
-  Sparkles,
+  Globe,
 } from "lucide-react";
 import { useStore } from "../data/store";
 import { useAllOpenInsights } from "../hooks/useAiInsights";
 
 /**
- * Insights — Layer C firm intelligence destination (PRD §4.4 Layer C).
+ * Opportunities — Layer C firm-intelligence destination (PRD §4.4 Layer C),
+ * surfaced under the user-facing label "Opportunities" in the sidebar so the
+ * action is unambiguous: revenue or risk the AI noticed that a partner can
+ * act on. The internal spec name "Insights" / "Layer C" stays in the code.
  *
- * The partner-retention thesis. Year-3 vision made tangible: Mode E + cohort
- * substrate produce surfaces no individual firm can build by hand. This is
- * the layer that "makes the partner notice the product matters" and carries
- * the highest pricing power.
+ * The partner-retention thesis. Mode E + cohort substrate produce surfaces no
+ * individual firm can build by hand: "this client is underbilled," "your Q3
+ * is going to break capacity," "you've handled this edge case before."
  *
  * Three sections:
  *   1. Pricing intelligence — "$1,500 billed for Riverside, comparable LLCs $2,400"
@@ -49,30 +51,45 @@ export function Insights() {
     <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 space-y-6">
       <header>
         <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
-          Insights
+          Opportunities
         </p>
         <h1 className="text-2xl font-semibold text-ink-900 mt-1">
-          Firm intelligence
+          Revenue and risk the AI noticed
         </h1>
         <p className="text-sm text-ink-500 mt-2 max-w-2xl">
-          What you can't see by hand. Pricing, capacity, and your own
-          institutional knowledge — surfaced from your roster, your prior
-          years, and anonymous cross-firm baselines. PRD §4.4 Layer C.
-        </p>
-        <p className="text-2xs text-ink-400 mt-2 italic">
-          Year-1 buyers see Layer A (efficiency). Year-3 retention is built on
-          Layer B (advisory). Layer C is what keeps the partner past Year 5.
+          Things you'd catch if you had time to read every prior return and
+          benchmark every fee against the market. Pricing, capacity, and your
+          own institutional knowledge — surfaced from your roster, your prior
+          years, and anonymous cross-firm baselines.
         </p>
       </header>
 
+      {/* Sticky in-page section nav. Four chips that jump to each section
+          via fragment links + scroll-margin so the section header isn't
+          obscured by the nav. Persists below the page header so a CPA
+          scrolling Pricing → Capacity → Firm brain doesn't have to scroll
+          back up to switch sections. */}
+      <nav
+        className="sticky top-0 z-10 -mx-4 md:-mx-6 px-4 md:px-6 py-2 bg-canvas/95 backdrop-blur-sm border-b border-line flex flex-wrap gap-1.5"
+        aria-label="Page sections"
+      >
+        <SectionAnchor href="#pricing" label="Pricing" />
+        <SectionAnchor href="#capacity" label="Capacity" />
+        <SectionAnchor href="#firm-brain" label="Firm brain" />
+        <SectionAnchor href="#benchmarks" label="Cross-firm benchmarks" />
+      </nav>
+
       {/* Pricing intelligence */}
-      <section className="bg-surface border border-line rounded-md overflow-hidden">
+      <section
+        id="pricing"
+        className="bg-surface border border-line rounded-md overflow-hidden scroll-mt-20"
+      >
         <header className="flex items-baseline px-5 py-3 border-b border-line bg-sunken/40 gap-2">
           <h2 className="text-sm font-semibold text-ink-900">
             Pricing intelligence
           </h2>
           <span className="text-2xs text-ink-500">
-            Layer C · cohort baselines
+            cohort baselines
           </span>
         </header>
         <div className="px-5 py-4 space-y-3">
@@ -125,13 +142,16 @@ export function Insights() {
       </section>
 
       {/* Capacity planning */}
-      <section className="bg-surface border border-line rounded-md overflow-hidden">
+      <section
+        id="capacity"
+        className="bg-surface border border-line rounded-md overflow-hidden scroll-mt-20"
+      >
         <header className="flex items-baseline px-5 py-3 border-b border-line bg-sunken/40 gap-2">
           <h2 className="text-sm font-semibold text-ink-900">
             Capacity planning
           </h2>
           <span className="text-2xs text-ink-500">
-            Layer C · workload forecast
+            workload forecast
           </span>
         </header>
         <div className="px-5 py-4 space-y-4">
@@ -192,11 +212,14 @@ export function Insights() {
       </section>
 
       {/* Firm brain */}
-      <section className="bg-surface border border-line rounded-md overflow-hidden">
+      <section
+        id="firm-brain"
+        className="bg-surface border border-line rounded-md overflow-hidden scroll-mt-20"
+      >
         <header className="flex items-baseline px-5 py-3 border-b border-line bg-sunken/40 gap-2">
           <h2 className="text-sm font-semibold text-ink-900">Firm brain</h2>
           <span className="text-2xs text-ink-500">
-            Layer C · institutional knowledge
+            institutional knowledge
           </span>
         </header>
         <div className="px-5 py-4 space-y-3">
@@ -243,15 +266,18 @@ export function Insights() {
         </div>
       </section>
 
-      {/* Cross-firm benchmarks (Layer D teaser) */}
-      <section className="bg-info-bg/30 border border-info-border rounded-md p-4">
+      {/* Cross-firm benchmarks teaser */}
+      <section
+        id="benchmarks"
+        className="bg-info-bg/30 border border-info-border rounded-md p-4 scroll-mt-20"
+      >
         <div className="flex items-baseline gap-2 mb-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-info-ink shrink-0" aria-hidden />
+          <Globe className="w-3.5 h-3.5 text-info-ink shrink-0" aria-hidden />
           <h2 className="text-sm font-semibold text-info-ink">
             Cross-firm benchmarks coming
           </h2>
           <span className="text-2xs text-info-ink/70">
-            Layer D · Phase 2-3
+            once 100+ firms onboard
           </span>
         </div>
         <p className="text-xs text-info-ink/90">
@@ -368,5 +394,20 @@ function KnowledgeEntry({
       <p className="text-xs text-ink-700">{decision}</p>
       <p className="text-2xs text-ink-400 italic mt-2">— {author}</p>
     </article>
+  );
+}
+
+/**
+ * Anchor pill in the sticky page nav. Renders an accessible <a> for
+ * fragment navigation. Uses the URL hash, so deep-links work too.
+ */
+function SectionAnchor({ href, label }: { href: string; label: string }) {
+  return (
+    <a
+      href={href}
+      className="text-2xs uppercase tracking-wide font-semibold px-2.5 py-1 rounded border border-line text-ink-500 hover:text-ink-900 hover:bg-sunken transition-colors"
+    >
+      {label}
+    </a>
   );
 }

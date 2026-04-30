@@ -30,6 +30,11 @@ import type {
   AiInsight,
 } from "../types";
 import { EmailDraftModal, type EmailDraftIntent } from "./EmailDraftModal";
+import { AuthorityChip } from "./AuthorityChip";
+import { BottomSheet } from "./BottomSheet";
+import { useIsTouchViewport } from "../hooks/useIsTouchViewport";
+import { SmsChaseDialog } from "./SmsChaseDialog";
+import { useSmsStatus } from "../hooks/useFilesFromClients";
 
 /**
  * Task-centric dashboard. AI lives at Layer 4 *inside* each task per PRD §3
@@ -47,15 +52,19 @@ import { EmailDraftModal, type EmailDraftIntent } from "./EmailDraftModal";
  *   Ready to file — all checklist items confirmed
  */
 
-type FilterKey = "needs_me" | "waiting" | "all";
+type FilterKey = "needs_me" | "behind" | "waiting" | "all";
 
-// Three filters, not five. The CPA's actual mental cuts:
+// Four filters, not five. The CPA's actual mental cuts:
 //   Needs me — flagged, unreviewed, or overdue. The pile that won't move
-//              unless I touch it.
+//              unless I touch it. AI surfaced these but never auto-confirmed
+//              anything (§5.3 invariant); the user is the decider.
+//   Behind   — past internal target, official deadline still ahead. Buffer
+//              eaten; decide chase-harder, file-extension, or push.
 //   Waiting  — chased the client, no reply yet. Time-driven, not me-driven.
 //   All      — everything actionable.
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
-  { key: "needs_me", label: "Needs me" },
+  { key: "needs_me", label: "Needs your decision" },
+  { key: "behind", label: "Behind schedule" },
   { key: "waiting", label: "Waiting on client" },
   { key: "all", label: "All" },
 ];
@@ -72,7 +81,8 @@ interface TaskRowData {
   waiting: number;
   notRequested: number;
   // Derived signals
-  isOverdue: boolean;
+  isOverdue: boolean;       // past official deadline (rare — extension territory)
+  isPastInternalTarget: boolean; // past internal target, official still ahead
   isReady: boolean;
   needsDecision: boolean;
   isWaitingOnClient: boolean;
@@ -80,7 +90,8 @@ interface TaskRowData {
   daysUntilInternal: number;
   // AI risk forecast (PRD §4.4 Layer A): predicts whether this task is
   // likely to slip past its internal target if no action is taken. Combines
-  // missing-doc count + days remaining + historical chase-velocity.
+  // missing-doc count + days remaining + historical chase-velocity. Once
+  // the slip actually happens, isPastInternalTarget supersedes this.
   isAtRisk: boolean;
   // Cross-year insights for this client (Mode E) tagged in
   insights: AiInsight[];
@@ -100,6 +111,11 @@ export function TaskList() {
   const showAssignee = session?.tier !== "solo";
   const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null);
   const [assigneeMenuOpen, setAssigneeMenuOpen] = useState(false);
+  // Dashboard row cap. Default 10 keeps the morning view scannable;
+  // "Show 50" expander unlocks Yan-Jing-scale firms (600 clients,
+  // ~60 needs-decision items) without forcing a navigate to /to-review.
+  // Bulk lives on /to-review; this is just the in-place expansion.
+  const [showAll, setShowAll] = useState(false);
 
   const clientById = useMemo(
     () => new Map(clients.map((c) => [c.id, c])),
@@ -160,6 +176,11 @@ export function TaskList() {
       ).length;
       const totalRelevant = relevant.length;
       const isOverdue = task.officialDueDate < today;
+      // Buffer-eaten: past internal target but official is still ahead.
+      // This is the daily reality during tax season (CPAs barely miss
+      // official deadlines). Mutually exclusive with isOverdue by design.
+      const isPastInternalTarget =
+        !isOverdue && task.internalTargetDate < today;
       const isReady = totalRelevant > 0 && confirmed === totalRelevant;
       const needsDecision = unreviewed > 0 || flagged > 0;
       const isWaitingOnClient = waiting > 0 && !needsDecision;
@@ -171,11 +192,14 @@ export function TaskList() {
       // AI risk forecast: tasks at risk = missing docs + tight runway. The
       // internal target is the CPA's working deadline, so the forecast uses
       // that, not the official date. Threshold: if more docs are still
-      // outstanding than days remaining, the task is "at risk."
+      // outstanding than days remaining, the task is "at risk." Once the
+      // slip actually happens (isPastInternalTarget), the forecast turns
+      // off — the warning has materialized into a state we surface directly.
       const docsOutstanding = waiting + notRequested + unreviewed + flagged;
       const isAtRisk =
         !isReady &&
         !isOverdue &&
+        !isPastInternalTarget &&
         daysUntilInternal >= 0 &&
         daysUntilInternal <= 14 &&
         docsOutstanding > Math.max(daysUntilInternal, 1);
@@ -190,6 +214,7 @@ export function TaskList() {
         waiting,
         notRequested,
         isOverdue,
+        isPastInternalTarget,
         isReady,
         needsDecision,
         isWaitingOnClient,
@@ -218,6 +243,10 @@ export function TaskList() {
     switch (filter) {
       case "needs_me":
         return list.filter((r) => r.needsDecision || r.isOverdue);
+      case "behind":
+        return list.filter(
+          (r) => r.isPastInternalTarget || r.isOverdue,
+        );
       case "waiting":
         return list.filter((r) => r.isWaitingOnClient);
       case "all":
@@ -236,6 +265,9 @@ export function TaskList() {
   const counts = useMemo(() => {
     return {
       needs_me: rows.filter((r) => r.needsDecision || r.isOverdue).length,
+      behind: rows.filter(
+        (r) => r.isPastInternalTarget || r.isOverdue,
+      ).length,
       waiting: rows.filter((r) => r.isWaitingOnClient).length,
       all: rows.length,
     };
@@ -317,20 +349,15 @@ export function TaskList() {
             )}
             {FILTERS.map((f) => {
               const active = filter === f.key;
-              const count =
-                f.key === "all"
-                  ? counts.all
-                  : f.key === "needs_me"
-                  ? counts.needs_me
-                  : counts.waiting;
+              const count = counts[f.key];
               return (
                 <button
                   key={f.key}
                   onClick={() => setFilter(f.key)}
                   className={`text-2xs uppercase tracking-wide px-2 py-0.5 rounded border ${
                     active
-                      ? "bg-ink-900 text-canvas border-ink-900"
-                      : "border-line text-ink-500 hover:bg-sunken"
+                      ? "bg-sunken text-ink-900 border-ink-900 font-medium"
+                      : "border-line text-ink-500 hover:bg-sunken hover:text-ink-700"
                   }`}
                 >
                   {f.label}
@@ -340,13 +367,23 @@ export function TaskList() {
             })}
           </div>
         </header>
+        {filter === "needs_me" && filtered.length > 0 && (
+          <div className="px-4 py-2 bg-info-bg/40 border-b border-info-border text-2xs text-info-ink flex items-center gap-2">
+            <AuthorityChip zone="yellow" label="AI proposes" />
+            <span>
+              <span className="font-medium">AI noticed something on each of these.</span>{" "}
+              We never auto-confirm — your click is the only way an item
+              advances.
+            </span>
+          </div>
+        )}
         {filtered.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-ink-500">
             Nothing matches this filter.
           </div>
         ) : (
           <ul className="divide-y divide-line">
-            {filtered.slice(0, 10).map((row) => (
+            {filtered.slice(0, showAll ? 50 : 10).map((row) => (
               <TaskRow
                 key={row.task.id}
                 row={row}
@@ -361,12 +398,42 @@ export function TaskList() {
                 onSendChase={(item) => openEmailFor(row, item)}
               />
             ))}
-            {filtered.length > 10 && (
-              <li className="px-4 py-2.5 text-xs text-ink-500 hover:bg-sunken">
-                <Link to="/inbox" className="flex items-center gap-1">
-                  + {filtered.length - 10} more — open inbox for the full list
+            {filtered.length > 10 && !showAll && (
+              <li className="px-4 py-2.5 text-xs flex items-center gap-3 hover:bg-sunken">
+                <button
+                  onClick={() => setShowAll(true)}
+                  className="text-ink-700 hover:text-ink-900 font-medium"
+                >
+                  Show {Math.min(filtered.length - 10, 40)} more
+                </button>
+                <span className="text-ink-300">·</span>
+                <Link
+                  to="/to-review"
+                  className="text-ink-500 hover:text-ink-900 inline-flex items-center gap-1"
+                >
+                  Open To review for the full list
                   <ChevronRight className="w-3 h-3" aria-hidden />
                 </Link>
+              </li>
+            )}
+            {showAll && filtered.length > 50 && (
+              <li className="px-4 py-2.5 text-xs flex items-center gap-3">
+                <span className="text-ink-500">
+                  Showing 50 of {filtered.length}.
+                </span>
+                <Link
+                  to="/to-review"
+                  className="text-ink-700 hover:text-ink-900 font-medium inline-flex items-center gap-1"
+                >
+                  Open To review for the rest
+                  <ChevronRight className="w-3 h-3" aria-hidden />
+                </Link>
+                <button
+                  onClick={() => setShowAll(false)}
+                  className="ml-auto text-ink-500 hover:text-ink-900"
+                >
+                  Collapse
+                </button>
               </li>
             )}
           </ul>
@@ -455,6 +522,14 @@ function TaskRow({
                 at risk
               </span>
             )}
+            {row.isPastInternalTarget && (
+              <span
+                className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-warn-bg text-warn-ink border border-warn-border font-semibold"
+                title={behindScheduleHint(row)}
+              >
+                behind schedule
+              </span>
+            )}
             {hasUnreadAlert && (
               <span
                 className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-warn-bg text-warn-ink border border-warn-border"
@@ -466,7 +541,7 @@ function TaskRow({
             {row.insights.length > 0 && (
               <span
                 className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-info-bg text-info-ink border border-info-border"
-                title="Mode E — cross-year advisory opportunity"
+                title="Cross-year advisory opportunity"
               >
                 advisory
               </span>
@@ -478,19 +553,37 @@ function TaskRow({
           </p>
         </div>
 
-        {/* Deadline — top-right on mobile, mid-right on desktop */}
-        <span
-          className={`text-xs tabular-nums shrink-0 text-right whitespace-nowrap ${
-            row.daysUntilInternal < 0
-              ? "text-danger-ink font-semibold"
-              : row.daysUntilInternal <= 3
-              ? "text-warn-ink font-medium"
-              : "text-ink-700"
-          }`}
+        {/* Deadline column — internal target is the working deadline.
+            Show only ONE date by default; surface official runway inline
+            ONLY when the buffer is already gone (isPastInternalTarget) so
+            the CPA can decide chase / extension / push without hovering. */}
+        <div
+          className="text-right shrink-0 whitespace-nowrap"
           title={`Internal target ${row.task.internalTargetDate}\nIRS official deadline ${row.task.officialDueDate}`}
         >
-          {countdownLabel(row.task.internalTargetDate)}
-        </span>
+          <span
+            className={`text-xs tabular-nums block ${
+              row.isOverdue
+                ? "text-danger-ink font-semibold"
+                : row.isPastInternalTarget
+                ? "text-warn-ink font-semibold"
+                : row.daysUntilInternal <= 3
+                ? "text-warn-ink font-medium"
+                : "text-ink-700"
+            }`}
+          >
+            {row.isOverdue
+              ? `${-row.daysUntil}d past official`
+              : countdownLabel(row.task.internalTargetDate)}
+          </span>
+          {row.isPastInternalTarget && (
+            <span className="text-2xs text-ink-500 tabular-nums block">
+              {row.daysUntil > 0
+                ? `${row.daysUntil}d to official`
+                : "official today"}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Bottom row on mobile: assignees + action.
@@ -526,12 +619,17 @@ function TaskRow({
 
 /**
  * Per-row quick actions: mark complete, defer 7 days, file extension.
- * Closes PRD §10.3 #7 — the "status toggle on rows" P0 requirement that
- * lets the CPA dispatch routine state changes without entering Task detail.
+ *
+ * Renders as a desktop dropdown menu (anchored to the trigger) OR as a
+ * mobile bottom-sheet when the viewport is ≤640px. The bottom-sheet
+ * gives Sarah-on-phone bigger touch targets than the cramped dropdown
+ * positioning could provide, and dismiss-via-tap-outside is more
+ * forgiving than tapping a tiny X.
  */
 function QuickMenu({ task }: { task: Task }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
+  const isTouch = useIsTouchViewport();
 
   const onMarkComplete = () => {
     if (
@@ -552,6 +650,29 @@ function QuickMenu({ task }: { task: Task }) {
     close();
   };
 
+  const items = (
+    <>
+      <MenuItem
+        icon={<Check className="w-4 h-4 text-ok-solid" aria-hidden />}
+        label="Mark complete"
+        hint={isTouch ? "Closes the task and stops chases" : undefined}
+        onClick={onMarkComplete}
+      />
+      <MenuItem
+        icon={<CalendarClock className="w-4 h-4 text-ink-500" aria-hidden />}
+        label="Defer"
+        hint={isTouch ? "Push to next period — keeps the task open" : undefined}
+        onClick={onDefer}
+      />
+      <MenuItem
+        icon={<FileText className="w-4 h-4 text-ink-500" aria-hidden />}
+        label="File extension"
+        hint={isTouch ? "Marks Form 7004/4868 filed; opens the extension" : undefined}
+        onClick={onFileExtension}
+      />
+    </>
+  );
+
   return (
     <span className="relative">
       <button
@@ -559,41 +680,34 @@ function QuickMenu({ task }: { task: Task }) {
           e.stopPropagation();
           setOpen((v) => !v);
         }}
-        className="text-ink-400 hover:text-ink-900 hover:bg-sunken rounded p-1.5"
+        // Bigger touch target on mobile — the same icon, more padding
+        className="text-ink-400 hover:text-ink-900 hover:bg-sunken rounded p-2 sm:p-1.5"
         aria-label="More actions"
         title="More actions"
       >
-        <MoreHorizontal className="w-3.5 h-3.5" aria-hidden />
+        <MoreHorizontal className="w-4 h-4 sm:w-3.5 sm:h-3.5" aria-hidden />
       </button>
-      {open && (
-        <>
-          <span
-            className="fixed inset-0 z-30"
-            onClick={(e) => {
-              e.stopPropagation();
-              close();
-            }}
-          />
-          <div
-            className="absolute right-0 top-full mt-1 z-40 bg-surface border border-line rounded-md shadow-overlay py-1 w-48"
-          >
-            <MenuItem
-              icon={<Check className="w-3.5 h-3.5 text-ok-solid" aria-hidden />}
-              label="Mark complete"
-              onClick={onMarkComplete}
+
+      {/* Mobile path — full-width bottom-sheet with bigger rows */}
+      {isTouch ? (
+        <BottomSheet open={open} onClose={close} title={task.formType}>
+          <div className="divide-y divide-line">{items}</div>
+        </BottomSheet>
+      ) : (
+        open && (
+          <>
+            <span
+              className="fixed inset-0 z-30"
+              onClick={(e) => {
+                e.stopPropagation();
+                close();
+              }}
             />
-            <MenuItem
-              icon={<CalendarClock className="w-3.5 h-3.5 text-ink-500" aria-hidden />}
-              label="Defer"
-              onClick={onDefer}
-            />
-            <MenuItem
-              icon={<FileText className="w-3.5 h-3.5 text-ink-500" aria-hidden />}
-              label="File extension"
-              onClick={onFileExtension}
-            />
-          </div>
-        </>
+            <div className="absolute right-0 top-full mt-1 z-40 bg-surface border border-line rounded-md shadow-overlay py-1 w-48">
+              {items}
+            </div>
+          </>
+        )
       )}
     </span>
   );
@@ -603,21 +717,31 @@ function MenuItem({
   icon,
   label,
   onClick,
+  hint,
 }: {
   icon: React.ReactNode;
   label: string;
-  onClick: () => void;
+  onClick: (e: React.MouseEvent) => void;
+  hint?: string;
 }) {
   return (
     <button
       onClick={(e) => {
         e.stopPropagation();
-        onClick();
+        onClick(e);
       }}
-      className="w-full text-left px-3 py-1.5 text-sm text-ink-700 hover:bg-sunken flex items-center gap-2"
+      // Bigger tap target on mobile (44pt min via py-3) — the same row
+      // is denser on desktop (py-1.5). Keeps both feel native to the
+      // input method.
+      className="w-full text-left px-4 py-3 sm:px-3 sm:py-1.5 text-sm text-ink-700 hover:bg-sunken active:bg-sunken/70 flex items-start gap-3 sm:gap-2"
     >
-      {icon}
-      {label}
+      <span className="mt-0.5">{icon}</span>
+      <span className="flex-1">
+        {label}
+        {hint && (
+          <span className="block text-2xs text-ink-500 mt-0.5">{hint}</span>
+        )}
+      </span>
     </button>
   );
 }
@@ -829,30 +953,26 @@ function PrimaryAction({
       <button
         onClick={() => onConfirm(lead.id)}
         className="text-xs px-3 py-1.5 rounded bg-warn-bg text-warn-ink border border-warn-border hover:bg-warn-bg/70 inline-flex items-center gap-1 shrink-0"
-        title="Confirm — only the CPA can do this (PRD §5.3)"
+        title="Confirm — only you can do this"
       >
         <Check className="w-3 h-3" aria-hidden /> Confirm
       </button>
     );
   }
-  if (lead?.state === "received_issue") {
+  // Both flagged-issue and waiting-for-reply lead to the Ask Client menu —
+  // the CPA's affordance is the same: chase or copy the forwarding address.
+  if (
+    lead?.state === "received_issue" ||
+    lead?.state === "requested_waiting"
+  ) {
     return (
-      <button
-        onClick={() => onSendChase(lead)}
-        className="text-xs px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover inline-flex items-center gap-1 shrink-0"
-      >
-        <Mail className="w-3 h-3" aria-hidden /> Ask client
-      </button>
-    );
-  }
-  if (lead?.state === "requested_waiting") {
-    return (
-      <button
-        onClick={() => onSendChase(lead)}
-        className="text-xs px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover inline-flex items-center gap-1 shrink-0"
-      >
-        <Mail className="w-3 h-3" aria-hidden /> Send
-      </button>
+      <AskClientMenu
+        item={lead}
+        task={row.task}
+        client={row.client}
+        forwardingEmail={row.task.forwardingEmail}
+        onCustom={() => onSendChase(lead)}
+      />
     );
   }
   if (row.isReady) {
@@ -876,9 +996,222 @@ function PrimaryAction({
   );
 }
 
+/**
+ * Three-option dropdown replacing the single "Ask client" button. The
+ * critique: opening a 346-line email composer for every chase is overweight
+ * for what the CPA actually wants 80% of the time — "send the same template
+ * I always send."
+ *
+ *   1. Quick chase — one-click, sends the implied default template, just
+ *      bumps lastReminderAt + activity event. No modal.
+ *   2. Custom email… — opens the EmailDraftModal for full edit.
+ *   3. Copy forwarding address — clipboard. Lets the CPA paste it into a
+ *      different conversation (Slack thread with the bookkeeper, the
+ *      client's text message thread) — accepts that the product isn't the
+ *      only place email lives.
+ */
+function AskClientMenu({
+  item,
+  task,
+  client,
+  forwardingEmail,
+  onCustom,
+}: {
+  item: ChecklistItem;
+  task: Task;
+  client: Client;
+  forwardingEmail: string;
+  onCustom: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [smsOpen, setSmsOpen] = useState(false);
+  const smsStatus = useSmsStatusInline();
+  const session = useSession();
+  const isTouch = useIsTouchViewport();
+
+  const close = () => setOpen(false);
+  const tier = session?.tier ?? "solo";
+  // SMS option visibility: tier-gated (Pro/Team) AND BE-configured.
+  // Solo firms see no SMS option at all (they can't send anyway).
+  // Pro/Team without BE config see a disabled hint so they know it
+  // exists but isn't wired yet.
+  const canSendSms = tier !== "solo" && smsStatus.configured;
+  const showSmsRow = tier !== "solo";
+
+  const onQuickChase = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    actions.quickChase(item.id);
+    close();
+  };
+
+  const onCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(forwardingEmail);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
+    close();
+  };
+
+  const items = (
+    <>
+      <MenuItem
+        icon={<Mail className="w-4 h-4 text-accent" aria-hidden />}
+        label="Quick chase"
+        onClick={onQuickChase}
+        hint="Send the default template"
+      />
+      <MenuItem
+        icon={<FileText className="w-4 h-4 text-ink-500" aria-hidden />}
+        label="Custom email…"
+        onClick={() => {
+          onCustom();
+          close();
+        }}
+        hint="Edit before sending"
+      />
+      {showSmsRow && (
+        <MenuItem
+          icon={
+            <span
+              className={[
+                "w-4 h-4 inline-flex items-center justify-center text-2xs font-mono rounded",
+                canSendSms
+                  ? "bg-info-bg text-info-ink"
+                  : "bg-sunken text-ink-400 border border-line",
+              ].join(" ")}
+              aria-hidden
+            >
+              SMS
+            </span>
+          }
+          label={canSendSms ? "Send SMS chase…" : "Send SMS chase (not configured)"}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (canSendSms) {
+              setSmsOpen(true);
+              close();
+            }
+          }}
+          hint={
+            canSendSms
+              ? "Often 5-10x response rate vs email"
+              : "Wire TWILIO_* env vars to enable"
+          }
+        />
+      )}
+      <div className="border-t border-line my-1" />
+      <MenuItem
+        icon={<Mail className="w-4 h-4 text-ink-500" aria-hidden />}
+        label="Copy forwarding address"
+        onClick={onCopy}
+        hint="Paste into Slack, text, or anywhere"
+      />
+    </>
+  );
+
+  return (
+    <span className="relative shrink-0">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        className="text-xs px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover inline-flex items-center gap-1"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <Mail className="w-3 h-3" aria-hidden />
+        Ask client
+        <ChevronDown className="w-3 h-3 opacity-70" aria-hidden />
+      </button>
+      {copied && (
+        <span className="absolute right-0 top-full mt-1 text-2xs text-ok-ink bg-ok-bg border border-ok-border rounded px-2 py-0.5 whitespace-nowrap">
+          Copied!
+        </span>
+      )}
+
+      {/* Mobile: bottom-sheet. Desktop: anchored dropdown. */}
+      {isTouch ? (
+        <BottomSheet open={open} onClose={close} title={item.label}>
+          <div className="divide-y divide-line">{items}</div>
+        </BottomSheet>
+      ) : (
+        open && (
+          <>
+            <span
+              className="fixed inset-0 z-30"
+              onClick={(e) => {
+                e.stopPropagation();
+                close();
+              }}
+            />
+            <div
+              className="absolute right-0 top-full mt-1 z-40 bg-surface border border-line rounded-md shadow-overlay py-1 w-64"
+              role="menu"
+            >
+              {items}
+            </div>
+          </>
+        )
+      )}
+
+      <SmsChaseDialog
+        open={smsOpen}
+        onClose={() => setSmsOpen(false)}
+        task={task}
+        client={client}
+        item={item}
+      />
+    </span>
+  );
+}
+
+/**
+ * Inline wrapper around useSmsStatus that returns a stable shape even
+ * when the query is loading or errored. Lets callers branch on
+ * .configured without nullable juggling.
+ */
+function useSmsStatusInline(): { configured: boolean } {
+  const q = useSmsStatus();
+  return { configured: q.data?.configured ?? false };
+}
+
+/**
+ * Tooltip hint for the "behind schedule" chip. Maps the runway-to-official
+ * to the next decision the CPA needs to make:
+ *
+ *   >7 days  → chase harder; the buffer's gone but there's still working time
+ *    1–7 days → file extension OR push; decision time
+ *    0 days   → official is today; decide now
+ *   <0 days   → past official (handled by isOverdue branch elsewhere)
+ *
+ * The hint is intentionally action-oriented, not status-oriented. CPAs
+ * rarely miss official deadlines because they don't dwell on "behind" —
+ * they pick a recovery move. We surface the move.
+ */
+function behindScheduleHint(r: TaskRowData): string {
+  const lateBy = -r.daysUntilInternal;
+  if (r.daysUntil > 7) {
+    return `${lateBy}d past internal target · ${r.daysUntil}d to official — chase harder`;
+  }
+  if (r.daysUntil >= 1) {
+    return `${lateBy}d past internal target · ${r.daysUntil}d to official — file extension or push`;
+  }
+  if (r.daysUntil === 0) {
+    return `${lateBy}d past internal target · official is today — decide now`;
+  }
+  return `${lateBy}d past internal target`;
+}
+
 function urgencyScore(r: TaskRowData): number {
   let score = 0;
-  if (r.isOverdue) score += 100;
+  if (r.isOverdue) score += 100; // past official — extension territory
+  if (r.isPastInternalTarget) score += 70; // buffer eaten, official still ahead
   if (r.flagged > 0) score += 60;
   if (r.affectingAlerts.some((a) => !a.read)) score += 50;
   if (r.daysUntil <= 0 && !r.isReady) score += 40;
@@ -888,29 +1221,79 @@ function urgencyScore(r: TaskRowData): number {
   return score;
 }
 
+/**
+ * Urgency indicator. Pairs color with shape so color-blind users (~8% of
+ * CPAs, mostly deuteranopia) can still scan a list of 60+ rows. Shape
+ * mapping is consistent with traffic-light convention:
+ *   - filled solid    = act now (overdue / flagged)
+ *   - filled with ring = needs your decision
+ *   - half-filled      = due soon, on track
+ *   - check glyph      = ready to file
+ *   - hollow           = open, no signal yet
+ */
 function UrgencyDot({ row }: { row: TaskRowData }) {
   if (row.isOverdue || row.flagged > 0) {
     return (
-      <span className="w-2 h-2 rounded-full bg-danger-solid block" aria-label="urgent" />
+      <span
+        className="w-2.5 h-2.5 rounded-full bg-danger-solid block"
+        aria-label="urgent"
+        title="Urgent — overdue or flagged"
+      />
     );
   }
   if (row.unreviewed > 0) {
     return (
-      <span className="w-2 h-2 rounded-full bg-warn-solid block" aria-label="needs decision" />
+      // Concentric ring: outer warn-solid, inner canvas, distinct shape
+      <span
+        className="w-2.5 h-2.5 rounded-full bg-warn-solid relative block"
+        aria-label="needs your decision"
+        title="Needs your decision — AI flagged something"
+      >
+        <span className="absolute inset-[3px] rounded-full bg-canvas block" />
+      </span>
     );
   }
   if (row.daysUntil <= 7) {
     return (
-      <span className="w-2 h-2 rounded-full bg-info-solid block" aria-label="due soon" />
+      // Half-fill: bottom semicircle filled, top hollow
+      <span
+        className="w-2.5 h-2.5 rounded-full border border-info-solid relative overflow-hidden block"
+        aria-label="due soon"
+        title="Due this week"
+      >
+        <span className="absolute inset-x-0 bottom-0 h-1/2 bg-info-solid block" />
+      </span>
     );
   }
   if (row.isReady) {
     return (
-      <span className="w-2 h-2 rounded-full bg-ok-solid block" aria-label="ready" />
+      // Check glyph in a circle — unmistakable "done" signal
+      <span
+        className="w-2.5 h-2.5 rounded-full bg-ok-solid flex items-center justify-center"
+        aria-label="ready to file"
+        title="Ready to file — all docs confirmed"
+      >
+        <svg
+          viewBox="0 0 8 8"
+          className="w-2 h-2 text-canvas"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <path d="M2 4.2 L3.4 5.6 L6.2 2.4" />
+        </svg>
+      </span>
     );
   }
   return (
-    <span className="w-2 h-2 rounded-full border border-ink-300 block" aria-label="open" />
+    <span
+      className="w-2.5 h-2.5 rounded-full border border-ink-300 block"
+      aria-label="open"
+      title="Open"
+    />
   );
 }
 

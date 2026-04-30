@@ -24,5 +24,5 @@ COPY --from=deps /app/backend/node_modules ./node_modules
 COPY --from=build /app/backend/dist ./dist
 COPY --from=build /app/backend/migrations ./migrations
 COPY backend/package.json ./
-EXPOSE 8080
+EXPOSE 8000
 CMD ["node", "dist/index.js"]

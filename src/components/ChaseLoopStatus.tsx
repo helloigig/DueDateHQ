@@ -212,7 +212,7 @@ export function ChaseLoopStatus() {
               : `${confirmTasks} tasks have docs in. Batch them when you have a minute.`
           }
           ctaLabel={confirms.length > 3 ? "Open inbox" : "Review"}
-          ctaHref="/inbox"
+          ctaHref="/to-review"
           items={confirms.slice(0, 3).map((c) => {
             const task = taskById.get(c.taskId);
             const client = task ? clientById.get(task.clientId) : null;
@@ -225,7 +225,7 @@ export function ChaseLoopStatus() {
                 <button
                   onClick={() => confirmWithUndo(c)}
                   className="text-2xs px-1.5 py-0.5 rounded bg-warn-bg text-warn-ink border border-warn-border hover:bg-warn-bg/70 shrink-0"
-                  title="Confirm — only the CPA can do this (PRD §5.3)"
+                  title="Confirm — only you can do this"
                 >
                   ✓
                 </button>
@@ -256,10 +256,10 @@ export function ChaseLoopStatus() {
           subtitle={
             chases.length === 0
               ? "Nothing to chase today."
-              : `Mode B says it's time to follow up on ${chaseTasks} task${chaseTasks === 1 ? "" : "s"}.`
+              : `It's time to follow up on ${chaseTasks} task${chaseTasks === 1 ? "" : "s"}.`
           }
           ctaLabel={chases.length > 3 ? "Open inbox" : "Send all"}
-          ctaHref={chases.length > 3 ? "/inbox" : null}
+          ctaHref={chases.length > 3 ? "/to-review" : null}
           items={chases.slice(0, 3).map((c) => {
             const task = taskById.get(c.taskId);
             const client = task ? clientById.get(task.clientId) : null;

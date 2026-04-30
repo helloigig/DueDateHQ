@@ -16,7 +16,9 @@ import { Signup } from "./pages/auth/Signup";
 import { AcceptInvite } from "./pages/auth/AcceptInvite";
 import { ForgotPassword } from "./pages/auth/ForgotPassword";
 import { ResetPassword } from "./pages/auth/ResetPassword";
+import { MagicLink } from "./pages/auth/MagicLink";
 import { Changes } from "./pages/Changes";
+import { Calendar } from "./pages/Calendar";
 import { OnboardingFirm } from "./pages/onboarding/OnboardingFirm";
 import { OnboardingChoosePath } from "./pages/onboarding/OnboardingChoosePath";
 import { OnboardingManual } from "./pages/onboarding/OnboardingManual";
@@ -39,6 +41,7 @@ export default function App() {
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/magic-link" element={<MagicLink />} />
 
       {/* Onboarding wizard — wizard chrome, no sidebar (IA §3.8) */}
       {localSession && (
@@ -66,8 +69,13 @@ export default function App() {
           }
         >
           <Route index element={<Dashboard />} />
-          <Route path="inbox" element={<Inbox />} />
-          <Route path="insights" element={<Insights />} />
+          <Route path="to-review" element={<Inbox />} />
+          <Route path="calendar" element={<Calendar />} />
+          {/* Legacy /inbox route — redirect to canonical /to-review */}
+          <Route path="inbox" element={<Navigate to="/to-review" replace />} />
+          <Route path="opportunities" element={<Insights />} />
+          {/* Legacy /insights route — redirect to canonical /opportunities */}
+          <Route path="insights" element={<Navigate to="/opportunities" replace />} />
           <Route path="clients" element={<Clients />} />
           <Route path="clients/:id" element={<ClientDetail />} />
           <Route path="clients/:id/tasks/:taskId" element={<TaskDetail />} />

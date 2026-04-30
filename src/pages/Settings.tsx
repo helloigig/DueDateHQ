@@ -16,6 +16,8 @@ import {
   PauseCircle,
   PlayCircle,
   ShieldCheck,
+  Brain,
+  TrendingDown,
 } from "lucide-react";
 import { actions, useStore } from "../data/store";
 import { useImportHistory } from "../hooks/useImports";
@@ -24,6 +26,22 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ErrorState } from "../components/ErrorState";
 import { UpgradePrompt } from "../components/UpgradePrompt";
 import { useFeatureFlags } from "../hooks/useFeatureFlags";
+import {
+  useReviewerQueue,
+  useManualDetect,
+  useApproveScraped,
+  useRejectScraped,
+} from "../hooks/useScraperReview";
+import {
+  useIntegrations,
+  useIntegrationCatalog,
+  useStartConnect,
+  useDisconnect,
+  useSyncNow,
+} from "../hooks/useIntegrations";
+import { useDriftReport, useAiStatus } from "../hooks/useDriftReport";
+import { PriorYearUpload } from "../components/PriorYearUpload";
+import { PwaInstallCard } from "../components/PwaInstallCard";
 import {
   useReminderTemplates,
   useUpdateReminderTemplate,
@@ -47,6 +65,7 @@ const NAV = [
   { to: "/settings/billing", label: "Billing", icon: CreditCard },
   { to: "/settings/notifications", label: "Notifications", icon: Bell },
   { to: "/settings/alerts", label: "Alert digest", icon: Bell },
+  { to: "/settings/ai", label: "AI eval", icon: Brain },
   { to: "/settings/data", label: "Data", icon: Download },
 ];
 
@@ -87,6 +106,7 @@ export function Settings() {
           <Route path="notifications" element={<NotificationsPanel />} />
           <Route path="imports" element={<ImportsPanel />} />
           <Route path="team" element={<TeamPanel />} />
+          <Route path="ai" element={<AiEvalPanel />} />
           <Route path="data" element={<DataPanel />} />
         </Routes>
       </div>
@@ -196,27 +216,154 @@ function AlertsPanel() {
   };
 
   return (
+    <div className="space-y-6">
+      <Card
+        title="Alerts & email delivery"
+        description="How state announcement alerts reach your inbox. In-app banners fire regardless."
+      >
+        <div className="space-y-2">
+          <RadioRow
+            checked={digest === "digest_8am"}
+            onChange={() => save("digest_8am")}
+            label="Daily 8am digest"
+            hint="One email per morning with all state announcements from the last 24h."
+          />
+          <RadioRow
+            checked={digest === "per_alert"}
+            onChange={() => save("per_alert")}
+            label="Per-alert email"
+            hint="Email fires immediately when an announcement is detected."
+          />
+        </div>
+        <p className="text-2xs text-ink-500 mt-4">
+          SMS reminders are deferred to Phase 2 — we won't half-build them.
+        </p>
+      </Card>
+
+      <ReviewerQueueSection />
+    </div>
+  );
+}
+
+/**
+ * Reviewer queue — low-confidence scraped notices waiting for human
+ * approval before they project to firms. The "human review queue"
+ * the architecture spec calls for, surfaced here in Settings → Alerts.
+ *
+ * Empty state is the most common — when the regex/LLM classifier is
+ * confident, items skip review and go straight to firm projection.
+ */
+function ReviewerQueueSection() {
+  const queue = useReviewerQueue();
+  const detect = useManualDetect();
+  const approve = useApproveScraped();
+  const reject = useRejectScraped();
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const onDetect = async () => {
+    setFeedback(null);
+    try {
+      const result = await detect.mutateAsync();
+      const newCount = result.new ?? 0;
+      const lowConf = result.lowConfidence ?? 0;
+      setFeedback(
+        newCount > 0
+          ? `Found ${newCount} new notice${newCount === 1 ? "" : "s"} (${lowConf} need review).`
+          : "No new notices since last check.",
+      );
+    } catch (err) {
+      setFeedback(
+        err instanceof Error ? err.message : "Detection failed — check logs.",
+      );
+    }
+  };
+
+  return (
     <Card
-      title="Alerts & email delivery"
-      description="How state announcement alerts reach your inbox. In-app banners fire regardless."
+      title="Reviewer queue"
+      description="State notices the scraper isn't confident about. Approve to project them to your firm; reject to discard."
     >
-      <div className="space-y-2">
-        <RadioRow
-          checked={digest === "digest_8am"}
-          onChange={() => save("digest_8am")}
-          label="Daily 8am digest"
-          hint="One email per morning with all state announcements from the last 24h."
-        />
-        <RadioRow
-          checked={digest === "per_alert"}
-          onChange={() => save("per_alert")}
-          label="Per-alert email"
-          hint="Email fires immediately when an announcement is detected."
-        />
+      <div className="flex items-center gap-2 mb-3">
+        <button
+          onClick={onDetect}
+          disabled={detect.isPending}
+          className="text-xs px-3 py-1.5 rounded border border-line text-ink-700 hover:bg-sunken disabled:opacity-40"
+        >
+          {detect.isPending ? "Detecting…" : "Run detection now"}
+        </button>
+        <span className="text-2xs text-ink-500">
+          The scraper runs hourly in the background — this triggers an extra
+          cycle.
+        </span>
       </div>
-      <p className="text-2xs text-ink-500 mt-4">
-        SMS reminders are deferred to Phase 2 — we won't half-build them.
-      </p>
+      {feedback && (
+        <p className="text-2xs text-ink-700 bg-sunken/50 border border-line rounded px-2.5 py-1.5 mb-3">
+          {feedback}
+        </p>
+      )}
+
+      {queue.isLoading && (
+        <p className="text-xs text-ink-500">Loading queue…</p>
+      )}
+      {queue.error && (
+        <p className="text-xs text-danger-ink">
+          Couldn't load queue: {queue.error.message}
+        </p>
+      )}
+      {queue.data && queue.data.length === 0 && (
+        <p className="text-xs text-ink-500">
+          Queue is clear — no low-confidence notices waiting.
+        </p>
+      )}
+      {queue.data && queue.data.length > 0 && (
+        <ul className="divide-y divide-line border border-line rounded-md bg-canvas">
+          {queue.data.map((row) => (
+            <li key={row.id} className="px-3 py-2.5 flex items-start gap-3">
+              <span className="text-2xs font-mono uppercase text-ink-500 w-9 shrink-0 mt-0.5">
+                {row.stateCode}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-ink-900">{row.title}</p>
+                <p className="text-2xs text-ink-500 mt-0.5">
+                  {row.authority}
+                  {" · "}
+                  {new Date(row.detectedAt).toLocaleDateString()}
+                  {" · "}
+                  <a
+                    href={row.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline hover:text-ink-900"
+                  >
+                    source
+                  </a>
+                </p>
+                {row.summary && (
+                  <p className="text-2xs text-ink-700 mt-1 line-clamp-2">
+                    {row.summary}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={() => approve.mutate({ id: row.id })}
+                  disabled={approve.isPending}
+                  className="text-2xs px-2.5 py-1 rounded bg-ok-bg text-ok-ink border border-ok-border hover:bg-ok-bg/70 disabled:opacity-40"
+                >
+                  Approve
+                </button>
+                <button
+                  onClick={() => reject.mutate({ id: row.id })}
+                  disabled={reject.isPending}
+                  className="text-2xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken disabled:opacity-40"
+                >
+                  Reject
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </Card>
   );
 }
@@ -249,6 +396,255 @@ function RadioRow({
         <div className="text-xs text-ink-500 mt-0.5">{hint}</div>
       </div>
     </label>
+  );
+}
+
+/**
+ * AI eval panel — drift detection over time, per mode.
+ *
+ * Reads aiInferences.driftReport for the selected mode (default A).
+ * Shows:
+ *   - Configured-or-not banner (BE reads ANTHROPIC_API_KEY)
+ *   - Mode selector (only A and D will have data; B/C/E are
+ *     deterministic so the BE doesn't log them)
+ *   - Per-mode summary: latest acceptance + drift signal
+ *   - 12-week sparkline of acceptance rates
+ *   - Drift alert when latest week dropped >5pp below trailing mean
+ *
+ * Ops surface, not for everyday CPAs — sits in Settings → AI eval
+ * for partners + ops to monitor model performance over time.
+ */
+function AiEvalPanel() {
+  const [mode, setMode] = useState<"A" | "D">("A");
+  const status = useAiStatus();
+  const drift = useDriftReport(mode);
+
+  const latest = drift.data?.weeks[drift.data.weeks.length - 1];
+  const acceptancePct =
+    latest?.acceptanceRate !== null && latest?.acceptanceRate !== undefined
+      ? Math.round(latest.acceptanceRate * 100)
+      : null;
+  const driftPp =
+    drift.data?.drift !== null && drift.data?.drift !== undefined
+      ? Math.round(drift.data.drift * 100)
+      : null;
+
+  return (
+    <div className="space-y-6">
+      <Card
+        title="AI configuration"
+        description="Whether the backend has an Anthropic API key wired. Without it, AI procedures throw and the FE falls back to deterministic stubs."
+      >
+        {status.isLoading ? (
+          <p className="text-sm text-ink-500">Checking…</p>
+        ) : status.data?.configured ? (
+          <p className="text-sm text-ok-ink inline-flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4" aria-hidden />
+            Anthropic configured. Mode A + D + scraper run on real Claude.
+          </p>
+        ) : (
+          <div className="text-sm text-warn-ink bg-warn-bg/40 border border-warn-border rounded px-3 py-2">
+            <p className="font-medium">AI not yet configured.</p>
+            <p className="text-xs mt-1 text-warn-ink/90">
+              Set <code className="font-mono">ANTHROPIC_API_KEY</code> in
+              backend/.env.local to enable real Claude calls. Until then,
+              classifications and email drafts use deterministic stubs.
+            </p>
+          </div>
+        )}
+      </Card>
+
+      <Card
+        title="Acceptance over time"
+        description="What fraction of AI proposals you accept, bucketed by ISO week. Drift = latest week vs trailing 4-week mean. >5pp drop fires the alert below."
+      >
+        {/* Mode selector — A/D have real data, others are deterministic */}
+        <div className="flex gap-1 mb-4">
+          {(["A", "D"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={[
+                "text-xs px-3 py-1 rounded border",
+                mode === m
+                  ? "bg-sunken text-ink-900 border-ink-900 font-medium"
+                  : "border-line text-ink-500 hover:bg-sunken hover:text-ink-700",
+              ].join(" ")}
+            >
+              Mode {m}
+              <span className="ml-1.5 text-2xs opacity-70">
+                {m === "A" ? "Classify" : "Draft email"}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {drift.isLoading ? (
+          <p className="text-sm text-ink-500">Loading drift report…</p>
+        ) : drift.error ? (
+          <p className="text-sm text-danger-ink">
+            Couldn't load drift report: {drift.error.message}
+          </p>
+        ) : drift.data && drift.data.weeks.length === 0 ? (
+          <p className="text-sm text-ink-500">
+            No Mode {mode} inferences logged yet. Once your firm starts
+            confirming AI suggestions or sending drafts, this will populate.
+          </p>
+        ) : drift.data ? (
+          <>
+            {/* Headline numbers */}
+            <div className="flex items-baseline gap-6 mb-4">
+              <div>
+                <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
+                  Latest week
+                </p>
+                <p className="text-2xl font-semibold text-ink-900 tabular-nums mt-0.5">
+                  {acceptancePct !== null ? `${acceptancePct}%` : "—"}
+                </p>
+                <p className="text-2xs text-ink-500 mt-0.5">
+                  acceptance ({latest?.total ?? 0}{" "}
+                  inference{latest?.total === 1 ? "" : "s"})
+                </p>
+              </div>
+              <div>
+                <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
+                  Drift vs 4w mean
+                </p>
+                <p
+                  className={[
+                    "text-2xl font-semibold tabular-nums mt-0.5",
+                    driftPp === null
+                      ? "text-ink-400"
+                      : driftPp < -5
+                        ? "text-danger-ink"
+                        : driftPp < 0
+                          ? "text-warn-ink"
+                          : "text-ok-ink",
+                  ].join(" ")}
+                >
+                  {driftPp === null
+                    ? "—"
+                    : `${driftPp >= 0 ? "+" : ""}${driftPp}pp`}
+                </p>
+                <p className="text-2xs text-ink-500 mt-0.5">
+                  {driftPp === null
+                    ? "not enough history"
+                    : driftPp < -5
+                      ? "drift alert"
+                      : "stable"}
+                </p>
+              </div>
+            </div>
+
+            {/* Drift alert callout */}
+            {drift.data.alert && (
+              <div className="bg-danger-bg/40 border border-danger-border rounded px-3 py-2.5 mb-4 flex items-start gap-2">
+                <TrendingDown
+                  className="w-4 h-4 text-danger-ink shrink-0 mt-0.5"
+                  aria-hidden
+                />
+                <div className="text-xs text-danger-ink">
+                  <p className="font-medium">Drift alert</p>
+                  <p className="mt-0.5">
+                    Latest acceptance dropped more than 5pp below the
+                    trailing 4-week mean. Mode {mode} may be regressing —
+                    check recent inferences for misclassifications.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Sparkline — ASCII bars per week, calm + tabular */}
+            <SparklineChart weeks={drift.data.weeks} />
+          </>
+        ) : null}
+      </Card>
+
+      <Card
+        title="What gets logged"
+        description="Every Anthropic call writes to ai_inferences with mode + model + cost + latency + the input hash for grouping. CPA acceptance flips was_acted_on; this dashboard reads those flags."
+      >
+        <ul className="text-xs text-ink-500 space-y-1.5">
+          <li>
+            <span className="font-mono text-ink-700">Mode A</span>{" "}
+            (classify) — every inbound document. Logged on the BE inbound
+            email handler.
+          </li>
+          <li>
+            <span className="font-mono text-ink-700">Mode D</span>{" "}
+            (draft email) — every "Custom email…" click. Logged when the
+            BE returns the draft.
+          </li>
+          <li>
+            <span className="font-mono text-ink-700">Scraper</span> — LLM
+            lift on low-confidence regex hits. Logged with mode='C' for now
+            (worth a separate mode bucket once volume justifies).
+          </li>
+          <li className="text-ink-400 italic mt-2">
+            Modes B / C / E stay deterministic by design — their existing
+            logic (history math, statistical anomaly, set-difference) is
+            meaningful without an LLM round-trip.
+          </li>
+        </ul>
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * Tiny sparkline — vertical bars per week, height proportional to
+ * acceptance rate. 12 weeks max. Tabular numbers, no chart library.
+ */
+function SparklineChart({
+  weeks,
+}: {
+  weeks: Array<{
+    week: string;
+    total: number;
+    acceptanceRate: number | null;
+  }>;
+}) {
+  return (
+    <div>
+      <div className="flex items-end gap-1 h-24 border-b border-line">
+        {weeks.map((w) => {
+          const h = w.acceptanceRate !== null ? w.acceptanceRate * 100 : 0;
+          const isLatest = w === weeks[weeks.length - 1];
+          return (
+            <div
+              key={w.week}
+              className="flex-1 flex flex-col justify-end"
+              title={`${w.week}: ${
+                w.acceptanceRate !== null
+                  ? `${Math.round(w.acceptanceRate * 100)}%`
+                  : "no data"
+              } (${w.total} inferences)`}
+            >
+              <div
+                className={[
+                  "rounded-t",
+                  isLatest ? "bg-ink-900" : "bg-ink-300",
+                ].join(" ")}
+                style={{ height: `${Math.max(2, h * 0.95)}%` }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex gap-1 mt-1">
+        {weeks.map((w) => (
+          <span
+            key={w.week}
+            className="flex-1 text-center text-2xs text-ink-400 font-mono tabular-nums truncate"
+          >
+            {w.week.split("-W")[1]}
+          </span>
+        ))}
+      </div>
+      <p className="text-2xs text-ink-400 mt-2">
+        Week numbers (ISO). Hover a bar for the rate + inference count.
+      </p>
+    </div>
   );
 }
 
@@ -299,15 +695,18 @@ function ImportsPanel() {
 
   if (imports.length === 0) {
     return (
-      <Card title="Imports">
-        <p className="text-sm text-ink-500">
-          No CSV imports yet. Try{" "}
-          <NavLink to="/import" className="text-ink-900 underline">
-            importing clients
-          </NavLink>
-          .
-        </p>
-      </Card>
+      <div className="space-y-6">
+        <PriorYearUpload />
+        <Card title="Imports">
+          <p className="text-sm text-ink-500">
+            No CSV imports yet. Try{" "}
+            <NavLink to="/import" className="text-ink-900 underline">
+              importing clients
+            </NavLink>
+            .
+          </p>
+        </Card>
+      </div>
     );
   }
 
@@ -315,6 +714,7 @@ function ImportsPanel() {
 
   return (
     <>
+      <PriorYearUpload />
       <Card
         title="Import history"
         description="Undo is available for 7 days after an import."
@@ -723,6 +1123,9 @@ function FirmPanel() {
           />
         </Field>
       </Card>
+      {/* PWA install — self-gates when not installable / already installed,
+          so the slot is invisible unless the prompt is genuinely available. */}
+      <PwaInstallCard />
     </>
   );
 }
@@ -1229,52 +1632,160 @@ function ReminderTemplateEditor({
   );
 }
 
+/**
+ * Tier 0 OAuth providers — wired to the new BE OAuth flow.
+ * QBO/Xero are two-way sync; Gmail/Outlook are send-only on day 1
+ * (Method B full-read is Phase 2). Each card knows whether the BE
+ * has client credentials configured (catalog) and surfaces "Connect"
+ * vs "Coming soon" honestly.
+ */
+const TIER_0_PROVIDERS: Array<{
+  kind: "qbo" | "xero" | "gmail" | "outlook";
+  name: string;
+  blurb: string;
+}> = [
+  {
+    kind: "qbo",
+    name: "QuickBooks Online",
+    blurb: "Two-way sync for financial profiles and per-client anomaly anchors.",
+  },
+  {
+    kind: "xero",
+    name: "Xero",
+    blurb: "Same as QBO for firms outside the US ecosystem.",
+  },
+  {
+    kind: "gmail",
+    name: "Gmail",
+    blurb: "Send chase emails on your behalf. Full read scope ships next quarter.",
+  },
+  {
+    kind: "outlook",
+    name: "Outlook / Microsoft 365",
+    blurb: "Same scope as Gmail.",
+  },
+];
+
 function IntegrationsPanel() {
+  const list = useIntegrations();
+  const catalog = useIntegrationCatalog();
+  const startConnect = useStartConnect();
+  const disconnect = useDisconnect();
+  const syncNow = useSyncNow();
+  const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
+  // Index live integrations by kind for fast lookup
+  const byKind = useMemo(() => {
+    const m = new Map<string, NonNullable<typeof list.data>[number]>();
+    for (const row of list.data ?? []) m.set(row.kind, row);
+    return m;
+  }, [list.data]);
+
+  const onConnect = (kind: "qbo" | "xero" | "gmail" | "outlook") => {
+    startConnect.mutate({
+      kind,
+      redirectTo: window.location.href,
+    });
+  };
+
+  const onSync = async (provider: "qbo" | "xero") => {
+    setSyncFeedback(null);
+    try {
+      const result = await syncNow.mutateAsync({ provider });
+      const msg =
+        result.fetched === 0
+          ? "Already up to date."
+          : `Synced ${result.fetched} customer${
+              result.fetched === 1 ? "" : "s"
+            } — ${result.inserted} new, ${result.updated} updated${
+              result.errors > 0 ? `, ${result.errors} error(s)` : ""
+            }.`;
+      setSyncFeedback(msg);
+    } catch (err) {
+      setSyncFeedback(
+        err instanceof Error ? err.message : "Sync failed",
+      );
+    }
+  };
+
   return (
     <>
       <Card
-        title="Tier 0 — must-have, two-way"
-        description="Connect Day-1 to put DueDateHQ alongside your existing stack (PRD §6.4)."
+        title="Connected sources"
+        description="Each provider unlocks a specific capability — financial anchoring (QBO/Xero) or outbound email rerouting (Gmail/Outlook). Disconnect anytime."
       >
+        {list.error && (
+          <p className="text-xs text-danger-ink mb-3">
+            Couldn't load integrations: {list.error.message}
+          </p>
+        )}
+        {startConnect.error && (
+          <p className="text-xs text-danger-ink mb-3">
+            Connect failed: {startConnect.error.message}
+          </p>
+        )}
+        {syncFeedback && (
+          <p className="text-xs text-ink-700 bg-sunken/50 border border-line rounded px-2.5 py-1.5 mb-3">
+            {syncFeedback}
+          </p>
+        )}
         <ul className="divide-y divide-line">
-          <IntegrationRow
-            name="QuickBooks Online"
-            tier="Tier 0"
-            status="not_connected"
-            blurb="Two-way sync for financial profiles and Mode B/C anchors."
-          />
-          <IntegrationRow
-            name="Xero"
-            tier="Tier 0"
-            status="not_connected"
-            blurb="QBO equivalent for international markets."
-          />
-          <IntegrationRow
-            name="Gmail"
-            tier="Tier 0"
-            status="not_connected"
-            blurb="Method A send-only on Day 1 · Method B full read scope in P1."
-          />
-          <IntegrationRow
-            name="Outlook"
-            tier="Tier 0"
-            status="not_connected"
-            blurb="Same scope as Gmail."
-          />
+          {TIER_0_PROVIDERS.map((p) => {
+            const live = byKind.get(p.kind);
+            const cat = catalog.data?.find((c) => c.kind === p.kind);
+            const configured = cat?.configured ?? false;
+            // Sync button only for QBO/Xero rows that are connected.
+            // Gmail/Outlook are send-only (Method A) and the inbox
+            // poller (Method B) has its own on-demand button elsewhere.
+            const supportsSync = p.kind === "qbo" || p.kind === "xero";
+            return (
+              <IntegrationRow
+                key={p.kind}
+                name={p.name}
+                blurb={p.blurb}
+                live={live}
+                configured={configured}
+                onConnect={() => onConnect(p.kind)}
+                onDisconnect={() =>
+                  live && disconnect.mutate({ id: live.id })
+                }
+                onSync={
+                  supportsSync && live?.status === "connected"
+                    ? () => onSync(p.kind as "qbo" | "xero")
+                    : undefined
+                }
+                connecting={startConnect.isPending}
+                disconnecting={disconnect.isPending}
+                syncing={syncNow.isPending}
+              />
+            );
+          })}
         </ul>
       </Card>
-      <Card title="Tier 1 — strongly recommended" description="One-way connectors, P1 unless noted.">
-        <ul className="divide-y divide-line">
-          <IntegrationRow name="Lacerte / UltraTax / Drake / ProSeries" tier="Tier 1" status="not_connected" blurb="Prior-year imports — Import Tier 3 (PRD §6.6)." />
-          <IntegrationRow name="SharePoint" tier="Tier 1" status="not_connected" blurb="Write task summaries and audit packs back to SharePoint." />
-          <IntegrationRow name="HubSpot / Mailchimp" tier="Tier 1" status="not_connected" blurb="Client list export for marketing flows." />
-          <IntegrationRow name="Bloomberg / CCH publication feed" tier="Tier 1" status="not_connected" blurb="Read-only feed into the state-alert engine." />
+
+      <Card
+        title="Coming next"
+        description="Connectors on the roadmap — not yet wired. Tell us which would unblock you."
+      >
+        <ul className="text-sm text-ink-500 space-y-1.5">
+          <li>
+            · <span className="text-ink-700">Lacerte / UltraTax / Drake / ProSeries</span>
+            {" "}— prior-year-return imports
+          </li>
+          <li>
+            · <span className="text-ink-700">SharePoint</span> — write
+            task summaries + audit packs back to your firm's archive
+          </li>
+          <li>
+            · <span className="text-ink-700">Bloomberg / CCH publication feed</span>
+            {" "}— read-only feed into the state-alert engine
+          </li>
         </ul>
       </Card>
+
       <Card title="Not supported (intentional)">
         <ul className="text-sm text-ink-500 space-y-1.5">
-          <li>· CCH Axcess — no usable API; customer base exiting (PRD §1.7).</li>
-          <li>· Client payments — use Stripe / CPACharge.</li>
+          <li>· CCH Axcess — no usable API; customer base exiting.</li>
+          <li>· Client payments — use Stripe / CPACharge directly.</li>
           <li>· Bank account access — PCI/regulatory complexity not justified.</li>
         </ul>
       </Card>
@@ -1284,44 +1795,145 @@ function IntegrationsPanel() {
 
 function IntegrationRow({
   name,
-  tier,
-  status,
   blurb,
+  live,
+  configured,
+  onConnect,
+  onDisconnect,
+  onSync,
+  connecting,
+  disconnecting,
+  syncing,
 }: {
   name: string;
-  tier: string;
-  status: "connected" | "not_connected" | "error";
   blurb: string;
+  live:
+    | {
+        id: string;
+        status: "connected" | "disconnected" | "error";
+        externalAccountId: string | null;
+        lastSyncedAt: string | null;
+        lastError: string | null;
+        expiresAt: string | null;
+      }
+    | undefined;
+  configured: boolean;
+  onConnect: () => void;
+  onDisconnect: () => void;
+  /** When set, renders a "Sync now" button next to Disconnect. Only
+   *  meaningful for QBO/Xero (data-pull providers); Gmail/Outlook
+   *  use Method B's own poll button elsewhere. */
+  onSync?: () => void;
+  connecting: boolean;
+  disconnecting: boolean;
+  syncing?: boolean;
 }) {
+  // Three states: connected, disconnected (or never connected), error.
+  // The visual hierarchy puts the action button on the right, mirroring
+  // the rest of the Settings panels.
+  const status: "connected" | "disconnected" | "error" =
+    live?.status === "connected"
+      ? "connected"
+      : live?.status === "error"
+        ? "error"
+        : "disconnected";
+
   return (
     <li className="py-3 flex items-start gap-3">
       <Plug className="w-4 h-4 text-ink-400 mt-0.5" aria-hidden />
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2 flex-wrap">
           <p className="text-sm font-medium text-ink-900">{name}</p>
-          <span className="text-2xs uppercase tracking-wide text-ink-400">
-            {tier}
-          </span>
           <span
             className={`text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded border ${
               status === "connected"
                 ? "bg-ok-bg text-ok-ink border-ok-border"
                 : status === "error"
-                ? "bg-warn-bg text-warn-ink border-warn-border"
-                : "bg-sunken text-ink-500 border-line"
+                  ? "bg-warn-bg text-warn-ink border-warn-border"
+                  : "bg-sunken text-ink-500 border-line"
             }`}
           >
-            {status.replace("_", " ")}
+            {status === "disconnected" ? "not connected" : status}
           </span>
+          {!configured && status !== "connected" && (
+            <span
+              className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded border bg-sunken/40 text-ink-400 border-line"
+              title="Backend doesn't have OAuth credentials for this provider yet"
+            >
+              coming soon
+            </span>
+          )}
         </div>
         <p className="text-xs text-ink-500 mt-1">{blurb}</p>
+        {status === "connected" && live && (
+          <p className="text-2xs text-ink-500 mt-1">
+            {live.externalAccountId && (
+              <>Account {live.externalAccountId.slice(0, 12)}…</>
+            )}
+            {live.lastSyncedAt && (
+              <>
+                {" · last synced "}
+                {new Date(live.lastSyncedAt).toLocaleString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </>
+            )}
+            {live.expiresAt && (
+              <>
+                {" · token valid until "}
+                {new Date(live.expiresAt).toLocaleDateString()}
+              </>
+            )}
+          </p>
+        )}
+        {status === "error" && live?.lastError && (
+          <p className="text-2xs text-warn-ink mt-1">
+            Last error: {live.lastError}
+          </p>
+        )}
       </div>
-      <button
-        className="text-xs px-3 py-1 rounded border border-line text-ink-700 hover:bg-sunken"
-        title="OAuth flow stubbed for the wireframe"
-      >
-        Connect
-      </button>
+      {status === "connected" ? (
+        <span className="flex items-center gap-1.5 shrink-0">
+          {onSync && (
+            <button
+              onClick={onSync}
+              disabled={syncing}
+              className="text-xs px-3 py-1 rounded bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40"
+              title="Pull latest customers from this provider into your client list"
+            >
+              {syncing ? "Syncing…" : "Sync now"}
+            </button>
+          )}
+          <button
+            onClick={onDisconnect}
+            disabled={disconnecting}
+            className="text-xs px-3 py-1 rounded border border-line text-ink-700 hover:bg-sunken disabled:opacity-40"
+          >
+            {disconnecting ? "Disconnecting…" : "Disconnect"}
+          </button>
+        </span>
+      ) : (
+        <button
+          onClick={onConnect}
+          disabled={!configured || connecting}
+          className={[
+            "text-xs px-3 py-1 rounded",
+            !configured
+              ? "border border-line text-ink-400 cursor-not-allowed"
+              : "bg-accent text-canvas hover:bg-accent-hover",
+          ].join(" ")}
+          title={
+            configured
+              ? "Open the provider's OAuth consent screen"
+              : "Backend OAuth credentials not configured for this provider"
+          }
+        >
+          {connecting ? "Connecting…" : "Connect"}
+        </button>
+      )}
     </li>
   );
 }

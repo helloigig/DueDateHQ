@@ -10,6 +10,7 @@ import type {
 } from "../types";
 import { draftEmail } from "../lib/ai-stub";
 import { actions, useStore } from "../data/store";
+import { AuthorityChip } from "./AuthorityChip";
 import { useSession } from "../data/session";
 
 /**
@@ -57,6 +58,44 @@ export function EmailDraftModal({ open, intent, onClose }: Props) {
   const itemLabel = intent?.checklistItem?.label;
   const itemType = intent?.checklistItem?.itemType;
 
+  // Smart chase — pull every still-pending item on this task so the
+  // draft can be specific ("I still need W-2 + 1099-INT") rather than
+  // template-shaped. importedFacts gives us last-year arrival dates
+  // for the same item types so the model can anchor expectations
+  // ("you usually send the W-2 in early March").
+  const { checklistItems, importedFacts } = useStore();
+  const missingDocs = useMemo(() => {
+    if (!intent) return [];
+    const taskItems = checklistItems.filter(
+      (c) => c.taskId === intent.task.id,
+    );
+    // Only items the client owes us — not yet received, not n/a
+    const pending = taskItems.filter(
+      (c) =>
+        c.state === "not_requested" ||
+        c.state === "requested_waiting" ||
+        c.state === "received_issue",
+    );
+    return pending.map((c) => {
+      // Find the most recent prior-year arrival for this item type
+      const priors = importedFacts
+        .filter(
+          (f) =>
+            f.clientId === intent.client.id &&
+            f.itemType === c.itemType &&
+            f.observedDate,
+        )
+        .sort((a, b) =>
+          (b.observedDate ?? "").localeCompare(a.observedDate ?? ""),
+        );
+      return {
+        itemType: c.itemType,
+        label: c.label,
+        lastYearArrival: priors[0]?.observedDate,
+      };
+    });
+  }, [intent, checklistItems, importedFacts]);
+
   // Match the inbound item to a system reminder template — closes the loop
   // between Settings → Reminder Templates and the email modal. Educates the
   // CPA on which template AI used as the seed.
@@ -99,6 +138,7 @@ export function EmailDraftModal({ open, intent, onClose }: Props) {
       forwardingEmail: intent.task.forwardingEmail,
       context: intent.context,
       methodBConnected: false,
+      missingDocs,
     }).then((out) => {
       if (cancelled) return;
       setSubject(out.subject);
@@ -159,11 +199,10 @@ export function EmailDraftModal({ open, intent, onClose }: Props) {
     >
       <div className="bg-surface border border-line rounded-lg shadow-overlay w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         <header className="flex items-center px-5 py-3 border-b border-line">
-          <h2 className="text-sm font-semibold text-ink-900">
-            Compose · Mode D
-          </h2>
-          <span className="ml-2 text-2xs text-ink-400 uppercase tracking-wider">
-            Phase 1 · CPA reviews + sends
+          <h2 className="text-sm font-semibold text-ink-900">Compose</h2>
+          <AuthorityChip zone="yellow" className="ml-2" />
+          <span className="ml-2 text-2xs text-ink-400">
+            You review and send — we never send on your behalf
           </span>
           <button
             onClick={onClose}

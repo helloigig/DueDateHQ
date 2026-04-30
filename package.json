@@ -14,7 +14,8 @@
     "backend:lint": "npm run lint --prefix backend",
     "backend:migrate": "npm run db:migrate --prefix backend",
     "backend:generate": "npm run db:generate --prefix backend",
-    "backend:seed": "npm run db:seed --prefix backend"
+    "backend:seed": "npm run db:seed --prefix backend",
+    "backend:probe": "npm run db:probe --prefix backend"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.1",
@@ -32,11 +33,11 @@
     "@types/node": "^25.6.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
+    "@vitejs/plugin-react": "^5.2.0",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.13",
     "typescript": "^5.6.2",
-    "vite": "^5.4.8"
+    "vite": "^8.0.10"
   }
 }

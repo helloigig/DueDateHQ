@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Search, UserPlus, Upload, LogOut, FilePlus } from "lucide-react";
 import { AddClientModal } from "./AddClientModal";
 import { BellDropdown } from "./BellDropdown";
@@ -118,6 +118,7 @@ export function TopBar() {
         )}
       </div>
 
+      <TrialBadge />
       <BellDropdown />
 
       <div
@@ -173,5 +174,51 @@ export function TopBar() {
       <AddClientModal open={modal === "client"} onClose={() => setModal(null)} />
       <CommandPaletteStub open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </header>
+  );
+}
+
+/**
+ * Calm trial pill in the top bar. Three states:
+ *
+ *   - "Pro trial · 28 days left" (info-tone, days > 5)
+ *   - "Pro trial · 3 days left"  (warn-tone, days ≤ 5)
+ *   - "Trial ended — pick a plan" (danger-tone, expired)
+ *
+ * Click → /settings/billing. Hidden once the user picks a paid plan
+ * (when trialEndsAt is cleared and tier is solo/pro/team with a billing
+ * subscription — currently we just check trialEndsAt presence).
+ */
+function TrialBadge() {
+  const session = useSession();
+  const status = useMemo(() => {
+    if (!session?.trialEndsAt) return null;
+    const ms = new Date(session.trialEndsAt).getTime() - Date.now();
+    const days = Math.ceil(ms / (24 * 60 * 60 * 1000));
+    if (days <= 0) return { tone: "danger" as const, label: "Trial ended — pick a plan" };
+    if (days <= 5) return { tone: "warn" as const, label: `Pro trial · ${days} day${days === 1 ? "" : "s"} left` };
+    return { tone: "neutral" as const, label: `Pro trial · ${days} days left` };
+  }, [session?.trialEndsAt]);
+
+  if (!status) return null;
+  // The default state uses sunken-tone neutral, NOT info-blue. Info-blue
+  // is reserved for AI-decided surfaces (AdvisoryPeek, OTP step, "AI
+  // noticed" banner) — overloading it on the trial pill made every
+  // info-toned thing on screen feel like the same kind of signal.
+  // Warn + danger keep their tones — those are real alerts.
+  const toneClass =
+    status.tone === "danger"
+      ? "bg-danger-bg text-danger-ink border-danger-border hover:border-danger-ink"
+      : status.tone === "warn"
+        ? "bg-warn-bg text-warn-ink border-warn-border hover:border-warn-ink"
+        : "bg-sunken text-ink-700 border-line hover:border-ink-400 hover:text-ink-900";
+
+  return (
+    <Link
+      to="/settings/billing"
+      className={`hidden md:inline-flex items-center text-2xs font-medium px-2 py-1 rounded border transition-colors ${toneClass}`}
+      title="Trial details — Settings → Billing"
+    >
+      {status.label}
+    </Link>
   );
 }

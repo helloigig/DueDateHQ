@@ -280,31 +280,38 @@ export function Clients() {
   if (allClients.length === 0) {
     return (
       <div className="max-w-5xl mx-auto px-6 py-12">
-        <div className="bg-surface border border-line rounded-md px-6 py-16 text-center">
-          <p className="text-sm text-ink-700 font-medium">Let's get your clients in.</p>
-          <p className="text-xs text-ink-500 mt-1">
-            Bulk import, quick add, or try a sample workspace.
+        {/* Single-purpose direct empty state. The user came to /clients
+            deliberately to manage clients — give them one strong action,
+            not a re-onboarding menu. */}
+        <header className="mb-6">
+          <h1 className="text-xl font-semibold text-ink-900">Clients</h1>
+          <p className="text-sm text-ink-500 mt-1">
+            Your roster is empty.
           </p>
-          <div className="mt-4 flex items-center justify-center gap-2">
+        </header>
+        <div className="bg-surface border border-line rounded-md px-6 py-12 text-center">
+          <h2 className="text-base font-semibold text-ink-900">
+            Add your first client
+          </h2>
+          <p className="text-sm text-ink-500 mt-1.5 max-w-md mx-auto">
+            One client, two minutes. Once they're in, deadlines auto-generate
+            from the filing bundle you pick.
+          </p>
+          <button
+            onClick={() => setAddOpen(true)}
+            className="mt-5 text-sm font-medium px-4 py-2 rounded-md bg-accent text-canvas hover:bg-accent-hover"
+          >
+            + Add a client
+          </button>
+          <p className="text-xs text-ink-500 mt-4">
+            Or{" "}
             <button
               onClick={() => navigate("/import")}
-              className="text-sm px-3 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover"
+              className="text-ink-900 underline hover:no-underline"
             >
-              Import CSV
+              import in bulk from a CSV →
             </button>
-            <button
-              onClick={() => setAddOpen(true)}
-              className="text-sm px-3 py-1.5 rounded-md border border-line text-ink-700 hover:bg-sunken"
-            >
-              Add 5 manually
-            </button>
-            <button
-              onClick={() => navigate("/import?demo=1")}
-              className="text-sm px-3 py-1.5 rounded-md border border-line text-ink-700 hover:bg-sunken"
-            >
-              Try demo data
-            </button>
-          </div>
+          </p>
         </div>
         <AddClientModal open={addOpen} onClose={() => setAddOpen(false)} />
       </div>

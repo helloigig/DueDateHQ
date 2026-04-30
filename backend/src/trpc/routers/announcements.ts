@@ -303,18 +303,68 @@ export const announcementsRouter = router({
     }),
 
   /**
-   * Stub. Real implementation runs in Cloudflare Workers (50-state crawler)
-   * + LLM parser (Gemini) + matching engine. See
-   * `backend/scripts/scraper-worker.ts` for the entry point. Calling this
-   * from the FE just signals "rerun the crawler now" — Phase 1.
+   * Trigger an on-demand scrape + match cycle for this firm. The
+   * scheduled scraper runs hourly in the background; this mutation lets
+   * the FE force-refresh after a known state authority publishes a
+   * notice. Returns counts so the UI can show "X new alerts found".
    */
-  detect: firmProcedure.mutation(() => {
-    throw new TRPCError({
-      code: "NOT_IMPLEMENTED",
-      message:
-        "scraper_pipeline_not_deployed — see backend/RUNBOOK.md §Announcement pipeline",
-    });
+  detect: firmProcedure.mutation(async ({ ctx }) => {
+    const { runScraperCycle, matchFirm } = await import(
+      "../../lib/scraper.js"
+    );
+    const cycle = await runScraperCycle();
+    const matched = await matchFirm(ctx.firmId);
+    return { ...cycle, matchedForFirm: matched };
   }),
+
+  /**
+   * Reviewer queue — low-confidence scraped notices awaiting human
+   * approval before they project to firms (PRD §11.5 / arch §6.4
+   * "human review queue"). Phase 1 surface; lives at /settings/alerts
+   * in the FE.
+   */
+  reviewerQueue: firmProcedure.query(async () => {
+    const rows = await db
+      .select()
+      .from(announcements)
+      .where(eq(announcements.parseConfidence, "low"))
+      .orderBy(desc(announcements.detectedAt))
+      .limit(50);
+    return rows;
+  }),
+
+  /**
+   * Approve a low-confidence scraped notice, optionally with corrected
+   * fields. Bumps parse_confidence to "high" so it projects to firms on
+   * the next match cycle.
+   */
+  approveScraped: firmProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        title: z.string().optional(),
+        summary: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      await db
+        .update(announcements)
+        .set({
+          parseConfidence: "high",
+          ...(input.title ? { title: input.title } : {}),
+          ...(input.summary ? { summary: input.summary } : {}),
+        })
+        .where(eq(announcements.id, input.id));
+      return { ok: true as const };
+    }),
+
+  /** Reject a scraped notice (false positive / not relevant). */
+  rejectScraped: firmProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ input }) => {
+      await db.delete(announcements).where(eq(announcements.id, input.id));
+      return { ok: true as const };
+    }),
 });
 
 export const notificationsRouter = router({

@@ -8,10 +8,21 @@ export interface FirmSession {
   tier: "solo" | "pro" | "team";
   digestMode: "digest_8am" | "per_alert";
   signedInAt: string;
+  /** ISO timestamp when the 30-day Pro trial ends. After this, billing
+   *  enforces the chosen plan; if no plan is chosen, account goes
+   *  read-only. Set on signIn(). Surfaced in TopBar as a calm pill. */
+  trialEndsAt?: string;
   /** Onboarding Layer 1 completion (PRD §8.4 / IA §3.8). */
   onboardingComplete?: boolean;
   /** Primary states served (collected in Onboarding step "firm setup"). */
   primaryStates?: string[];
+  /** IANA time zone (e.g., "America/Los_Angeles"). Drives "due today" /
+   *  "this week" calculations. Defaulted from browser at signup; user can
+   *  override in Settings → Firm. */
+  timeZone?: string;
+  /** Calendar provider the partner wants deadlines pushed to. Each option
+   *  triggers a Phase 1 OAuth flow when wired. "none" = don't push. */
+  calendarProvider?: "google" | "outlook" | "apple" | "none";
   /** Firm-wide kill switch for Phase 2 auto-send (PRD §7.3). When true,
    *  every Phase-2-enabled template is paused regardless of per-template
    *  state. The CPA can flip it instantly from Settings → Reminders. */
@@ -65,6 +76,13 @@ export function signIn(input: {
   userEmail: string;
   tier?: FirmSession["tier"];
 }) {
+  // Preserve trialEndsAt across re-signin — only set it once on first
+  // signup. (In production the BE owns this; the FE just mirrors.)
+  const existing = read();
+  const trialEndsAt =
+    existing?.trialEndsAt ??
+    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
   const s: FirmSession = {
     firmName: input.firmName.trim(),
     userName: input.userName.trim(),
@@ -73,6 +91,7 @@ export function signIn(input: {
     tier: input.tier ?? "solo",
     digestMode: "digest_8am",
     signedInAt: new Date().toISOString(),
+    trialEndsAt,
   };
   write(s);
   return s;

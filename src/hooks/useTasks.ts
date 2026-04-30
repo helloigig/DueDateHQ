@@ -1,21 +1,32 @@
 import { useStore, actions } from "../data/store";
-import type { TaskStatus } from "../types";
+import type { Task, TaskStatus } from "../types";
 import { buildTasksFromDeadlines } from "../data/mockTasks";
+import { trpc } from "../lib/api/client";
+import { env } from "../config";
 
 /** All tasks (for filters / lists). */
-export function useTasks() {
-  const { tasks } = useStore();
-  return tasks;
+export function useTasks(): Task[] {
+  const query = trpc.tasks.list.useQuery(undefined, {
+    staleTime: 30_000,
+  });
+  return query.data ?? [];
 }
 
 /** Lookup one task. Falls back to lazily building from the matching
- *  Deadline if the seeded task list is out of sync (e.g., after import). */
-export function useTask(taskId: string | undefined) {
-  const { tasks, deadlines } = useStore();
+ *  Deadline if the seeded task list is out of sync. Mock-mode behavior
+ *  is preserved; real-mode reads via `tasks.get`. */
+export function useTask(taskId: string | undefined): Task | undefined {
+  const { tasks: storeTasks, deadlines } = useStore();
+  const remote = trpc.tasks.get.useQuery(
+    { id: taskId ?? "" },
+    { enabled: !!taskId && !env.useMockApi, staleTime: 30_000 },
+  );
   if (!taskId) return undefined;
-  const task = tasks.find((t) => t.id === taskId);
+  if (!env.useMockApi) return remote.data ?? undefined;
+
+  // Mock-mode lookup with the lazy-build fallback.
+  const task = storeTasks.find((t) => t.id === taskId);
   if (task) return task;
-  // Fallback: derive from deadline (handles tasks added via new deadlines).
   const deadlineId = taskId.startsWith("t-") ? taskId.slice(2) : taskId;
   const d = deadlines.find((x) => x.id === deadlineId);
   if (!d) return undefined;
@@ -23,13 +34,31 @@ export function useTask(taskId: string | undefined) {
 }
 
 /** Tasks for a single client. */
-export function useTasksForClient(clientId: string | undefined) {
-  const { tasks } = useStore();
-  if (!clientId) return [];
-  return tasks.filter((t) => t.clientId === clientId);
+export function useTasksForClient(clientId: string | undefined): Task[] {
+  const query = trpc.tasks.list.useQuery(
+    { clientId: clientId ?? "" },
+    { enabled: !!clientId, staleTime: 30_000 },
+  );
+  return query.data ?? [];
 }
 
+/**
+ * Returns a function that updates a task's status. tRPC handles both modes
+ * via the mock adapter / real BE. After mutation, invalidates the relevant
+ * `tasks.list` queries so the UI refreshes.
+ */
 export function useUpdateTaskStatus() {
-  return (taskId: string, status: TaskStatus) =>
-    actions.updateTaskStatus(taskId, status);
+  const utils = trpc.useUtils();
+  const mutation = trpc.tasks.updateStatus.useMutation({
+    onSuccess: () => {
+      void utils.tasks.list.invalidate();
+    },
+  });
+  return (taskId: string, status: TaskStatus) => {
+    if (env.useMockApi) {
+      // Optimistic store update so the FE feels instant in mock mode.
+      actions.updateTaskStatus(taskId, status);
+    }
+    mutation.mutate({ id: taskId, status });
+  };
 }

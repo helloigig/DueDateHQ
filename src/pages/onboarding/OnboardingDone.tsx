@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import {
   CheckCircle2,
-  Sparkles,
+  TrendingUp,
+  Plug,
   ShieldCheck,
   AlertTriangle,
   Mail,
@@ -11,7 +12,7 @@ import { updateSession } from "../../data/session";
 import { useStore } from "../../data/store";
 
 /**
- * Onboarding Layer 1 — Done. The proof-of-Day-1 moment.
+ * Onboarding done. The proof-of-Day-1 moment.
  *
  * Two jobs:
  *   1. Show what just lit up (real numbers from the store, not promises)
@@ -21,6 +22,9 @@ import { useStore } from "../../data/store";
  *
  * Forever-no list (PRD §1.7): never apologize for cold start. The framing is
  * "here's what's already working," not "AI will get smarter."
+ *
+ * Internal vocabulary (Layer 1, Layer 2, etc.) lives in the spec but never
+ * appears in user-facing copy here.
  */
 export function OnboardingDone() {
   const navigate = useNavigate();
@@ -49,8 +53,8 @@ export function OnboardingDone() {
       totalSteps={3}
       estimate="done"
       title="You're set up."
-      subtitle="Onboarding Layer 1 complete. Here's what just lit up — every number below is real, not a promise."
-      brandLine="Layer 2 (one integration, 30 min) and Layer 3 (ongoing) compound on top. Never required."
+      subtitle="Here's what just lit up — every number below is real, not a promise."
+      brandLine="Connecting one more source (QuickBooks, Gmail, or a prior return) compounds the value. Never required, always optional."
     >
       <div className="space-y-5">
         {/* What's working */}
@@ -93,7 +97,7 @@ export function OnboardingDone() {
           </div>
           {stats.insights > 0 && (
             <div className="px-5 py-3 border-t border-line bg-info-bg/30 flex items-start gap-3">
-              <Sparkles
+              <TrendingUp
                 className="w-3.5 h-3.5 text-info-ink mt-0.5"
                 aria-hidden
               />
@@ -102,9 +106,9 @@ export function OnboardingDone() {
                   {stats.insights} advisory opportunit
                   {stats.insights === 1 ? "y" : "ies"} surfaced.
                 </span>{" "}
-                Mode E pattern recognition is already running. Look for the
-                "Advisory opportunities" section on your dashboard — that's
-                the lever for moving from preparer to advisor.
+                Cross-year pattern recognition is already running. Look for
+                the "Advisory opportunities" section on your dashboard —
+                that's the lever for moving from preparer to advisor.
               </p>
             </div>
           )}
@@ -122,7 +126,7 @@ export function OnboardingDone() {
                 What to expect from AI
               </h3>
               <span className="text-2xs text-ink-400 ml-auto">
-                PRD §4.5 — the authority gradient
+                How AI shows up across your work
               </span>
             </div>
             <p className="text-xs text-ink-500 mt-1">
@@ -139,7 +143,7 @@ export function OnboardingDone() {
             <ZoneRow
               tone="yellow"
               title="Yellow zone — AI proposes, you approve"
-              detail="Email drafts, Mode C anomaly flags, advisory triggers, applying state alerts to client lists. Most of your daily UX lives here."
+              detail="Email drafts, anomaly flags, advisory triggers, applying state alerts to client lists. Most of your daily UX lives here."
             />
             <ZoneRow
               tone="red"
@@ -148,8 +152,8 @@ export function OnboardingDone() {
             />
           </ul>
           <footer className="px-5 py-2 text-2xs text-ink-400 bg-sunken/30 border-t border-line">
-            The §5.3 invariant: AI never auto-promotes a checklist item to
-            received_confirmed. Every confirmation is your explicit click.
+            We never auto-confirm a checklist item — every confirmation is
+            your explicit click.
           </footer>
         </section>
 
@@ -157,28 +161,28 @@ export function OnboardingDone() {
         <section className="bg-surface border border-line rounded-md overflow-hidden">
           <header className="px-5 py-3 border-b border-line">
             <h3 className="text-sm font-semibold text-ink-900">
-              What unlocks next (Onboarding Layer 2)
+              Connect one more source — optional, anytime
             </h3>
             <p className="text-xs text-ink-500 mt-1">
-              Optional — the dashboard widget will rotate suggestions on your
-              own timeline. You don't have to do these now.
+              Each connection unlocks new capabilities. The dashboard widget
+              will resurface these on your own timeline — no rush.
             </p>
           </header>
           <ul className="divide-y divide-line">
             <UnlockRow
-              icon={<Sparkles className="w-3.5 h-3.5" aria-hidden />}
+              icon={<Plug className="w-3.5 h-3.5" aria-hidden />}
               title="Connect QuickBooks"
-              detail="Unlocks financial profiles for your clients · Mode B/C/E anchors begin forming. ~30 seconds of OAuth."
+              detail="Unlocks financial profiles for your clients — richer per-client signals begin forming. ~30 seconds of OAuth."
             />
             <UnlockRow
               icon={<AlertTriangle className="w-3.5 h-3.5" aria-hidden />}
               title="Upload one prior-year return"
-              detail="One PDF activates Mode E cross-year insights and Mode B per-client timing. The biggest single capability unlock."
+              detail="One PDF activates cross-year insights and per-client timing. The biggest single capability unlock."
             />
             <UnlockRow
               icon={<Mail className="w-3.5 h-3.5" aria-hidden />}
               title="Connect Gmail or Outlook"
-              detail="Unlocks Method B inbound + Mode D voice mirroring. Your draft emails sound like you, not like a template."
+              detail="Inbound replies route automatically and your draft emails sound like you, not like a template."
             />
           </ul>
         </section>

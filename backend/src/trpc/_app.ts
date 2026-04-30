@@ -1,5 +1,7 @@
 import { router } from "./init.js";
+import { aiRouter } from "./routers/ai.js";
 import { aiInferencesRouter } from "./routers/aiInferences.js";
+import { filesFromClientsRouter } from "./routers/digest-sms.js";
 import {
   announcementsRouter,
   notificationsRouter,
@@ -11,6 +13,7 @@ import { emailsRouter, reminderTemplatesRouter } from "./routers/emails.js";
 import { exportsRouter } from "./routers/exports.js";
 import { importsRouter } from "./routers/imports.js";
 import { integrationsRouter } from "./routers/integrations.js";
+import { multistateRouter } from "./routers/multistate.js";
 import { servicePackagesRouter } from "./routers/servicePackages.js";
 import {
   activityRouter,
@@ -37,7 +40,10 @@ export const appRouter = router({
   integrations: integrationsRouter,
   imports: importsRouter,
   uploads: uploadsRouter,
+  ai: aiRouter,
   aiInferences: aiInferencesRouter,
+  filesFromClients: filesFromClientsRouter,
+  multistate: multistateRouter,
 });
 
 export type AppRouter = typeof appRouter;

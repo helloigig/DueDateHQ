@@ -7,6 +7,9 @@ const client = postgres(env.DATABASE_URL, {
   prepare: false,
   max: 10,
   idle_timeout: 20,
+  // Supabase requires SSL. postgres-js doesn't always auto-enable it for the
+  // pooler hostname, so set explicitly. psql does the same via sslmode=prefer.
+  ssl: "require",
 });
 
 export const db = drizzle(client, { schema, casing: "snake_case" });

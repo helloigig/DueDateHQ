@@ -115,8 +115,16 @@ export const clientsRouter = router({
   }),
 
   get: firmProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(z.object({ id: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
+      // Accept any string id but only attempt the DB lookup when it's a
+      // valid UUID. Stale FE URLs (e.g. localStorage seed clients with
+      // ids like "c-ca-01") return null instead of a Zod parse error.
+      const isUuid =
+        /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(
+          input.id,
+        );
+      if (!isUuid) return null;
       const row = await db.query.clients.findFirst({
         where: and(eq(clients.id, input.id), eq(clients.firmId, ctx.firmId)),
       });
@@ -184,7 +192,7 @@ export const clientsRouter = router({
     }),
 
   archive: firmProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(z.object({ id: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const result = await db
         .update(clients)
