@@ -256,6 +256,12 @@ export const importsRouter = router({
           contactEmail: row.contactEmail ?? null,
           contactPhone: row.contactPhone ?? null,
           status: "active",
+          // Service starts today by default — deadlines before today won't
+          // be generated for this client. Removes the "8d late" surprise on
+          // freshly-imported clients. P1 enhancement: surface this as an
+          // optional CSV column so CPAs doing back-tax cleanup can override
+          // to an earlier date.
+          serviceStartDate: importedAt.toISOString().slice(0, 10),
           // Stash importId in metadata so undo can find this batch
           // without a separate table.
           metadata: { importId, importedAt: importedAt.toISOString() },

@@ -98,6 +98,13 @@ export const clients = pgTable("clients", {
   county: text("county"),
   notes: text("notes"),
   metadata: jsonb("metadata").notNull().default({}),
+  // Service start date — when the firm took on this client. Defaults to
+  // created_at on insert. Deadline-generator skips rows whose officialDueDate
+  // falls before this date — the firm wasn't responsible for them, so they
+  // shouldn't show up as "8d late" the moment a CPA imports a CSV. Users can
+  // set it explicitly during import or per-client (P1 UI: AddClientModal +
+  // Settings → Firm).
+  serviceStartDate: date("service_start_date"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .default(sql`now()`),
