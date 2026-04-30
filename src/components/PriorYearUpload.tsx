@@ -23,10 +23,12 @@ export function PriorYearUpload() {
   const status = useUploadStatus();
   const { upload, progress, reset } = useFileUpload();
   const parse = trpc.imports.parsePriorYearReturn.useMutation();
+  const commit = trpc.imports.commitPriorYearReturn.useMutation();
   const { clients } = useStore();
   const [clientId, setClientId] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const [storageKey, setStorageKey] = useState<string | null>(null);
 
   const onPick = (f: File | null) => {
     if (!f) return;
@@ -40,13 +42,16 @@ export function PriorYearUpload() {
   const onUpload = async () => {
     if (!file) return;
     parse.reset();
+    commit.reset();
+    setStorageKey(null);
     try {
-      const { storageKey } = await upload({
+      const result = await upload({
         file,
         kind: "prior_year_return",
       });
+      setStorageKey(result.storageKey);
       await parse.mutateAsync({
-        storageKey,
+        storageKey: result.storageKey,
         clientId: clientId || undefined,
       });
     } catch {
@@ -54,10 +59,31 @@ export function PriorYearUpload() {
     }
   };
 
+  const onCommit = async () => {
+    const fields = parse.data?.fields;
+    if (!fields || !clientId) return;
+    await commit.mutateAsync({
+      clientId,
+      taxYear: fields.taxYear ?? new Date().getFullYear() - 1,
+      fields: {
+        clientName: fields.clientName,
+        ein: fields.ein,
+        entityType: fields.entityType,
+        priorAGI: fields.priorAGI,
+        formsFiled: fields.formsFiled,
+        k1Sources: fields.k1Sources,
+        confidence: fields.confidence,
+      },
+      sourceStorageKey: storageKey ?? undefined,
+    });
+  };
+
   const onClear = () => {
     setFile(null);
     reset();
     parse.reset();
+    commit.reset();
+    setStorageKey(null);
     if (fileInput.current) fileInput.current.value = "";
   };
 
@@ -254,20 +280,44 @@ export function PriorYearUpload() {
                 />
               )}
             </dl>
-            <div className="flex items-center gap-2 pt-2 border-t border-line">
-              {parse.data?.readyForCommit ? (
+            <div className="flex items-center gap-2 pt-2 border-t border-line flex-wrap">
+              {commit.data ? (
+                <span className="text-2xs text-ok-ink inline-flex items-center gap-1">
+                  <Check className="w-3 h-3" aria-hidden />
+                  Wrote {commit.data.inserted} fact{commit.data.inserted === 1 ? "" : "s"}
+                  {commit.data.factTypes.length > 0 && (
+                    <span className="text-ink-500 ml-1">
+                      ({commit.data.factTypes.join(", ")})
+                    </span>
+                  )}
+                </span>
+              ) : parse.data?.readyForCommit ? (
                 <button
-                  disabled
-                  className="text-xs px-3 py-1 rounded bg-accent text-canvas opacity-40 cursor-not-allowed"
-                  title="Commit-to-imported-facts wiring lands in the next pass."
+                  onClick={onCommit}
+                  disabled={!clientId || commit.isPending}
+                  className="text-xs px-3 py-1 rounded bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={
+                    !clientId
+                      ? "Bind to a client above before committing"
+                      : "Write extracted facts to imported_facts (Mode E memory)"
+                  }
                 >
                   <Check className="w-3 h-3 inline mr-1" aria-hidden />
-                  Confirm + write (Phase 2)
+                  {commit.isPending
+                    ? "Writing…"
+                    : !clientId
+                      ? "Confirm + write (bind a client first)"
+                      : "Confirm + write"}
                 </button>
               ) : (
                 <span className="text-2xs text-warn-ink inline-flex items-center gap-1">
                   <AlertTriangle className="w-3 h-3" aria-hidden />
                   Below 0.7 confidence — review needed before commit
+                </span>
+              )}
+              {commit.error && (
+                <span className="text-2xs text-danger-ink">
+                  {commit.error.message}
                 </span>
               )}
               <button

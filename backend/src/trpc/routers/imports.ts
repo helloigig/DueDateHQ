@@ -7,9 +7,11 @@ import { db } from "../../db/client.js";
 import {
   clients,
   deadlines,
+  importedFacts,
   servicePackages,
   tasks,
   type ClientInsert,
+  type ImportedFactInsert,
 } from "../../db/schema.js";
 import { generateDeadlinesForClient } from "../../lib/deadline-generator.js";
 import { seedChecklistsForTasks } from "../../lib/checklist-seeder.js";
@@ -504,6 +506,121 @@ export const importsRouter = router({
       return {
         fields: extracted,
         readyForCommit: extracted.confidence >= 0.7,
+      };
+    }),
+
+  /**
+   * Commit reviewed prior-year extraction → imported_facts. Closes the
+   * Tier 3 import path: parser extracts → CPA reviews → this writes the
+   * canonical fact rows that Mode E's `generateCrossYearInsights` reads.
+   *
+   * One importedFacts row per significant field. fact_type is the
+   * normalized fact key (prior_agi / forms_filed / k1_sources / entity_type
+   * / ein). value is jsonb — scalars stored as JSON literals, arrays as
+   * arrays. extraction_version="v1" so future Mode A v2 re-extraction batch
+   * can identify which facts to refresh.
+   */
+  commitPriorYearReturn: firmProcedure
+    .input(
+      z.object({
+        clientId: z.string().uuid(),
+        taxYear: z.number().int().min(2000).max(2100),
+        fields: z.object({
+          clientName: z.string().nullable().optional(),
+          ein: z.string().nullable().optional(),
+          entityType: z.string().nullable().optional(),
+          priorAGI: z.number().nullable().optional(),
+          formsFiled: z.array(z.string()).optional(),
+          k1Sources: z.array(z.string()).optional(),
+          confidence: z.number().min(0).max(1),
+        }),
+        sourceStorageKey: z.string().min(1).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Ownership check — caller's firm must own the client.
+      const [client] = await db
+        .select({ id: clients.id })
+        .from(clients)
+        .where(
+          and(eq(clients.id, input.clientId), eq(clients.firmId, ctx.firmId)),
+        );
+      if (!client) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "client_not_in_firm",
+        });
+      }
+
+      // Map confidence → schema enum.
+      const confidence: ImportedFactInsert["confidence"] =
+        input.fields.confidence >= 0.85
+          ? "high"
+          : input.fields.confidence >= 0.7
+            ? "medium"
+            : "low";
+
+      const rows: ImportedFactInsert[] = [];
+      const make = (
+        factType: string,
+        value: unknown,
+        unit: string | null = null,
+      ): ImportedFactInsert => ({
+        firmId: ctx.firmId,
+        clientId: input.clientId,
+        factType,
+        value: value as never,
+        unit,
+        taxYear: input.taxYear,
+        // Tier 3 = prior-year PDF import (PRD §6.6). Provenance fields land
+        // when the PDF source is in Gmail (Method B). For Tier 3 uploads
+        // (Supabase Storage), source_gmail_message_id stays null.
+        sourceGmailMessageId: null,
+        sourceAttachmentIndex: null,
+        sourcePageRange: null,
+        extractionVersion: "v1",
+        gmailMessageStatus: "available",
+        confidence,
+        importTier: 3,
+      });
+
+      if (input.fields.priorAGI != null) {
+        rows.push(make("prior_agi", input.fields.priorAGI, "USD"));
+      }
+      if (
+        input.fields.formsFiled &&
+        input.fields.formsFiled.length > 0
+      ) {
+        rows.push(make("forms_filed", input.fields.formsFiled));
+      }
+      if (input.fields.k1Sources && input.fields.k1Sources.length > 0) {
+        rows.push(make("k1_sources", input.fields.k1Sources));
+      }
+      if (input.fields.entityType) {
+        rows.push(make("entity_type", input.fields.entityType));
+      }
+      if (input.fields.ein) {
+        rows.push(make("ein", input.fields.ein));
+      }
+
+      if (rows.length === 0) {
+        return { inserted: 0, factTypes: [] as string[] };
+      }
+
+      const inserted = await db.insert(importedFacts).values(rows).returning({
+        id: importedFacts.id,
+        factType: importedFacts.factType,
+      });
+      log.info("imports.commitPriorYearReturn.done", {
+        firmId: ctx.firmId,
+        clientId: input.clientId,
+        taxYear: input.taxYear,
+        inserted: inserted.length,
+        factTypes: inserted.map((r) => r.factType),
+      });
+      return {
+        inserted: inserted.length,
+        factTypes: inserted.map((r) => r.factType),
       };
     }),
 });

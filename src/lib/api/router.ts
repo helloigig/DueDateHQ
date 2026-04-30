@@ -559,6 +559,31 @@ export const appRouter = t.router({
           readyForCommit: boolean;
         }> => NOT_IMPL(),
       ),
+    /** Tier 3 commit — write reviewed prior-year extraction to imported_facts.
+     *  Mode E reads these via generateCrossYearInsights. */
+    commitPriorYearReturn: t.procedure
+      .input(
+        z.object({
+          clientId: z.string().uuid(),
+          taxYear: z.number().int(),
+          fields: z.object({
+            clientName: z.string().nullable().optional(),
+            ein: z.string().nullable().optional(),
+            entityType: z.string().nullable().optional(),
+            priorAGI: z.number().nullable().optional(),
+            formsFiled: z.array(z.string()).optional(),
+            k1Sources: z.array(z.string()).optional(),
+            confidence: z.number(),
+          }),
+          sourceStorageKey: z.string().optional(),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          inserted: number;
+          factTypes: string[];
+        }> => NOT_IMPL(),
+      ),
   }),
 
   exports: t.router({

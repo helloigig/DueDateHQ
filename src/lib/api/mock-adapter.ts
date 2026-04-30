@@ -986,19 +986,45 @@ export const mockAdapter = {
       );
       const entityType =
         hash % 3 === 0 ? "LLC" : hash % 3 === 1 ? "S-Corp" : "Individual";
+      // Mock returns above-threshold confidence so the commit button is
+      // exercisable end-to-end in mock mode (real LLM extraction varies).
       return {
         fields: {
-          clientName: null,
-          ein: null,
+          clientName: "Mitchell Demo Client",
+          ein: "12-3456789",
           entityType,
           taxYear: 2024,
-          priorAGI: null,
-          formsFiled: [],
-          k1Sources: [],
-          confidence: 0.4,
+          priorAGI: 145000,
+          formsFiled: ["1040", "Schedule C", "Schedule E"],
+          k1Sources: ["Apex Fund LP"],
+          confidence: 0.82,
         },
-        readyForCommit: false,
+        readyForCommit: true,
       };
+    },
+    /** Mock commit — synthesizes inserted-fact-row counts so the FE round-
+     *  trip works in mock mode. Real BE inserts into imported_facts. */
+    commitPriorYearReturn: async (input: {
+      clientId: string;
+      taxYear: number;
+      fields: {
+        priorAGI?: number | null;
+        formsFiled?: string[];
+        k1Sources?: string[];
+        entityType?: string | null;
+        ein?: string | null;
+      };
+    }) => {
+      await delay();
+      const factTypes: string[] = [];
+      if (input.fields.priorAGI != null) factTypes.push("prior_agi");
+      if (input.fields.formsFiled && input.fields.formsFiled.length > 0)
+        factTypes.push("forms_filed");
+      if (input.fields.k1Sources && input.fields.k1Sources.length > 0)
+        factTypes.push("k1_sources");
+      if (input.fields.entityType) factTypes.push("entity_type");
+      if (input.fields.ein) factTypes.push("ein");
+      return { inserted: factTypes.length, factTypes };
     },
   },
 
