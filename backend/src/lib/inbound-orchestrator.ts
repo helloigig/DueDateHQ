@@ -76,10 +76,16 @@ export type ClassificationResult = {
 
 const AGENCY_DOMAIN_PATTERNS = [
   /\birs\.gov$/i,
-  /\.tax\.[a-z.]+$/i,
-  /\bdor\.[a-z.]+$/i,
+  // (^|\.) anchor so both `tax.ny.gov` (where `tax` is the first segment)
+  // and `subdomain.tax.something.gov` match. Earlier `\.tax\.` required a
+  // preceding dot, missing all NY/CA/etc. state authority direct sends.
+  // Surfaced by inbound-classifier-v1.jsonl example 012 (NY DTF notice).
+  /(?:^|\.)tax\.[a-z.]+$/i,
+  /(?:^|\.)dor\.[a-z.]+$/i,
   /\bftb\.ca\.gov$/i,
-  /\btreasury\.[a-z.]+$/i,
+  /(?:^|\.)treasury\.[a-z.]+$/i,
+  /(?:^|\.)taxation\.[a-z.]+$/i,
+  /(?:^|\.)revenue\.[a-z.]+$/i,
 ];
 const PAYMENT_DOMAIN_PATTERNS = [
   /^stripe\.com$/i,
