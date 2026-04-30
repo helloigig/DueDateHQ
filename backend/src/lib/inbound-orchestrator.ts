@@ -303,7 +303,15 @@ Confidence calibration:
 - 0.50-0.69 = uncertain — surface for CPA review
 - below 0.50 = guess; CPA should treat as unmatched
 
-Output STRICT JSON only, no preamble:
+CRITICAL OUTPUT RULES — your response will be JSON.parse()'d directly:
+- Your FIRST character MUST be { and your LAST character MUST be }
+- DO NOT wrap in \`\`\`json fences or any markdown
+- DO NOT add "Reasoning:" / "Rationale:" / "Explanation:" or any prose AFTER the JSON
+- DO NOT add any preamble BEFORE the JSON
+- DO NOT add comments inside the JSON
+- The parser is strict — any character outside the JSON object causes a fallback to the heuristic classifier (worse accuracy)
+
+Output STRICT JSON only, this exact shape:
 {
   "topLevelClass": "<one of the 7>",
   "replyIntent": "<one of the 5 OR null if topLevelClass != client_reply_intent>",
@@ -411,17 +419,60 @@ export async function classifyInboundLLM(
 }
 
 function parseLLMResponse(text: string): ClassificationResult | null {
-  // Try direct JSON parse first; some models wrap in ```json fences which
-  // we strip when present. The system prompt says "no preamble" but we
-  // defend against drift.
-  const stripped = text
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/```\s*$/i, "")
-    .trim();
+  // Real Haiku output observed: model often wraps in ```json fences AND
+  // appends trailing rationale prose ("**Reasoning:** ..."). Stripping fences
+  // alone isn't enough — JSON.parse fails on the trailing prose. Strategy:
+  // extract the first balanced JSON object via brace-counting, then parse it.
+  // System prompt forbids both, but we defend against drift.
+  const trimmed = text.trim();
+  let jsonText: string | null = null;
+
+  // Fast path — entire response is valid JSON.
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    jsonText = trimmed;
+  }
+
+  // Slow path — find the first `{` and walk balanced braces (ignoring brace
+  // chars inside strings) to extract just the JSON object. Handles both
+  // ```json-fenced output and plain JSON-with-trailing-prose.
+  if (!jsonText) {
+    const start = trimmed.indexOf("{");
+    if (start < 0) return null;
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    let end = -1;
+    for (let i = start; i < trimmed.length; i++) {
+      const ch = trimmed[i];
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch === "\\" && inString) {
+        escape = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) continue;
+      if (ch === "{") depth++;
+      else if (ch === "}") {
+        depth--;
+        if (depth === 0) {
+          end = i + 1;
+          break;
+        }
+      }
+    }
+    if (end < 0) return null;
+    jsonText = trimmed.slice(start, end);
+  }
+
   let parsed: unknown;
   try {
-    parsed = JSON.parse(stripped);
+    parsed = JSON.parse(jsonText);
   } catch {
     return null;
   }

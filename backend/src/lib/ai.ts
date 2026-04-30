@@ -119,8 +119,27 @@ export async function callLLM(args: {
     throw err;
   } finally {
     const durationMs = Date.now() - start;
+    // Skip ai_inferences logging for the eval-runner sentinel firmId
+    // (00000000-...) — the FK to firms.id won't match and the insert would
+    // throw on every eval call, spamming Sentry. Real production calls always
+    // have a valid firmId.
+    const isEvalSentinel =
+      args.firmId === "00000000-0000-0000-0000-000000000000";
     // Record the inference even on error — drift detection needs both
     try {
+      if (isEvalSentinel) {
+        // Skip DB write but still emit the structured log so the eval can
+        // see latency + cost.
+        log.info("ai.call", {
+          mode: args.mode,
+          model: args.model,
+          durationMs,
+          costCents: Number(costCents.toFixed(4)),
+          inferenceId: 0,
+          error: errorMsg,
+          ctx: "eval_sentinel_skip_db",
+        });
+      } else {
       const inputHash = createHash("sha256")
         .update(args.systemPrompt)
         .update("\n--\n")
@@ -154,6 +173,7 @@ export async function callLLM(args: {
         // We can't return inside finally — the outer try returns first.
         // Stash on the closure via a side channel.
         (returnHook as { id?: number }).id = row.id;
+      }
       }
     } catch (logErr) {
       // Logging failure shouldn't fail the user's request
