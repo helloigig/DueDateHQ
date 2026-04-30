@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DueDateHQ — v14 · Liquid Glass</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Liquid glass — committed glassmorphism (THE direction). Iridescent OKLCH backdrop, multi-layer frost */
+  :root {
+    --ink:        oklch(20% 0.020 280);
+    --ink-2:      oklch(36% 0.024 270);
+    --ink-3:      oklch(54% 0.026 265 / 0.75);
+    --ink-4:      oklch(54% 0.026 265 / 0.55);
+    --ink-soft:   oklch(54% 0.026 265 / 0.22);
+
+    --primary:    oklch(58% 0.140 270);
+
+    --crimson:    oklch(50% 0.180 27);
+    --crimson-bg: oklch(50% 0.180 27 / 0.10);
+    --warn:       oklch(70% 0.140 70);
+    --ok:         oklch(56% 0.130 145);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Geist', -apple-system, sans-serif;
+    font-size: 14px; line-height: 1.5;
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 800px at 5% 5%, oklch(86% 0.080 60) 0%, transparent 50%),
+      radial-gradient(1100px 700px at 95% 25%, oklch(82% 0.110 280) 0%, transparent 55%),
+      radial-gradient(1000px 700px at 30% 100%, oklch(84% 0.090 0) 0%, transparent 50%),
+      radial-gradient(900px 600px at 100% 100%, oklch(86% 0.080 175) 0%, transparent 50%),
+      oklch(94% 0.025 80);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Animated noise + grain texture for the liquid feel */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><filter id="n"><feTurbulence baseFrequency="0.85" numOctaves="2"/><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.04 0"/></filter><rect width="200" height="200" filter="url(%23n)"/></svg>');
+    pointer-events: none; z-index: 0;
+    opacity: 0.6;
+    mix-blend-mode: multiply;
+  }
+  ::selection { background: oklch(58% 0.140 270 / 0.3); color: var(--ink); }
+
+  /* Glass primitives — multi-layer */
+  .glass {
+    background: oklch(100% 0 0 / 0.42);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid oklch(100% 0 0 / 0.6);
+    border-radius: 22px;
+    box-shadow:
+      inset 0 1px 0 oklch(100% 0 0 / 0.7),
+      inset 0 -1px 0 oklch(0% 0 0 / 0.04),
+      0 16px 40px oklch(20% 0.020 280 / 0.08),
+      0 4px 12px oklch(20% 0.020 280 / 0.04);
+  }
+  .glass-strong {
+    background: oklch(100% 0 0 / 0.55);
+    backdrop-filter: blur(40px) saturate(200%);
+    -webkit-backdrop-filter: blur(40px) saturate(200%);
+    border: 1px solid oklch(100% 0 0 / 0.75);
+  }
+  .glass-deep {
+    background: oklch(100% 0 0 / 0.30);
+    backdrop-filter: blur(52px) saturate(220%);
+    -webkit-backdrop-filter: blur(52px) saturate(220%);
+    border: 1px solid oklch(100% 0 0 / 0.5);
+  }
+
+  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; padding: 16px; gap: 16px; position: relative; z-index: 1; }
+
+  aside { padding: 18px 12px; display: flex; flex-direction: column; gap: 6px; height: fit-content; position: sticky; top: 16px; }
+  .brand { display: flex; align-items: center; gap: 12px; padding: 6px 14px 18px; }
+  .brand-mark { width: 32px; height: 32px; background: linear-gradient(135deg, var(--primary) 0%, oklch(72% 0.110 0) 100%); border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; color: oklch(100% 0 0); font-weight: 700; font-size: 14px; box-shadow: 0 4px 12px oklch(58% 0.140 270 / 0.3); }
+  .brand-name { font-size: 15px; font-weight: 600; line-height: 1.05; }
+  .brand-firm { font-size: 12px; color: var(--ink-3); margin-top: 1px; }
+
+  nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav-item { display: flex; align-items: center; gap: 12px; padding: 0 14px; height: 38px; border-radius: 12px; color: var(--ink-2); text-decoration: none; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 200ms; }
+  .nav-item:hover { background: oklch(100% 0 0 / 0.5); }
+  .nav-item.active { background: oklch(100% 0 0 / 0.85); box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.8), 0 4px 12px oklch(20% 0.020 280 / 0.04); font-weight: 600; }
+  .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .nav-item .count { margin-left: auto; font-size: 12px; color: var(--ink-3); font-weight: 600; }
+  .nav-item.alert .count { color: oklch(100% 0 0); background: var(--crimson); padding: 1px 8px; border-radius: 999px; font-weight: 700; }
+
+  main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .topbar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+  .crumb { font-size: 14px; color: var(--ink-3); padding-left: 8px; }
+  .crumb strong { color: var(--ink); font-weight: 600; }
+  .topbar .spacer { flex: 1; }
+
+  .pill-search { height: 40px; padding: 0 18px; display: flex; align-items: center; gap: 10px; border: 0; border-radius: 999px; color: var(--ink-3); font-family: inherit; font-size: 13px; cursor: pointer; min-width: 280px; }
+  .pill-search svg { width: 14px; height: 14px; }
+  .pill-search .kbd { margin-left: auto; }
+  .kbd { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink-3); background: oklch(100% 0 0 / 0.5); border-radius: 5px; padding: 1px 6px; border: 1px solid oklch(100% 0 0 / 0.8); }
+  .icon-btn { width: 40px; height: 40px; border: 0; border-radius: 999px; color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; position: relative; }
+  .icon-btn svg { width: 16px; height: 16px; }
+  .icon-btn .pip { position: absolute; top: 9px; right: 9px; width: 8px; height: 8px; background: var(--crimson); border: 2px solid oklch(100% 0 0 / 0.6); border-radius: 999px; }
+  .new-btn { height: 40px; padding: 0 20px; background: var(--ink); color: oklch(100% 0 0); border: 0; border-radius: 999px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px oklch(20% 0.020 280 / 0.18); }
+  .avatar { width: 40px; height: 40px; background: linear-gradient(135deg, oklch(82% 0.110 60) 0%, oklch(76% 0.140 280) 100%); color: oklch(100% 0 0); border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.5); }
+
+  .hero { padding: 36px 32px 32px; }
+  .hero h1 { font-size: clamp(36px, 4.6vw, 48px); font-weight: 500; letter-spacing: -0.025em; line-height: 1.05; }
+  /* Solid color emphasis — no gradient text */
+  .hero h1 em { font-style: normal; color: var(--primary); font-weight: 600; }
+  .hero .meta { margin-top: 12px; font-size: 14px; color: var(--ink-3); }
+  .hero .meta .sep { color: var(--ink-soft); margin: 0 8px; }
+  .hero .meta .overdue { color: var(--crimson); font-weight: 600; }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 0 4px; }
+  .kpi { padding: 18px 20px; border-radius: 18px; }
+  .kpi .label { font-size: 12px; font-weight: 600; color: var(--ink-3); }
+  .kpi .value { font-size: 32px; font-weight: 600; line-height: 1.05; margin-top: 4px; letter-spacing: -0.018em; font-variant-numeric: tabular-nums; }
+  .kpi .value.danger { color: var(--crimson); }
+  .kpi .trend { font-size: 12px; color: var(--ink-3); margin-top: 6px; font-weight: 500; }
+
+  .alert { padding: 18px 22px; display: flex; align-items: center; gap: 14px; border-radius: 18px; }
+  .alert-icon { width: 36px; height: 36px; background: var(--crimson-bg); color: var(--crimson); border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .alert-icon svg { width: 17px; height: 17px; }
+  .alert-body { flex: 1; }
+  .alert-title { font-size: 14px; font-weight: 600; }
+  .alert-meta { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+  .alert-action { background: var(--ink); color: oklch(100% 0 0); border: 0; border-radius: 999px; padding: 8px 16px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px oklch(20% 0.020 280 / 0.18); }
+
+  .section { padding: 22px; }
+  .section-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+  .section-title { font-size: 18px; font-weight: 600; letter-spacing: -0.012em; }
+  .section-count { font-size: 12px; color: var(--ink-3); font-weight: 500; }
+  .section-actions { margin-left: auto; display: flex; gap: 6px; }
+  .section-actions button { background: oklch(100% 0 0 / 0.5); border: 0; padding: 5px 12px; border-radius: 999px; font-family: inherit; font-size: 12px; font-weight: 500; color: var(--ink-2); cursor: pointer; }
+
+  .rows { list-style: none; }
+  .row { display: flex; align-items: center; gap: 14px; padding: 12px 12px; border-radius: 12px; transition: background 200ms; }
+  .row:hover { background: oklch(100% 0 0 / 0.5); }
+  .row.overdue { background: var(--crimson-bg); }
+  .dot { width: 8px; height: 8px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
+  .countdown { font-family: ui-monospace, monospace; font-size: 12px; width: 60px; color: var(--ink-2); flex-shrink: 0; font-weight: 600; }
+  .countdown.danger { color: var(--crimson); }
+  .client { width: 184px; flex-shrink: 0; color: var(--ink); font-size: 14px; font-weight: 600; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .client-suppress { width: 184px; color: var(--ink-4); font-size: 13px; }
+  .form { flex: 1; min-width: 0; color: var(--ink-3); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+  .pill { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; flex-shrink: 0; line-height: 1.4; }
+  .pill.primary { background: var(--ink); color: oklch(100% 0 0); }
+  .pill.nexus { border: 1px solid var(--ink-soft); color: var(--ink-3); padding: 2px 8px; }
+  .pill.fed { background: oklch(100% 0 0 / 0.6); color: var(--ink-2); }
+  .ai-source { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 3px 10px; border-radius: 999px; flex-shrink: 0; font-weight: 600; color: oklch(100% 0 0); background: linear-gradient(135deg, var(--primary) 0%, oklch(72% 0.110 0) 100%); }
+  .ai-source svg { width: 11px; height: 11px; }
+  .status-text { font-size: 12px; color: var(--ink-3); width: 80px; flex-shrink: 0; }
+
+  .direction-tag { position: fixed; bottom: 20px; right: 20px; padding: 8px 16px; border-radius: 999px; font-size: 11px; font-weight: 600; z-index: 100; color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="glass">
+    <div class="brand"><span class="brand-mark">D</span><div><div class="brand-name">DueDateHQ</div><div class="brand-firm">Sarah Mitchell, CPA</div></div></div>
+    <nav>
+      <a class="nav-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Dashboard</a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>To review<span class="count">5</span></a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Clients</a>
+      <a class="nav-item alert"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>Alerts<span class="count">3</span></a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>Insights</a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <span class="crumb">Workspace · <strong>Dashboard</strong></span>
+      <div class="spacer"></div>
+      <button class="pill-search glass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>Search<span class="kbd">⌘K</span></button>
+      <button class="icon-btn glass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="pip"></span></button>
+      <button class="new-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>New</button>
+      <span class="avatar">SC</span>
+    </div>
+
+    <div class="hero glass-strong" style="border-radius: 22px;">
+      <h1>Good morning,<br>Sarah. <em>Eight filings</em><br>are pressing this week.</h1>
+      <p class="meta">Thursday, April 30 <span class="sep">·</span> 80 active <span class="sep">·</span> <span class="overdue">2 overdue</span> <span class="sep">·</span> 3 awaiting client docs</p>
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi glass"><div class="label">Active</div><div class="value">80</div><div class="trend">+3 this month</div></div>
+      <div class="kpi glass"><div class="label">Overdue</div><div class="value danger">2</div><div class="trend">act today</div></div>
+      <div class="kpi glass"><div class="label">This week</div><div class="value">8</div><div class="trend">5 jurisdictions</div></div>
+      <div class="kpi glass"><div class="label">Awaiting docs</div><div class="value">3</div><div class="trend">avg 2 days</div></div>
+    </div>
+
+    <div class="alert glass" style="background: var(--crimson-bg); border-color: oklch(50% 0.180 27 / 0.3);">
+      <span class="alert-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+      <div class="alert-body"><div class="alert-title">Louisiana DOR · Hurricane Delta extension issued</div><div class="alert-meta">Affects 6 of your clients · Detected 2h ago</div></div>
+      <button class="alert-action">Review →</button>
+    </div>
+
+    <section class="section glass-deep">
+      <div class="section-head"><span class="section-title">Overdue</span><span class="section-count">2 filings</span><div class="section-actions"><button>Filter</button></div></div>
+      <ul class="rows">
+        <li class="row overdue"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--crimson)"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg></span><span class="countdown danger">3d late</span><a class="client" href="#">Acme LLC</a><a class="form" href="#">1120-S federal</a><span class="pill fed">FED</span></li>
+        <li class="row overdue"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--crimson)"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg></span><span class="countdown danger">1d late</span><a class="client" href="#">Tessera Holdings</a><a class="form" href="#">CA Form 568 · LLC fee</a><span class="pill primary">CA</span></li>
+      </ul>
+    </section>
+
+    <section class="section glass-deep">
+      <div class="section-head"><span class="section-title">This week</span><span class="section-count">8 filings</span><div class="section-actions"><button>Filter</button><button>Export</button></div></div>
+      <ul class="rows">
+        <li class="row"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--warn)"><circle cx="4" cy="4" r="3.5" fill="none" stroke="currentColor" stroke-width="1"/><path d="M4 0.5 A 3.5 3.5 0 0 1 4 7.5 Z" fill="currentColor"/></svg></span><span class="countdown">Today</span><a class="client" href="#">Wilkins Plumbing</a><a class="form" href="#">LA-CIFT-620</a><span class="ai-source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>S-Corp</span><span class="pill primary">LA</span><span class="status-text">In progress</span></li>
+        <li class="row"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--warn)"><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span><span class="countdown">Tue</span><a class="client" href="#">Northshore Co</a><a class="form" href="#">TX Franchise Tax</a><span class="pill nexus">TX</span><span class="status-text"></span></li>
+        <li class="row"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--ink-soft)"><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span><span class="countdown">Wed</span><a class="client" href="#">Pinecrest Inc</a><a class="form" href="#">Form 941 · Q1 2026</a><span class="pill fed">FED</span><span class="status-text"></span></li>
+        <li class="row"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--ink-soft)"><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span><span class="countdown">Thu</span><a class="client" href="#">Vanderbilt &amp; Sons</a><a class="form" href="#">IT-204 NY-LLC</a><span class="pill primary">NY</span><span class="status-text"></span></li>
+        <li class="row"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--ink-soft)"><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span><span class="countdown">Fri</span><span class="client-suppress">↪</span><a class="form" href="#">CA Form 100 · S-Corp annual</a><span class="pill primary">CA</span><span class="status-text"></span></li>
+        <li class="row"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--ink-soft)"><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span><span class="countdown">Fri</span><a class="client" href="#">Ridgemont Group</a><a class="form" href="#">ST-1 · IL Sales/Use</a><span class="pill nexus">IL</span><span class="status-text"></span></li>
+      </ul>
+    </section>
+  </main>
+</div>
+<div class="direction-tag glass">v14 · Liquid Glass</div>
+</body>
+</html>

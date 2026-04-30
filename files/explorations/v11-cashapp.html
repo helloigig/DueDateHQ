@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DueDateHQ — v11 · Cash App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hubot+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Cash App: bold green field, white ink, brutalist scale */
+  :root {
+    --bg:        oklch(72% 0.180 145);   /* Cash green */
+    --green:     oklch(78% 0.190 145);
+    --green-2:   oklch(64% 0.180 145);
+    --green-deep:oklch(50% 0.180 145);
+    --black:     oklch(8% 0 0);
+    --ink:       oklch(99% 0 0);
+    --ink-2:     oklch(99% 0 0 / 0.85);
+    --ink-3:     oklch(99% 0 0 / 0.65);
+    --ink-4:     oklch(99% 0 0 / 0.4);
+    --rule:      oklch(99% 0 0 / 0.16);
+    --hover:     oklch(99% 0 0 / 0.08);
+    --tint:      oklch(99% 0 0 / 0.06);
+    --surface:   oklch(0% 0 0 / 0.18);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Hubot Sans', -apple-system, sans-serif;
+    font-size: 14px; line-height: 1.4;
+    color: var(--ink);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  .display { font-family: 'Bricolage Grotesque'; font-variation-settings: 'opsz' 96; letter-spacing: -0.04em; }
+  ::selection { background: var(--black); color: var(--green); }
+
+  .app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+
+  aside { padding: 28px 16px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; border-right: 1px solid var(--rule); }
+  .brand { font-family: 'Bricolage Grotesque'; font-variation-settings: 'opsz' 96; font-size: 22px; font-weight: 800; letter-spacing: -0.04em; padding: 0 12px 24px; }
+  .brand-firm { font-size: 12px; color: var(--ink-3); font-weight: 500; padding: 0 12px 16px; }
+
+  nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav-item { display: flex; align-items: center; gap: 12px; padding: 0 12px; height: 36px; color: var(--ink-2); text-decoration: none; font-size: 16px; font-weight: 600; cursor: pointer; }
+  .nav-item:hover { color: var(--ink); }
+  .nav-item.active { color: var(--ink); }
+  .nav-item.active::after { content: ''; flex: 1; height: 1px; background: var(--ink); margin-left: 8px; }
+  .nav-item .count { margin-left: auto; font-size: 13px; color: var(--ink-3); font-weight: 700; }
+  .nav-item.alert .count { color: var(--bg); background: var(--ink); padding: 1px 8px; font-weight: 800; }
+
+  main { display: flex; flex-direction: column; min-width: 0; }
+
+  .topbar { display: flex; align-items: center; gap: 10px; padding: 0 36px; height: 64px; border-bottom: 1px solid var(--rule); }
+  .topbar .spacer { flex: 1; }
+  .search { height: 40px; padding: 0 16px; display: flex; align-items: center; gap: 10px; background: var(--surface); border: 0; color: var(--ink-3); font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; min-width: 240px; }
+  .search svg { width: 14px; height: 14px; }
+  .icon-btn { width: 40px; height: 40px; background: transparent; border: 0; color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; position: relative; }
+  .icon-btn:hover { background: var(--hover); }
+  .icon-btn svg { width: 20px; height: 20px; }
+  .icon-btn .pip { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; background: var(--ink); }
+  .new-btn { height: 40px; padding: 0 18px; background: var(--ink); color: var(--bg); border: 0; font-family: 'Hubot Sans'; font-size: 14px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; letter-spacing: -0.005em; }
+  .avatar { width: 40px; height: 40px; background: var(--ink); color: var(--bg); display: inline-flex; align-items: center; justify-content: center; font-family: 'Bricolage Grotesque'; font-weight: 800; font-size: 13px; }
+
+  .content { padding: 48px 36px 96px; }
+
+  .hero { padding-bottom: 48px; }
+  .hero .label { font-size: 14px; color: var(--ink-2); font-weight: 700; margin-bottom: 8px; letter-spacing: -0.005em; }
+  .hero .greeting { font-family: 'Bricolage Grotesque'; font-variation-settings: 'opsz' 96; font-size: clamp(48px, 7vw, 64px); font-weight: 700; letter-spacing: -0.045em; line-height: 0.95; color: var(--ink); margin-bottom: 32px; }
+
+  .massive-row { display: flex; gap: 0; align-items: flex-end; border-top: 1px solid var(--rule); padding-top: 36px; }
+  .massive { flex: 1; padding-right: 32px; border-right: 1px solid var(--rule); }
+  .massive:last-child { border-right: 0; }
+  .massive-label { font-size: 13px; font-weight: 700; color: var(--ink-2); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .massive-value { font-family: 'Bricolage Grotesque'; font-variation-settings: 'opsz' 96; font-size: clamp(72px, 10vw, 96px); font-weight: 700; letter-spacing: -0.06em; line-height: 0.85; }
+  .massive-trend { font-size: 13px; font-weight: 600; color: var(--ink-2); margin-top: 8px; }
+
+  /* Banner — full black panel, NO left stripe */
+  .alert { margin-top: 56px; background: var(--black); padding: 20px 24px; display: flex; align-items: center; gap: 16px; }
+  .alert-emoji { font-size: 28px; flex-shrink: 0; color: var(--green); font-family: 'Bricolage Grotesque'; font-weight: 700; }
+  .alert-body { flex: 1; }
+  .alert-title { font-family: 'Bricolage Grotesque'; font-size: 18px; font-weight: 700; letter-spacing: -0.015em; }
+  .alert-meta { font-size: 13px; color: var(--ink-3); margin-top: 2px; font-weight: 500; }
+  .alert-action { background: var(--green); color: var(--black); border: 0; padding: 10px 20px; font-family: inherit; font-size: 13px; font-weight: 800; cursor: pointer; letter-spacing: -0.005em; }
+
+  .section { margin-top: 48px; }
+  .section-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 20px; }
+  .section-title { font-family: 'Bricolage Grotesque'; font-size: clamp(28px, 3.4vw, 32px); font-weight: 700; letter-spacing: -0.022em; line-height: 1; }
+  .section-count { font-size: 16px; font-weight: 700; color: var(--ink-3); }
+  .section-actions { margin-left: auto; display: flex; gap: 8px; }
+  .section-actions button { background: transparent; border: 1px solid var(--rule); padding: 6px 14px; font-family: inherit; font-size: 12px; color: var(--ink); font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.04em; }
+  .section-actions button:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .rows { list-style: none; }
+  .row { display: flex; align-items: center; gap: 16px; padding: 18px 0; border-bottom: 1px solid var(--rule); }
+  .row:last-child { border-bottom: 0; }
+  .countdown { font-family: 'Bricolage Grotesque'; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; width: 110px; flex-shrink: 0; line-height: 1; }
+  .countdown.danger { color: var(--ink); }
+  .countdown.danger::before { content: '↓ '; color: var(--ink); }
+  .client-form { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .client { color: var(--ink); font-size: 18px; font-weight: 700; text-decoration: none; letter-spacing: -0.012em; }
+  .form { color: var(--ink-3); font-size: 13px; font-weight: 600; text-decoration: none; }
+  .pill { font-size: 11px; font-weight: 800; padding: 5px 11px; flex-shrink: 0; line-height: 1.4; letter-spacing: 0.04em; text-transform: uppercase; }
+  .pill.primary { background: var(--ink); color: var(--bg); }
+  .pill.nexus { border: 1px solid var(--ink-3); color: var(--ink-2); padding: 4px 10px; }
+  .pill.fed { background: var(--black); color: var(--green); }
+  .ai-source { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 5px 11px; flex-shrink: 0; font-weight: 800; color: var(--bg); background: var(--ink); text-transform: uppercase; letter-spacing: 0.04em; }
+  .ai-source svg { width: 11px; height: 11px; }
+
+  .complete-btn { width: 40px; height: 40px; background: var(--ink); color: var(--bg); border: 0; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; opacity: 0; transition: opacity 100ms; }
+  .row:hover .complete-btn { opacity: 1; }
+  .complete-btn svg { width: 18px; height: 18px; stroke-width: 3; }
+
+  .direction-tag { position: fixed; bottom: 20px; right: 20px; background: var(--ink); color: var(--bg); padding: 8px 16px; font-family: 'Bricolage Grotesque'; font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; z-index: 100; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand">DDH$</div>
+    <div class="brand-firm">Sarah Mitchell, CPA</div>
+    <nav>
+      <a class="nav-item active">Dashboard</a>
+      <a class="nav-item">To review<span class="count">5</span></a>
+      <a class="nav-item">Clients</a>
+      <a class="nav-item alert">Alerts<span class="count">3</span></a>
+      <a class="nav-item">Insights</a>
+      <a class="nav-item">Settings</a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <button class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>SEARCH</button>
+      <div class="spacer"></div>
+      <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="pip"></span></button>
+      <button class="new-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg>NEW</button>
+      <span class="avatar">SC</span>
+    </div>
+
+    <div class="content">
+      <div class="hero">
+        <div class="label">THURSDAY · APRIL 30</div>
+        <h1 class="greeting">Hi,<br>Sarah.</h1>
+
+        <div class="massive-row">
+          <div class="massive">
+            <div class="massive-label">Overdue</div>
+            <div class="massive-value">02</div>
+            <div class="massive-trend">act today</div>
+          </div>
+          <div class="massive">
+            <div class="massive-label">This week</div>
+            <div class="massive-value">08</div>
+            <div class="massive-trend">5 jurisdictions</div>
+          </div>
+          <div class="massive">
+            <div class="massive-label">Active</div>
+            <div class="massive-value">80</div>
+            <div class="massive-trend">+3 this month</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="alert">
+        <span class="alert-emoji">!</span>
+        <div class="alert-body"><div class="alert-title">Hurricane Delta extension · Louisiana DOR</div><div class="alert-meta">Affects 6 of your clients · Detected 2h ago</div></div>
+        <button class="alert-action">REVIEW</button>
+      </div>
+
+      <section class="section">
+        <div class="section-head"><span class="section-title">Overdue</span><span class="section-count">2</span></div>
+        <ul class="rows">
+          <li class="row">
+            <span class="countdown danger">3D LATE</span>
+            <div class="client-form"><a class="client" href="#">Acme LLC</a><a class="form" href="#">1120-S federal</a></div>
+            <span class="pill fed">FED</span>
+            <button class="complete-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
+          </li>
+          <li class="row">
+            <span class="countdown danger">1D LATE</span>
+            <div class="client-form"><a class="client" href="#">Tessera Holdings</a><a class="form" href="#">CA Form 568 · LLC fee</a></div>
+            <span class="pill primary">CA</span>
+            <button class="complete-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
+          </li>
+        </ul>
+      </section>
+
+      <section class="section">
+        <div class="section-head"><span class="section-title">This week</span><span class="section-count">8</span><div class="section-actions"><button>Export</button><button>Filter</button></div></div>
+        <ul class="rows">
+          <li class="row">
+            <span class="countdown">TODAY</span>
+            <div class="client-form"><a class="client" href="#">Wilkins Plumbing</a><a class="form" href="#">LA-CIFT-620</a></div>
+            <span class="ai-source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>S-Corp</span>
+            <span class="pill primary">LA</span>
+            <button class="complete-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
+          </li>
+          <li class="row"><span class="countdown">TUE</span><div class="client-form"><a class="client" href="#">Northshore Co</a><a class="form" href="#">TX Franchise Tax</a></div><span class="pill nexus">TX</span><button class="complete-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button></li>
+          <li class="row"><span class="countdown">WED</span><div class="client-form"><a class="client" href="#">Pinecrest Inc</a><a class="form" href="#">Form 941 · Q1 2026</a></div><span class="pill fed">FED</span><button class="complete-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button></li>
+          <li class="row"><span class="countdown">THU</span><div class="client-form"><a class="client" href="#">Vanderbilt &amp; Sons</a><a class="form" href="#">IT-204 NY-LLC</a></div><span class="pill primary">NY</span><button class="complete-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button></li>
+          <li class="row"><span class="countdown">FRI</span><div class="client-form"><a class="client" href="#">↪ Acme LLC</a><a class="form" href="#">CA Form 100 · S-Corp annual</a></div><span class="pill primary">CA</span><button class="complete-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button></li>
+          <li class="row"><span class="countdown">FRI</span><div class="client-form"><a class="client" href="#">Ridgemont Group</a><a class="form" href="#">ST-1 · IL Sales/Use</a></div><span class="pill nexus">IL</span><button class="complete-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button></li>
+        </ul>
+      </section>
+    </div>
+  </main>
+</div>
+<div class="direction-tag">v11 · Cash</div>
+</body>
+</html>

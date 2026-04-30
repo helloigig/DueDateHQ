@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DueDateHQ — v20 · Old Céline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cardo:ital,wght@0,400;0,700;1,400&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Old Céline: severe minimalism. Beige paper, black ink, intentional cold */
+  :root {
+    --bg:           oklch(89% 0.014 78);
+    --paper:        oklch(91% 0.018 80);
+    --rule:         oklch(20% 0.010 60);
+    --rule-soft:    oklch(70% 0.010 60 / 0.18);
+
+    --ink:          oklch(20% 0.010 60);
+    --ink-2:        oklch(36% 0.012 55);
+    --ink-3:        oklch(50% 0.014 50);
+    --ink-4:        oklch(64% 0.014 60);
+
+    --crimson:      oklch(36% 0.140 27);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Cardo', 'Times New Roman', serif;
+    font-size: 13px; line-height: 1.6;
+    color: var(--ink);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: 0.005em;
+    font-feature-settings: 'kern', 'liga', 'onum';
+  }
+  .sans { font-family: 'Public Sans', sans-serif; }
+
+  .app { display: grid; grid-template-columns: 200px 1fr; min-height: 100vh; }
+
+  aside { background: var(--bg); border-right: 1px solid var(--rule); padding: 64px 28px; display: flex; flex-direction: column; gap: 0; position: sticky; top: 0; height: 100vh; }
+  .masthead { font-size: 11px; font-weight: 400; letter-spacing: 0.42em; text-transform: uppercase; line-height: 1.6; }
+  .masthead-rule { width: 18px; height: 1px; background: var(--ink); margin: 14px 0 22px; }
+  .masthead-firm { font-size: 10px; letter-spacing: 0.36em; text-transform: uppercase; color: var(--ink-3); }
+
+  nav { margin-top: auto; padding-top: 36px; display: flex; flex-direction: column; gap: 14px; border-top: 1px solid var(--rule); }
+  .nav-item { display: flex; align-items: center; justify-content: space-between; color: var(--ink-2); text-decoration: none; font-size: 11px; font-weight: 400; letter-spacing: 0.32em; text-transform: uppercase; cursor: pointer; }
+  .nav-item:hover { color: var(--ink); }
+  .nav-item.active { color: var(--ink); font-weight: 700; }
+  .nav-item.active::before { content: '·'; margin-right: 6px; color: var(--ink); font-size: 18px; line-height: 0; }
+  .nav-item .count { font-size: 10px; letter-spacing: 0.04em; color: var(--ink-3); font-feature-settings: 'lnum'; }
+  .nav-item.alert .count { color: var(--crimson); font-weight: 500; }
+
+  main { display: flex; flex-direction: column; min-width: 0; }
+
+  .topbar { display: flex; align-items: center; gap: 18px; padding: 28px 56px 24px; }
+  .folio { font-size: 10px; letter-spacing: 0.36em; text-transform: uppercase; color: var(--ink-3); font-feature-settings: 'lnum'; }
+  .folio strong { color: var(--ink); font-weight: 700; }
+  .topbar .spacer { flex: 1; }
+  .pill-search { background: transparent; border: 0; border-bottom: 1px solid var(--rule); padding: 4px 0; min-width: 180px; font-family: 'Cardo', serif; font-size: 13px; font-style: italic; color: var(--ink-3); cursor: pointer; }
+  .icon-btn { width: 28px; height: 28px; background: transparent; border: 0; color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; position: relative; }
+  .icon-btn svg { width: 14px; height: 14px; }
+  .icon-btn .pip { position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; background: var(--crimson); border-radius: 999px; }
+  .new-btn { background: transparent; border: 1px solid var(--rule); padding: 7px 18px; font-family: 'Cardo', serif; font-size: 10px; letter-spacing: 0.32em; text-transform: uppercase; color: var(--ink); cursor: pointer; }
+  .new-btn:hover { background: var(--ink); color: var(--bg); }
+  .avatar { font-family: 'Cardo'; font-size: 11px; letter-spacing: 0.18em; padding: 0 12px; height: 28px; line-height: 26px; border: 1px solid var(--rule); }
+
+  .pagehead { padding: 96px 56px 84px; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); display: grid; grid-template-columns: 1fr; gap: 0; }
+  .pagehead-title { font-family: 'Cardo'; font-size: 14px; font-weight: 400; letter-spacing: 0.6em; text-transform: uppercase; line-height: 1.6; max-width: 560px; }
+
+  .pagehead-display {
+    margin-top: 36px;
+    font-family: 'Cardo';
+    font-style: italic;
+    font-size: clamp(56px, 7.5vw, 88px);
+    font-weight: 400;
+    line-height: 1.05;
+    letter-spacing: -0.022em;
+    color: var(--ink);
+    max-width: 720px;
+  }
+
+  .stat-line { margin-top: 42px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; padding-top: 28px; border-top: 1px solid var(--rule); max-width: 560px; }
+  .stat .lbl { font-size: 10px; letter-spacing: 0.32em; text-transform: uppercase; color: var(--ink-3); }
+  .stat .val { font-family: 'Cardo'; font-size: 26px; font-weight: 400; line-height: 1.1; margin-top: 8px; letter-spacing: 0.005em; font-variant-numeric: lining-nums tabular-nums; }
+  .stat.high .val { color: var(--crimson); font-style: italic; }
+
+  .lead { padding: 32px 56px; border-bottom: 1px solid var(--rule); display: grid; grid-template-columns: auto 1fr auto; gap: 36px; align-items: center; }
+  .lead-num { font-size: 11px; letter-spacing: 0.36em; text-transform: uppercase; color: var(--crimson); }
+  .lead-body { font-family: 'Cardo'; }
+  .lead-title { font-size: 24px; font-weight: 400; letter-spacing: -0.005em; line-height: 1.25; }
+  .lead-title em { font-style: italic; color: var(--ink-3); }
+  .lead-meta { font-size: 13px; font-style: italic; color: var(--ink-3); margin-top: 4px; }
+  .lead-action { background: transparent; border: 1px solid var(--rule); padding: 8px 22px; font-family: 'Cardo'; font-size: 10px; letter-spacing: 0.36em; text-transform: uppercase; color: var(--ink); cursor: pointer; white-space: nowrap; }
+  .lead-action:hover { background: var(--ink); color: var(--bg); }
+
+  .columns { padding: 56px 56px 96px; display: grid; grid-template-columns: 1fr 1fr; gap: 64px; }
+
+  .section-head { display: flex; align-items: baseline; gap: 18px; padding-bottom: 12px; margin-bottom: 18px; border-bottom: 1px solid var(--rule); }
+  .section-num { font-family: 'Cardo'; font-size: 11px; letter-spacing: 0.36em; text-transform: uppercase; color: var(--ink-3); }
+  .section-title { font-family: 'Cardo'; font-size: 14px; letter-spacing: 0.42em; text-transform: uppercase; font-weight: 400; }
+  .section-count { margin-left: auto; font-family: 'Cardo'; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-3); }
+
+  .rows { list-style: none; }
+  .row { display: grid; grid-template-columns: 64px 1fr auto; gap: 18px; padding: 18px 0; border-bottom: 1px solid var(--rule-soft); align-items: baseline; }
+  .row:last-child { border-bottom: 0; }
+  .row.overdue .when { color: var(--crimson); }
+  .when { font-family: 'Cardo'; font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--ink-3); padding-top: 4px; }
+  .row-body { min-width: 0; }
+  .row-title { font-family: 'Cardo'; font-size: 18px; font-weight: 400; line-height: 1.25; }
+  .row-title em { font-style: italic; color: var(--ink-3); }
+  .row-form { font-family: 'Cardo'; font-style: italic; font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+  .row-form .ai { font-style: normal; font-size: 9px; color: var(--ink-3); margin-left: 8px; letter-spacing: 0.32em; text-transform: uppercase; border-bottom: 1px solid var(--ink-3); padding-bottom: 1px; }
+  .row-tag { font-family: 'Cardo'; font-size: 10px; letter-spacing: 0.36em; text-transform: uppercase; color: var(--ink-3); padding-top: 6px; }
+
+  .footer { padding: 18px 56px 32px; display: flex; align-items: baseline; justify-content: space-between; font-family: 'Cardo'; font-size: 10px; letter-spacing: 0.32em; text-transform: uppercase; color: var(--ink-3); border-top: 1px solid var(--rule); }
+  .footer em { font-style: italic; color: var(--ink); letter-spacing: 0; text-transform: none; font-size: 13px; }
+
+  .direction-tag { position: fixed; bottom: 28px; right: 28px; background: transparent; color: var(--ink); padding: 8px 16px; font-family: 'Cardo'; font-size: 10px; letter-spacing: 0.36em; text-transform: uppercase; z-index: 100; border: 1px solid var(--rule); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="masthead">DUEDATEHQ.</div>
+    <div class="masthead-rule"></div>
+    <div class="masthead-firm">SARAH<br>MITCHELL CPA</div>
+    <nav>
+      <a class="nav-item active">Dashboard</a>
+      <a class="nav-item">Review<span class="count">5</span></a>
+      <a class="nav-item">Clients</a>
+      <a class="nav-item alert">Alerts<span class="count">3</span></a>
+      <a class="nav-item">Insights</a>
+      <a class="nav-item">Settings</a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <span class="folio">VOLUME I · ISSUE 18 · <strong>APR 30 26</strong></span>
+      <div class="spacer"></div>
+      <button class="pill-search">Search…</button>
+      <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="pip"></span></button>
+      <button class="new-btn">New</button>
+      <span class="avatar">SM</span>
+    </div>
+
+    <div class="pagehead">
+      <div class="pagehead-title">Filing season ⁄ week eighteen ⁄ april thirtieth</div>
+      <h1 class="pagehead-display">good morning, Sarah.<br>two filings overdue.<br><em>eight more by Friday.</em></h1>
+      <div class="stat-line">
+        <div class="stat high"><div class="lbl">Overdue</div><div class="val">02</div></div>
+        <div class="stat"><div class="lbl">Week</div><div class="val">08</div></div>
+        <div class="stat"><div class="lbl">Active</div><div class="val">80</div></div>
+        <div class="stat"><div class="lbl">Awaiting</div><div class="val">03</div></div>
+      </div>
+    </div>
+
+    <div class="lead">
+      <div class="lead-num">— No. 1</div>
+      <div class="lead-body">
+        <div class="lead-title">Louisiana — Hurricane Delta extension. <em>Six clients eligible.</em></div>
+        <div class="lead-meta">Detected from official sources, two hours ago.</div>
+      </div>
+      <button class="lead-action">Review</button>
+    </div>
+
+    <div class="columns">
+      <section>
+        <div class="section-head"><span class="section-num">I.</span><span class="section-title">Overdue</span><span class="section-count">02</span></div>
+        <ul class="rows">
+          <li class="row overdue"><span class="when">3 days late</span><div class="row-body"><div class="row-title">Acme LLC <em>— 1120-S federal</em></div><div class="row-form">Annual filing.</div></div><span class="row-tag">FED</span></li>
+          <li class="row overdue"><span class="when">1 day late</span><div class="row-body"><div class="row-title">Tessera Holdings <em>— CA Form 568</em></div><div class="row-form">LLC fee.</div></div><span class="row-tag">CA</span></li>
+        </ul>
+      </section>
+
+      <section>
+        <div class="section-head"><span class="section-num">II.</span><span class="section-title">This week</span><span class="section-count">08</span></div>
+        <ul class="rows">
+          <li class="row"><span class="when">Today</span><div class="row-body"><div class="row-title">Wilkins Plumbing <em>— LA-CIFT-620</em></div><div class="row-form">In progress.<span class="ai">Generated · S-Corp</span></div></div><span class="row-tag">LA</span></li>
+          <li class="row"><span class="when">Tuesday</span><div class="row-body"><div class="row-title">Northshore Co <em>— TX Franchise</em></div><div class="row-form">Annual report.</div></div><span class="row-tag">TX</span></li>
+          <li class="row"><span class="when">Wednesday</span><div class="row-body"><div class="row-title">Pinecrest Inc <em>— Form 941</em></div><div class="row-form">Q1 quarterly.</div></div><span class="row-tag">FED</span></li>
+          <li class="row"><span class="when">Thursday</span><div class="row-body"><div class="row-title">Vanderbilt &amp; Sons <em>— IT-204</em></div><div class="row-form">NY-LLC.</div></div><span class="row-tag">NY</span></li>
+          <li class="row"><span class="when">Friday</span><div class="row-body"><div class="row-title"><em>↪ ditto</em> — CA Form 100</div><div class="row-form">S-Corp.</div></div><span class="row-tag">CA</span></li>
+          <li class="row"><span class="when">Friday</span><div class="row-body"><div class="row-title">Ridgemont Group <em>— ST-1</em></div><div class="row-form">IL Sales/Use.</div></div><span class="row-tag">IL</span></li>
+        </ul>
+      </section>
+    </div>
+
+    <div class="footer"><span>DUEDATEHQ · ISSUE 18</span><em>i</em><span>APRIL 30 · 26</span></div>
+  </main>
+</div>
+<div class="direction-tag">v20 · OLD CÉLINE</div>
+</body>
+</html>

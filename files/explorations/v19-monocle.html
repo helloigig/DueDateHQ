@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DueDateHQ — v19 · Monocle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper:        oklch(95% 0.018 80);
+    --paper-2:      oklch(91% 0.022 78);
+    --paper-3:      oklch(86% 0.028 76);
+    --surface:      oklch(98% 0.012 80);
+    --rule:         oklch(72% 0.018 70);
+    --rule-soft:    oklch(82% 0.020 75);
+    --rule-fade:    oklch(89% 0.020 78);
+
+    --ink:          oklch(18% 0.014 60);
+    --ink-2:        oklch(36% 0.018 55);
+    --ink-3:        oklch(52% 0.020 50);
+    --ink-4:        oklch(66% 0.022 60);
+
+    --gold:         oklch(58% 0.110 70);   /* Monocle's accent */
+    --gold-paper:   oklch(89% 0.060 80);
+    --crimson:      oklch(40% 0.150 27);
+    --crimson-paper:oklch(91% 0.040 30);
+    --teal:         oklch(46% 0.080 200);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Hanken Grotesk', -apple-system, sans-serif;
+    font-size: 13px; line-height: 1.5;
+    color: var(--ink);
+    background: var(--paper);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'kern', 'liga', 'onum';
+  }
+  .display { font-family: 'Spectral', Georgia, serif; font-feature-settings: 'kern', 'liga', 'onum'; }
+  .mono    { font-family: 'JetBrains Mono', ui-monospace, monospace; font-feature-settings: 'tnum'; }
+  ::selection { background: var(--gold-paper); color: var(--ink); }
+
+  .app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+
+  /* ============== Masthead column ============== */
+  aside {
+    background: var(--paper);
+    border-right: 1px solid var(--rule);
+    padding: 36px 24px 28px;
+    display: flex; flex-direction: column;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .masthead {
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .masthead-line {
+    font-family: 'Hanken Grotesk';
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: 8px;
+  }
+  .masthead-title {
+    font-family: 'Spectral', serif;
+    font-size: 26px; font-weight: 600;
+    line-height: 0.92;
+    letter-spacing: -0.022em;
+    color: var(--ink);
+  }
+  .masthead-title em { font-style: italic; font-weight: 400; color: var(--ink-3); }
+  .masthead-firm {
+    margin-top: 12px;
+    font-family: 'Spectral', serif;
+    font-style: italic;
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+  .masthead-issue {
+    margin-top: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  .nav-section {
+    font-family: 'Hanken Grotesk';
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-4);
+    padding: 22px 0 8px;
+  }
+  nav { display: flex; flex-direction: column; }
+  .nav-item {
+    display: grid; grid-template-columns: 22px 1fr auto; gap: 10px;
+    align-items: baseline;
+    padding: 8px 0;
+    color: var(--ink-2); text-decoration: none;
+    font-size: 13px; font-weight: 500;
+    cursor: pointer;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .nav-item:last-child { border-bottom: 0; }
+  .nav-item:hover { color: var(--ink); }
+  .nav-item.active { color: var(--ink); font-weight: 700; }
+  .nav-item.active .num { color: var(--gold); font-weight: 700; }
+  .nav-item .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 500;
+    color: var(--ink-4);
+  }
+  .nav-item .count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-3);
+  }
+  .nav-item.alert .count { color: var(--crimson); font-weight: 700; }
+
+  .colophon {
+    margin-top: auto;
+    padding-top: 18px;
+    border-top: 1px solid var(--rule);
+    font-family: 'Spectral', serif;
+    font-style: italic;
+    font-size: 11px;
+    color: var(--ink-4);
+    line-height: 1.55;
+  }
+  .colophon strong { font-weight: 600; color: var(--ink-3); font-style: normal; font-family: 'Hanken Grotesk'; letter-spacing: 0.04em; text-transform: uppercase; font-size: 10px; }
+
+  /* ============== Main ============== */
+  main { display: flex; flex-direction: column; min-width: 0; }
+
+  .topbar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 36px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .folio {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .folio strong { color: var(--ink); font-weight: 600; }
+  .topbar .spacer { flex: 1; }
+  .search-input {
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    padding: 4px 0;
+    font-family: 'Spectral', serif;
+    font-style: italic;
+    font-size: 13px;
+    color: var(--ink-3);
+    cursor: pointer;
+    min-width: 220px;
+  }
+  .icon-btn {
+    width: 30px; height: 30px;
+    background: transparent; border: 0;
+    color: var(--ink-2); cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .icon-btn:hover { color: var(--ink); }
+  .icon-btn svg { width: 14px; height: 14px; }
+  .icon-btn .pip { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; background: var(--crimson); }
+  .new-btn {
+    height: 30px; padding: 0 14px;
+    background: var(--ink); color: var(--paper);
+    border: 0;
+    font-family: 'Hanken Grotesk';
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    cursor: pointer;
+  }
+  .new-btn:hover { background: var(--ink-2); }
+  .avatar {
+    width: 30px; height: 30px;
+    border: 1px solid var(--rule);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: 'Spectral', serif;
+    font-style: italic;
+    font-size: 13px;
+    color: var(--ink);
+  }
+
+  /* Issue cover spread */
+  .pagehead {
+    padding: 56px 36px 36px;
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: 36px;
+    align-items: end;
+    border-bottom: 1px solid var(--rule);
+  }
+  .issue-num-wrap {
+    border-top: 1px solid var(--ink);
+    padding-top: 6px;
+  }
+  .issue-num {
+    font-family: 'Spectral', serif;
+    font-style: italic;
+    font-size: 80px;
+    font-weight: 400;
+    line-height: 0.85;
+    color: var(--gold);
+    letter-spacing: -0.03em;
+  }
+  .issue-label {
+    margin-top: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  .pagehead-main h1 {
+    font-family: 'Spectral', serif;
+    font-size: clamp(32px, 4vw, 48px);
+    font-weight: 500;
+    letter-spacing: -0.018em;
+    line-height: 1.05;
+    color: var(--ink);
+    text-wrap: pretty;
+  }
+  .pagehead-main h1 em { font-style: italic; font-weight: 400; color: var(--gold); }
+  .pagehead-main .dek {
+    margin-top: 14px;
+    font-family: 'Spectral', serif;
+    font-style: italic;
+    font-size: 16px;
+    color: var(--ink-2);
+    line-height: 1.5;
+    max-width: 50ch;
+  }
+  .pagehead-main .byline {
+    margin-top: 14px;
+    font-family: 'Hanken Grotesk';
+    font-size: 11px; letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .pagehead-main .byline strong { color: var(--ink-2); font-weight: 700; }
+
+  /* Definition-list stats — explicitly NOT a tile grid */
+  .stat-stack { }
+  .stat-stack dl { display: flex; flex-direction: column; gap: 14px; }
+  .stat-stack dl > div { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--rule-soft); }
+  .stat-stack dl > div:last-child { border-bottom: 0; padding-bottom: 0; }
+  .stat-stack dt {
+    font-family: 'Hanken Grotesk';
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .stat-stack dd {
+    font-family: 'Spectral', serif;
+    font-size: 28px; font-weight: 500;
+    line-height: 0.95;
+    letter-spacing: -0.018em;
+    color: var(--ink);
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+  .stat-stack dd.high { color: var(--crimson); font-style: italic; font-weight: 500; }
+
+  /* Lead strip — proper image block + dark bar, NO border-left */
+  .lead-strip {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr) auto;
+    gap: 24px;
+    padding: 24px 36px;
+    align-items: center;
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .lead-strip .photo {
+    aspect-ratio: 16 / 10;
+    background:
+      radial-gradient(circle at 25% 70%, oklch(60% 0.180 60) 0%, transparent 50%),
+      radial-gradient(circle at 75% 30%, oklch(58% 0.110 70) 0%, transparent 60%),
+      oklch(28% 0.045 60);
+    position: relative;
+  }
+  .lead-strip .photo::after {
+    content: 'PHOTO · LA · DELTA';
+    position: absolute; bottom: 8px; left: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; font-weight: 600;
+    letter-spacing: 0.16em; color: var(--gold);
+  }
+  .lead-eyebrow {
+    font-family: 'Hanken Grotesk';
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 6px;
+  }
+  .lead-title {
+    font-family: 'Spectral', serif;
+    font-size: 22px; font-weight: 500;
+    line-height: 1.22;
+    letter-spacing: -0.005em;
+    color: var(--paper);
+    text-wrap: balance;
+    max-width: 48ch;
+  }
+  .lead-meta {
+    margin-top: 8px;
+    font-family: 'Spectral', serif;
+    font-style: italic;
+    font-size: 13px;
+    color: oklch(80% 0.020 75);
+  }
+  .lead-action {
+    background: transparent;
+    border: 1px solid var(--paper);
+    padding: 8px 16px;
+    font-family: 'Hanken Grotesk';
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--paper);
+    cursor: pointer;
+  }
+  .lead-action:hover { background: var(--paper); color: var(--ink); }
+
+  .columns {
+    padding: 36px 36px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+    gap: 32px;
+  }
+  .col-rule { background: var(--rule-soft); }
+
+  .section-head {
+    display: grid;
+    grid-template-columns: 36px 1fr auto;
+    gap: 12px;
+    align-items: baseline;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 14px;
+  }
+  .section-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 600;
+    color: var(--gold);
+    letter-spacing: 0.04em;
+  }
+  .section-title {
+    font-family: 'Spectral', serif;
+    font-size: 20px; font-weight: 500;
+    letter-spacing: -0.012em;
+  }
+  .section-title em { font-style: italic; color: var(--ink-3); font-size: 14px; margin-left: 4px; font-weight: 400; }
+  .section-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-3);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .rows { list-style: none; padding-top: 4px; }
+  .row {
+    display: grid;
+    grid-template-columns: 60px minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: baseline;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule-fade);
+  }
+  .row:last-child { border-bottom: 0; }
+  /* Overdue: full background tint + crimson italic when, NO left stripe */
+  .row.overdue { background: var(--crimson-paper); padding: 12px 10px; margin: 0 -10px; }
+  .when {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 500;
+    color: var(--ink-3);
+    padding-top: 2px;
+    letter-spacing: 0.005em;
+    font-variant-numeric: tabular-nums;
+  }
+  .when.overdue { color: var(--crimson); font-weight: 700; }
+  .row-body { min-width: 0; }
+  .row-title {
+    font-family: 'Spectral', serif;
+    font-size: 15px; font-weight: 500;
+    line-height: 1.25;
+  }
+  .row-title em { font-style: italic; color: var(--ink-3); font-weight: 400; }
+  .row-form {
+    margin-top: 1px;
+    font-family: 'Hanken Grotesk';
+    font-size: 12px;
+    color: var(--ink-2);
+    line-height: 1.4;
+  }
+  .row-form .ai {
+    display: inline-block;
+    margin-left: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; font-weight: 600;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--gold);
+    border-bottom: 1px solid var(--gold);
+    padding-bottom: 1px;
+  }
+  .row-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--ink-3);
+    align-self: center;
+  }
+
+  .footer {
+    padding: 18px 36px;
+    border-top: 1px solid var(--rule);
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 24px;
+    align-items: baseline;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .footer .center {
+    font-family: 'Spectral', serif;
+    font-style: italic;
+    font-size: 14px;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--ink);
+  }
+  .footer .right { text-align: right; }
+
+  .direction-tag {
+    position: fixed; bottom: 16px; right: 16px;
+    background: var(--gold); color: var(--paper);
+    padding: 7px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    z-index: 100;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside>
+    <div class="masthead">
+      <div class="masthead-line">A periodical of state filings</div>
+      <h1 class="masthead-title">DueDate<em>HQ</em></h1>
+      <p class="masthead-firm">For Sarah Mitchell, CPA</p>
+      <p class="masthead-issue">Issue 18 · Apr 30 · 2026</p>
+    </div>
+
+    <div class="nav-section">Sections</div>
+    <nav>
+      <a class="nav-item active"><span class="num">01</span><span>Front</span><span class="count"></span></a>
+      <a class="nav-item"><span class="num">02</span><span>To review</span><span class="count">5</span></a>
+      <a class="nav-item"><span class="num">03</span><span>Clients</span><span class="count">80</span></a>
+      <a class="nav-item alert"><span class="num">04</span><span>Alerts</span><span class="count">3</span></a>
+      <a class="nav-item"><span class="num">05</span><span>Insights</span><span class="count"></span></a>
+      <a class="nav-item"><span class="num">06</span><span>Settings</span><span class="count"></span></a>
+    </nav>
+
+    <div class="colophon">
+      <p><strong>Vol. I · 2026</strong><br>Set in Spectral, Hanken Grotesk &amp; JetBrains Mono.<br>Compiled at first light.</p>
+    </div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <span class="folio">Issue <strong>18</strong> · Vol. <strong>I</strong> · Apr 30, 2026 · Late edition</span>
+      <span class="spacer"></span>
+      <button class="search-input">Search the archive…</button>
+      <button class="icon-btn" aria-label="Notifications">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <span class="pip"></span>
+      </button>
+      <button class="new-btn">New</button>
+      <span class="avatar">SC</span>
+    </div>
+
+    <div class="pagehead">
+      <div class="issue-num-wrap">
+        <div class="issue-num">18</div>
+        <div class="issue-label">Issue</div>
+      </div>
+      <div class="pagehead-main">
+        <h1>Two filings overdue;<br><em>eight more</em> by Friday.</h1>
+        <p class="dek">Louisiana issued an automatic Hurricane Delta extension overnight, granting relief to six clients in your roster. Three remain outstanding on documents.</p>
+        <p class="byline">Filing season · Week <strong>18</strong> · 50 / 50 states monitored</p>
+      </div>
+      <aside class="stat-stack">
+        <dl>
+          <div><dt>Overdue</dt><dd class="high">02</dd></div>
+          <div><dt>This week</dt><dd>08</dd></div>
+          <div><dt>Active</dt><dd>80</dd></div>
+          <div><dt>Awaiting</dt><dd>03</dd></div>
+        </dl>
+      </aside>
+    </div>
+
+    <div class="lead-strip">
+      <div class="photo"></div>
+      <div>
+        <div class="lead-eyebrow">Lead · Louisiana · Disaster declaration</div>
+        <div class="lead-title">Hurricane Delta extension grants automatic relief through July 15 to six clients on your roster.</div>
+        <div class="lead-meta">Detected from official sources, two hours ago.</div>
+      </div>
+      <button class="lead-action">Review →</button>
+    </div>
+
+    <div class="columns">
+      <section>
+        <div class="section-head">
+          <span class="section-num">— 01</span>
+          <h2 class="section-title">Overdue <em>two filings</em></h2>
+          <span class="section-count">02 / 80</span>
+        </div>
+        <ul class="rows">
+          <li class="row overdue">
+            <span class="when overdue">3d late</span>
+            <div class="row-body">
+              <div class="row-title">Acme LLC <em>· 1120-S federal</em></div>
+              <div class="row-form">Annual filing.</div>
+            </div>
+            <span class="row-tag">Fed</span>
+          </li>
+          <li class="row overdue">
+            <span class="when overdue">1d late</span>
+            <div class="row-body">
+              <div class="row-title">Tessera Holdings <em>· CA Form 568</em></div>
+              <div class="row-form">LLC fee.</div>
+            </div>
+            <span class="row-tag">CA</span>
+          </li>
+        </ul>
+      </section>
+
+      <div class="col-rule" aria-hidden="true"></div>
+
+      <section>
+        <div class="section-head">
+          <span class="section-num">— 02</span>
+          <h2 class="section-title">This week <em>eight filings</em></h2>
+          <span class="section-count">08 / 80</span>
+        </div>
+        <ul class="rows">
+          <li class="row">
+            <span class="when">Today</span>
+            <div class="row-body">
+              <div class="row-title">Wilkins Plumbing <em>· LA-CIFT-620</em></div>
+              <div class="row-form">In progress.<span class="ai">Generated · S-Corp</span></div>
+            </div>
+            <span class="row-tag">LA</span>
+          </li>
+          <li class="row">
+            <span class="when">Tue</span>
+            <div class="row-body">
+              <div class="row-title">Northshore Co <em>· TX Franchise</em></div>
+              <div class="row-form">Annual report.</div>
+            </div>
+            <span class="row-tag">TX</span>
+          </li>
+          <li class="row">
+            <span class="when">Wed</span>
+            <div class="row-body">
+              <div class="row-title">Pinecrest Inc <em>· Form 941</em></div>
+              <div class="row-form">Q1 quarterly.</div>
+            </div>
+            <span class="row-tag">Fed</span>
+          </li>
+          <li class="row">
+            <span class="when">Thu</span>
+            <div class="row-body">
+              <div class="row-title">Vanderbilt &amp; Sons <em>· IT-204</em></div>
+              <div class="row-form">NY-LLC partnership.</div>
+            </div>
+            <span class="row-tag">NY</span>
+          </li>
+          <li class="row">
+            <span class="when">Fri</span>
+            <div class="row-body">
+              <div class="row-title"><em>↪ ditto</em> · CA Form 100</div>
+              <div class="row-form">S-Corp annual.</div>
+            </div>
+            <span class="row-tag">CA</span>
+          </li>
+          <li class="row">
+            <span class="when">Fri</span>
+            <div class="row-body">
+              <div class="row-title">Ridgemont Group <em>· ST-1</em></div>
+              <div class="row-form">IL Sales/Use.</div>
+            </div>
+            <span class="row-tag">IL</span>
+          </li>
+        </ul>
+      </section>
+    </div>
+
+    <div class="footer">
+      <span>DueDateHQ · Issue 18</span>
+      <span class="center">page <em>i</em></span>
+      <span class="right">April 30 · 2026</span>
+    </div>
+  </main>
+</div>
+
+<div class="direction-tag">v19 · Monocle</div>
+</body>
+</html>

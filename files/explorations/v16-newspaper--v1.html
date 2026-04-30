@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DueDateHQ — v16 · Newspaper</title>
+<link href="https://fonts.googleapis.com/css2?family=Old+Standard+TT:ital,wght@0,400;0,700;1,400&family=Vollkorn:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Source+Code+Pro:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #FBFAF5;
+    --paper-2: #F1EFE6;
+    --rule: #2A2A2A;
+    --rule-soft: #C8C5BA;
+    --rule-fade: #D9D6CB;
+    --ink: #1A1A1A;
+    --ink-2: #3A3A3A;
+    --ink-3: #6A6A6A;
+    --ink-4: #9A9A9A;
+    --red: #8C1518;
+    --danger-bg: rgba(140,21,24,0.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Vollkorn', 'Times New Roman', Georgia, serif;
+    font-size: 14px; line-height: 1.55;
+    color: var(--ink);
+    background: var(--paper);
+    -webkit-font-smoothing: antialiased;
+  }
+  .display { font-family: 'Old Standard TT', 'Times New Roman', serif; }
+  .mono { font-family: 'Source Code Pro', monospace; }
+
+  .app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+
+  aside { background: var(--paper); border-right: 1px solid var(--rule-soft); padding: 0; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; }
+  .masthead { padding: 24px 22px 18px; border-bottom: 3px double var(--rule); }
+  .masthead-title { font-family: 'Old Standard TT', serif; font-size: 24px; font-weight: 700; letter-spacing: -0.005em; line-height: 0.95; }
+  .masthead-rule { height: 1px; background: var(--rule); margin: 6px 0; }
+  .masthead-firm { font-family: 'Source Code Pro', monospace; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); }
+
+  .nav-section-label { font-family: 'Source Code Pro', monospace; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-3); padding: 18px 22px 4px; }
+
+  nav { padding: 0 12px; display: flex; flex-direction: column; gap: 0; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 6px 10px; height: 30px; color: var(--ink-2); text-decoration: none; font-family: 'Vollkorn', serif; font-size: 14px; font-weight: 400; cursor: pointer; border-bottom: 1px solid var(--rule-fade); }
+  .nav-item:last-child { border-bottom: 0; }
+  .nav-item:hover { color: var(--ink); background: var(--paper-2); }
+  .nav-item.active { color: var(--ink); font-weight: 600; font-style: italic; }
+  .nav-item.active::before { content: '§ '; color: var(--red); margin-right: 0; font-style: normal; }
+  .nav-item .count { margin-left: auto; font-family: 'Source Code Pro', monospace; font-size: 10px; color: var(--ink-3); }
+  .nav-item.alert .count { color: var(--red); font-weight: 600; }
+
+  main { display: flex; flex-direction: column; min-width: 0; }
+
+  .topbar { display: flex; align-items: center; gap: 14px; padding: 8px 28px; height: 44px; border-bottom: 1px solid var(--rule); }
+  .folio { font-family: 'Source Code Pro', monospace; font-size: 11px; letter-spacing: 0.12em; color: var(--ink-3); text-transform: uppercase; }
+  .folio strong { color: var(--ink); font-weight: 600; }
+  .topbar .spacer { flex: 1; }
+  .search { background: transparent; border: 1px solid var(--rule-soft); padding: 4px 10px; height: 28px; font-family: 'Vollkorn'; font-style: italic; font-size: 13px; color: var(--ink-3); cursor: pointer; }
+  .icon-btn { width: 28px; height: 28px; background: transparent; border: 1px solid var(--rule-soft); color: var(--ink-2); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; position: relative; }
+  .icon-btn svg { width: 13px; height: 13px; }
+  .icon-btn .indicator { position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; background: var(--red); }
+  .new-btn { height: 28px; padding: 0 12px; background: var(--ink); color: var(--paper); border: 0; font-family: 'Source Code Pro', monospace; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; cursor: pointer; }
+  .avatar { font-family: 'Source Code Pro', monospace; font-size: 11px; letter-spacing: 0.1em; padding: 0 8px; height: 28px; line-height: 28px; border: 1px solid var(--rule-soft); }
+
+  /* The masthead bar */
+  .pagehead { padding: 28px 28px 22px; border-bottom: 6px double var(--rule); text-align: center; }
+  .pagehead-eyebrow { font-family: 'Source Code Pro', monospace; font-size: 11px; letter-spacing: 0.32em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 10px; }
+  .pagehead-title { font-family: 'Old Standard TT', serif; font-size: 56px; font-weight: 700; letter-spacing: -0.018em; line-height: 1; }
+  .pagehead-title em { font-style: italic; color: var(--ink-2); font-weight: 400; }
+  .pagehead-dek { margin-top: 12px; font-family: 'Vollkorn'; font-style: italic; font-size: 17px; color: var(--ink-2); max-width: 640px; margin-inline: auto; line-height: 1.45; }
+  .pagehead-byline { margin-top: 10px; font-family: 'Source Code Pro', monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
+  .pagehead-byline strong { color: var(--ink); font-weight: 600; }
+
+  /* Wire bulletin */
+  .wire { margin: 22px 28px 0; border-top: 3px solid var(--red); border-bottom: 1px solid var(--rule); padding: 16px 0; display: grid; grid-template-columns: auto 1fr auto; gap: 18px; align-items: start; }
+  .wire-num { font-family: 'Old Standard TT'; font-size: 30px; font-weight: 400; color: var(--red); line-height: 0.9; padding-top: 4px; }
+  .wire-eyebrow { font-family: 'Source Code Pro', monospace; font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--red); margin-bottom: 4px; }
+  .wire-title { font-family: 'Old Standard TT'; font-size: 24px; font-weight: 700; line-height: 1.15; }
+  .wire-meta { margin-top: 6px; font-family: 'Vollkorn'; font-style: italic; font-size: 14px; color: var(--ink-2); }
+  .wire-action { font-family: 'Source Code Pro', monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; padding: 6px 14px; border: 1px solid var(--ink); background: transparent; color: var(--ink); cursor: pointer; align-self: center; }
+  .wire-action:hover { background: var(--ink); color: var(--paper); }
+
+  /* Three-column layout */
+  .columns { padding: 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 32px; border-top: 1px solid var(--rule-soft); margin-top: 22px; }
+
+  .section { }
+  .section-head { display: flex; align-items: baseline; gap: 10px; padding-bottom: 8px; margin-bottom: 14px; border-bottom: 2px solid var(--rule); }
+  .section-title { font-family: 'Old Standard TT', serif; font-size: 22px; font-weight: 700; }
+  .section-count { font-family: 'Source Code Pro', monospace; font-size: 11px; color: var(--ink-3); letter-spacing: 0.14em; text-transform: uppercase; }
+
+  .rows { list-style: none; }
+  .row { display: grid; grid-template-columns: 60px 1fr auto; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--rule-fade); align-items: baseline; }
+  .row:last-child { border-bottom: 0; }
+  .row.overdue { background: var(--danger-bg); padding: 12px 8px; margin: 0 -8px; }
+  .row-when { font-family: 'Source Code Pro', monospace; font-size: 11px; color: var(--ink-3); letter-spacing: 0.06em; text-transform: uppercase; padding-top: 2px; }
+  .row-when.danger { color: var(--red); font-weight: 600; }
+  .row-body { min-width: 0; }
+  .row-title { font-family: 'Old Standard TT'; font-size: 16px; font-weight: 700; line-height: 1.3; }
+  .row-title em { font-style: italic; color: var(--ink-3); font-weight: 400; }
+  .row-form { font-family: 'Vollkorn'; font-style: italic; font-size: 13px; color: var(--ink-2); margin-top: 2px; }
+  .row-form .ai { font-family: 'Source Code Pro'; font-style: normal; font-size: 10px; color: var(--red); margin-left: 6px; letter-spacing: 0.12em; text-transform: uppercase; border-bottom: 1px solid var(--red); }
+  .row-tag { font-family: 'Source Code Pro', monospace; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); padding-top: 4px; }
+
+  .footer { margin: 28px; padding-top: 14px; border-top: 6px double var(--rule); display: flex; align-items: baseline; justify-content: space-between; font-family: 'Source Code Pro', monospace; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-3); }
+  .footer .page { font-family: 'Old Standard TT'; font-style: italic; font-size: 14px; text-transform: none; letter-spacing: 0; color: var(--ink); }
+
+  .direction-tag { position: fixed; bottom: 16px; right: 16px; background: var(--red); color: var(--paper); padding: 6px 14px; font-family: 'Source Code Pro', monospace; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; z-index: 100; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="masthead">
+      <div class="masthead-title">The DueDateHQ Daily</div>
+      <div class="masthead-rule"></div>
+      <div class="masthead-firm">Vol. I · Sarah Mitchell, CPA</div>
+    </div>
+    <div class="nav-section-label">Departments</div>
+    <nav>
+      <a class="nav-item active">Front page</a>
+      <a class="nav-item">To review<span class="count">5</span></a>
+      <a class="nav-item">Clients</a>
+      <a class="nav-item alert">Alerts<span class="count">3</span></a>
+      <a class="nav-item">Insights</a>
+      <a class="nav-item">Settings</a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <span class="folio">Vol. I · No. 18 · <strong>Apr 30, 2026</strong></span>
+      <div class="spacer"></div>
+      <button class="search">Search the archive…</button>
+      <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/></svg><span class="indicator"></span></button>
+      <button class="new-btn">New Entry</button>
+      <span class="avatar">SC</span>
+    </div>
+
+    <div class="pagehead">
+      <div class="pagehead-eyebrow">Front page · Filing season · Week 18</div>
+      <h1 class="pagehead-title">Two filings overdue;<br><em>eight more by Friday.</em></h1>
+      <p class="pagehead-dek">Louisiana issued an automatic Hurricane Delta extension overnight, granting relief to six of your clients. Three remain outstanding on documents.</p>
+      <p class="pagehead-byline">Issued <strong>Thursday, April 30</strong> · <strong>50 of 50</strong> states monitored · scrape <strong>14 m</strong> ago</p>
+    </div>
+
+    <div class="wire">
+      <div class="wire-num">§</div>
+      <div>
+        <div class="wire-eyebrow">Wire · Louisiana DOR · Disaster declaration</div>
+        <div class="wire-title">Hurricane Delta extension grants automatic relief through July 15.</div>
+        <div class="wire-meta">Six of your LA clients become eligible. Detected from official sources, two hours ago. View source ↗</div>
+      </div>
+      <button class="wire-action">Review →</button>
+    </div>
+
+    <div class="columns">
+      <section class="section">
+        <div class="section-head"><span class="section-title">Overdue.</span><span class="section-count">Two filings</span></div>
+        <ul class="rows">
+          <li class="row overdue"><span class="row-when danger">3 d. late</span><div class="row-body"><div class="row-title">Acme LLC <em>· 1120-S federal</em></div><div class="row-form">Filed annually since 2018.</div></div><span class="row-tag">Fed</span></li>
+          <li class="row overdue"><span class="row-when danger">1 d. late</span><div class="row-body"><div class="row-title">Tessera Holdings <em>· CA Form 568</em></div><div class="row-form">LLC fee, primary state filing.</div></div><span class="row-tag">CA</span></li>
+        </ul>
+      </section>
+
+      <section class="section">
+        <div class="section-head"><span class="section-title">This week.</span><span class="section-count">Eight filings</span></div>
+        <ul class="rows">
+          <li class="row"><span class="row-when">Today</span><div class="row-body"><div class="row-title">Wilkins Plumbing <em>· LA-CIFT-620</em></div><div class="row-form">In progress; awaiting depreciation schedule.<span class="ai">Generated · S-Corp · LA</span></div></div><span class="row-tag">LA</span></li>
+          <li class="row"><span class="row-when">Tue</span><div class="row-body"><div class="row-title">Northshore Co <em>· TX Franchise Tax</em></div><div class="row-form">Annual report filing.</div></div><span class="row-tag">TX</span></li>
+          <li class="row"><span class="row-when">Wed</span><div class="row-body"><div class="row-title">Pinecrest Inc <em>· Form 941</em></div><div class="row-form">Q1 2026 quarterly.</div></div><span class="row-tag">Fed</span></li>
+          <li class="row"><span class="row-when">Thu</span><div class="row-body"><div class="row-title">Vanderbilt &amp; Sons <em>· IT-204 NY-LLC</em></div><div class="row-form">Partnership return.</div></div><span class="row-tag">NY</span></li>
+          <li class="row"><span class="row-when">Fri</span><div class="row-body"><div class="row-title"><em>↪ ditto</em> · CA Form 100</div><div class="row-form">S-Corp annual report.</div></div><span class="row-tag">CA</span></li>
+          <li class="row"><span class="row-when">Fri</span><div class="row-body"><div class="row-title">Ridgemont Group <em>· ST-1</em></div><div class="row-form">Illinois Sales/Use Tax.</div></div><span class="row-tag">IL</span></li>
+        </ul>
+      </section>
+    </div>
+
+    <div class="footer">
+      <span>The DueDateHQ Daily · Vol. I · No. 18</span>
+      <span class="page">page <em>i</em></span>
+      <span>Apr 30, 2026 · 50/50 states</span>
+    </div>
+  </main>
+</div>
+<div class="direction-tag">v16 · Newspaper</div>
+</body>
+</html>

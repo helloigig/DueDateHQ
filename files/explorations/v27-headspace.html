@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DueDateHQ — v27 · Headspace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* Headspace: friendly orange, soft warm cream, calm warmth */
+  :root {
+    --warm:        oklch(72% 0.150 50);   /* Headspace orange */
+    --warm-2:      oklch(78% 0.130 60);
+    --sun:         oklch(86% 0.110 75);
+    --cream:       oklch(98% 0.018 60);
+    --paper:       oklch(94% 0.040 60);
+    --rule:        oklch(20% 0.014 30);
+    --rule-soft:   oklch(60% 0.020 30 / 0.18);
+
+    --ink:         oklch(20% 0.014 30);
+    --ink-2:       oklch(38% 0.018 35);
+    --ink-3:       oklch(54% 0.022 40);
+    --ink-4:       oklch(68% 0.022 45);
+
+    --moon:        oklch(54% 0.090 250);
+    --leaf:        oklch(54% 0.080 145);
+    --rose:        oklch(64% 0.140 25);
+
+    --r:    24px;
+    --r-sm: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Manrope', -apple-system, sans-serif;
+    font-size: 14px; line-height: 1.55;
+    color: var(--ink);
+    background: var(--paper);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; padding: 18px; gap: 18px; }
+
+  aside { background: var(--cream); border-radius: var(--r); padding: 28px 16px; display: flex; flex-direction: column; gap: 4px; height: fit-content; position: sticky; top: 18px; }
+  .brand { padding: 0 14px 22px; display: flex; align-items: center; gap: 12px; }
+  .brand-shape {
+    width: 44px; height: 44px;
+    background: var(--warm); color: var(--cream);
+    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 800;
+    flex-shrink: 0;
+    box-shadow: 0 6px 14px oklch(72% 0.150 50 / 0.3);
+  }
+  .brand-name { font-size: 18px; font-weight: 800; letter-spacing: -0.018em; line-height: 1.05; }
+  .brand-firm { font-size: 11px; color: var(--ink-3); margin-top: 2px; font-weight: 600; }
+
+  nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav-item { display: flex; align-items: center; gap: 12px; padding: 0 14px; height: 40px; border-radius: 999px; color: var(--ink-2); text-decoration: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .nav-item:hover { background: var(--paper); }
+  .nav-item.active { background: var(--warm); color: var(--cream); font-weight: 700; box-shadow: 0 4px 10px oklch(72% 0.150 50 / 0.25); }
+  .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .nav-item .count { margin-left: auto; font-size: 11px; color: var(--ink-3); font-weight: 700; }
+  .nav-item.active .count { color: var(--sun); }
+  .nav-item.alert .count { color: var(--cream); background: var(--rose); padding: 1px 8px; border-radius: 999px; font-weight: 800; }
+
+  /* Meditation card */
+  .meditation-card {
+    margin-top: 22px;
+    padding: 18px;
+    background: linear-gradient(135deg, var(--warm) 0%, var(--warm-2) 100%);
+    color: var(--cream);
+    border-radius: 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .meditation-card::before {
+    content: '';
+    position: absolute; top: -30px; right: -30px;
+    width: 100px; height: 100px;
+    background: var(--sun); opacity: 0.4;
+    border-radius: 999px;
+  }
+  .meditation-eyebrow { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; opacity: 0.85; }
+  .meditation-title { font-size: 16px; font-weight: 800; margin-top: 4px; line-height: 1.2; letter-spacing: -0.012em; position: relative; }
+  .meditation-cta { margin-top: 10px; background: var(--cream); color: var(--warm); padding: 6px 14px; border: 0; border-radius: 999px; font-family: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
+
+  main { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+
+  .topbar { display: flex; align-items: center; gap: 12px; padding: 6px 6px; }
+  .crumb { font-size: 14px; color: var(--ink-3); padding-left: 10px; font-weight: 600; }
+  .crumb strong { color: var(--ink); font-weight: 800; }
+  .topbar .spacer { flex: 1; }
+  .pill-search { background: var(--cream); border: 0; padding: 0 18px; height: 40px; border-radius: 999px; font-size: 13px; color: var(--ink-3); cursor: pointer; min-width: 240px; font-family: inherit; font-weight: 500; }
+  .icon-btn { width: 40px; height: 40px; background: var(--cream); border: 0; border-radius: 999px; color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; position: relative; }
+  .icon-btn svg { width: 16px; height: 16px; }
+  .icon-btn .pip { position: absolute; top: 9px; right: 9px; width: 8px; height: 8px; background: var(--rose); border: 2px solid var(--cream); border-radius: 999px; }
+  .new-btn { height: 40px; padding: 0 22px; background: var(--ink); color: var(--cream); border: 0; border-radius: 999px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .avatar { width: 40px; height: 40px; background: var(--leaf); color: var(--cream); border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; }
+
+  /* Welcome */
+  .welcome {
+    background: var(--cream);
+    border-radius: var(--r);
+    padding: 40px 44px;
+    display: grid;
+    grid-template-columns: 1fr 220px;
+    gap: 36px;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .welcome::after {
+    content: '';
+    position: absolute; right: -120px; top: -120px;
+    width: 320px; height: 320px;
+    background: radial-gradient(circle at center, var(--sun) 0%, transparent 70%);
+    border-radius: 999px;
+    pointer-events: none;
+  }
+  .welcome h1 { font-size: clamp(36px, 4.4vw, 44px); font-weight: 800; letter-spacing: -0.025em; line-height: 1.1; position: relative; z-index: 1; }
+  .welcome h1 em { font-style: normal; color: var(--warm); }
+  .welcome .meta { margin-top: 14px; font-size: 14px; color: var(--ink-2); font-weight: 600; position: relative; z-index: 1; }
+  .welcome .meta .sep { color: var(--ink-4); margin: 0 8px; }
+  .welcome .meta .overdue { color: var(--rose); }
+
+  .sun-illust { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; position: relative; z-index: 1; }
+  .sun-shape { width: 160px; height: 160px; background: var(--warm); border-radius: 999px; position: relative; box-shadow: 0 12px 32px oklch(72% 0.150 50 / 0.32); }
+  .sun-shape::before { content: ''; position: absolute; top: 30px; left: 36px; width: 16px; height: 16px; background: var(--cream); border-radius: 999px; }
+  .sun-shape::after { content: ''; position: absolute; top: 30px; right: 36px; width: 16px; height: 16px; background: var(--cream); border-radius: 999px; }
+  .sun-mouth { position: absolute; bottom: 36px; left: 50%; transform: translateX(-50%); width: 56px; height: 28px; border: 4px solid var(--cream); border-top: 0; border-radius: 0 0 28px 28px; }
+
+  /* Capsules */
+  .capsules { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .capsule { background: var(--cream); border-radius: var(--r); padding: 22px; display: flex; align-items: center; gap: 14px; }
+  .cap-shape { width: 48px; height: 48px; border-radius: 999px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; }
+  .cap-shape.s1 { background: var(--leaf); color: var(--cream); }
+  .cap-shape.s2 { background: var(--rose); color: var(--cream); }
+  .cap-shape.s3 { background: var(--moon); color: var(--cream); }
+  .cap-shape.s4 { background: var(--sun); color: var(--ink); }
+  .cap-text { min-width: 0; }
+  .cap-lbl { font-size: 12px; color: var(--ink-3); font-weight: 600; }
+  .cap-val { font-size: 22px; font-weight: 800; line-height: 1; letter-spacing: -0.012em; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .cap-trend { font-size: 11px; color: var(--ink-4); font-weight: 600; margin-top: 4px; }
+
+  /* Banner — full rose panel, no left stripe */
+  .alert {
+    background: var(--rose); color: var(--cream);
+    border-radius: var(--r);
+    padding: 20px 24px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .alert-ico { width: 40px; height: 40px; background: var(--cream); color: var(--rose); border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .alert-ico svg { width: 18px; height: 18px; }
+  .alert-body { flex: 1; }
+  .alert-title { font-size: 15px; font-weight: 800; }
+  .alert-meta { font-size: 13px; opacity: 0.85; margin-top: 2px; font-weight: 600; }
+  .alert-action { background: var(--cream); color: var(--rose); border: 0; padding: 9px 18px; border-radius: 999px; font-family: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+
+  .section { background: var(--cream); border-radius: var(--r); padding: 26px 28px; }
+  .section-head { display: flex; align-items: baseline; gap: 12px; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 2px solid var(--paper); }
+  .section-title { font-size: 22px; font-weight: 800; letter-spacing: -0.012em; }
+  .section-count { font-size: 12px; color: var(--ink-3); font-weight: 700; }
+  .section-actions { margin-left: auto; display: flex; gap: 6px; }
+  .section-actions button { background: var(--paper); border: 0; padding: 6px 14px; border-radius: 999px; font-family: inherit; font-size: 12px; font-weight: 700; color: var(--ink-2); cursor: pointer; }
+
+  .rows { list-style: none; }
+  .row { display: flex; align-items: center; gap: 14px; padding: 14px 4px; border-bottom: 1px solid var(--paper); border-radius: 12px; }
+  .row:last-child { border-bottom: 0; }
+  .row.overdue { background: oklch(95% 0.040 25); padding: 14px 12px; margin: 0 -8px; border-radius: 14px; border: 0; }
+  .when { font-size: 12px; width: 64px; color: var(--ink-3); flex-shrink: 0; font-weight: 700; }
+  .when.danger { color: var(--rose); }
+  .client { width: 188px; flex-shrink: 0; color: var(--ink); font-size: 14px; font-weight: 700; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .client-suppress { width: 188px; color: var(--ink-4); font-size: 13px; }
+  .form { flex: 1; min-width: 0; color: var(--ink-3); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; font-weight: 500; }
+  .pill { font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 999px; flex-shrink: 0; line-height: 1.4; }
+  .pill.primary { background: var(--ink); color: var(--cream); }
+  .pill.nexus { background: var(--paper); color: var(--ink-2); }
+  .pill.fed { background: var(--sun); color: var(--ink); }
+  .ai-source { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 3px 11px; border-radius: 999px; flex-shrink: 0; font-weight: 800; color: var(--cream); background: var(--leaf); }
+  .ai-source svg { width: 11px; height: 11px; }
+  .status { font-size: 12px; color: var(--ink-3); width: 80px; flex-shrink: 0; font-weight: 600; }
+
+  .direction-tag { position: fixed; bottom: 22px; right: 22px; background: var(--warm); color: var(--cream); padding: 8px 18px; border-radius: 999px; font-size: 12px; font-weight: 800; z-index: 100; box-shadow: 0 8px 20px oklch(72% 0.150 50 / 0.3); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand"><span class="brand-shape">D</span><div><div class="brand-name">DueDateHQ</div><div class="brand-firm">Sarah Mitchell, CPA</div></div></div>
+    <nav>
+      <a class="nav-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Dashboard</a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Review<span class="count">5</span></a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Clients</a>
+      <a class="nav-item alert"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>Alerts<span class="count">3</span></a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>Insights</a>
+    </nav>
+    <div class="meditation-card">
+      <div class="meditation-eyebrow">A 2-min reset</div>
+      <div class="meditation-title">Breathe before your<br>first filing.</div>
+      <button class="meditation-cta">Begin →</button>
+    </div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <span class="crumb">Workspace · <strong>Dashboard</strong></span>
+      <div class="spacer"></div>
+      <button class="pill-search">Search clients, deadlines…</button>
+      <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="pip"></span></button>
+      <button class="new-btn">+ New</button>
+      <span class="avatar">SM</span>
+    </div>
+
+    <div class="welcome">
+      <div>
+        <h1>Good morning, Sarah!<br>Two filings <em>need a hand,</em><br>and eight more by Friday.</h1>
+        <p class="meta">Thursday, April 30 <span class="sep">·</span> 80 active <span class="sep">·</span> <span class="overdue">2 overdue</span> <span class="sep">·</span> 3 awaiting docs</p>
+      </div>
+      <div class="sun-illust"><div class="sun-shape"><div class="sun-mouth"></div></div></div>
+    </div>
+
+    <div class="capsules">
+      <div class="capsule"><div class="cap-shape s1">80</div><div class="cap-text"><div class="cap-lbl">Active</div><div class="cap-val">80</div><div class="cap-trend">+3 this month</div></div></div>
+      <div class="capsule"><div class="cap-shape s2">!</div><div class="cap-text"><div class="cap-lbl">Overdue</div><div class="cap-val">2</div><div class="cap-trend">act today</div></div></div>
+      <div class="capsule"><div class="cap-shape s3">5</div><div class="cap-text"><div class="cap-lbl">This week</div><div class="cap-val">8</div><div class="cap-trend">5 jurisdictions</div></div></div>
+      <div class="capsule"><div class="cap-shape s4">?</div><div class="cap-text"><div class="cap-lbl">Awaiting</div><div class="cap-val">3</div><div class="cap-trend">avg 2 days</div></div></div>
+    </div>
+
+    <div class="alert">
+      <span class="alert-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+      <div class="alert-body"><div class="alert-title">Louisiana DOR · Hurricane Delta extension issued</div><div class="alert-meta">Affects 6 of your clients · Detected 2h ago</div></div>
+      <button class="alert-action">Review →</button>
+    </div>
+
+    <section class="section">
+      <div class="section-head"><span class="section-title">Overdue</span><span class="section-count">2 filings · take a breath, then act</span></div>
+      <ul class="rows">
+        <li class="row overdue"><span class="when danger">3d late</span><a class="client" href="#">Acme LLC</a><a class="form" href="#">1120-S federal</a><span class="pill fed">FED</span></li>
+        <li class="row overdue"><span class="when danger">1d late</span><a class="client" href="#">Tessera Holdings</a><a class="form" href="#">CA Form 568 · LLC fee</a><span class="pill primary">CA</span></li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-title">This week</span><span class="section-count">8 filings · nicely paced</span><div class="section-actions"><button>Filter</button><button>Export</button></div></div>
+      <ul class="rows">
+        <li class="row"><span class="when">Today</span><a class="client" href="#">Wilkins Plumbing</a><a class="form" href="#">LA-CIFT-620</a><span class="ai-source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>S-Corp</span><span class="pill primary">LA</span><span class="status">in progress</span></li>
+        <li class="row"><span class="when">Tue</span><a class="client" href="#">Northshore Co</a><a class="form" href="#">TX Franchise Tax</a><span class="pill nexus">TX</span><span class="status"></span></li>
+        <li class="row"><span class="when">Wed</span><a class="client" href="#">Pinecrest Inc</a><a class="form" href="#">Form 941 · Q1 2026</a><span class="pill fed">FED</span><span class="status"></span></li>
+        <li class="row"><span class="when">Thu</span><a class="client" href="#">Vanderbilt &amp; Sons</a><a class="form" href="#">IT-204 NY-LLC</a><span class="pill primary">NY</span><span class="status"></span></li>
+        <li class="row"><span class="when">Fri</span><span class="client-suppress">↪</span><a class="form" href="#">CA Form 100 · S-Corp</a><span class="pill primary">CA</span><span class="status"></span></li>
+        <li class="row"><span class="when">Fri</span><a class="client" href="#">Ridgemont Group</a><a class="form" href="#">ST-1 · IL Sales/Use</a><span class="pill nexus">IL</span><span class="status"></span></li>
+      </ul>
+    </section>
+  </main>
+</div>
+<div class="direction-tag">v27 · Headspace</div>
+</body>
+</html>

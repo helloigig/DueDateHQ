@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DueDateHQ — v9 · Stripe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=Funnel+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:           oklch(99% 0 0);
+    --tint:         oklch(98% 0.012 250);
+    --tint-2:       oklch(95% 0.018 250);
+    --rule:         oklch(89% 0.014 250);
+    --rule-strong:  oklch(78% 0.020 250);
+    --ink:          oklch(20% 0.030 260);
+    --ink-2:        oklch(38% 0.030 255);
+    --ink-3:        oklch(54% 0.030 250);
+    --ink-4:        oklch(68% 0.025 250);
+
+    --primary:      oklch(58% 0.190 280);   /* Stripe purple */
+    --primary-2:    oklch(50% 0.190 280);
+    --primary-bg:   oklch(96% 0.040 280);
+    --primary-line: oklch(85% 0.080 280);
+
+    --accent:       oklch(80% 0.120 220);   /* cyan accent */
+    --accent-bg:    oklch(96% 0.030 220);
+
+    /* Stripe-style hero gradient — used as BACKGROUND only, never on text */
+    --hero-bg: linear-gradient(160deg, oklch(95% 0.040 280) 0%, oklch(94% 0.040 220) 50%, oklch(95% 0.040 320) 100%);
+
+    --crimson:      oklch(48% 0.180 27);
+    --crimson-bg:   oklch(95% 0.030 27);
+    --warn:         oklch(70% 0.150 70);
+    --ok:           oklch(56% 0.130 145);
+    --ok-bg:        oklch(94% 0.045 145);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Funnel Sans', -apple-system, sans-serif;
+    font-size: 14px; line-height: 1.5;
+    color: var(--ink-2);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  .display { font-family: 'Onest', sans-serif; }
+  ::selection { background: var(--primary-bg); color: var(--primary); }
+
+  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+
+  aside { background: var(--bg); border-right: 1px solid var(--rule); padding: 18px 12px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; }
+  .brand-block { display: flex; align-items: center; gap: 10px; padding: 4px 10px 18px; }
+  .brand-mark { width: 30px; height: 30px; background: var(--primary); border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: var(--bg); font-family: 'Onest'; font-weight: 800; font-size: 14px; letter-spacing: -0.02em; }
+  .brand-name { font-family: 'Onest'; font-size: 16px; font-weight: 700; color: var(--ink); letter-spacing: -0.012em; line-height: 1.05; }
+  .brand-firm { font-size: 11px; color: var(--ink-3); margin-top: 1px; }
+
+  nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 0 12px; height: 34px; border-radius: 6px; color: var(--ink-3); text-decoration: none; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .nav-item:hover { color: var(--ink); background: var(--tint); }
+  .nav-item.active { color: var(--primary); background: var(--primary-bg); font-weight: 600; }
+  .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .nav-item .count { margin-left: auto; font-size: 11px; color: var(--ink-3); font-weight: 500; }
+  .nav-item.alert .count { color: var(--bg); background: var(--crimson); padding: 1px 7px; border-radius: 999px; font-weight: 600; }
+  .nav-section { font-size: 11px; font-weight: 700; color: var(--ink-4); text-transform: uppercase; letter-spacing: 0.06em; padding: 14px 12px 4px; }
+
+  main { display: flex; flex-direction: column; min-width: 0; }
+
+  .topbar { display: flex; align-items: center; gap: 10px; padding: 0 24px; height: 60px; border-bottom: 1px solid var(--rule); position: sticky; top: 0; background: var(--bg); z-index: 5; }
+  .crumb { font-family: 'Onest'; font-size: 14px; color: var(--ink-3); }
+  .crumb strong { color: var(--ink); font-weight: 700; }
+  .crumb .sep { color: var(--rule-strong); margin: 0 6px; }
+  .topbar .spacer { flex: 1; }
+  .search { height: 36px; padding: 0 12px; display: flex; align-items: center; gap: 8px; background: var(--tint); border: 0; border-radius: 8px; color: var(--ink-3); font-family: inherit; font-size: 13px; cursor: pointer; width: 280px; }
+  .search:hover { background: var(--tint-2); }
+  .search svg { width: 14px; height: 14px; }
+  .search .kbd { margin-left: auto; }
+  .kbd { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink-3); background: var(--bg); border: 1px solid var(--rule); border-radius: 4px; padding: 1px 5px; }
+  .icon-btn { width: 36px; height: 36px; background: transparent; border: 0; border-radius: 999px; color: var(--ink-3); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; position: relative; }
+  .icon-btn:hover { background: var(--tint); }
+  .icon-btn svg { width: 16px; height: 16px; }
+  .icon-btn .pip { position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; background: var(--crimson); border: 1.5px solid var(--bg); border-radius: 999px; }
+  .new-btn { height: 36px; padding: 0 16px; background: var(--ink); color: var(--bg); border: 0; border-radius: 999px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 0 0 1px oklch(0% 0 0 / 0.04), 0 1px 2px oklch(0% 0 0 / 0.06); }
+  .new-btn:hover { background: var(--ink-2); }
+  .new-btn svg { width: 13px; height: 13px; }
+  .avatar { width: 32px; height: 32px; background: var(--primary); color: var(--bg); border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-family: 'Onest'; font-size: 12px; font-weight: 700; }
+
+  /* Stripe gradient hero — BACKGROUND, not gradient text */
+  .gradient-hero {
+    margin: 24px 24px 0;
+    background: var(--hero-bg);
+    border-radius: 16px;
+    padding: 40px 40px 32px;
+    position: relative;
+    overflow: hidden;
+  }
+  .gradient-hero::before {
+    content: '';
+    position: absolute;
+    top: -200px; right: -150px;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle at center, oklch(58% 0.190 280 / 0.18) 0%, transparent 60%);
+    filter: blur(40px);
+  }
+  .gradient-hero::after {
+    content: '';
+    position: absolute;
+    bottom: -200px; left: 30%;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle at center, oklch(80% 0.120 220 / 0.18) 0%, transparent 60%);
+    filter: blur(40px);
+  }
+  .hero-eyebrow {
+    position: relative; z-index: 1;
+    font-size: 12px; font-weight: 700;
+    color: var(--primary);
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  /* Solid color (no gradient text) */
+  .hero-title {
+    position: relative; z-index: 1;
+    margin-top: 8px;
+    font-family: 'Onest';
+    font-size: clamp(32px, 4vw, 48px);
+    font-weight: 700;
+    letter-spacing: -0.028em;
+    line-height: 1.05;
+    color: var(--ink);
+    text-wrap: pretty;
+  }
+  .hero-title em { font-style: normal; color: var(--primary); font-weight: 700; }
+  .hero-meta { position: relative; z-index: 1; margin-top: 14px; font-size: 14px; color: var(--ink-2); }
+  .hero-meta .sep { color: var(--rule-strong); margin: 0 8px; }
+  .hero-meta .overdue { color: var(--crimson); font-weight: 600; }
+
+  /* Tiles */
+  .tiles { margin: 16px 24px 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .tile {
+    background: var(--bg);
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    padding: 14px 16px;
+    transition: box-shadow 200ms;
+  }
+  .tile:hover { box-shadow: 0 4px 16px oklch(58% 0.190 280 / 0.08); border-color: var(--primary-line); }
+  .tile .label { font-size: 12px; font-weight: 500; color: var(--ink-3); }
+  .tile .value { font-family: 'Onest'; font-size: 28px; font-weight: 700; line-height: 1.05; margin-top: 4px; color: var(--ink); letter-spacing: -0.018em; font-variant-numeric: tabular-nums; }
+  .tile .value.danger { color: var(--crimson); }
+  .tile .trend { font-size: 12px; color: var(--ok); font-weight: 600; margin-top: 4px; }
+  .tile .trend.down { color: var(--crimson); }
+
+  .content { padding: 24px; max-width: 1280px; }
+
+  /* Banner — full 1px border, NO 4px left stripe */
+  .banner { background: var(--crimson-bg); border: 1px solid oklch(80% 0.060 30); border-radius: 12px; padding: 16px 20px; display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+  .banner-icon { width: 36px; height: 36px; background: var(--crimson); color: var(--bg); border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .banner-icon svg { width: 16px; height: 16px; }
+  .banner-body { flex: 1; }
+  .banner-title { font-family: 'Onest'; font-size: 15px; font-weight: 600; color: var(--ink); }
+  .banner-meta { font-size: 13px; color: var(--ink-2); margin-top: 2px; }
+  .banner-action { background: var(--bg); color: var(--primary); border: 1px solid var(--rule); padding: 8px 16px; border-radius: 999px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .banner-action:hover { box-shadow: 0 0 0 3px var(--primary-bg); }
+
+  .section { margin-top: 24px; }
+  .section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .section-title { font-family: 'Onest'; font-size: 18px; font-weight: 700; letter-spacing: -0.018em; color: var(--ink); }
+  .section-count { font-size: 12px; color: var(--ink-3); background: var(--tint); padding: 3px 10px; border-radius: 999px; font-weight: 600; }
+  .section-actions { margin-left: auto; display: flex; gap: 6px; }
+  .section-actions button { background: transparent; border: 0; font-size: 13px; color: var(--ink-3); padding: 6px 12px; border-radius: 999px; font-family: inherit; font-weight: 500; cursor: pointer; }
+  .section-actions button:hover { color: var(--primary); background: var(--primary-bg); }
+
+  .card { background: var(--bg); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+  .rows { list-style: none; }
+  .row { display: flex; align-items: center; gap: 14px; padding: 0 18px; height: 52px; border-bottom: 1px solid var(--rule); transition: background 120ms; }
+  .row:last-child { border-bottom: 0; }
+  .row:hover { background: var(--tint); }
+  .row.overdue { background: var(--crimson-bg); }
+
+  .dot { width: 8px; height: 8px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
+  .countdown { font-family: 'Onest'; font-size: 13px; width: 64px; color: var(--ink-3); flex-shrink: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .countdown.danger { color: var(--crimson); }
+  .client { width: 192px; flex-shrink: 0; color: var(--ink); font-family: 'Onest'; font-size: 14px; font-weight: 600; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .client:hover { color: var(--primary); }
+  .client-suppress { width: 192px; color: var(--ink-4); font-size: 13px; }
+  .form { flex: 1; min-width: 0; color: var(--ink-2); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+  .pill { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px; flex-shrink: 0; line-height: 1.4; }
+  .pill.primary { background: var(--primary); color: var(--bg); }
+  .pill.nexus { background: var(--bg); color: var(--ink-3); border: 1px solid var(--rule-strong); padding: 2px 9px; }
+  .pill.fed { background: var(--tint); color: var(--ink-2); }
+  .ai-source { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 3px 10px; border-radius: 999px; flex-shrink: 0; font-weight: 700; color: var(--primary); background: var(--primary-bg); border: 1px solid var(--primary-line); }
+  .ai-source svg { width: 11px; height: 11px; }
+  .status-text { font-size: 12px; color: var(--ink-3); width: 80px; flex-shrink: 0; }
+
+  .direction-tag { position: fixed; bottom: 16px; right: 16px; background: var(--primary); color: var(--bg); padding: 7px 16px; border-radius: 999px; font-family: 'Onest'; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; z-index: 100; box-shadow: 0 4px 16px oklch(58% 0.190 280 / 0.3); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand-block"><span class="brand-mark">D</span><div><div class="brand-name">DueDateHQ</div><div class="brand-firm">Sarah Mitchell, CPA</div></div></div>
+    <nav>
+      <a class="nav-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Dashboard</a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>To review<span class="count">5</span></a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Clients</a>
+      <a class="nav-item alert"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>Alerts<span class="count">3</span></a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>Insights</a>
+    </nav>
+    <div class="nav-section">Workspace</div>
+    <nav><a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="3"/></svg>Settings</a></nav>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <span class="crumb">Workspace<span class="sep">/</span><strong>Dashboard</strong></span>
+      <div class="spacer"></div>
+      <button class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>Search<span class="kbd">⌘K</span></button>
+      <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="pip"></span></button>
+      <button class="new-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>New</button>
+      <span class="avatar">SC</span>
+    </div>
+
+    <div class="gradient-hero">
+      <div class="hero-eyebrow">Thursday · April 30</div>
+      <h1 class="hero-title">Good morning, Sarah.<br><em>Eight filings</em> are pressing this week.</h1>
+      <p class="hero-meta">80 active <span class="sep">·</span> <span class="overdue">2 overdue</span> <span class="sep">·</span> 3 awaiting client docs <span class="sep">·</span> 50/50 states monitored</p>
+    </div>
+
+    <div class="tiles">
+      <div class="tile"><div class="label">Active clients</div><div class="value">80</div><div class="trend">+3 this month</div></div>
+      <div class="tile"><div class="label">Overdue</div><div class="value danger">2</div><div class="trend down">+2 since yesterday</div></div>
+      <div class="tile"><div class="label">Due this week</div><div class="value">8</div><div class="trend">5 jurisdictions</div></div>
+      <div class="tile"><div class="label">Awaiting docs</div><div class="value">3</div><div class="trend">avg 2 days</div></div>
+    </div>
+
+    <div class="content">
+      <div class="banner">
+        <span class="banner-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+        <div class="banner-body"><div class="banner-title">Louisiana DOR · Hurricane Delta extension issued</div><div class="banner-meta">Affects 6 of your clients · Detected 2h ago</div></div>
+        <button class="banner-action">Review →</button>
+      </div>
+
+      <section class="section">
+        <div class="section-head"><span class="section-title">Overdue</span><span class="section-count">2 filings</span><div class="section-actions"><button>Export</button></div></div>
+        <div class="card">
+          <ul class="rows">
+            <li class="row overdue"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--crimson)"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg></span><span class="countdown danger">3d late</span><a class="client" href="#">Acme LLC</a><a class="form" href="#">1120-S federal</a><span class="pill fed">FED</span></li>
+            <li class="row overdue"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--crimson)"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg></span><span class="countdown danger">1d late</span><a class="client" href="#">Tessera Holdings</a><a class="form" href="#">CA Form 568 · LLC fee</a><span class="pill primary">CA</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head"><span class="section-title">This week</span><span class="section-count">8 filings</span><div class="section-actions"><button>Export</button><button>Filter</button></div></div>
+        <div class="card">
+          <ul class="rows">
+            <li class="row"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--warn)"><circle cx="4" cy="4" r="3.5" fill="none" stroke="currentColor" stroke-width="1"/><path d="M4 0.5 A 3.5 3.5 0 0 1 4 7.5 Z" fill="currentColor"/></svg></span><span class="countdown">Today</span><a class="client" href="#">Wilkins Plumbing</a><a class="form" href="#">LA-CIFT-620</a><span class="ai-source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>S-Corp</span><span class="pill primary">LA</span><span class="status-text">In progress</span></li>
+            <li class="row"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--warn)"><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span><span class="countdown">Tue</span><a class="client" href="#">Northshore Co</a><a class="form" href="#">TX Franchise Tax</a><span class="pill nexus">TX</span><span class="status-text"></span></li>
+            <li class="row"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--ink-4)"><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span><span class="countdown">Wed</span><a class="client" href="#">Pinecrest Inc</a><a class="form" href="#">Form 941 · Q1 2026</a><span class="pill fed">FED</span><span class="status-text"></span></li>
+            <li class="row"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--ink-4)"><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span><span class="countdown">Thu</span><a class="client" href="#">Vanderbilt &amp; Sons</a><a class="form" href="#">IT-204 NY-LLC</a><span class="pill primary">NY</span><span class="status-text"></span></li>
+            <li class="row"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--ink-4)"><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span><span class="countdown">Fri</span><span class="client-suppress">↪</span><a class="form" href="#">CA Form 100 · S-Corp annual</a><span class="pill primary">CA</span><span class="status-text"></span></li>
+            <li class="row"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--ink-4)"><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span><span class="countdown">Fri</span><a class="client" href="#">Ridgemont Group</a><a class="form" href="#">ST-1 · IL Sales/Use</a><span class="pill nexus">IL</span><span class="status-text"></span></li>
+          </ul>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+<div class="direction-tag">v9 · STRIPE</div>
+</body>
+</html>

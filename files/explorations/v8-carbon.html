@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DueDateHQ — v8 · Industrial Grid</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700&family=Source+Code+Pro:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Industrial / engineering grid system. Tinted neutrals toward the brand blue. */
+  :root {
+    --paper:        oklch(98% 0.004 245);
+    --paper-2:      oklch(95% 0.005 245);
+    --paper-3:      oklch(90% 0.008 245);
+    --surface:      oklch(100% 0 0);
+    --rule:         oklch(83% 0.010 245);
+    --rule-strong:  oklch(70% 0.020 245);
+    --rule-soft:    oklch(91% 0.008 245);
+
+    --ink:          oklch(20% 0.020 245);
+    --ink-2:        oklch(35% 0.022 245);
+    --ink-3:        oklch(50% 0.024 245);
+    --ink-4:        oklch(65% 0.025 245);
+    --ink-5:        oklch(78% 0.020 245);
+
+    --brand:        oklch(48% 0.190 250);   /* engineering blue */
+    --brand-paper:  oklch(94% 0.040 250);
+    --brand-line:   oklch(78% 0.080 250);
+
+    --high:         oklch(48% 0.180 27);
+    --high-paper:   oklch(94% 0.040 27);
+
+    --warn:         oklch(70% 0.150 70);
+    --warn-paper:   oklch(95% 0.060 75);
+    --ok:           oklch(55% 0.130 145);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Public Sans', -apple-system, sans-serif;
+    font-size: 14px; line-height: 1.45;
+    color: var(--ink);
+    background: var(--paper);
+    -webkit-font-smoothing: antialiased;
+    /* Visible 16px engineering grid — body-level texture, not a stripe */
+    background-image:
+      linear-gradient(to right, oklch(20% 0.020 245 / 0.025) 1px, transparent 1px),
+      linear-gradient(to bottom, oklch(20% 0.020 245 / 0.018) 1px, transparent 1px);
+    background-size: 16px 100%, 100% 16px;
+  }
+  .mono { font-family: 'Source Code Pro', ui-monospace, monospace; font-feature-settings: 'tnum'; }
+  .figures { font-variant-numeric: tabular-nums lining-nums; }
+  ::selection { background: var(--brand-paper); color: var(--ink); }
+
+  .app { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+
+  /* ============== Sidebar ============== */
+  aside {
+    background: var(--surface);
+    border-right: 1px solid var(--rule);
+    display: flex; flex-direction: column;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .header-bar {
+    height: 48px;
+    background: var(--ink); color: var(--paper);
+    display: flex; align-items: center; gap: 0;
+    padding: 0 0 0 16px;
+    border-bottom: 1px solid var(--ink);
+  }
+  .header-bar .ddh {
+    font-family: 'Public Sans';
+    font-weight: 700; font-size: 14px;
+    letter-spacing: -0.005em;
+    color: var(--paper);
+  }
+  .header-bar .pipe { width: 1px; height: 24px; background: oklch(35% 0.020 245); margin: 0 14px; }
+  .header-bar .firm {
+    font-family: 'Source Code Pro', monospace;
+    font-size: 11px; letter-spacing: 0.02em;
+    color: oklch(78% 0.020 245);
+  }
+
+  .nav-section {
+    font-family: 'Source Code Pro', monospace;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-3);
+    padding: 18px 16px 6px;
+  }
+  nav { display: flex; flex-direction: column; }
+  /* Active indicator: full background tint plus row number, NO left stripe */
+  .nav-item {
+    display: grid; grid-template-columns: 22px 1fr auto; gap: 12px;
+    align-items: center;
+    padding: 0 16px;
+    height: 36px;
+    color: var(--ink); text-decoration: none;
+    font-size: 14px; font-weight: 400;
+    cursor: pointer;
+    border-bottom: 1px solid var(--rule-soft);
+    background: var(--surface);
+  }
+  .nav-item:hover { background: var(--paper-2); }
+  .nav-item.active {
+    background: var(--paper-2);
+    font-weight: 700;
+    box-shadow: inset 0 -2px 0 var(--brand);
+  }
+  .nav-item .num {
+    font-family: 'Source Code Pro', monospace;
+    font-size: 11px;
+    color: var(--ink-3);
+  }
+  .nav-item.active .num { color: var(--brand); font-weight: 600; }
+  .nav-item .count {
+    font-family: 'Source Code Pro', monospace;
+    font-size: 12px;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .nav-item.alert .count {
+    color: var(--paper);
+    background: var(--high);
+    padding: 0 7px;
+    height: 18px;
+    line-height: 18px;
+    font-weight: 600;
+    font-size: 11px;
+  }
+
+  /* ============== Main ============== */
+  main { display: flex; flex-direction: column; min-width: 0; }
+
+  .topbar {
+    display: flex; align-items: stretch; gap: 0;
+    padding: 0;
+    height: 48px;
+    border-bottom: 1px solid var(--rule);
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 5;
+  }
+  .crumbs {
+    padding: 0 16px;
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 12px; letter-spacing: 0.02em;
+    color: var(--ink-3);
+    flex: 1;
+  }
+  .crumbs .arrow { color: var(--rule-strong); }
+  .crumbs strong { color: var(--ink); font-weight: 700; }
+  .crumbs em { font-family: 'Public Sans'; font-style: normal; color: var(--ink-2); }
+
+  .icon-btn {
+    width: 48px; height: 48px;
+    background: transparent; border: 0;
+    border-left: 1px solid var(--rule);
+    color: var(--ink-2); cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .icon-btn:hover { background: var(--paper-2); color: var(--ink); }
+  .icon-btn svg { width: 18px; height: 18px; }
+  .icon-btn .pip {
+    position: absolute; top: 12px; right: 12px;
+    width: 6px; height: 6px; background: var(--high);
+  }
+  .new-btn {
+    height: 48px; padding: 0 24px;
+    background: var(--brand); color: var(--paper);
+    border: 0;
+    font-family: 'Public Sans'; font-size: 14px; font-weight: 500;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px;
+    letter-spacing: 0.005em;
+  }
+  .new-btn:hover { background: oklch(40% 0.190 250); }
+  .new-btn svg { width: 16px; height: 16px; }
+  .avatar {
+    width: 48px; height: 48px;
+    background: var(--ink); color: var(--paper);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 12px; font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  /* ============== Content ============== */
+  .content { padding: 0; max-width: 1320px; }
+
+  /* Hero strip — engineering datasheet header */
+  .datasheet {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr);
+    border-bottom: 1px solid var(--rule);
+  }
+  .datasheet .head {
+    padding: 32px 24px 28px;
+    border-right: 1px solid var(--rule);
+  }
+  .datasheet .eyebrow {
+    font-family: 'Source Code Pro', monospace;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.10em; text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: 12px;
+  }
+  .datasheet h1 {
+    font-family: 'Public Sans';
+    font-size: clamp(28px, 3.4vw, 40px);
+    font-weight: 300;
+    letter-spacing: -0.012em;
+    line-height: 1.1;
+    color: var(--ink);
+  }
+  .datasheet h1 strong { font-weight: 700; }
+  .datasheet h1 em { font-style: normal; color: var(--high); font-weight: 700; }
+  .datasheet .meta {
+    margin-top: 14px;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 12px;
+    color: var(--ink-3);
+    letter-spacing: 0.005em;
+  }
+  .datasheet .meta .sep { color: var(--rule-strong); margin: 0 10px; }
+
+  /* KPI table — proper grid cells, no stripes */
+  .datasheet .kpi {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+  .kpi-cell {
+    padding: 24px 22px 22px;
+    border-right: 1px solid var(--rule-soft);
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .kpi-cell:nth-child(3n) { border-right: 0; }
+  .kpi-cell:nth-last-child(-n+3) { border-bottom: 0; }
+  .kpi-cell.full { grid-column: 1 / -1; border-right: 0; }
+  .kpi-label {
+    font-family: 'Source Code Pro', monospace;
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.10em; text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: 8px;
+  }
+  .kpi-value {
+    font-family: 'Public Sans';
+    font-size: 36px; font-weight: 300;
+    line-height: 1;
+    letter-spacing: -0.012em;
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--ink);
+  }
+  .kpi-value.high { color: var(--high); }
+  .kpi-trend {
+    margin-top: 6px;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 11px;
+    color: var(--ink-3);
+    letter-spacing: 0.005em;
+  }
+  .kpi-trend.up { color: var(--ok); }
+  .kpi-trend.down { color: var(--high); }
+
+  /* Notification — top + bottom rules, NOT left stripe */
+  .notif {
+    border-top: 2px solid var(--high);
+    border-bottom: 1px solid var(--rule);
+    background: var(--high-paper);
+    padding: 16px 24px 14px;
+    display: grid;
+    grid-template-columns: 18px 1fr auto;
+    gap: 14px;
+    align-items: start;
+  }
+  .notif-icon {
+    color: var(--high);
+    line-height: 0;
+    padding-top: 1px;
+  }
+  .notif-icon svg { width: 18px; height: 18px; }
+  .notif-body { min-width: 0; }
+  .notif-tag {
+    font-family: 'Source Code Pro', monospace;
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.10em; text-transform: uppercase;
+    color: var(--high);
+    margin-bottom: 4px;
+  }
+  .notif-title {
+    font-family: 'Public Sans';
+    font-size: 16px; font-weight: 600;
+    line-height: 1.35;
+    color: var(--ink);
+  }
+  .notif-meta {
+    margin-top: 6px;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+  .notif-meta a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .notif-action {
+    height: 32px; padding: 0 16px;
+    background: var(--ink); color: var(--paper);
+    border: 0;
+    font-family: 'Public Sans'; font-size: 12px; font-weight: 500;
+    cursor: pointer;
+    align-self: center;
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .notif-action:hover { background: var(--ink-2); }
+
+  /* Section */
+  .section {
+    border-bottom: 1px solid var(--rule);
+  }
+  .section-head {
+    display: flex; align-items: center; gap: 0;
+    padding: 0;
+    border-bottom: 1px solid var(--rule);
+    height: 40px;
+    background: var(--paper-2);
+  }
+  .section-num {
+    width: 48px;
+    text-align: center;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--brand);
+    border-right: 1px solid var(--rule);
+    align-self: stretch;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .section-title {
+    padding: 0 16px;
+    font-family: 'Public Sans';
+    font-size: 14px; font-weight: 700;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+    flex: 1;
+  }
+  .section-meta {
+    padding: 0 16px;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 11px;
+    color: var(--ink-3);
+    border-left: 1px solid var(--rule);
+    align-self: stretch;
+    display: flex; align-items: center;
+  }
+  .section-actions { display: flex; align-self: stretch; }
+  .section-actions button {
+    height: 100%;
+    background: transparent; border: 0;
+    border-left: 1px solid var(--rule);
+    padding: 0 16px;
+    font-family: 'Public Sans'; font-size: 12px; font-weight: 500;
+    color: var(--ink-2);
+    cursor: pointer;
+    letter-spacing: 0.005em;
+  }
+  .section-actions button:hover { background: var(--paper-3); color: var(--ink); }
+
+  /* DataTable — sharp 0px corners, sans-serif body, mono for numerics */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: var(--surface);
+  }
+  thead th {
+    text-align: left;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 11px; font-weight: 600;
+    color: var(--ink-3);
+    letter-spacing: 0.06em; text-transform: uppercase;
+    background: var(--paper);
+    padding: 10px 16px;
+    height: 36px;
+    border-bottom: 1px solid var(--rule);
+    user-select: none;
+    white-space: nowrap;
+  }
+  thead th .sort { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  thead th .sort svg { width: 11px; height: 11px; opacity: 0.5; }
+  thead th:hover { color: var(--ink); }
+
+  tbody tr {
+    border-bottom: 1px solid var(--rule-soft);
+    transition: background 80ms;
+  }
+  tbody tr:hover { background: var(--paper-2); }
+  /* Overdue row: full background, NOT a stripe */
+  tbody tr.overdue { background: var(--high-paper); }
+  tbody tr.overdue:hover { background: oklch(91% 0.045 27); }
+  tbody tr:last-child { border-bottom: 0; }
+  tbody td {
+    padding: 0 16px;
+    height: 40px;
+    color: var(--ink);
+    vertical-align: middle;
+  }
+  td.muted { color: var(--ink-3); }
+  td.client { font-weight: 600; }
+  td.client a { color: var(--ink); text-decoration: none; }
+  td.client a:hover { color: var(--brand); text-decoration: underline; text-underline-offset: 2px; }
+  td.client .ditto { font-family: 'Source Code Pro', monospace; color: var(--ink-4); font-weight: 400; }
+
+  td.when {
+    font-family: 'Source Code Pro', monospace;
+    font-size: 12px; font-weight: 600;
+    letter-spacing: 0.005em;
+    color: var(--ink-2);
+  }
+  td.when.overdue {
+    color: var(--high);
+  }
+
+  /* Tag — sharp corners, mono caps, no stripe */
+  .tag {
+    display: inline-flex; align-items: center;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.10em; text-transform: uppercase;
+    padding: 2px 7px;
+    line-height: 16px;
+    background: var(--paper-2);
+    color: var(--ink-2);
+    border: 1px solid var(--rule);
+  }
+  .tag.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .tag.fed     { background: var(--surface); color: var(--ink-2); }
+  .tag.nexus   { background: transparent; color: var(--ink-3); border-style: dashed; }
+
+  .ai {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 2px 7px;
+    background: var(--brand-paper);
+    color: var(--brand);
+    border: 1px solid var(--brand-line);
+  }
+  .ai svg { width: 11px; height: 11px; }
+
+  td.status { font-size: 12px; color: var(--ink-3); white-space: nowrap; }
+
+  .row-action {
+    width: 28px; height: 28px;
+    background: transparent; border: 1px solid transparent;
+    color: var(--ink-3);
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .row-action:hover { background: var(--surface); border-color: var(--rule); color: var(--ink); }
+  .row-action svg { width: 14px; height: 14px; }
+
+  /* Pagination footer — engineering style */
+  .table-foot {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px;
+    border-top: 1px solid var(--rule);
+    background: var(--paper-2);
+    font-family: 'Source Code Pro', monospace;
+    font-size: 11px;
+    color: var(--ink-3);
+  }
+  .table-foot .pageinfo { letter-spacing: 0.04em; }
+  .table-foot .spacer { flex: 1; }
+  .table-foot .pager { display: flex; gap: 0; }
+  .table-foot .pager button {
+    height: 26px; padding: 0 12px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-right: 0;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 11px; color: var(--ink-2);
+    cursor: pointer;
+    letter-spacing: 0.04em;
+  }
+  .table-foot .pager button:last-child { border-right: 1px solid var(--rule); }
+  .table-foot .pager button:hover { background: var(--paper-2); }
+
+  /* Footnote */
+  .footnote {
+    padding: 14px 24px;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 11px;
+    color: var(--ink-4);
+    letter-spacing: 0.04em;
+    border-top: 1px solid var(--rule-soft);
+    display: flex; align-items: baseline; justify-content: space-between;
+  }
+
+  .direction-tag {
+    position: fixed; bottom: 16px; right: 16px;
+    background: var(--brand); color: var(--paper);
+    padding: 8px 14px;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    z-index: 100;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside>
+    <div class="header-bar">
+      <span class="ddh">DueDateHQ</span>
+      <span class="pipe"></span>
+      <span class="firm">SARAH·MITCHELL·CPA</span>
+    </div>
+
+    <div class="nav-section">Navigate</div>
+    <nav>
+      <a class="nav-item active"><span class="num">01</span><span>Dashboard</span><span class="count"></span></a>
+      <a class="nav-item"><span class="num">02</span><span>To review</span><span class="count">5</span></a>
+      <a class="nav-item"><span class="num">03</span><span>Clients</span><span class="count">80</span></a>
+      <a class="nav-item alert"><span class="num">04</span><span>Alerts</span><span class="count">3</span></a>
+      <a class="nav-item"><span class="num">05</span><span>Insights</span><span class="count"></span></a>
+    </nav>
+
+    <div class="nav-section">Workspace</div>
+    <nav>
+      <a class="nav-item"><span class="num">06</span><span>Settings</span><span class="count"></span></a>
+      <a class="nav-item"><span class="num">07</span><span>Help &amp; docs</span><span class="count"></span></a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div class="crumbs">
+        <span>Workspace</span>
+        <span class="arrow">/</span>
+        <strong>Dashboard</strong>
+        <span class="arrow">/</span>
+        <em>2026·W18</em>
+      </div>
+      <button class="icon-btn" aria-label="Search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+      <button class="icon-btn" aria-label="Notifications">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <span class="pip"></span>
+      </button>
+      <button class="new-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        New
+      </button>
+      <span class="avatar">SC</span>
+    </div>
+
+    <div class="content">
+
+      <div class="datasheet">
+        <div class="head">
+          <div class="eyebrow">2026 · Week 18 · Filing season</div>
+          <h1>Two filings <em>overdue</em>; <strong>eight more</strong> by Friday.</h1>
+          <p class="meta"><span>THU·APR·30</span><span class="sep">·</span><span>50/50 STATES</span><span class="sep">·</span><span>SCRAPE 14M AGO</span></p>
+        </div>
+        <div class="kpi">
+          <div class="kpi-cell">
+            <div class="kpi-label">Active</div>
+            <div class="kpi-value">80</div>
+            <div class="kpi-trend up">+3 m/m</div>
+          </div>
+          <div class="kpi-cell">
+            <div class="kpi-label">Overdue</div>
+            <div class="kpi-value high">02</div>
+            <div class="kpi-trend down">+2 d/d</div>
+          </div>
+          <div class="kpi-cell">
+            <div class="kpi-label">This week</div>
+            <div class="kpi-value">08</div>
+            <div class="kpi-trend">5 jurisdictions</div>
+          </div>
+          <div class="kpi-cell">
+            <div class="kpi-label">Awaiting docs</div>
+            <div class="kpi-value">03</div>
+            <div class="kpi-trend">avg 2 d</div>
+          </div>
+          <div class="kpi-cell">
+            <div class="kpi-label">Alerts</div>
+            <div class="kpi-value">03</div>
+            <div class="kpi-trend">unactioned</div>
+          </div>
+          <div class="kpi-cell">
+            <div class="kpi-label">Streak</div>
+            <div class="kpi-value">07</div>
+            <div class="kpi-trend">days clean</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="notif">
+        <span class="notif-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        </span>
+        <div class="notif-body">
+          <div class="notif-tag">Disaster · Louisiana · 6 affected</div>
+          <div class="notif-title">Hurricane Delta extension grants automatic relief through July 15.</div>
+          <div class="notif-meta">DETECTED 2H AGO · CONFIDENCE HIGH · <a href="#">VIEW SOURCE ↗</a></div>
+        </div>
+        <button class="notif-action">Review affected</button>
+      </div>
+
+      <section class="section">
+        <div class="section-head">
+          <span class="section-num">01</span>
+          <h2 class="section-title">Overdue</h2>
+          <span class="section-meta">2 / 80</span>
+          <div class="section-actions">
+            <button>Filter</button>
+            <button>Export</button>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th><span class="sort">Due ↓</span></th>
+              <th><span class="sort">Client</span></th>
+              <th><span class="sort">Form</span></th>
+              <th><span class="sort">Jur.</span></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="overdue">
+              <td class="when overdue">−3 d</td>
+              <td class="client"><a href="#">Acme LLC</a></td>
+              <td class="muted">1120-S federal</td>
+              <td><span class="tag fed">FED</span></td>
+              <td><button class="row-action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></button></td>
+            </tr>
+            <tr class="overdue">
+              <td class="when overdue">−1 d</td>
+              <td class="client"><a href="#">Tessera Holdings</a></td>
+              <td class="muted">CA Form 568 · LLC fee</td>
+              <td><span class="tag primary">CA</span></td>
+              <td><button class="row-action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></button></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <span class="section-num">02</span>
+          <h2 class="section-title">This week</h2>
+          <span class="section-meta">8 / 80</span>
+          <div class="section-actions">
+            <button>Filter</button>
+            <button>Export</button>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th><span class="sort">Due ↑</span></th>
+              <th><span class="sort">Client</span></th>
+              <th><span class="sort">Form</span></th>
+              <th><span class="sort">Jur.</span></th>
+              <th><span class="sort">Status</span></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="when">Today</td>
+              <td class="client"><a href="#">Wilkins Plumbing</a></td>
+              <td class="muted">LA-CIFT-620 <span class="ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>S-CORP</span></td>
+              <td><span class="tag primary">LA</span></td>
+              <td class="status">In progress</td>
+              <td><button class="row-action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></button></td>
+            </tr>
+            <tr>
+              <td class="when">Tue</td>
+              <td class="client"><a href="#">Northshore Co</a></td>
+              <td class="muted">TX Franchise Tax</td>
+              <td><span class="tag nexus">TX</span></td>
+              <td class="status">—</td>
+              <td><button class="row-action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></button></td>
+            </tr>
+            <tr>
+              <td class="when">Wed</td>
+              <td class="client"><a href="#">Pinecrest Inc</a></td>
+              <td class="muted">Form 941 · Q1 2026</td>
+              <td><span class="tag fed">FED</span></td>
+              <td class="status">—</td>
+              <td><button class="row-action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></button></td>
+            </tr>
+            <tr>
+              <td class="when">Thu</td>
+              <td class="client"><a href="#">Vanderbilt &amp; Sons</a></td>
+              <td class="muted">IT-204 NY-LLC</td>
+              <td><span class="tag primary">NY</span></td>
+              <td class="status">—</td>
+              <td><button class="row-action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></button></td>
+            </tr>
+            <tr>
+              <td class="when">Fri</td>
+              <td class="client"><span class="ditto">↪ ditto</span></td>
+              <td class="muted">CA Form 100 · S-Corp annual</td>
+              <td><span class="tag primary">CA</span></td>
+              <td class="status">—</td>
+              <td><button class="row-action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></button></td>
+            </tr>
+            <tr>
+              <td class="when">Fri</td>
+              <td class="client"><a href="#">Ridgemont Group</a></td>
+              <td class="muted">ST-1 · IL Sales/Use</td>
+              <td><span class="tag nexus">IL</span></td>
+              <td class="status">—</td>
+              <td><button class="row-action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></button></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="table-foot">
+          <span class="pageinfo">SHOWING 6 OF 8 · BUCKET = THIS WEEK</span>
+          <span class="spacer"></span>
+          <div class="pager">
+            <button>← Prev</button>
+            <button>Next →</button>
+          </div>
+        </div>
+      </section>
+
+      <div class="footnote">
+        <span>2026·W18·THU · 50/50 STATES MONITORED · v0.7.4</span>
+        <span>16PX BASELINE GRID · OKLCH NEUTRALS</span>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<div class="direction-tag">v8 · Industrial Grid</div>
+</body>
+</html>

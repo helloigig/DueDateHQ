@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DueDateHQ — v28 · Oatly</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Mona+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #F1ECDF;
+    --paper: #E5DFCC;
+    --black: #1A1A1A;
+    --rule: #1A1A1A;
+    --hot: #FF5757;
+    --green: #5C8A4F;
+    --blue: #4773C4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Mona Sans', sans-serif;
+    font-size: 14px; line-height: 1.45;
+    color: var(--black);
+    background: var(--cream);
+    -webkit-font-smoothing: antialiased;
+  }
+  .hand { font-family: 'Caveat', cursive; }
+  .ink-block { background: var(--black); color: var(--cream); padding: 1px 8px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+
+  .app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+
+  aside { background: var(--cream); border-right: 2px solid var(--black); padding: 30px 20px; display: flex; flex-direction: column; gap: 0; position: sticky; top: 0; height: 100vh; }
+  .brand-mess { font-family: 'Caveat'; font-size: 28px; font-weight: 700; line-height: 0.95; letter-spacing: -0.005em; transform: rotate(-1deg); }
+  .brand-mess strong { font-family: 'Mona Sans'; font-weight: 900; font-size: 26px; letter-spacing: -0.04em; }
+  .brand-rule { width: 36px; height: 2px; background: var(--black); margin: 16px 0; }
+  .brand-firm { font-size: 11px; line-height: 1.5; font-weight: 500; }
+
+  .nav-section { font-family: 'Caveat'; font-size: 22px; font-weight: 700; padding: 22px 0 4px; transform: rotate(-1deg); }
+  nav { display: flex; flex-direction: column; gap: 0; }
+  .nav-item { display: flex; align-items: baseline; gap: 10px; padding: 8px 0; color: var(--black); text-decoration: none; font-size: 14px; font-weight: 500; cursor: pointer; border-bottom: 1px solid var(--black); }
+  .nav-item:last-of-type { border-bottom: 0; }
+  .nav-item:hover { background: var(--paper); }
+  .nav-item.active { font-weight: 900; }
+  .nav-item.active::before { content: '→ '; font-weight: 900; }
+  .nav-item .count { margin-left: auto; font-family: 'Mona Sans'; font-weight: 700; font-size: 12px; background: var(--black); color: var(--cream); padding: 1px 7px; }
+  .nav-item.alert .count { background: var(--hot); }
+
+  .footer-rant { margin-top: auto; padding-top: 22px; border-top: 2px solid var(--black); font-family: 'Caveat'; font-size: 16px; line-height: 1.3; transform: rotate(-1deg); }
+  .footer-rant em { background: var(--black); color: var(--cream); padding: 0 4px; font-style: normal; }
+
+  main { display: flex; flex-direction: column; min-width: 0; }
+
+  .topbar { display: flex; align-items: center; gap: 12px; padding: 18px 32px; border-bottom: 2px solid var(--black); }
+  .folio { font-family: 'Caveat'; font-size: 20px; font-weight: 700; transform: rotate(-1deg); }
+  .topbar .spacer { flex: 1; }
+  .pill-search { background: transparent; border: 2px solid var(--black); padding: 6px 14px; height: 34px; font-family: 'Caveat'; font-size: 16px; font-weight: 500; color: var(--black); cursor: pointer; min-width: 220px; }
+  .icon-btn { width: 34px; height: 34px; background: transparent; border: 2px solid var(--black); color: var(--black); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; position: relative; }
+  .icon-btn:hover { background: var(--black); color: var(--cream); }
+  .icon-btn svg { width: 14px; height: 14px; }
+  .icon-btn .indicator { position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; background: var(--hot); }
+  .new-btn { height: 34px; padding: 0 18px; background: var(--black); color: var(--cream); border: 0; font-family: 'Caveat'; font-size: 18px; font-weight: 700; cursor: pointer; }
+  .avatar { width: 34px; height: 34px; background: var(--cream); border: 2px solid var(--black); display: inline-flex; align-items: center; justify-content: center; font-family: 'Caveat'; font-size: 16px; font-weight: 700; }
+
+  .ridiculous-hero { padding: 72px 32px 56px; border-bottom: 2px solid var(--black); position: relative; overflow: hidden; }
+  .ridiculous-hero h1 { font-family: 'Mona Sans'; font-weight: 900; font-size: 86px; line-height: 0.92; letter-spacing: -0.045em; }
+  .ridiculous-hero h1 .strike { text-decoration: line-through; text-decoration-thickness: 6px; color: rgba(26,26,26,0.4); }
+  .ridiculous-hero h1 .scribble { font-family: 'Caveat'; font-weight: 700; font-style: normal; color: var(--hot); transform: rotate(-2deg); display: inline-block; }
+  .ridiculous-hero h1 em { font-family: 'Caveat'; font-style: normal; font-weight: 700; transform: rotate(-1.5deg); display: inline-block; }
+  .hero-arrow { position: absolute; bottom: 36px; right: 56px; font-family: 'Caveat'; font-size: 36px; font-weight: 700; color: var(--hot); transform: rotate(8deg); }
+  .hero-meta { margin-top: 22px; font-family: 'Caveat'; font-size: 22px; font-weight: 500; max-width: 720px; line-height: 1.3; }
+  .hero-meta span.box { background: var(--black); color: var(--cream); padding: 0 8px; }
+  .hero-meta span.hot { background: var(--hot); color: var(--cream); padding: 0 8px; }
+
+  .stats-strip { padding: 16px 32px; border-bottom: 2px solid var(--black); display: grid; grid-template-columns: repeat(4, 1fr); }
+  .stat-cell { padding: 14px 20px; border-right: 2px solid var(--black); position: relative; }
+  .stat-cell:first-child { padding-left: 0; }
+  .stat-cell:last-child { border-right: 0; }
+  .stat-lbl { font-family: 'Caveat'; font-size: 18px; font-weight: 700; }
+  .stat-val { font-family: 'Mona Sans'; font-weight: 900; font-size: 48px; line-height: 1; letter-spacing: -0.045em; margin-top: 4px; }
+  .stat-val.danger { color: var(--hot); }
+  .stat-trend { font-family: 'Caveat'; font-size: 14px; margin-top: 4px; }
+
+  .rant-banner { padding: 22px 32px; border-bottom: 2px solid var(--black); display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: center; background: var(--paper); }
+  .rant-text { font-family: 'Mona Sans'; font-weight: 900; font-size: 22px; line-height: 1.2; letter-spacing: -0.018em; }
+  .rant-text em { font-family: 'Caveat'; font-style: normal; font-weight: 700; color: var(--hot); }
+  .rant-meta { font-family: 'Caveat'; font-size: 16px; font-weight: 500; margin-top: 4px; }
+  .rant-action { background: var(--black); color: var(--cream); border: 0; padding: 10px 22px; font-family: 'Caveat'; font-size: 22px; font-weight: 700; cursor: pointer; transform: rotate(-1deg); }
+
+  .columns { padding: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
+
+  .section-head { display: flex; align-items: baseline; gap: 14px; padding-bottom: 10px; margin-bottom: 14px; border-bottom: 2px solid var(--black); }
+  .section-title { font-family: 'Caveat'; font-size: 36px; font-weight: 700; line-height: 0.9; }
+  .section-count { font-family: 'Mona Sans'; font-size: 12px; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; }
+  .section-actions { margin-left: auto; display: flex; gap: 6px; }
+  .section-actions button { background: transparent; border: 1.5px solid var(--black); padding: 4px 10px; font-family: 'Caveat'; font-size: 14px; font-weight: 700; color: var(--black); cursor: pointer; }
+
+  .rows { list-style: none; }
+  .row { display: flex; align-items: center; gap: 14px; padding: 14px 6px; border-bottom: 1.5px solid var(--black); }
+  .row:last-child { border-bottom: 0; }
+  .row.overdue { background: var(--hot); color: var(--cream); padding: 14px 12px; margin: 0 -8px; border-radius: 0; }
+  .row.overdue .when { color: var(--cream); }
+  .row.overdue .client { color: var(--cream); }
+  .row.overdue .form { color: var(--cream); }
+  .when { font-family: 'Mona Sans'; font-weight: 900; font-size: 14px; width: 80px; flex-shrink: 0; letter-spacing: -0.005em; }
+  .client { width: 184px; flex-shrink: 0; color: var(--black); font-size: 16px; font-weight: 900; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -0.01em; }
+  .client-suppress { width: 184px; font-family: 'Caveat'; font-size: 18px; font-weight: 700; }
+  .form { flex: 1; min-width: 0; color: var(--black); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; font-weight: 500; }
+  .pill { font-family: 'Mona Sans'; font-size: 11px; font-weight: 900; padding: 2px 8px; flex-shrink: 0; line-height: 1.4; letter-spacing: 0.04em; text-transform: uppercase; }
+  .pill.primary { background: var(--black); color: var(--cream); }
+  .pill.nexus { border: 1.5px solid var(--black); }
+  .pill.fed { background: var(--paper); }
+  .ai-source { display: inline-flex; align-items: center; gap: 4px; font-family: 'Caveat'; font-size: 14px; font-weight: 700; padding: 1px 8px; flex-shrink: 0; color: var(--cream); background: var(--blue); transform: rotate(-1deg); }
+  .ai-source svg { width: 12px; height: 12px; }
+
+  .direction-tag { position: fixed; bottom: 18px; right: 18px; background: var(--hot); color: var(--cream); padding: 10px 16px; font-family: 'Caveat'; font-size: 22px; font-weight: 700; transform: rotate(-3deg); z-index: 100; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand-mess"><strong>DueDateHQ.</strong><br>not a tax<br>app, OK?</div>
+    <div class="brand-rule"></div>
+    <div class="brand-firm">Sarah's filing season,<br>volume one, week 18.</div>
+    <div class="nav-section">where to?</div>
+    <nav>
+      <a class="nav-item active">Dashboard</a>
+      <a class="nav-item">Review<span class="count">5</span></a>
+      <a class="nav-item">Clients</a>
+      <a class="nav-item alert">Alerts<span class="count">3</span></a>
+      <a class="nav-item">Insights</a>
+      <a class="nav-item">Settings</a>
+    </nav>
+    <div class="footer-rant">It's just deadlines.<br>But also: <em>NOT JUST</em><br><em>DEADLINES.</em></div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <span class="folio">Thursday, Apr 30 · ✱✱✱</span>
+      <div class="spacer"></div>
+      <button class="pill-search">search the thing</button>
+      <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="indicator"></span></button>
+      <button class="new-btn">new!</button>
+      <span class="avatar">SM</span>
+    </div>
+
+    <div class="ridiculous-hero">
+      <h1>good <em>morning</em><br><span class="strike">good morning</span><br>HEY <em>SARAH —</em><br><span class="scribble">eight</span> <span class="ink-block">filings.</span></h1>
+      <p class="hero-meta">80 active. <span class="hot">2 OVERDUE</span> (sorry). 8 due this week, btw. 3 clients still owing docs, <em>obvs.</em></p>
+      <span class="hero-arrow">↘ start here</span>
+    </div>
+
+    <div class="stats-strip">
+      <div class="stat-cell"><div class="stat-lbl">active</div><div class="stat-val">80</div><div class="stat-trend">+3, nice work</div></div>
+      <div class="stat-cell"><div class="stat-lbl">overdue!</div><div class="stat-val danger">02</div><div class="stat-trend">act today, please</div></div>
+      <div class="stat-cell"><div class="stat-lbl">this week</div><div class="stat-val">08</div><div class="stat-trend">five jurisdictions</div></div>
+      <div class="stat-cell"><div class="stat-lbl">awaiting</div><div class="stat-val">03</div><div class="stat-trend">two days avg</div></div>
+    </div>
+
+    <div class="rant-banner">
+      <div>
+        <div class="rant-text">Louisiana DOR. <em>Hurricane Delta.</em> Six clients <span class="ink-block">eligible.</span></div>
+        <div class="rant-meta">Detected 2h ago. The state actually announced something useful, who knew.</div>
+      </div>
+      <button class="rant-action">REVIEW →</button>
+    </div>
+
+    <div class="columns">
+      <section>
+        <div class="section-head"><span class="section-title">overdue.</span><span class="section-count">02</span></div>
+        <ul class="rows">
+          <li class="row overdue"><span class="when">3D LATE</span><a class="client" href="#">Acme LLC</a><a class="form" href="#">1120-S federal</a><span class="pill fed">FED</span></li>
+          <li class="row overdue"><span class="when">1D LATE</span><a class="client" href="#">Tessera Holdings</a><a class="form" href="#">CA Form 568 · LLC fee</a><span class="pill primary">CA</span></li>
+        </ul>
+      </section>
+
+      <section>
+        <div class="section-head"><span class="section-title">this week.</span><span class="section-count">08</span><div class="section-actions"><button>filter?</button><button>export!</button></div></div>
+        <ul class="rows">
+          <li class="row"><span class="when">TODAY</span><a class="client" href="#">Wilkins Plumbing</a><a class="form" href="#">LA-CIFT-620</a><span class="ai-source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>AI did this</span><span class="pill primary">LA</span></li>
+          <li class="row"><span class="when">TUE</span><a class="client" href="#">Northshore Co</a><a class="form" href="#">TX Franchise Tax</a><span class="pill nexus">TX</span></li>
+          <li class="row"><span class="when">WED</span><a class="client" href="#">Pinecrest Inc</a><a class="form" href="#">Form 941 · Q1</a><span class="pill fed">FED</span></li>
+          <li class="row"><span class="when">THU</span><a class="client" href="#">Vanderbilt &amp; Sons</a><a class="form" href="#">IT-204 NY-LLC</a><span class="pill primary">NY</span></li>
+          <li class="row"><span class="when">FRI</span><span class="client-suppress">↪ same client</span><a class="form" href="#">CA Form 100 · S-Corp</a><span class="pill primary">CA</span></li>
+          <li class="row"><span class="when">FRI</span><a class="client" href="#">Ridgemont Group</a><a class="form" href="#">ST-1 · IL Sales/Use</a><span class="pill nexus">IL</span></li>
+        </ul>
+      </section>
+    </div>
+  </main>
+</div>
+<div class="direction-tag">v28 · OATLY?</div>
+</body>
+</html>

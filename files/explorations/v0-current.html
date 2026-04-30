@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DueDateHQ — v0 · Current state (untouched)</title>
+<style>
+  /* Verbatim from tailwind.config.js — no design changes */
+  :root {
+    --canvas:        #FAFAF7;
+    --surface:       #FFFFFF;
+    --sunken:        #F5F4EF;
+    --ink-900:       #0F172A;
+    --ink-700:       #334155;
+    --ink-500:       #64748B;
+    --ink-400:       #94A3B8;
+    --ink-300:       #CBD5E1;
+    --line:          #E2E8F0;
+    --line-strong:   #CBD5E1;
+    --accent:        #0F172A;
+    --accent-hover:  #1E293B;
+    --danger-bg:     #FEF2F2;
+    --danger-border: #FCA5A5;
+    --danger-ink:    #B91C1C;
+    --danger-solid:  #DC2626;
+    --warn-bg:       #FFFBEB;
+    --warn-solid:    #D97706;
+    --ok-bg:         #ECFDF5;
+    --ok-ink:        #047857;
+    --info-solid:    #2563EB;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    /* System font stack only — verbatim per tailwind.config.js */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px; line-height: 20px;
+    color: var(--ink-900); background: var(--canvas);
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "cv02", "cv11", "ss01";
+  }
+  .tabular { font-variant-numeric: tabular-nums; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  .app { display: grid; grid-template-columns: 224px 1fr; min-height: 100vh; }
+
+  /* Sidebar — w-56 = 224px, h-14 header = 56px */
+  aside {
+    background: var(--surface);
+    border-right: 1px solid var(--line);
+    display: flex; flex-direction: column;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .brand-block {
+    height: 56px;
+    display: flex; align-items: center;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  .brand-name { font-size: 13px; font-weight: 600; line-height: 18px; color: var(--ink-900); }
+  .brand-firm { font-size: 11px; line-height: 14px; color: var(--ink-500); }
+
+  nav { flex: 1; padding: 16px 8px; display: flex; flex-direction: column; gap: 4px; }
+  .nav-item {
+    position: relative;
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px; color: var(--ink-500);
+    text-decoration: none; line-height: 20px;
+  }
+  .nav-item:hover { background: var(--sunken); color: var(--ink-900); }
+  .nav-item.active { background: var(--sunken); color: var(--ink-900); font-weight: 500; }
+  .nav-item.active::before {
+    content: '';
+    position: absolute; left: 0; top: 4px; bottom: 4px;
+    width: 2px; border-radius: 0 2px 2px 0;
+    background: var(--accent);
+  }
+  .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+  .badge-soft {
+    margin-left: auto;
+    background: var(--sunken); color: var(--ink-700);
+    border: 1px solid var(--line);
+    font-size: 11px; line-height: 14px;
+    padding: 1px 6px; border-radius: 999px;
+    min-width: 20px; text-align: center;
+  }
+  .badge-danger {
+    margin-left: auto;
+    background: var(--danger-solid); color: white;
+    font-size: 11px; line-height: 14px;
+    padding: 1px 6px; border-radius: 999px;
+    min-width: 20px; text-align: center; font-weight: 500;
+  }
+
+  .workspace-label {
+    font-size: 11px; color: var(--ink-400);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 4px 12px 8px;
+  }
+  .sidebar-footer {
+    padding: 12px 8px;
+    border-top: 1px solid var(--line);
+  }
+  .collapse-btn {
+    margin-top: 4px;
+    width: 100%;
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 12px;
+    background: transparent; border: 0;
+    border-radius: 6px;
+    color: var(--ink-400); font-size: 13px;
+    cursor: pointer;
+  }
+  .collapse-btn:hover { background: var(--sunken); color: var(--ink-700); }
+  .collapse-btn svg { width: 16px; height: 16px; }
+  .collapse-btn span { font-size: 11px; }
+
+  /* TopBar — h-14 = 56px */
+  main { display: flex; flex-direction: column; min-width: 0; }
+  .topbar {
+    height: 56px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 20px;
+    position: sticky; top: 0; z-index: 5;
+  }
+  .search {
+    flex: 1; max-width: 384px;
+    height: 30px;
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px;
+    background: var(--sunken);
+    border: 0;
+    border-radius: 6px;
+    color: var(--ink-500); font-size: 13px;
+    cursor: pointer;
+  }
+  .search:hover { background: rgba(245,244,239,0.7); color: var(--ink-700); }
+  .search svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .kbd {
+    margin-left: auto;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 1px 4px;
+    font-family: ui-monospace, monospace;
+    font-size: 11px; color: var(--ink-400);
+  }
+
+  .new-btn {
+    height: 30px; padding: 0 12px;
+    background: var(--accent); color: var(--canvas);
+    border: 0; border-radius: 6px;
+    font-family: inherit; font-size: 13px; cursor: pointer;
+  }
+  .new-btn:hover { background: var(--accent-hover); }
+
+  .icon-btn {
+    width: 32px; height: 32px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0;
+    border-radius: 6px;
+    color: var(--ink-500);
+    cursor: pointer; position: relative;
+  }
+  .icon-btn:hover { background: var(--sunken); color: var(--ink-900); }
+  .icon-btn svg { width: 16px; height: 16px; }
+  .icon-btn .dot {
+    position: absolute; top: 7px; right: 7px;
+    width: 6px; height: 6px; border-radius: 999px;
+    background: var(--danger-solid); border: 1.5px solid var(--surface);
+  }
+
+  .user-block {
+    display: flex; align-items: center; gap: 8px;
+    padding-left: 8px;
+    border-left: 1px solid var(--line);
+  }
+  .user-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px;
+    background: transparent; border: 0;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .user-btn:hover { background: var(--sunken); }
+  .avatar {
+    width: 32px; height: 32px;
+    border-radius: 999px;
+    background: var(--ink-900); color: var(--canvas);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 500;
+  }
+  .user-name { font-size: 13px; color: var(--ink-700); }
+
+  /* Content */
+  .content { padding: 24px 24px 64px; max-width: 1024px; width: 100%; }
+
+  .greeting h1 { font-size: 18px; font-weight: 600; line-height: 26px; color: var(--ink-900); letter-spacing: -0.005em; }
+  .meta { margin-top: 4px; font-size: 13px; color: var(--ink-500); }
+  .meta .sep { color: var(--ink-300); margin: 0 6px; }
+  .meta .overdue { color: var(--danger-ink); font-weight: 500; }
+
+  /* Banner — red-tinted card */
+  .banner {
+    margin-top: 16px;
+    background: var(--danger-bg);
+    border: 1px solid var(--danger-border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    display: flex; align-items: flex-start; gap: 12px;
+  }
+  .banner-icon { color: var(--danger-solid); margin-top: 2px; flex-shrink: 0; }
+  .banner-icon svg { width: 16px; height: 16px; }
+  .banner-body { flex: 1; min-width: 0; }
+  .banner-title { font-size: 14px; font-weight: 500; color: var(--ink-900); }
+  .banner-meta { font-size: 12px; color: var(--ink-700); margin-top: 2px; }
+  .banner-meta a { color: var(--ink-700); text-decoration: underline; }
+  .banner-actions { display: flex; gap: 8px; }
+  .banner .review {
+    height: 28px; padding: 0 12px;
+    background: var(--surface); color: var(--ink-900);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-family: inherit; font-size: 12px; font-weight: 500;
+    cursor: pointer; display: flex; align-items: center; gap: 4px;
+  }
+  .banner .review:hover { background: var(--sunken); }
+
+  /* Sections */
+  .section { margin-top: 24px; }
+  .section-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 4px 8px;
+  }
+  .section-title {
+    font-size: 11px; line-height: 16px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--ink-700); font-weight: 600;
+  }
+  .section-actions { margin-left: auto; display: flex; gap: 4px; }
+  .section-actions button {
+    background: transparent; border: 0;
+    font-size: 12px; color: var(--ink-500);
+    cursor: pointer; padding: 2px 8px; border-radius: 4px;
+    font-family: inherit;
+  }
+  .section-actions button:hover { color: var(--ink-900); background: var(--sunken); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  /* Row — h-11 = 44px */
+  .rows { list-style: none; }
+  .row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 16px;
+    height: 44px;
+    border-bottom: 1px solid var(--line);
+    outline: none;
+  }
+  .row:last-child { border-bottom: 0; }
+  .row:hover { background: var(--sunken); }
+  .row.overdue { background: var(--danger-bg); }
+  .row.overdue:hover { background: rgba(254,242,242,0.7); }
+
+  .dot { width: 8px; height: 8px; flex-shrink: 0; }
+
+  .countdown {
+    font-size: 12px; line-height: 16px;
+    width: 64px; flex-shrink: 0;
+    color: var(--ink-500); font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .countdown.danger { color: var(--danger-ink); }
+
+  .client {
+    width: 192px; flex-shrink: 0;
+    color: var(--ink-900);
+    font-size: 13px; line-height: 20px; font-weight: 500;
+    text-decoration: none;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .client:hover { text-decoration: underline; }
+  .client-suppress {
+    width: 192px; flex-shrink: 0;
+    color: var(--ink-300); font-size: 12px;
+  }
+
+  .form {
+    flex: 1; min-width: 0;
+    color: var(--ink-700);
+    font-size: 13px; line-height: 20px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    text-decoration: none;
+  }
+  .form:hover { color: var(--ink-900); text-decoration: underline; }
+
+  .chip {
+    font-size: 11px; line-height: 16px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .chip.primary { background: var(--ink-900); color: var(--canvas); }
+  .chip.nexus { border: 1px solid var(--line-strong); color: var(--ink-500); }
+  .chip.fed { background: var(--sunken); color: var(--ink-700); }
+
+  .status-text {
+    font-size: 12px; line-height: 16px;
+    color: var(--ink-500);
+    width: 96px; flex-shrink: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .actions {
+    display: flex; gap: 4px; flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 100ms ease-out;
+  }
+  .row:hover .actions, .row:focus-within .actions { opacity: 1; }
+  .row-action {
+    background: transparent; border: 0;
+    padding: 6px;
+    border-radius: 4px;
+    color: var(--ink-500); cursor: pointer;
+    display: inline-flex;
+  }
+  .row-action svg { width: 14px; height: 14px; }
+  .row-action.complete { background: var(--ok-bg); color: var(--ok-ink); }
+  .row-action.complete:hover { background: rgba(134,239,172,0.4); }
+  .row-action.more:hover { background: var(--sunken); }
+
+  .direction-tag {
+    position: fixed;
+    bottom: 16px; right: 16px;
+    background: var(--ink-900); color: var(--canvas);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    z-index: 100;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside>
+    <div class="brand-block">
+      <div>
+        <div class="brand-name">DueDateHQ</div>
+        <div class="brand-firm">Sarah Mitchell, CPA</div>
+      </div>
+    </div>
+
+    <nav>
+      <a class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+        <span>Dashboard</span>
+      </a>
+      <a class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <span>To review</span>
+        <span class="badge-soft">5</span>
+      </a>
+      <a class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Clients</span>
+      </a>
+      <a class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <span>Alerts</span>
+        <span class="badge-danger">3</span>
+      </a>
+      <a class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>
+        <span>Insights</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="workspace-label">Workspace</div>
+      <a class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Settings</span>
+      </a>
+      <button class="collapse-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></svg>
+        <span>Collapse</span>
+      </button>
+    </div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <button class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <span>Search clients, deadlines, alerts</span>
+        <span class="kbd">⌘K</span>
+      </button>
+      <button class="new-btn">+ New</button>
+      <button class="icon-btn" aria-label="Notifications">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <span class="dot"></span>
+      </button>
+      <div class="user-block">
+        <button class="user-btn">
+          <span class="avatar">SC</span>
+          <span class="user-name">Sarah Chen</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <div class="greeting">
+        <h1>Good morning, Sarah</h1>
+        <p class="meta">
+          Thursday, April 30
+          <span class="sep">·</span> 80 active
+          <span class="sep">·</span> <span class="overdue">2 overdue</span>
+          <span class="sep">·</span> 8 due this week
+          <span class="sep">·</span> 3 awaiting client docs
+        </p>
+      </div>
+
+      <div class="banner">
+        <span class="banner-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        </span>
+        <div class="banner-body">
+          <div class="banner-title">Louisiana DOR · Hurricane Delta extension issued</div>
+          <div class="banner-meta">Affects 6 of your clients · Detected 2h ago · <a href="#">View source</a></div>
+        </div>
+        <div class="banner-actions">
+          <button class="review">Review</button>
+        </div>
+      </div>
+
+      <section class="section">
+        <div class="section-head"><span class="section-title">Overdue (2)</span></div>
+        <div class="card">
+          <ul class="rows">
+            <li class="row overdue" tabindex="0">
+              <span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color: var(--danger-solid);"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg></span>
+              <span class="countdown danger tabular">3d late</span>
+              <a class="client" href="#">Acme LLC</a>
+              <a class="form" href="#">1120-S federal</a>
+              <span class="chip fed">FED</span>
+              <div class="actions">
+                <button class="row-action complete" title="Mark complete (c)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
+                <button class="row-action more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+              </div>
+            </li>
+            <li class="row overdue" tabindex="0">
+              <span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color: var(--danger-solid);"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg></span>
+              <span class="countdown danger tabular">1d late</span>
+              <a class="client" href="#">Tessera Holdings</a>
+              <a class="form" href="#">CA Form 568 · LLC fee</a>
+              <span class="chip primary">CA</span>
+              <div class="actions">
+                <button class="row-action complete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
+                <button class="row-action more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <span class="section-title">This week (8)</span>
+          <div class="section-actions">
+            <button>Export</button>
+            <button>Filter</button>
+          </div>
+        </div>
+        <div class="card">
+          <ul class="rows">
+            <li class="row" tabindex="0">
+              <span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color: var(--warn-solid);"><circle cx="4" cy="4" r="3.5" fill="none" stroke="currentColor" stroke-width="1"/><path d="M4 0.5 A 3.5 3.5 0 0 1 4 7.5 Z" fill="currentColor"/></svg></span>
+              <span class="countdown tabular">Today</span>
+              <a class="client" href="#">Wilkins Plumbing</a>
+              <a class="form" href="#" title="Generated by: S-Corp Standard (LA)">LA-CIFT-620</a>
+              <span class="chip primary">LA</span>
+              <span class="status-text">In progress</span>
+              <div class="actions">
+                <button class="row-action complete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
+                <button class="row-action more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+              </div>
+            </li>
+            <li class="row" tabindex="0">
+              <span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color: var(--warn-solid);"><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
+              <span class="countdown tabular">Tue</span>
+              <a class="client" href="#">Northshore Co</a>
+              <a class="form" href="#">TX Franchise Tax</a>
+              <span class="chip nexus">TX</span>
+              <span class="status-text"></span>
+              <div class="actions">
+                <button class="row-action complete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
+                <button class="row-action more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+              </div>
+            </li>
+            <li class="row" tabindex="0">
+              <span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color: var(--ink-300);"><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
+              <span class="countdown tabular">Wed</span>
+              <a class="client" href="#">Pinecrest Inc</a>
+              <a class="form" href="#">Form 941 · Q1 2026</a>
+              <span class="chip fed">FED</span>
+              <span class="status-text"></span>
+              <div class="actions">
+                <button class="row-action complete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
+                <button class="row-action more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+              </div>
+            </li>
+            <li class="row" tabindex="0">
+              <span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color: var(--ink-300);"><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
+              <span class="countdown tabular">Thu</span>
+              <a class="client" href="#">Vanderbilt &amp; Sons</a>
+              <a class="form" href="#">IT-204 NY-LLC</a>
+              <span class="chip primary">NY</span>
+              <span class="status-text"></span>
+              <div class="actions">
+                <button class="row-action complete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
+                <button class="row-action more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+              </div>
+            </li>
+            <li class="row" tabindex="0">
+              <span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color: var(--ink-300);"><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
+              <span class="countdown tabular">Fri</span>
+              <span class="client-suppress">↪</span>
+              <a class="form" href="#">CA Form 100 · S-Corp annual</a>
+              <span class="chip primary">CA</span>
+              <span class="status-text"></span>
+              <div class="actions">
+                <button class="row-action complete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
+                <button class="row-action more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+              </div>
+            </li>
+            <li class="row" tabindex="0">
+              <span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color: var(--ink-300);"><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span>
+              <span class="countdown tabular">Fri</span>
+              <a class="client" href="#">Ridgemont Group</a>
+              <a class="form" href="#">ST-1 · IL Sales/Use</a>
+              <span class="chip nexus">IL</span>
+              <span class="status-text"></span>
+              <div class="actions">
+                <button class="row-action complete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
+                <button class="row-action more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<div class="direction-tag">v0 · current state (untouched)</div>
+</body>
+</html>

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DueDateHQ — v5 · Gemini (gradient AI)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mona+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+<style>
+  /* Gemini: light pastel surfaces, gradient as ATMOSPHERE not on text */
+  :root {
+    --bg:           oklch(99% 0 0);
+    --tint:         oklch(95% 0.014 240);
+    --tint-2:       oklch(92% 0.020 240);
+    --rule:         oklch(89% 0.010 250);
+    --rule-soft:    oklch(94% 0.008 250);
+
+    --ink:          oklch(20% 0.020 250);
+    --ink-2:        oklch(38% 0.022 245);
+    --ink-3:        oklch(54% 0.022 245);
+    --ink-4:        oklch(68% 0.020 245);
+
+    --primary:      oklch(58% 0.190 250);
+    --primary-bg:   oklch(94% 0.040 250);
+
+    /* Gemini gradient — atmospheric only, never on text */
+    --grad-from:    oklch(64% 0.180 250);
+    --grad-via:     oklch(60% 0.170 310);
+    --grad-to:      oklch(64% 0.160 20);
+    --grad: linear-gradient(135deg, var(--grad-from) 0%, var(--grad-via) 50%, var(--grad-to) 100%);
+    --grad-soft: linear-gradient(135deg, oklch(95% 0.040 250) 0%, oklch(95% 0.045 310) 50%, oklch(95% 0.040 20) 100%);
+
+    --crimson:      oklch(48% 0.180 27);
+    --crimson-bg:   oklch(95% 0.030 27);
+    --warn:         oklch(70% 0.150 70);
+    --ok:           oklch(56% 0.130 145);
+    --ok-bg:        oklch(94% 0.045 145);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Mona Sans', -apple-system, sans-serif;
+    font-size: 14px; line-height: 1.5;
+    color: var(--ink);
+    background:
+      radial-gradient(800px 500px at 100% 0%, oklch(64% 0.160 20 / 0.06) 0%, transparent 60%),
+      radial-gradient(800px 600px at 0% 100%, oklch(64% 0.180 250 / 0.05) 0%, transparent 60%),
+      var(--bg);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+  }
+  .ms { font-family: 'Material Symbols Rounded'; font-size: 20px; line-height: 1; user-select: none; }
+  ::selection { background: var(--primary-bg); color: var(--primary); }
+
+  .app { display: grid; grid-template-columns: 264px 1fr; min-height: 100vh; }
+
+  aside { background: var(--tint); padding: 20px 8px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; }
+  .brand-block { display: flex; align-items: center; gap: 12px; padding: 4px 18px 18px; }
+  .brand-mark { width: 36px; height: 36px; background: var(--grad); border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; color: var(--bg); font-weight: 700; font-size: 16px; letter-spacing: -0.02em; }
+  .brand-name { font-size: 18px; font-weight: 600; color: var(--ink); letter-spacing: -0.012em; line-height: 1.05; }
+  .brand-firm { font-size: 12px; color: var(--ink-3); margin-top: 1px; }
+
+  nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav-item { display: flex; align-items: center; gap: 14px; padding-left: 22px; padding-right: 16px; height: 44px; border-radius: 0 999px 999px 0; color: var(--ink-2); text-decoration: none; font-size: 14px; font-weight: 500; cursor: pointer; margin-right: 4px; }
+  .nav-item:hover { background: var(--tint-2); color: var(--ink); }
+  .nav-item.active { background: var(--primary-bg); color: var(--primary); font-weight: 700; }
+  .nav-item .ms { font-size: 22px; flex-shrink: 0; opacity: 0.85; }
+  .nav-item.active .ms { opacity: 1; }
+  .nav-item .count { margin-left: auto; font-size: 12px; font-weight: 500; color: var(--ink-3); }
+  .nav-item.alert .count { color: var(--bg); background: var(--crimson); padding: 1px 8px; border-radius: 999px; font-weight: 600; }
+  .nav-item.active .count { color: var(--primary); }
+  .nav-section-label { font-size: 11px; font-weight: 600; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; padding: 14px 22px 4px; }
+
+  main { background: var(--bg); border-top-left-radius: 16px; margin: 0; display: flex; flex-direction: column; min-width: 0; }
+
+  .topbar { display: flex; align-items: center; gap: 14px; padding: 16px 32px; height: 76px; border-bottom: 1px solid var(--rule-soft); position: sticky; top: 0; z-index: 5; background: var(--bg); }
+  /* AI input bar: gradient ATMOSPHERIC border via padding+mask, not gradient text */
+  .ai-bar { display: flex; align-items: center; gap: 12px; padding: 0 8px 0 18px; height: 48px; border-radius: 999px; background: var(--bg); flex: 1; max-width: 540px; color: var(--ink-3); font-size: 14px; cursor: pointer; position: relative; box-shadow: 0 0 0 1.5px transparent; transition: box-shadow 200ms; }
+  .ai-bar::before { content: ''; position: absolute; inset: 0; border-radius: 999px; padding: 1.5px; background: var(--grad); -webkit-mask: linear-gradient(var(--bg) 0 0) content-box, linear-gradient(var(--bg) 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
+  .ai-bar:hover { box-shadow: 0 6px 24px oklch(60% 0.170 310 / 0.15); }
+  .ai-bar .ms { color: var(--grad-via); font-size: 22px; }
+  .ai-bar .placeholder { flex: 1; }
+  .ai-bar .voice { width: 36px; height: 36px; background: var(--grad); border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; color: var(--bg); margin-left: auto; }
+  .ai-bar .voice .ms { color: var(--bg); font-size: 18px; }
+
+  .topbar .spacer { flex: 1; }
+  .icon-btn { width: 44px; height: 44px; border-radius: 999px; background: transparent; border: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2); cursor: pointer; position: relative; }
+  .icon-btn:hover { background: var(--tint); }
+  .icon-btn .ms { font-size: 22px; }
+  .icon-btn .pip { position: absolute; top: 9px; right: 9px; width: 9px; height: 9px; background: var(--crimson); border: 2px solid var(--bg); border-radius: 999px; }
+  .new-btn { height: 48px; padding: 0 22px 0 18px; background: var(--grad); color: var(--bg); border: 0; border-radius: 999px; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 14px oklch(60% 0.170 310 / 0.25); }
+  .new-btn:hover { filter: brightness(0.97); }
+  .new-btn .ms { font-size: 18px; }
+  .avatar { width: 40px; height: 40px; border-radius: 999px; background: var(--primary); color: var(--bg); display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; }
+
+  .content { padding: 36px 32px 80px; max-width: 1100px; }
+
+  /* Greeting — solid color, NO gradient text */
+  .hero h1 { font-size: clamp(40px, 5vw, 56px); font-weight: 600; letter-spacing: -0.035em; line-height: 1.05; color: var(--ink); }
+  .hero h1 .accent { color: var(--primary); }
+  .hero .meta { margin-top: 12px; font-size: 14px; color: var(--ink-3); }
+  .hero .meta .sep { color: var(--rule); margin: 0 10px; }
+  .hero .meta .overdue { color: var(--crimson); font-weight: 600; }
+
+  /* Suggestion cards — full borders + gradient atmosphere on hover (no left stripe) */
+  .suggest-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 24px; }
+  .suggest { border: 1.5px solid var(--rule); border-radius: 16px; padding: 18px 20px 16px; cursor: pointer; transition: border-color 160ms, transform 160ms, box-shadow 160ms; background: var(--bg); position: relative; overflow: hidden; }
+  .suggest:hover { transform: translateY(-2px); box-shadow: 0 16px 32px oklch(20% 0.020 250 / 0.06); border-color: transparent; }
+  .suggest:hover::before { content: ''; position: absolute; inset: 0; border-radius: 16px; padding: 1.5px; background: var(--grad); -webkit-mask: linear-gradient(var(--bg) 0 0) content-box, linear-gradient(var(--bg) 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
+  .suggest .ms { font-size: 24px; color: var(--grad-via); margin-bottom: 12px; display: inline-block; }
+  .suggest .text { font-size: 14px; font-weight: 500; color: var(--ink); line-height: 1.4; }
+  .suggest .arrow { font-size: 18px; color: var(--ink-3); position: absolute; bottom: 14px; right: 16px; }
+
+  /* Banner — full panel, no left stripe */
+  .banner { margin-top: 28px; background: var(--crimson-bg); border-radius: 16px; padding: 18px 22px; display: flex; align-items: center; gap: 14px; }
+  .banner-icon { width: 40px; height: 40px; background: var(--crimson); color: var(--bg); border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .banner-body { flex: 1; min-width: 0; }
+  .banner-title { font-size: 15px; font-weight: 600; color: var(--ink); letter-spacing: -0.005em; }
+  .banner-meta { font-size: 13px; color: var(--ink-3); margin-top: 4px; }
+  .banner-meta a { color: var(--primary); text-decoration: none; font-weight: 500; }
+  .banner .review { height: 40px; padding: 0 22px; background: var(--bg); color: var(--primary); border: 0; border-radius: 999px; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 1px 3px oklch(20% 0.020 250 / 0.08); }
+  .banner .review:hover { background: var(--primary-bg); }
+
+  /* Section */
+  .section { margin-top: 32px; }
+  .section-head { display: flex; align-items: center; gap: 12px; padding: 0 6px 12px; }
+  .section-title { font-size: 18px; font-weight: 600; letter-spacing: -0.012em; }
+  .section-count { font-size: 12px; font-weight: 500; color: var(--ink-3); background: var(--tint); padding: 3px 12px; border-radius: 999px; }
+  .section-actions { margin-left: auto; display: flex; gap: 4px; }
+  .section-actions button { background: transparent; border: 0; color: var(--ink-3); font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer; padding: 6px 14px; border-radius: 999px; }
+  .section-actions button:hover { color: var(--primary); background: var(--primary-bg); }
+
+  .card { background: var(--bg); border: 1px solid var(--rule-soft); border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px oklch(20% 0.020 250 / 0.05), 0 2px 6px oklch(20% 0.020 250 / 0.04); }
+  .rows { list-style: none; }
+  .row { display: flex; align-items: center; gap: 16px; padding: 0 22px; height: 56px; border-bottom: 1px solid var(--rule-soft); }
+  .row:last-child { border-bottom: 0; }
+  .row:hover { background: var(--tint); }
+  /* Overdue: full background, NO left stripe */
+  .row.overdue { background: var(--crimson-bg); }
+  .row.overdue:hover { background: oklch(91% 0.040 27); }
+
+  .dot { width: 10px; height: 10px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
+  .countdown { font-family: ui-monospace, monospace; font-size: 13px; width: 70px; color: var(--ink-3); flex-shrink: 0; font-weight: 500; }
+  .countdown.danger { color: var(--crimson); font-weight: 600; }
+  .client { width: 196px; flex-shrink: 0; color: var(--ink); font-size: 14px; font-weight: 500; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .client:hover { color: var(--primary); }
+  .client-suppress { width: 196px; flex-shrink: 0; color: var(--ink-4); font-size: 13px; }
+  .form { flex: 1; min-width: 0; color: var(--ink-3); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+  .form:hover { color: var(--ink); }
+  .chip { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; flex-shrink: 0; line-height: 1.4; letter-spacing: 0.01em; }
+  .chip.primary { background: var(--primary); color: var(--bg); }
+  .chip.nexus { border: 1px solid var(--rule); color: var(--ink-3); padding: 3px 9px; }
+  .chip.fed { background: var(--tint); color: var(--ink-3); }
+
+  /* AI source — gradient pill via background, no gradient text */
+  .ai-source { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 4px 12px; border-radius: 999px; flex-shrink: 0; font-weight: 600; color: var(--ink); background: var(--grad-soft); border: 1px solid transparent; }
+  .ai-source .ms { font-size: 14px; color: var(--grad-via); }
+  .status-text { font-size: 12px; color: var(--ink-3); width: 84px; flex-shrink: 0; }
+
+  .actions { display: flex; gap: 4px; flex-shrink: 0; opacity: 0; transition: opacity 140ms; }
+  .row:hover .actions, .row:focus-within .actions { opacity: 1; }
+  .row-action { width: 36px; height: 36px; background: transparent; border: 0; border-radius: 999px; color: var(--ink-3); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+  .row-action:hover { background: var(--tint); color: var(--ink); }
+  .row-action.complete { background: var(--ok-bg); color: var(--ok); }
+
+  /* Floating action — gradient surface, not gradient text */
+  .fab { position: fixed; bottom: 32px; right: 32px; height: 56px; padding: 0 24px 0 20px; background: var(--grad); color: var(--bg); border: 0; border-radius: 16px; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; box-shadow: 0 8px 28px oklch(60% 0.170 310 / 0.32); z-index: 90; }
+  .fab:hover { filter: brightness(0.96); transform: translateY(-1px); }
+  .fab .ms { font-size: 22px; }
+
+  .direction-tag { position: fixed; bottom: 32px; left: 280px; background: var(--grad); color: var(--bg); padding: 8px 16px; border-radius: 999px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; z-index: 100; box-shadow: 0 4px 12px oklch(60% 0.170 310 / 0.3); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand-block"><span class="brand-mark">D</span><div><div class="brand-name">DueDateHQ</div><div class="brand-firm">Sarah Mitchell, CPA</div></div></div>
+    <nav>
+      <a class="nav-item active"><span class="ms">space_dashboard</span>Dashboard</a>
+      <a class="nav-item"><span class="ms">checklist</span>To review<span class="count">5</span></a>
+      <a class="nav-item"><span class="ms">groups</span>Clients<span class="count">80</span></a>
+      <a class="nav-item alert"><span class="ms">notifications</span>Alerts<span class="count">3</span></a>
+      <a class="nav-item"><span class="ms">trending_up</span>Insights</a>
+    </nav>
+    <div class="nav-section-label">Workspace</div>
+    <nav>
+      <a class="nav-item"><span class="ms">settings</span>Settings</a>
+      <a class="nav-item"><span class="ms">help</span>Help &amp; docs</a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <button class="ai-bar"><span class="ms">auto_awesome</span><span class="placeholder">Ask Gemini about your deadlines, clients, or filings…</span><span class="voice"><span class="ms">mic</span></span></button>
+      <div class="spacer"></div>
+      <button class="icon-btn"><span class="ms">notifications</span><span class="pip"></span></button>
+      <button class="new-btn"><span class="ms">add</span>New</button>
+      <span class="avatar">SC</span>
+    </div>
+
+    <div class="content">
+      <div class="hero">
+        <h1>Good morning,<br><span class="accent">Sarah.</span></h1>
+        <p class="meta">Thursday, April 30 <span class="sep">·</span> 80 active <span class="sep">·</span> <span class="overdue">2 overdue</span> <span class="sep">·</span> 8 due this week</p>
+      </div>
+
+      <div class="suggest-row">
+        <div class="suggest"><span class="ms">auto_awesome</span><div class="text">3 of your overdue filings share a pattern — review batch action</div><span class="ms arrow">arrow_forward</span></div>
+        <div class="suggest"><span class="ms">draft</span><div class="text">Draft a chase email for the 3 clients waiting on documents</div><span class="ms arrow">arrow_forward</span></div>
+        <div class="suggest"><span class="ms">summarize</span><div class="text">Summarize what changed in Louisiana DOR's latest announcement</div><span class="ms arrow">arrow_forward</span></div>
+      </div>
+
+      <div class="banner">
+        <span class="banner-icon"><span class="ms">warning</span></span>
+        <div class="banner-body"><div class="banner-title">Louisiana DOR · Hurricane Delta extension issued</div><div class="banner-meta">Affects 6 of your clients · Detected 2h ago · <a href="#">View source</a></div></div>
+        <button class="review">Review affected →</button>
+      </div>
+
+      <section class="section">
+        <div class="section-head"><span class="section-title">Overdue</span><span class="section-count">2</span></div>
+        <div class="card">
+          <ul class="rows">
+            <li class="row overdue"><span class="dot"><svg viewBox="0 0 10 10" width="10" height="10" style="color:var(--crimson)"><circle cx="5" cy="5" r="5" fill="currentColor"/></svg></span><span class="countdown danger">3d late</span><a class="client" href="#">Acme LLC</a><a class="form" href="#">1120-S federal</a><span class="chip fed">FED</span></li>
+            <li class="row overdue"><span class="dot"><svg viewBox="0 0 10 10" width="10" height="10" style="color:var(--crimson)"><circle cx="5" cy="5" r="5" fill="currentColor"/></svg></span><span class="countdown danger">1d late</span><a class="client" href="#">Tessera Holdings</a><a class="form" href="#">CA Form 568 · LLC fee</a><span class="chip primary">CA</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head"><span class="section-title">This week</span><span class="section-count">8</span><div class="section-actions"><button>Export</button><button>Filter</button></div></div>
+        <div class="card">
+          <ul class="rows">
+            <li class="row"><span class="dot"><svg viewBox="0 0 10 10" width="10" height="10" style="color:var(--warn)"><circle cx="5" cy="5" r="4.25" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M5 0.75 A 4.25 4.25 0 0 1 5 9.25 Z" fill="currentColor"/></svg></span><span class="countdown">Today</span><a class="client" href="#">Wilkins Plumbing</a><a class="form" href="#">LA-CIFT-620</a><span class="ai-source"><span class="ms">auto_awesome</span>S-Corp · LA</span><span class="chip primary">LA</span><span class="status-text">In progress</span></li>
+            <li class="row"><span class="dot"><svg viewBox="0 0 10 10" width="10" height="10" style="color:var(--warn)"><circle cx="5" cy="5" r="4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><span class="countdown">Tue</span><a class="client" href="#">Northshore Co</a><a class="form" href="#">TX Franchise Tax</a><span class="chip nexus">TX</span><span class="status-text"></span></li>
+            <li class="row"><span class="dot"><svg viewBox="0 0 10 10" width="10" height="10" style="color:var(--ink-4)"><circle cx="5" cy="5" r="4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><span class="countdown">Wed</span><a class="client" href="#">Pinecrest Inc</a><a class="form" href="#">Form 941 · Q1 2026</a><span class="chip fed">FED</span><span class="status-text"></span></li>
+            <li class="row"><span class="dot"><svg viewBox="0 0 10 10" width="10" height="10" style="color:var(--ink-4)"><circle cx="5" cy="5" r="4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><span class="countdown">Thu</span><a class="client" href="#">Vanderbilt &amp; Sons</a><a class="form" href="#">IT-204 NY-LLC</a><span class="chip primary">NY</span><span class="status-text"></span></li>
+            <li class="row"><span class="dot"><svg viewBox="0 0 10 10" width="10" height="10" style="color:var(--ink-4)"><circle cx="5" cy="5" r="4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><span class="countdown">Fri</span><span class="client-suppress">↪</span><a class="form" href="#">CA Form 100 · S-Corp annual</a><span class="chip primary">CA</span><span class="status-text"></span></li>
+            <li class="row"><span class="dot"><svg viewBox="0 0 10 10" width="10" height="10" style="color:var(--ink-4)"><circle cx="5" cy="5" r="4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><span class="countdown">Fri</span><a class="client" href="#">Ridgemont Group</a><a class="form" href="#">ST-1 · IL Sales/Use</a><span class="chip nexus">IL</span><span class="status-text"></span></li>
+          </ul>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<button class="fab"><span class="ms">auto_awesome</span>Ask Gemini</button>
+<div class="direction-tag">v5 · Gemini</div>
+</body>
+</html>

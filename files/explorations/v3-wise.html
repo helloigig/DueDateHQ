@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DueDateHQ — v3 · Wise (fintech bold)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* Wise — forest, lime, off-cream, OKLCH tinted toward lime hue */
+  :root {
+    --bg:           oklch(96.5% 0.020 95);
+    --surface:      oklch(99% 0 0);
+    --surface-2:    oklch(95% 0.018 90);
+    --hover:        oklch(93% 0.020 88);
+
+    --rule:         oklch(86% 0.022 90);
+    --rule-strong:  oklch(76% 0.026 88);
+
+    --ink:          oklch(20% 0.040 145);
+    --ink-2:        oklch(34% 0.040 140);
+    --ink-3:        oklch(50% 0.030 130);
+    --ink-4:        oklch(64% 0.025 120);
+    --ink-disabled: oklch(80% 0.015 100);
+
+    --forest:       oklch(28% 0.080 145);
+    --forest-2:     oklch(22% 0.090 145);
+    --lime:         oklch(86% 0.180 130);
+    --lime-2:       oklch(82% 0.200 130);
+    --lime-bg:      oklch(95% 0.080 130);
+    --lime-deep:    oklch(58% 0.190 130);
+
+    --teal:         oklch(60% 0.130 200);
+    --teal-bg:      oklch(95% 0.040 200);
+
+    --crimson:      oklch(48% 0.180 27);
+    --crimson-bg:   oklch(94% 0.040 27);
+
+    --warn:         oklch(66% 0.150 80);
+    --success:      oklch(56% 0.130 145);
+    --success-bg:   oklch(94% 0.050 145);
+
+    --r-sm: 8px;
+    --r:    14px;
+    --r-md: 20px;
+    --r-lg: 28px;
+    --pill:  999px;
+
+    --shadow-sm: 0 1px 2px oklch(28% 0.080 145 / 0.06);
+    --shadow:    0 6px 20px oklch(28% 0.080 145 / 0.08);
+    --shadow-lg: 0 16px 40px oklch(28% 0.080 145 / 0.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Manrope', -apple-system, sans-serif;
+    font-size: 15px; line-height: 1.5;
+    color: var(--ink);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  .display { font-family: 'Bricolage Grotesque', sans-serif; font-variation-settings: 'opsz' 96; letter-spacing: -0.025em; }
+  ::selection { background: var(--lime); color: var(--forest); }
+
+  .app { display: grid; grid-template-columns: 268px 1fr; min-height: 100vh; }
+
+  aside {
+    background: var(--surface);
+    border-right: 1px solid var(--rule);
+    padding: 22px 14px;
+    display: flex; flex-direction: column;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .brand-block { padding: 4px 12px 22px; display: flex; align-items: center; gap: 12px; }
+  .brand-mark {
+    width: 36px; height: 36px;
+    background: var(--forest); color: var(--lime);
+    border-radius: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: 'Bricolage Grotesque';
+    font-variation-settings: 'opsz' 96;
+    font-weight: 800; font-size: 18px;
+    letter-spacing: -0.04em;
+  }
+  .brand-name {
+    font-family: 'Bricolage Grotesque';
+    font-variation-settings: 'opsz' 24;
+    font-size: 18px; font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    line-height: 1.05;
+  }
+  .brand-firm { font-size: 12px; color: var(--ink-3); margin-top: 1px; font-weight: 500; }
+
+  nav { display: flex; flex-direction: column; gap: 3px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 0 16px;
+    height: 44px;
+    border-radius: var(--pill);
+    color: var(--ink-3); text-decoration: none;
+    font-size: 15px; font-weight: 500;
+    cursor: pointer;
+    transition: background-color 120ms, color 120ms;
+  }
+  .nav-item:hover { background: var(--surface-2); color: var(--ink); }
+  .nav-item.active {
+    background: var(--lime-bg);
+    color: var(--forest);
+    font-weight: 700;
+  }
+  .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .nav-item.active svg { color: var(--lime-deep); stroke-width: 2.5; }
+  .nav-item .count {
+    margin-left: auto;
+    font-size: 12px; font-weight: 700;
+    color: var(--ink-4);
+    font-variant-numeric: tabular-nums;
+  }
+  .nav-item.alert .count {
+    color: var(--surface);
+    background: var(--crimson);
+    padding: 2px 9px;
+    border-radius: var(--pill);
+  }
+  .nav-section-label {
+    font-size: 11px; font-weight: 700;
+    color: var(--ink-4);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 18px 16px 6px;
+  }
+
+  /* Promo card */
+  .upgrade-card {
+    margin-top: auto;
+    background: var(--forest);
+    color: var(--lime);
+    border-radius: var(--r);
+    padding: 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .upgrade-card::before {
+    content: '';
+    position: absolute; top: -40px; right: -40px;
+    width: 120px; height: 120px;
+    background: var(--lime); opacity: 0.18;
+    border-radius: 999px;
+    filter: blur(20px);
+  }
+  .upgrade-eyebrow {
+    font-size: 11px; font-weight: 700;
+    color: var(--lime); opacity: 0.7;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin-bottom: 6px;
+  }
+  .upgrade-title {
+    font-family: 'Bricolage Grotesque';
+    font-variation-settings: 'opsz' 36;
+    font-size: 19px; font-weight: 600;
+    color: var(--surface);
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+  }
+  .upgrade-cta {
+    margin-top: 12px;
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--lime); color: var(--forest);
+    padding: 8px 14px;
+    border-radius: var(--pill);
+    border: 0;
+    font-family: inherit;
+    font-size: 13px; font-weight: 700;
+    cursor: pointer;
+  }
+  .upgrade-cta:hover { background: var(--lime-2); }
+  .upgrade-cta svg { width: 12px; height: 12px; }
+
+  main { display: flex; flex-direction: column; min-width: 0; }
+
+  .topbar {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px 36px;
+    background: var(--bg);
+    height: 76px;
+  }
+  .search {
+    height: 48px; padding: 0 18px;
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface);
+    border: 1.5px solid var(--rule);
+    border-radius: var(--pill);
+    color: var(--ink-3);
+    font-family: inherit; font-size: 14px; font-weight: 500;
+    cursor: pointer;
+    flex: 1; max-width: 460px;
+    transition: border-color 120ms, box-shadow 120ms;
+  }
+  .search:hover { border-color: var(--ink); box-shadow: var(--shadow-sm); }
+  .search svg { width: 18px; height: 18px; }
+  .search .kbd { margin-left: auto; }
+  .kbd {
+    font-family: ui-monospace, monospace;
+    font-size: 11px; font-weight: 600;
+    color: var(--ink-3);
+    border: 1px solid var(--rule-strong);
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 2px 6px;
+  }
+
+  .topbar .spacer { flex: 1; }
+
+  .new-btn {
+    height: 48px; padding: 0 24px 0 22px;
+    background: var(--forest); color: var(--lime);
+    border: 0; border-radius: var(--pill);
+    font-family: inherit; font-size: 15px; font-weight: 700;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px;
+    letter-spacing: -0.005em;
+  }
+  .new-btn:hover { background: var(--forest-2); }
+  .new-btn svg { width: 16px; height: 16px; }
+
+  .icon-btn {
+    width: 48px; height: 48px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: 0;
+    border-radius: var(--pill);
+    color: var(--ink); cursor: pointer; position: relative;
+  }
+  .icon-btn:hover { background: var(--surface-2); }
+  .icon-btn svg { width: 20px; height: 20px; }
+  .icon-btn .pip {
+    position: absolute; top: 11px; right: 11px;
+    width: 9px; height: 9px;
+    background: var(--crimson); border: 2px solid var(--bg);
+    border-radius: 999px;
+  }
+  .avatar {
+    width: 44px; height: 44px;
+    background: var(--lime); color: var(--forest);
+    border-radius: 999px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800;
+  }
+
+  .content { padding: 12px 36px 80px; max-width: 1200px; }
+
+  /* Hero — forest with massive lime KPIs */
+  .hero {
+    background: var(--forest);
+    color: var(--lime);
+    border-radius: var(--r-md);
+    padding: 36px 36px 32px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 36px;
+    align-items: end;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .hero::before {
+    content: '';
+    position: absolute; top: -100px; right: -50px;
+    width: 320px; height: 320px;
+    background: var(--lime); opacity: 0.1;
+    border-radius: 999px;
+    filter: blur(30px);
+  }
+  .hero-greeting { position: relative; z-index: 1; }
+  .hero-eyebrow {
+    font-size: 13px; font-weight: 700;
+    color: var(--lime);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 6px;
+    opacity: 0.85;
+  }
+  .hero-line {
+    font-family: 'Bricolage Grotesque';
+    font-variation-settings: 'opsz' 96;
+    font-size: clamp(40px, 5.6vw, 56px);
+    font-weight: 500;
+    line-height: 1.02;
+    letter-spacing: -0.04em;
+    color: var(--surface);
+    text-wrap: pretty;
+  }
+  /* Solid color (not gradient text) for emphasis */
+  .hero-line .accent { color: var(--lime); }
+  .hero-meta {
+    margin-top: 14px;
+    font-size: 14px;
+    color: oklch(82% 0.040 130);
+    font-weight: 500;
+  }
+  .hero-meta .pulse {
+    display: inline-block;
+    width: 7px; height: 7px;
+    background: var(--lime);
+    border-radius: 999px;
+    margin-right: 8px;
+    transform: translateY(-1px);
+    box-shadow: 0 0 0 0 var(--lime);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 oklch(86% 0.180 130 / 0); }
+    50%      { box-shadow: 0 0 0 6px oklch(86% 0.180 130 / 0.18); }
+  }
+
+  .hero-kpis {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 24px;
+    position: relative; z-index: 1;
+  }
+  .kpi { text-align: right; }
+  .kpi-label {
+    font-size: 11px; font-weight: 700;
+    color: var(--lime); opacity: 0.75;
+    text-transform: uppercase; letter-spacing: 0.10em;
+    margin-bottom: 6px;
+  }
+  .kpi-value {
+    font-family: 'Bricolage Grotesque';
+    font-variation-settings: 'opsz' 96;
+    font-size: clamp(44px, 5vw, 56px);
+    font-weight: 600;
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+    color: var(--surface);
+    font-variant-numeric: tabular-nums;
+  }
+  .kpi.danger .kpi-value { color: var(--lime); }
+  .kpi-trend {
+    margin-top: 6px;
+    font-size: 12px; font-weight: 600;
+    color: oklch(82% 0.040 130);
+  }
+
+  /* Banner — full top + bottom borders, NO left stripe */
+  .banner {
+    margin-top: 24px;
+    background: var(--surface);
+    border: 1px solid var(--crimson);
+    border-radius: var(--r);
+    padding: 20px 24px;
+    display: flex; align-items: center; gap: 18px;
+    box-shadow: var(--shadow-sm);
+  }
+  .banner-icon {
+    width: 44px; height: 44px;
+    background: var(--crimson-bg); color: var(--crimson);
+    border-radius: 999px;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .banner-icon svg { width: 20px; height: 20px; }
+  .banner-body { flex: 1; min-width: 0; }
+  .banner-title {
+    font-family: 'Bricolage Grotesque';
+    font-variation-settings: 'opsz' 24;
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.012em;
+    color: var(--ink);
+  }
+  .banner-meta { font-size: 14px; color: var(--ink-3); margin-top: 4px; font-weight: 500; }
+  .banner-meta a { color: var(--ink); font-weight: 700; text-decoration: none; border-bottom: 1.5px solid var(--lime); padding-bottom: 1px; }
+  .banner .review {
+    height: 44px; padding: 0 22px;
+    background: var(--ink); color: var(--surface);
+    border: 0; border-radius: var(--pill);
+    font-family: inherit; font-size: 14px; font-weight: 700;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .banner .review:hover { background: var(--forest); color: var(--lime); }
+
+  /* Section */
+  .section { margin-top: 36px; }
+  .section-head {
+    display: flex; align-items: baseline; gap: 16px;
+    padding: 0 4px 16px;
+  }
+  .section-title {
+    font-family: 'Bricolage Grotesque';
+    font-variation-settings: 'opsz' 48;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: -0.022em;
+    line-height: 1;
+  }
+  .section-count {
+    font-size: 14px; font-weight: 700;
+    color: var(--ink-3);
+    background: var(--surface-2);
+    padding: 4px 14px;
+    border-radius: var(--pill);
+  }
+  .section-actions { margin-left: auto; display: flex; gap: 6px; }
+  .section-actions button {
+    background: transparent; border: 1.5px solid var(--rule);
+    font-size: 13px; font-weight: 600; color: var(--ink-3);
+    cursor: pointer; padding: 8px 16px; border-radius: var(--pill);
+    font-family: inherit;
+    transition: border-color 120ms, color 120ms;
+  }
+  .section-actions button:hover { color: var(--ink); border-color: var(--ink); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--r-md);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .rows { list-style: none; }
+  .row {
+    display: flex; align-items: center; gap: 18px;
+    padding: 0 24px;
+    height: 64px;
+    border-bottom: 1px solid var(--rule);
+    transition: background-color 120ms;
+  }
+  .row:last-child { border-bottom: 0; }
+  .row:hover { background: var(--surface-2); }
+  /* Overdue: full background, NO left stripe */
+  .row.overdue { background: var(--crimson-bg); }
+  .row.overdue:hover { background: oklch(91% 0.045 27); }
+
+  .dot { width: 12px; height: 12px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
+  .dot-svg { width: 12px; height: 12px; }
+  .dot-svg.glow { filter: drop-shadow(0 0 6px currentColor); }
+
+  .countdown {
+    font-family: ui-monospace, monospace;
+    font-size: 14px;
+    width: 80px;
+    color: var(--ink-3);
+    flex-shrink: 0;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .countdown.danger { color: var(--crimson); }
+
+  .client {
+    width: 200px;
+    flex-shrink: 0;
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 700;
+    text-decoration: none;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    letter-spacing: -0.005em;
+  }
+  .client:hover { color: var(--lime-deep); }
+  .client-suppress { width: 200px; flex-shrink: 0; color: var(--ink-disabled); font-size: 14px; }
+
+  .form {
+    flex: 1; min-width: 0;
+    color: var(--ink-3);
+    font-size: 14px;
+    font-weight: 500;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    text-decoration: none;
+  }
+  .form:hover { color: var(--ink); }
+
+  .chip {
+    font-size: 11px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 5px 12px;
+    border-radius: var(--pill);
+    flex-shrink: 0;
+    line-height: 1.4;
+  }
+  .chip.primary { background: var(--forest); color: var(--lime); }
+  .chip.nexus { border: 1.5px solid var(--rule-strong); color: var(--ink-3); padding: 3.5px 11px; }
+  .chip.fed { background: var(--surface-2); color: var(--ink); border: 1.5px solid var(--rule); padding: 3.5px 11px; }
+
+  .ai-source {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 800;
+    color: oklch(40% 0.130 200);
+    background: var(--teal-bg);
+    padding: 5px 12px;
+    border-radius: var(--pill);
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .ai-source svg { width: 12px; height: 12px; }
+
+  .status-text {
+    font-size: 13px;
+    color: var(--ink-3);
+    font-weight: 600;
+    width: 96px;
+    flex-shrink: 0;
+  }
+
+  .actions {
+    display: flex; gap: 6px; flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 140ms;
+  }
+  .row:hover .actions, .row:focus-within .actions { opacity: 1; }
+  .row-action {
+    width: 40px; height: 40px;
+    background: transparent; border: 0;
+    border-radius: 999px;
+    color: var(--ink-3); cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background-color 120ms, color 120ms;
+  }
+  .row-action:hover { background: var(--surface); color: var(--ink); }
+  .row.overdue .row-action:hover { background: var(--surface); }
+  .row-action svg { width: 18px; height: 18px; }
+  .row-action.complete { background: var(--lime); color: var(--forest); }
+  .row-action.complete:hover { background: var(--lime-2); }
+
+  /* Floating value highlight — full lime panel */
+  .display-value-strip {
+    margin-top: 36px;
+    background: var(--lime);
+    border-radius: var(--r-md);
+    padding: 32px 36px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .display-value-strip::after {
+    content: '';
+    position: absolute; bottom: -100px; left: -50px;
+    width: 220px; height: 220px;
+    background: var(--forest); opacity: 0.04;
+    border-radius: 999px;
+  }
+  .dvs-text { position: relative; z-index: 1; }
+  .dvs-eyebrow {
+    font-size: 13px; font-weight: 800;
+    color: var(--forest); opacity: 0.7;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 4px;
+  }
+  .dvs-title {
+    font-family: 'Bricolage Grotesque';
+    font-variation-settings: 'opsz' 96;
+    font-size: 36px; font-weight: 600;
+    color: var(--forest);
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+  }
+  .dvs-cta {
+    height: 48px; padding: 0 24px;
+    background: var(--forest); color: var(--lime);
+    border: 0; border-radius: var(--pill);
+    font-family: inherit; font-size: 14px; font-weight: 800;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px;
+    position: relative; z-index: 1;
+  }
+  .dvs-cta:hover { background: var(--forest-2); }
+
+  .direction-tag {
+    position: fixed;
+    bottom: 20px; right: 20px;
+    background: var(--forest); color: var(--lime);
+    padding: 10px 16px;
+    border-radius: var(--pill);
+    font-size: 11px; font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    z-index: 100;
+    box-shadow: var(--shadow);
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside>
+    <div class="brand-block">
+      <span class="brand-mark">D</span>
+      <div>
+        <div class="brand-name">DueDateHQ</div>
+        <div class="brand-firm">Sarah Mitchell, CPA</div>
+      </div>
+    </div>
+    <nav>
+      <a class="nav-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Dashboard</a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>To review<span class="count">5</span></a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Clients</a>
+      <a class="nav-item alert"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>Alerts<span class="count">3</span></a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>Insights</a>
+    </nav>
+    <div class="nav-section-label">Workspace</div>
+    <nav>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/></svg>Settings</a>
+    </nav>
+
+    <div class="upgrade-card">
+      <div class="upgrade-eyebrow">Pro · 14 days left</div>
+      <div class="upgrade-title">Unlock multi-state team workflows.</div>
+      <button class="upgrade-cta">
+        Upgrade
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <button class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        Search clients, deadlines, alerts
+        <span class="kbd">⌘K</span>
+      </button>
+      <div class="spacer"></div>
+      <button class="icon-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <span class="pip"></span>
+      </button>
+      <button class="new-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        New
+      </button>
+      <span class="avatar">SC</span>
+    </div>
+
+    <div class="content">
+
+      <div class="hero">
+        <div class="hero-greeting">
+          <div class="hero-eyebrow">Thursday · April 30</div>
+          <h1 class="hero-line">Good morning,<br><span class="accent">Sarah.</span></h1>
+          <p class="hero-meta"><span class="pulse"></span>50 / 50 states monitored · last scrape 14 minutes ago</p>
+        </div>
+        <div class="hero-kpis">
+          <div class="kpi danger">
+            <div class="kpi-label">Overdue</div>
+            <div class="kpi-value">02</div>
+            <div class="kpi-trend">act today</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">This week</div>
+            <div class="kpi-value">08</div>
+            <div class="kpi-trend">5 jurisdictions</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Active</div>
+            <div class="kpi-value">80</div>
+            <div class="kpi-trend">+3 this month</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="banner">
+        <span class="banner-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        </span>
+        <div class="banner-body">
+          <div class="banner-title">Louisiana DOR · Hurricane Delta extension issued</div>
+          <div class="banner-meta">Affects 6 of your clients · Detected 2h ago · <a href="#">View source</a></div>
+        </div>
+        <button class="review">
+          Review affected
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </div>
+
+      <section class="section">
+        <div class="section-head">
+          <span class="section-title">Overdue</span>
+          <span class="section-count">2 filings</span>
+          <div class="section-actions"><button>Export</button><button>Filter</button></div>
+        </div>
+        <div class="card">
+          <ul class="rows">
+            <li class="row overdue" tabindex="0"><span class="dot"><svg viewBox="0 0 12 12" class="dot-svg glow" style="color: var(--crimson);"><circle cx="6" cy="6" r="6" fill="currentColor"/></svg></span><span class="countdown danger">3d late</span><a class="client" href="#">Acme LLC</a><a class="form" href="#">1120-S federal</a><span class="chip fed">FED</span></li>
+            <li class="row overdue" tabindex="0"><span class="dot"><svg viewBox="0 0 12 12" class="dot-svg glow" style="color: var(--crimson);"><circle cx="6" cy="6" r="6" fill="currentColor"/></svg></span><span class="countdown danger">1d late</span><a class="client" href="#">Tessera Holdings</a><a class="form" href="#">CA Form 568 · LLC fee</a><span class="chip primary">CA</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <span class="section-title">This week</span>
+          <span class="section-count">8 filings</span>
+          <div class="section-actions"><button>Export</button><button>Filter</button></div>
+        </div>
+        <div class="card">
+          <ul class="rows">
+            <li class="row" tabindex="0"><span class="dot"><svg viewBox="0 0 12 12" class="dot-svg" style="color: var(--warn);"><circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 1 A 5 5 0 0 1 6 11 Z" fill="currentColor"/></svg></span><span class="countdown">Today</span><a class="client" href="#">Wilkins Plumbing</a><a class="form" href="#">LA-CIFT-620</a><span class="ai-source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>S-Corp · LA</span><span class="chip primary">LA</span><span class="status-text">In progress</span></li>
+            <li class="row" tabindex="0"><span class="dot"><svg viewBox="0 0 12 12" class="dot-svg" style="color: var(--warn);"><circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><span class="countdown">Tue</span><a class="client" href="#">Northshore Co</a><a class="form" href="#">TX Franchise Tax</a><span class="chip nexus">TX</span><span class="status-text"></span></li>
+            <li class="row" tabindex="0"><span class="dot"><svg viewBox="0 0 12 12" class="dot-svg" style="color: var(--ink-disabled);"><circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><span class="countdown">Wed</span><a class="client" href="#">Pinecrest Inc</a><a class="form" href="#">Form 941 · Q1 2026</a><span class="chip fed">FED</span><span class="status-text"></span></li>
+            <li class="row" tabindex="0"><span class="dot"><svg viewBox="0 0 12 12" class="dot-svg" style="color: var(--ink-disabled);"><circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><span class="countdown">Thu</span><a class="client" href="#">Vanderbilt &amp; Sons</a><a class="form" href="#">IT-204 NY-LLC</a><span class="chip primary">NY</span><span class="status-text"></span></li>
+            <li class="row" tabindex="0"><span class="dot"><svg viewBox="0 0 12 12" class="dot-svg" style="color: var(--ink-disabled);"><circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><span class="countdown">Fri</span><span class="client-suppress">↪</span><a class="form" href="#">CA Form 100 · S-Corp annual</a><span class="chip primary">CA</span><span class="status-text"></span></li>
+            <li class="row" tabindex="0"><span class="dot"><svg viewBox="0 0 12 12" class="dot-svg" style="color: var(--ink-disabled);"><circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><span class="countdown">Fri</span><a class="client" href="#">Ridgemont Group</a><a class="form" href="#">ST-1 · IL Sales/Use</a><span class="chip nexus">IL</span><span class="status-text"></span></li>
+          </ul>
+        </div>
+      </section>
+
+      <div class="display-value-strip">
+        <div class="dvs-text">
+          <div class="dvs-eyebrow">By Friday — your roadmap</div>
+          <h2 class="dvs-title">Stay 8 filings ahead.<br>Zero in your overdue stack.</h2>
+        </div>
+        <button class="dvs-cta">Plan the week<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<div class="direction-tag">v3 · Wise</div>
+</body>
+</html>

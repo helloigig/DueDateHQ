@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DueDateHQ — v7 · Fluent (Microsoft)</title>
+<link href="https://fonts.googleapis.com/css2?family=Asap:wght@400;500;600;700&family=Cascadia+Code:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --mica-bg:    #F3F3F3;
+    --mica-2:     #FAFAFA;
+    --acrylic:    rgba(255,255,255,0.7);
+    --acrylic-2:  rgba(255,255,255,0.55);
+    --surface:    #FFFFFF;
+    --surface-2:  #F9F9F9;
+    --hover:      #F0F0F0;
+    --rule:       #E5E5E5;
+    --rule-strong:#C4C4C4;
+
+    --ink:        #1B1B1B;
+    --ink-2:      #424242;
+    --ink-3:      #616161;
+    --ink-4:      #8A8A8A;
+    --ink-disabled:#C4C4C4;
+
+    --primary:    #0078D4;
+    --primary-2:  #106EBE;
+    --primary-bg: #E5F1FB;
+    --primary-stroke: #BDD9F2;
+
+    --danger:     #C42B1C;
+    --danger-bg:  #FDE7E9;
+    --warn:       #9D5D00;
+    --warn-bg:    #FFF4CE;
+    --ok:         #107C10;
+    --ok-bg:      #DFF6DD;
+
+    --r-sm: 4px;
+    --r:    8px;
+    --r-md: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Asap', 'Segoe UI Variable', 'Segoe UI', -apple-system, sans-serif;
+    font-size: 14px; line-height: 1.45;
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 800px at 0% 0%, rgba(0,120,212,0.06) 0%, transparent 50%),
+      radial-gradient(1200px 800px at 100% 100%, rgba(0,120,212,0.04) 0%, transparent 50%),
+      var(--mica-bg);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: 'Cascadia Code', ui-monospace, Consolas, monospace; }
+  ::selection { background: var(--primary-bg); color: var(--primary); }
+
+  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+
+  aside {
+    background: var(--acrylic);
+    backdrop-filter: blur(40px) saturate(150%);
+    -webkit-backdrop-filter: blur(40px) saturate(150%);
+    border-right: 1px solid var(--rule);
+    padding: 12px 8px;
+    display: flex; flex-direction: column; gap: 4px;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .brand-block { display: flex; align-items: center; gap: 10px; padding: 10px 12px 16px; }
+  .brand-mark { width: 32px; height: 32px; background: var(--primary); color: #fff; border-radius: var(--r); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+  .brand-name { font-size: 14px; font-weight: 600; color: var(--ink); letter-spacing: -0.005em; line-height: 1.05; }
+  .brand-firm { font-size: 12px; color: var(--ink-3); margin-top: 1px; }
+
+  nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 12px;
+    height: 36px;
+    border-radius: var(--r-sm);
+    color: var(--ink); text-decoration: none;
+    font-size: 14px; font-weight: 500;
+    cursor: pointer;
+    position: relative;
+    transition: background 120ms;
+  }
+  .nav-item:hover { background: var(--hover); }
+  .nav-item.active {
+    background: var(--surface);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04);
+  }
+  .nav-item.active::before {
+    content: ''; position: absolute; left: 4px; top: 8px; bottom: 8px;
+    width: 3px; border-radius: 99px;
+    background: var(--primary);
+  }
+  .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .nav-item .count { margin-left: auto; font-size: 12px; color: var(--ink-3); }
+  .nav-item.alert .count { color: #fff; background: var(--danger); padding: 1px 7px; border-radius: 999px; font-weight: 600; }
+
+  .nav-section { font-size: 12px; font-weight: 600; color: var(--ink-3); padding: 14px 12px 4px; }
+
+  main { display: flex; flex-direction: column; min-width: 0; }
+
+  .topbar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 24px;
+    height: 48px;
+    background: var(--acrylic);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border-bottom: 1px solid var(--rule);
+    position: sticky; top: 0; z-index: 5;
+  }
+  .crumb { font-size: 14px; color: var(--ink-3); }
+  .crumb strong { color: var(--ink); font-weight: 600; }
+  .crumb .sep { color: var(--ink-disabled); margin: 0 6px; }
+  .topbar .spacer { flex: 1; }
+
+  .search {
+    height: 32px; padding: 0 12px;
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--r-sm);
+    color: var(--ink-3);
+    font-family: inherit; font-size: 13px;
+    cursor: pointer;
+    width: 280px;
+    transition: border-color 120ms;
+  }
+  .search:hover { border-color: var(--rule-strong); }
+  .search:focus-within { border-bottom-color: var(--primary); border-bottom-width: 2px; padding-bottom: 0; }
+  .search svg { width: 14px; height: 14px; }
+  .search .kbd { margin-left: auto; }
+  .kbd { font-family: 'Cascadia Code', monospace; font-size: 11px; color: var(--ink-3); background: var(--mica-2); border: 1px solid var(--rule); border-radius: 3px; padding: 1px 5px; }
+
+  .icon-btn { width: 32px; height: 32px; border: 0; background: transparent; border-radius: var(--r-sm); color: var(--ink-2); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; position: relative; }
+  .icon-btn:hover { background: var(--hover); }
+  .icon-btn svg { width: 16px; height: 16px; }
+  .icon-btn .indicator { position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; background: var(--danger); border: 1.5px solid var(--mica-bg); border-radius: 999px; }
+
+  .new-btn {
+    height: 32px; padding: 0 14px;
+    background: var(--primary); color: #fff;
+    border: 0; border-radius: var(--r-sm);
+    font-family: inherit; font-size: 13px; font-weight: 600;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  }
+  .new-btn:hover { background: var(--primary-2); }
+  .new-btn svg { width: 14px; height: 14px; }
+  .avatar { width: 28px; height: 28px; background: var(--primary); color: #fff; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; }
+
+  .content { padding: 24px 24px 64px; max-width: 1200px; }
+
+  .hero h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.018em; line-height: 1.2; }
+  .hero .meta { margin-top: 4px; font-size: 13px; color: var(--ink-3); }
+  .hero .meta .sep { color: var(--ink-disabled); margin: 0 8px; }
+  .hero .meta .overdue { color: var(--danger); font-weight: 600; }
+
+  /* KPI tiles — Fluent's signature card */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 18px; }
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--r-md);
+    padding: 16px 18px;
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow 120ms, border-color 120ms;
+    cursor: pointer;
+  }
+  .kpi:hover { border-color: var(--primary-stroke); box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+  .kpi::before {
+    content: ''; position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 0%, rgba(0,120,212,0.04) 100%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 120ms;
+  }
+  .kpi:hover::before { opacity: 1; }
+  .kpi-label { font-size: 12px; color: var(--ink-3); font-weight: 500; }
+  .kpi-value { font-size: 28px; font-weight: 600; line-height: 1.1; margin-top: 4px; }
+  .kpi-value.danger { color: var(--danger); }
+  .kpi-trend { font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+
+  .alert {
+    margin-top: 18px;
+    background: var(--danger-bg);
+    border: 1px solid #F2C0C2;
+    border-radius: var(--r);
+    padding: 14px 16px;
+    display: flex; align-items: center; gap: 12px;
+    box-shadow: 0 1px 2px rgba(196,43,28,0.05);
+  }
+  .alert-icon { color: var(--danger); }
+  .alert-icon svg { width: 18px; height: 18px; }
+  .alert-body { flex: 1; }
+  .alert-title { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .alert-meta { font-size: 13px; color: var(--ink-2); margin-top: 2px; }
+  .alert-action { background: var(--surface); border: 1px solid var(--rule-strong); padding: 6px 12px; border-radius: var(--r-sm); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+  .section { margin-top: 28px; }
+  .section-head { display: flex; align-items: center; gap: 10px; padding: 0 4px 10px; }
+  .section-title { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .section-count { font-size: 12px; color: var(--ink-3); }
+
+  .data-card { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--r-md); overflow: hidden; }
+  .rows { list-style: none; }
+  .row { display: flex; align-items: center; gap: 14px; padding: 0 16px; height: 42px; border-bottom: 1px solid var(--rule); position: relative; transition: background 120ms; }
+  .row:last-child { border-bottom: 0; }
+  .row:hover { background: var(--hover); }
+  .row.overdue { background: var(--danger-bg); }
+  .row::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: transparent; }
+  .row.focused::before { background: var(--primary); }
+
+  .dot { width: 8px; height: 8px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
+  .countdown { font-family: 'Cascadia Code', monospace; font-size: 12px; width: 60px; color: var(--ink-2); flex-shrink: 0; font-weight: 600; }
+  .countdown.danger { color: var(--danger); }
+  .client { width: 184px; flex-shrink: 0; color: var(--ink); font-size: 14px; font-weight: 600; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .client:hover { color: var(--primary); text-decoration: underline; }
+  .client-suppress { width: 184px; color: var(--ink-disabled); font-size: 13px; }
+  .form { flex: 1; min-width: 0; color: var(--ink-2); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+  .badge { font-family: 'Cascadia Code', monospace; font-size: 11px; padding: 2px 8px; border-radius: var(--r-sm); flex-shrink: 0; font-weight: 500; }
+  .badge.primary { background: var(--primary-bg); color: var(--primary); border: 1px solid var(--primary-stroke); }
+  .badge.nexus { background: var(--surface-2); color: var(--ink-3); border: 1px solid var(--rule); }
+  .badge.fed { background: #FFF4CE; color: #6B4D00; border: 1px solid #F2D88D; }
+  .ai-source { display: inline-flex; align-items: center; gap: 4px; font-family: 'Cascadia Code', monospace; font-size: 11px; padding: 2px 8px; border-radius: var(--r-sm); flex-shrink: 0; color: var(--primary); background: var(--primary-bg); border: 1px solid var(--primary-stroke); }
+  .ai-source svg { width: 10px; height: 10px; }
+  .status-text { font-size: 12px; color: var(--ink-3); width: 84px; flex-shrink: 0; }
+
+  .actions { display: flex; gap: 2px; flex-shrink: 0; opacity: 0; }
+  .row:hover .actions, .row:focus-within .actions { opacity: 1; }
+  .row-action { width: 28px; height: 28px; background: transparent; border: 0; border-radius: var(--r-sm); color: var(--ink-3); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+  .row-action:hover { background: var(--surface-2); color: var(--ink); }
+
+  .direction-tag { position: fixed; bottom: 16px; right: 16px; background: var(--primary); color: #fff; padding: 6px 12px; border-radius: var(--r-sm); font-size: 11px; font-weight: 600; z-index: 100; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand-block">
+      <span class="brand-mark">D</span>
+      <div><div class="brand-name">DueDateHQ</div><div class="brand-firm">Sarah Mitchell, CPA</div></div>
+    </div>
+    <nav>
+      <a class="nav-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Dashboard</a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>To review<span class="count">5</span></a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Clients</a>
+      <a class="nav-item alert"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>Alerts<span class="count">3</span></a>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>Insights</a>
+    </nav>
+    <div class="nav-section">Workspace</div>
+    <nav>
+      <a class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</a>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <span class="crumb">Workspace<span class="sep">›</span><strong>Dashboard</strong></span>
+      <div class="spacer"></div>
+      <button class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>Search<span class="kbd">⌘K</span></button>
+      <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="indicator"></span></button>
+      <button class="new-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>New</button>
+      <span class="avatar">SC</span>
+    </div>
+
+    <div class="content">
+      <div class="hero">
+        <h1>Good morning, Sarah</h1>
+        <p class="meta">Thursday, April 30 <span class="sep">·</span> 80 active <span class="sep">·</span> <span class="overdue">2 overdue</span> <span class="sep">·</span> 8 due this week</p>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi"><div class="kpi-label">Active</div><div class="kpi-value">80</div><div class="kpi-trend">▲ 3 this month</div></div>
+        <div class="kpi"><div class="kpi-label">Overdue</div><div class="kpi-value danger">2</div><div class="kpi-trend">▲ 2 since yesterday</div></div>
+        <div class="kpi"><div class="kpi-label">Due this week</div><div class="kpi-value">8</div><div class="kpi-trend">5 jurisdictions</div></div>
+        <div class="kpi"><div class="kpi-label">Awaiting docs</div><div class="kpi-value">3</div><div class="kpi-trend">avg 2 days</div></div>
+      </div>
+
+      <div class="alert">
+        <span class="alert-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+        <div class="alert-body"><div class="alert-title">Louisiana DOR · Hurricane Delta extension issued</div><div class="alert-meta">Affects 6 of your clients · Detected 2h ago</div></div>
+        <button class="alert-action">Review</button>
+      </div>
+
+      <section class="section">
+        <div class="section-head"><span class="section-title">Overdue</span><span class="section-count">2 filings</span></div>
+        <div class="data-card">
+          <ul class="rows">
+            <li class="row overdue focused" tabindex="0"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--danger)"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg></span><span class="countdown danger">3d late</span><a class="client" href="#">Acme LLC</a><a class="form" href="#">1120-S federal</a><span class="badge fed">FED</span><div class="actions"><button class="row-action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></button></div></li>
+            <li class="row overdue" tabindex="0"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--danger)"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg></span><span class="countdown danger">1d late</span><a class="client" href="#">Tessera Holdings</a><a class="form" href="#">CA Form 568 · LLC fee</a><span class="badge primary">CA</span><div class="actions"><button class="row-action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></button></div></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head"><span class="section-title">This week</span><span class="section-count">8 filings</span></div>
+        <div class="data-card">
+          <ul class="rows">
+            <li class="row" tabindex="0"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--warn)"><circle cx="4" cy="4" r="3.5" fill="none" stroke="currentColor" stroke-width="1"/><path d="M4 0.5 A 3.5 3.5 0 0 1 4 7.5 Z" fill="currentColor"/></svg></span><span class="countdown">Today</span><a class="client" href="#">Wilkins Plumbing</a><a class="form" href="#">LA-CIFT-620</a><span class="ai-source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>S-Corp</span><span class="badge primary">LA</span><span class="status-text">In progress</span><div class="actions"><button class="row-action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></button></div></li>
+            <li class="row" tabindex="0"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--warn)"><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span><span class="countdown">Tue</span><a class="client" href="#">Northshore Co</a><a class="form" href="#">TX Franchise Tax</a><span class="badge nexus">TX</span><span class="status-text"></span></li>
+            <li class="row" tabindex="0"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--ink-disabled)"><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span><span class="countdown">Wed</span><a class="client" href="#">Pinecrest Inc</a><a class="form" href="#">Form 941 · Q1 2026</a><span class="badge fed">FED</span><span class="status-text"></span></li>
+            <li class="row" tabindex="0"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--ink-disabled)"><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span><span class="countdown">Thu</span><a class="client" href="#">Vanderbilt &amp; Sons</a><a class="form" href="#">IT-204 NY-LLC</a><span class="badge primary">NY</span><span class="status-text"></span></li>
+            <li class="row" tabindex="0"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--ink-disabled)"><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span><span class="countdown">Fri</span><span class="client-suppress">↪</span><a class="form" href="#">CA Form 100 · S-Corp annual</a><span class="badge primary">CA</span><span class="status-text"></span></li>
+            <li class="row" tabindex="0"><span class="dot"><svg viewBox="0 0 8 8" width="8" height="8" style="color:var(--ink-disabled)"><circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></span><span class="countdown">Fri</span><a class="client" href="#">Ridgemont Group</a><a class="form" href="#">ST-1 · IL Sales/Use</a><span class="badge nexus">IL</span><span class="status-text"></span></li>
+          </ul>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+<div class="direction-tag">v7 · Fluent</div>
+</body>
+</html>

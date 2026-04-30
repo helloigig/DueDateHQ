@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DueDateHQ — v22 · Muji</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Serif+JP:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* No-brand. Unbleached craft paper, ink stamp red, sumi black */
+  :root {
+    --kraft:        oklch(82% 0.040 75);
+    --kraft-2:      oklch(76% 0.045 73);
+    --paper:        oklch(94% 0.020 78);
+    --paper-2:      oklch(91% 0.022 76);
+    --rule:         oklch(20% 0.018 60);
+    --rule-soft:    oklch(70% 0.024 70);
+    --rule-fade:    oklch(80% 0.022 75);
+
+    --ink:          oklch(20% 0.018 60);
+    --ink-2:        oklch(34% 0.022 55);
+    --ink-3:        oklch(50% 0.024 55);
+    --ink-4:        oklch(64% 0.022 65);
+
+    --hanko:        oklch(42% 0.140 27);   /* ink stamp red */
+    --hanko-paper:  oklch(89% 0.040 30);
+    --moss:         oklch(40% 0.060 130);  /* moss green for ai */
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Noto Sans JP', -apple-system, sans-serif;
+    font-weight: 400;
+    font-size: 13px; line-height: 1.7;
+    color: var(--ink);
+    background: var(--kraft);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  .serif { font-family: 'Noto Serif JP', serif; }
+  ::selection { background: var(--ink); color: var(--paper); }
+
+  .app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+
+  /* ============== Sidebar (kraft tag) ============== */
+  aside {
+    background: var(--kraft);
+    border-right: 1px solid var(--rule);
+    padding: 56px 28px;
+    display: flex; flex-direction: column;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .brand-line {
+    font-size: 11px; font-weight: 500;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    line-height: 1.5;
+  }
+  .brand-jp {
+    font-size: 13px; font-weight: 500;
+    color: var(--ink-3);
+    margin-top: 8px;
+    letter-spacing: 0.04em;
+  }
+  .brand-firm {
+    font-size: 11px;
+    color: var(--ink-3);
+    margin-top: 14px;
+    line-height: 1.7;
+  }
+  .brand-rule {
+    width: 24px; height: 1px;
+    background: var(--rule);
+    margin: 18px 0;
+  }
+
+  nav { display: flex; flex-direction: column; }
+  .nav-item {
+    display: grid; grid-template-columns: 18px 38px 1fr auto; gap: 12px;
+    align-items: baseline;
+    padding: 10px 0;
+    color: var(--ink-2); text-decoration: none;
+    font-size: 12px; font-weight: 400;
+    cursor: pointer;
+    border-bottom: 1px solid var(--rule-soft);
+    letter-spacing: 0.04em;
+  }
+  .nav-item:last-child { border-bottom: 0; }
+  .nav-item:hover { color: var(--ink); }
+  .nav-item.active { color: var(--ink); font-weight: 700; }
+  .nav-item .num {
+    font-size: 10px;
+    color: var(--ink-3);
+    font-variant-numeric: lining-nums;
+  }
+  .nav-item.active .num { color: var(--hanko); font-weight: 700; }
+  .nav-item .jp {
+    font-size: 11px;
+    color: var(--ink-3);
+  }
+  .nav-item .count {
+    font-size: 10px;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .nav-item.alert .count { color: var(--hanko); font-weight: 500; }
+
+  .footer-stamp {
+    margin-top: auto;
+    padding-top: 22px;
+    border-top: 1px solid var(--rule-soft);
+    text-align: center;
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-3);
+    line-height: 1.7;
+  }
+  /* Hanko (印鑑) — red ink stamp seal */
+  .hanko {
+    display: inline-block;
+    width: 56px; height: 56px;
+    background: var(--hanko);
+    color: var(--paper);
+    font-family: 'Noto Serif JP', serif;
+    font-size: 26px;
+    font-weight: 500;
+    line-height: 56px;
+    text-align: center;
+    margin-bottom: 12px;
+    /* Imperfect circle, like a real ink stamp */
+    border-radius: 999px;
+    box-shadow:
+      inset 0 0 0 1.5px var(--paper),
+      inset 0 0 0 4px var(--hanko);
+  }
+
+  /* ============== Main ============== */
+  main { background: var(--paper); display: flex; flex-direction: column; min-width: 0; }
+
+  .topbar {
+    display: flex; align-items: center; gap: 14px;
+    padding: 24px 48px 18px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .folio {
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .folio strong { color: var(--ink); font-weight: 700; }
+  .topbar .spacer { flex: 1; }
+  .pill-search {
+    background: transparent; border: 0;
+    border-bottom: 1px solid var(--rule);
+    padding: 4px 0;
+    font-size: 12px;
+    color: var(--ink-3);
+    cursor: pointer;
+    min-width: 200px;
+  }
+  .icon-btn {
+    width: 28px; height: 28px;
+    background: transparent; border: 0;
+    color: var(--ink); cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .icon-btn svg { width: 14px; height: 14px; }
+  .icon-btn .pip { position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; background: var(--hanko); border-radius: 999px; }
+  .new-btn {
+    background: transparent;
+    border: 1px solid var(--rule);
+    padding: 7px 18px;
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink); cursor: pointer;
+  }
+  .new-btn:hover { background: var(--ink); color: var(--paper); }
+  .avatar {
+    width: 28px; height: 28px;
+    border: 1px solid var(--rule);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; letter-spacing: 0.08em;
+    font-variant-numeric: lining-nums;
+  }
+
+  .hero { padding: 80px 48px 56px; }
+  .hero-eyebrow {
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.32em; text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: 14px;
+  }
+  .hero h1 {
+    font-weight: 300;
+    font-size: clamp(28px, 3.4vw, 38px);
+    letter-spacing: 0.005em;
+    line-height: 1.45;
+    max-width: 720px;
+    color: var(--ink);
+    text-wrap: pretty;
+  }
+  .hero h1 strong { font-weight: 700; }
+  .hero h1 em { font-style: normal; color: var(--hanko); font-weight: 700; }
+  .hero .meta {
+    margin-top: 24px;
+    font-size: 12px;
+    color: var(--ink-3);
+    letter-spacing: 0.05em;
+  }
+  .hero .meta .sep { margin: 0 12px; color: var(--ink-4); }
+
+  .stats-grid {
+    padding: 24px 48px;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .stat-cell {
+    padding: 18px 0;
+    padding-left: 24px;
+    border-right: 1px solid var(--rule-fade);
+  }
+  .stat-cell:first-child { padding-left: 0; }
+  .stat-cell:last-child { border-right: 0; }
+  .stat-lbl {
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: 8px;
+  }
+  .stat-val {
+    font-weight: 300;
+    font-size: 32px;
+    line-height: 1;
+    letter-spacing: 0.005em;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+  .stat-val.high { color: var(--hanko); }
+  .stat-trend {
+    font-size: 11px;
+    color: var(--ink-3);
+    margin-top: 8px;
+  }
+
+  /* Notice — full borders, no left stripe */
+  .notice {
+    padding: 18px 48px;
+    border-bottom: 1px solid var(--rule);
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 24px;
+    align-items: center;
+    background: var(--paper-2);
+  }
+  .notice-num {
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.32em; text-transform: uppercase;
+    color: var(--hanko);
+  }
+  .notice-body { font-size: 13px; }
+  .notice-title { font-weight: 700; line-height: 1.4; }
+  .notice-meta { color: var(--ink-3); margin-top: 2px; font-size: 12px; }
+  .notice-action {
+    background: transparent;
+    border: 1px solid var(--rule);
+    padding: 7px 18px;
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink); cursor: pointer;
+  }
+  .notice-action:hover { background: var(--ink); color: var(--paper); }
+
+  .columns {
+    padding: 48px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+  }
+  .section-head {
+    display: flex; align-items: baseline; gap: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 14px;
+  }
+  .section-num {
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-3);
+    font-variant-numeric: lining-nums;
+  }
+  .section-title {
+    font-size: 12px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase;
+  }
+  .section-count {
+    margin-left: auto;
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  .rows { list-style: none; }
+  .row {
+    display: grid;
+    grid-template-columns: 60px minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: baseline;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule-fade);
+  }
+  .row:last-child { border-bottom: 0; }
+  /* Overdue: full background tint, NO left stripe */
+  .row.overdue { background: var(--hanko-paper); padding: 12px 12px; margin: 0 -12px; }
+  .when {
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--ink-3);
+    padding-top: 3px;
+    font-variant-numeric: lining-nums;
+  }
+  .when.overdue { color: var(--hanko); font-weight: 700; }
+  .row-body { min-width: 0; }
+  .row-title {
+    font-size: 14px; font-weight: 500;
+    line-height: 1.4;
+  }
+  .row-form {
+    margin-top: 1px;
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+  .row-form .ai {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 9px; font-weight: 500;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--moss);
+    border-bottom: 1px solid var(--moss);
+    padding-bottom: 1px;
+  }
+  .row-tag {
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-3);
+    padding-top: 3px;
+  }
+
+  .footer {
+    padding: 18px 48px 32px;
+    border-top: 1px solid var(--rule);
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 24px;
+    align-items: baseline;
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .footer .right { text-align: right; }
+
+  .direction-tag {
+    position: fixed; bottom: 16px; right: 16px;
+    background: transparent;
+    border: 1px solid var(--rule);
+    color: var(--ink);
+    padding: 6px 14px;
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    z-index: 100;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside>
+    <div class="brand-line">DueDateHQ</div>
+    <div class="brand-jp">期限の家</div>
+    <div class="brand-rule"></div>
+    <div class="brand-firm">Sarah Mitchell, CPA<br>Vol. I · No. 18</div>
+
+    <div class="brand-rule"></div>
+
+    <nav>
+      <a class="nav-item active"><span class="num">01</span><span class="jp">表</span><span>Dashboard</span><span class="count"></span></a>
+      <a class="nav-item"><span class="num">02</span><span class="jp">確認</span><span>Review</span><span class="count">5</span></a>
+      <a class="nav-item"><span class="num">03</span><span class="jp">客</span><span>Clients</span><span class="count">80</span></a>
+      <a class="nav-item alert"><span class="num">04</span><span class="jp">通知</span><span>Alerts</span><span class="count">3</span></a>
+      <a class="nav-item"><span class="num">05</span><span class="jp">分析</span><span>Insights</span><span class="count"></span></a>
+      <a class="nav-item"><span class="num">06</span><span class="jp">設定</span><span>Settings</span><span class="count"></span></a>
+    </nav>
+
+    <div class="footer-stamp">
+      <div class="hanko" aria-label="Approved">印</div>
+      Compounded · plain product<br>April 30 · 2026
+    </div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <span class="folio">Vol I · No 18 · <strong>April 30, 2026</strong></span>
+      <span class="spacer"></span>
+      <button class="pill-search">Search…</button>
+      <button class="icon-btn" aria-label="Notifications">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <span class="pip"></span>
+      </button>
+      <button class="new-btn">New</button>
+      <span class="avatar">SM</span>
+    </div>
+
+    <div class="hero">
+      <div class="hero-eyebrow">Filing season ⁄ Week 18</div>
+      <h1>Good morning, Sarah.<br><strong>Two filings overdue.</strong> Eight more by Friday.</h1>
+      <p class="meta">Thursday · April 30 <span class="sep">·</span> 80 active <span class="sep">·</span> <em style="font-style:normal;color:var(--hanko);">2 overdue</em> <span class="sep">·</span> 50/50 states monitored</p>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-cell"><div class="stat-lbl">Active</div><div class="stat-val">80</div><div class="stat-trend">+3 this month</div></div>
+      <div class="stat-cell"><div class="stat-lbl">Overdue</div><div class="stat-val high">02</div><div class="stat-trend">act today</div></div>
+      <div class="stat-cell"><div class="stat-lbl">This week</div><div class="stat-val">08</div><div class="stat-trend">5 jurisdictions</div></div>
+      <div class="stat-cell"><div class="stat-lbl">Awaiting</div><div class="stat-val">03</div><div class="stat-trend">avg 2 days</div></div>
+    </div>
+
+    <div class="notice">
+      <span class="notice-num">No. 01 · 通知</span>
+      <div class="notice-body">
+        <div class="notice-title">Louisiana DOR — Hurricane Delta extension issued</div>
+        <div class="notice-meta">Affects 6 of your clients · Detected 2h ago</div>
+      </div>
+      <button class="notice-action">Review</button>
+    </div>
+
+    <div class="columns">
+      <section>
+        <div class="section-head"><span class="section-num">01</span><span class="section-title">Overdue · 期限切れ</span><span class="section-count">02 items</span></div>
+        <ul class="rows">
+          <li class="row overdue"><span class="when overdue">3 d. late</span><div class="row-body"><div class="row-title">Acme LLC</div><div class="row-form">1120-S federal · annual</div></div><span class="row-tag">FED</span></li>
+          <li class="row overdue"><span class="when overdue">1 d. late</span><div class="row-body"><div class="row-title">Tessera Holdings</div><div class="row-form">CA Form 568 · LLC fee</div></div><span class="row-tag">CA</span></li>
+        </ul>
+      </section>
+
+      <section>
+        <div class="section-head"><span class="section-num">02</span><span class="section-title">This week · 今週</span><span class="section-count">08 items</span></div>
+        <ul class="rows">
+          <li class="row"><span class="when">Today</span><div class="row-body"><div class="row-title">Wilkins Plumbing</div><div class="row-form">LA-CIFT-620 · in progress<span class="ai">Generated · S-Corp</span></div></div><span class="row-tag">LA</span></li>
+          <li class="row"><span class="when">Tue</span><div class="row-body"><div class="row-title">Northshore Co</div><div class="row-form">TX Franchise · annual</div></div><span class="row-tag">TX</span></li>
+          <li class="row"><span class="when">Wed</span><div class="row-body"><div class="row-title">Pinecrest Inc</div><div class="row-form">Form 941 · Q1</div></div><span class="row-tag">FED</span></li>
+          <li class="row"><span class="when">Thu</span><div class="row-body"><div class="row-title">Vanderbilt &amp; Sons</div><div class="row-form">IT-204 NY-LLC</div></div><span class="row-tag">NY</span></li>
+          <li class="row"><span class="when">Fri</span><div class="row-body"><div class="row-title">↪ ditto</div><div class="row-form">CA Form 100 · S-Corp</div></div><span class="row-tag">CA</span></li>
+          <li class="row"><span class="when">Fri</span><div class="row-body"><div class="row-title">Ridgemont Group</div><div class="row-form">ST-1 · IL Sales/Use</div></div><span class="row-tag">IL</span></li>
+        </ul>
+      </section>
+    </div>
+
+    <div class="footer"><span>DueDateHQ · Vol I · No 18</span><span>page i</span><span class="right">April 30 · 2026</span></div>
+  </main>
+</div>
+
+<div class="direction-tag">v22 · Muji</div>
+</body>
+</html>

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DueDateHQ — v12 · Porsche</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Porsche: black + gold + crest red, automotive engineering */
+  :root {
+    --bg:           oklch(99% 0 0);
+    --paper:        oklch(97.5% 0.002 250);
+    --tint:         oklch(94% 0.003 250);
+    --rule:         oklch(85% 0.005 250);
+    --rule-strong:  oklch(72% 0.008 250);
+    --silver:       oklch(86% 0.005 250);
+
+    --ink:          oklch(15% 0.005 250);
+    --ink-2:        oklch(28% 0.008 250);
+    --ink-3:        oklch(48% 0.010 250);
+    --ink-4:        oklch(64% 0.010 250);
+
+    --red:          oklch(50% 0.190 27);
+    --red-2:        oklch(40% 0.190 27);
+    --red-paper:    oklch(94% 0.040 30);
+    --gold:         oklch(72% 0.130 80);
+    --gold-2:       oklch(64% 0.130 80);
+
+    --warn:         oklch(64% 0.150 70);
+    --warn-paper:   oklch(95% 0.040 75);
+    --ok:           oklch(50% 0.110 145);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Manrope', -apple-system, sans-serif;
+    font-size: 14px; line-height: 1.5;
+    color: var(--ink);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  .display { font-family: 'Bebas Neue', sans-serif; }
+  ::selection { background: var(--ink); color: var(--gold); }
+
+  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+
+  aside { background: var(--ink); color: var(--bg); padding: 0; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; }
+  .crest { padding: 28px 24px 22px; border-bottom: 1px solid oklch(28% 0.008 250); text-align: center; }
+  .crest-mark {
+    width: 56px; height: 56px;
+    margin: 0 auto 10px;
+    background: var(--gold);
+    color: var(--ink);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: 'Bebas Neue';
+    font-size: 28px;
+    letter-spacing: 0.04em;
+    border: 2px solid var(--gold);
+    position: relative;
+  }
+  .crest-mark::before {
+    content: '';
+    position: absolute; top: -6px; bottom: -6px; left: -6px; right: -6px;
+    border: 1px solid oklch(99% 0 0 / 0.3);
+  }
+  .crest-name { font-family: 'Bebas Neue'; font-size: 18px; letter-spacing: 0.18em; color: var(--bg); }
+  .crest-firm { font-family: 'Bebas Neue'; font-size: 11px; letter-spacing: 0.2em; color: oklch(99% 0 0 / 0.55); margin-top: 4px; }
+
+  nav { padding: 12px 0; display: flex; flex-direction: column; }
+  /* Active uses background tint, no left-stripe */
+  .nav-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 0 24px;
+    height: 38px;
+    color: oklch(99% 0 0 / 0.7);
+    text-decoration: none;
+    font-family: 'Bebas Neue';
+    font-size: 14px;
+    letter-spacing: 0.16em;
+    cursor: pointer;
+  }
+  .nav-item:hover { color: var(--bg); background: oklch(99% 0 0 / 0.04); }
+  .nav-item.active {
+    color: var(--bg);
+    background: oklch(50% 0.190 27 / 0.18);
+  }
+  .nav-item.active::after { content: ''; flex: 1; height: 1px; background: var(--red); margin-left: 8px; }
+  .nav-item svg { width: 14px; height: 14px; flex-shrink: 0; }
+  .nav-item .count { margin-left: auto; font-family: 'Manrope'; font-size: 11px; letter-spacing: 0; font-weight: 600; color: oklch(99% 0 0 / 0.5); }
+  .nav-item.alert .count { color: var(--bg); background: var(--red); padding: 1px 7px; }
+
+  .nav-section { padding: 18px 24px 6px; font-family: 'Bebas Neue'; font-size: 11px; letter-spacing: 0.22em; color: oklch(99% 0 0 / 0.4); }
+
+  main { display: flex; flex-direction: column; min-width: 0; }
+
+  .topbar { display: flex; align-items: stretch; gap: 0; padding: 0; height: 56px; border-bottom: 1px solid var(--rule); }
+  .topbar .crumb { padding: 0 28px; flex: 1; display: flex; align-items: center; font-family: 'Bebas Neue'; font-size: 13px; letter-spacing: 0.18em; color: var(--ink-3); }
+  .topbar .crumb strong { color: var(--ink); }
+  .topbar .crumb .sep { margin: 0 10px; color: var(--rule-strong); }
+  .icon-btn { width: 56px; height: 56px; background: transparent; border: 0; border-left: 1px solid var(--rule); color: var(--ink-2); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; position: relative; }
+  .icon-btn:hover { background: var(--paper); color: var(--ink); }
+  .icon-btn svg { width: 17px; height: 17px; }
+  .icon-btn .pip { position: absolute; top: 16px; right: 16px; width: 7px; height: 7px; background: var(--red); }
+  .new-btn { height: 56px; padding: 0 28px; background: var(--red); color: var(--bg); border: 0; border-left: 1px solid var(--rule); font-family: 'Bebas Neue', inherit; font-size: 14px; letter-spacing: 0.18em; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; }
+  .new-btn:hover { background: var(--red-2); }
+  .new-btn svg { width: 14px; height: 14px; }
+  .avatar { width: 56px; height: 56px; background: transparent; border-left: 1px solid var(--rule); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; font-family: 'Bebas Neue'; font-size: 14px; letter-spacing: 0.12em; }
+
+  .content { padding: 0 0 96px; }
+
+  .hero { padding: 56px 28px; background: linear-gradient(180deg, var(--paper) 0%, var(--bg) 100%); border-bottom: 1px solid var(--ink); display: grid; grid-template-columns: 1fr 1fr; gap: 36px; align-items: end; }
+  .hero-eyebrow { font-family: 'Bebas Neue'; font-size: 13px; letter-spacing: 0.32em; color: var(--red); margin-bottom: 18px; }
+  .hero-line { font-family: 'Bebas Neue'; font-size: clamp(64px, 9vw, 96px); font-weight: 400; letter-spacing: 0.005em; line-height: 0.95; color: var(--ink); }
+  .hero-line .light { font-weight: 400; color: var(--ink-3); }
+  .hero-meta { margin-top: 14px; font-size: 13px; color: var(--ink-3); font-family: 'Bebas Neue'; letter-spacing: 0.12em; }
+  .hero-meta .sep { color: var(--rule-strong); margin: 0 10px; }
+  .hero-meta .overdue { color: var(--red); }
+
+  .hero-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
+  .stat { border-top: 1px solid var(--ink); padding-top: 16px; }
+  .stat-label { font-family: 'Bebas Neue'; font-size: 11px; letter-spacing: 0.22em; color: var(--ink-3); margin-bottom: 6px; }
+  .stat-value { font-family: 'Bebas Neue'; font-size: clamp(40px, 5vw, 56px); line-height: 0.9; color: var(--ink); letter-spacing: -0.005em; font-variant-numeric: tabular-nums; }
+  .stat.danger .stat-value { color: var(--red); }
+  .stat-trend { font-size: 12px; color: var(--ink-3); margin-top: 8px; font-weight: 500; }
+
+  /* Banner — full black panel with full borders, NO left stripe */
+  .alert { margin: 36px 28px 0; background: var(--ink); color: var(--bg); padding: 22px 26px; display: grid; grid-template-columns: auto 1fr auto; gap: 18px; align-items: center; border: 1px solid var(--red); }
+  .alert-stamp {
+    width: 56px; height: 56px;
+    background: var(--red); color: var(--bg);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: 'Bebas Neue';
+    font-size: 28px;
+    letter-spacing: 0.04em;
+  }
+  .alert-tag { font-family: 'Bebas Neue'; font-size: 11px; letter-spacing: 0.32em; color: var(--red); margin-bottom: 4px; }
+  .alert-body { min-width: 0; }
+  .alert-title { font-family: 'Bebas Neue'; font-size: 22px; letter-spacing: 0.04em; color: var(--bg); line-height: 1.2; }
+  .alert-meta { font-size: 12px; color: oklch(99% 0 0 / 0.6); margin-top: 2px; font-family: 'Bebas Neue'; letter-spacing: 0.12em; }
+  .alert-action { background: transparent; color: var(--bg); border: 1px solid var(--bg); padding: 10px 18px; font-family: 'Bebas Neue'; font-size: 12px; letter-spacing: 0.18em; cursor: pointer; }
+  .alert-action:hover { background: var(--bg); color: var(--ink); }
+
+  .section { margin: 56px 28px 0; }
+  .section-head { display: flex; align-items: baseline; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--ink); }
+  .section-num { font-family: 'Bebas Neue'; font-size: 14px; letter-spacing: 0.18em; color: var(--red); }
+  .section-title { font-family: 'Bebas Neue'; font-size: 28px; letter-spacing: 0.04em; }
+  .section-count { font-family: 'Bebas Neue'; font-size: 14px; letter-spacing: 0.18em; color: var(--ink-3); }
+  .section-actions { margin-left: auto; display: flex; gap: 16px; }
+  .section-actions button { background: transparent; border: 0; font-family: 'Bebas Neue'; font-size: 12px; letter-spacing: 0.18em; color: var(--ink-3); cursor: pointer; padding: 4px 0; }
+  .section-actions button:hover { color: var(--red); }
+
+  .rows { list-style: none; }
+  .row { display: flex; align-items: center; gap: 16px; padding: 0 0; height: 56px; border-bottom: 1px solid var(--rule); }
+  .row:hover { background: var(--paper); }
+  /* Overdue: full background tint, NO left stripe */
+  .row.overdue { background: var(--red-paper); }
+  .dot { width: 8px; height: 8px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
+  .countdown { font-family: 'Bebas Neue'; font-size: 17px; width: 80px; color: var(--ink-2); flex-shrink: 0; letter-spacing: 0.06em; }
+  .countdown.danger { color: var(--red); }
+  .client { width: 196px; flex-shrink: 0; color: var(--ink); font-family: 'Bebas Neue'; font-size: 17px; letter-spacing: 0.04em; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .client-suppress { width: 196px; color: var(--ink-4); font-size: 13px; }
+  .form { flex: 1; min-width: 0; color: var(--ink-3); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; font-weight: 500; }
+  .pill { font-family: 'Bebas Neue'; font-size: 11px; letter-spacing: 0.18em; padding: 4px 9px; flex-shrink: 0; line-height: 1.4; }
+  .pill.primary { background: var(--ink); color: var(--bg); }
+  .pill.nexus { border: 1px solid var(--rule-strong); color: var(--ink-3); padding: 3px 8px; }
+  .pill.fed { background: var(--silver); color: var(--ink); }
+  .ai-source { display: inline-flex; align-items: center; gap: 5px; font-family: 'Bebas Neue'; font-size: 11px; letter-spacing: 0.18em; padding: 4px 10px; flex-shrink: 0; color: var(--ink); background: var(--gold); }
+  .ai-source svg { width: 11px; height: 11px; }
+  .status-text { font-family: 'Bebas Neue'; font-size: 11px; color: var(--ink-3); width: 96px; flex-shrink: 0; letter-spacing: 0.14em; }
+  .actions { display: flex; gap: 0; flex-shrink: 0; opacity: 0; }
+  .row:hover .actions { opacity: 1; }
+  .row-action { width: 32px; height: 32px; background: transparent; border: 1px solid var(--rule); color: var(--ink-2); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; border-left: 0; }
+  .row-action:first-child { border-left: 1px solid var(--rule); }
+  .row-action:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .direction-tag { position: fixed; bottom: 16px; right: 16px; background: var(--red); color: var(--bg); padding: 8px 14px; font-family: 'Bebas Neue'; font-size: 11px; letter-spacing: 0.22em; z-index: 100; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="crest">
+      <div class="crest-mark">D</div>
+      <div class="crest-name">DUEDATEHQ</div>
+      <div class="crest-firm">SARAH MITCHELL · CPA</div>
+    </div>
+    <nav>
+      <a class="nav-item active">Dashboard</a>
+      <a class="nav-item">To review<span class="count">5</span></a>
+      <a class="nav-item">Clients</a>
+      <a class="nav-item alert">Alerts<span class="count">3</span></a>
+      <a class="nav-item">Insights</a>
+    </nav>
+    <div class="nav-section">Workspace</div>
+    <nav><a class="nav-item">Settings</a></nav>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div class="crumb">WORKSPACE<span class="sep">/</span><strong>DASHBOARD</strong></div>
+      <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></button>
+      <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="pip"></span></button>
+      <button class="new-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>NEW</button>
+      <span class="avatar">SC</span>
+    </div>
+
+    <div class="content">
+      <div class="hero">
+        <div>
+          <div class="hero-eyebrow">2026 · WEEK 18 · APRIL 30</div>
+          <h1 class="hero-line">GOOD<br>MORNING<span class="light">,</span><br>SARAH<span style="color:var(--red);">.</span></h1>
+          <p class="hero-meta">80 ACTIVE <span class="sep">/</span> <span class="overdue">2 OVERDUE</span> <span class="sep">/</span> 8 THIS WEEK <span class="sep">/</span> 50/50 STATES</p>
+        </div>
+        <div class="hero-stats">
+          <div class="stat danger"><div class="stat-label">Overdue</div><div class="stat-value">02</div><div class="stat-trend">act today</div></div>
+          <div class="stat"><div class="stat-label">This week</div><div class="stat-value">08</div><div class="stat-trend">5 jurisdictions</div></div>
+          <div class="stat"><div class="stat-label">Active</div><div class="stat-value">80</div><div class="stat-trend">+3 this month</div></div>
+        </div>
+      </div>
+
+      <div class="alert">
+        <span class="alert-stamp">!</span>
+        <div class="alert-body">
+          <div class="alert-tag">DISASTER · LOUISIANA · 6 AFFECTED</div>
+          <div class="alert-title">HURRICANE DELTA · LA-DOR EXTENSION ISSUED</div>
+          <div class="alert-meta">DETECTED 2H AGO · CONFIDENCE HIGH</div>
+        </div>
+        <button class="alert-action">REVIEW →</button>
+      </div>
+
+      <section class="section">
+        <div class="section-head"><span class="section-num">01.</span><span class="section-title">OVERDUE</span><span class="section-count">[02]</span><div class="section-actions"><button>Filter</button><button>Export</button></div></div>
+        <ul class="rows">
+          <li class="row overdue"><span class="dot"></span><span class="countdown danger">−3D</span><a class="client" href="#">ACME LLC</a><a class="form" href="#">1120-S federal</a><span class="pill fed">FED</span></li>
+          <li class="row overdue"><span class="dot"></span><span class="countdown danger">−1D</span><a class="client" href="#">TESSERA HOLDINGS</a><a class="form" href="#">CA Form 568 · LLC fee</a><span class="pill primary">CA</span></li>
+        </ul>
+      </section>
+
+      <section class="section">
+        <div class="section-head"><span class="section-num">02.</span><span class="section-title">THIS WEEK</span><span class="section-count">[08]</span><div class="section-actions"><button>Filter</button><button>Export</button></div></div>
+        <ul class="rows">
+          <li class="row"><span class="dot"></span><span class="countdown">TODAY</span><a class="client" href="#">WILKINS PLUMBING</a><a class="form" href="#">LA-CIFT-620</a><span class="ai-source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>S-CORP</span><span class="pill primary">LA</span><span class="status-text">IN PROGRESS</span></li>
+          <li class="row"><span class="dot"></span><span class="countdown">TUE</span><a class="client" href="#">NORTHSHORE CO</a><a class="form" href="#">TX Franchise Tax</a><span class="pill nexus">TX</span><span class="status-text"></span></li>
+          <li class="row"><span class="dot"></span><span class="countdown">WED</span><a class="client" href="#">PINECREST INC</a><a class="form" href="#">Form 941 · Q1 2026</a><span class="pill fed">FED</span><span class="status-text"></span></li>
+          <li class="row"><span class="dot"></span><span class="countdown">THU</span><a class="client" href="#">VANDERBILT &amp; SONS</a><a class="form" href="#">IT-204 NY-LLC</a><span class="pill primary">NY</span><span class="status-text"></span></li>
+          <li class="row"><span class="dot"></span><span class="countdown">FRI</span><span class="client-suppress">↪</span><a class="form" href="#">CA Form 100 · S-Corp annual</a><span class="pill primary">CA</span><span class="status-text"></span></li>
+          <li class="row"><span class="dot"></span><span class="countdown">FRI</span><a class="client" href="#">RIDGEMONT GROUP</a><a class="form" href="#">ST-1 · IL Sales/Use</a><span class="pill nexus">IL</span><span class="status-text"></span></li>
+        </ul>
+      </section>
+    </div>
+  </main>
+</div>
+<div class="direction-tag">v12 · PORSCHE</div>
+</body>
+</html>

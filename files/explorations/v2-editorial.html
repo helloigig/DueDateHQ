@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DueDateHQ — v2 · Editorial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Brygada+1918:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Karla:wght@400;500;600;700&family=Petrona:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* All color in OKLCH, no pure black/white, neutrals tinted toward editorial gold */
+  :root {
+    --paper:        oklch(95.5% 0.018 80);   /* warm laid paper */
+    --paper-2:      oklch(91% 0.024 78);
+    --paper-3:      oklch(86% 0.030 76);
+    --surface:      oklch(97% 0.014 80);     /* lighter than paper, used for inset cards */
+    --rule:         oklch(72% 0.020 68);
+    --rule-soft:    oklch(82% 0.022 75);
+    --rule-fade:    oklch(89% 0.022 78);
+
+    --ink:          oklch(20% 0.018 60);     /* warm dark, not black */
+    --ink-2:        oklch(38% 0.020 55);
+    --ink-3:        oklch(54% 0.024 52);
+    --ink-4:        oklch(68% 0.025 60);
+
+    --gold:         oklch(56% 0.110 65);     /* deep editorial gold, the only accent */
+    --gold-paper:   oklch(89% 0.060 80);
+    --high:         oklch(43% 0.135 27);     /* deep editorial red, restrained */
+    --high-paper:   oklch(89% 0.060 30);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Karla', Georgia, serif;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--ink);
+    background: var(--paper);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'kern', 'liga', 'onum';
+  }
+  /* Brygada 1918 — Polish 20th-century revival, idiosyncratic. Used for display only. */
+  .display { font-family: 'Brygada 1918', 'Times New Roman', serif; font-feature-settings: 'liga', 'dlig', 'onum'; }
+  .text    { font-family: 'Petrona', Georgia, serif; }   /* fallback serif for body where serif is desired */
+  .mono    { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-feature-settings: 'tnum'; }
+  .figures { font-variant-numeric: lining-nums tabular-nums; }
+  ::selection { background: var(--gold-paper); color: var(--ink); }
+
+  .app { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+
+  /* ============== Masthead column ============== */
+  aside {
+    border-right: 1px solid var(--rule);
+    display: flex; flex-direction: column;
+    position: sticky; top: 0; height: 100vh;
+    padding: 32px 0 28px;
+  }
+  .masthead {
+    padding: 0 26px 22px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .masthead-line {
+    font-family: 'Brygada 1918', serif;
+    font-size: 11px; letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: 10px;
+  }
+  .masthead-title {
+    font-family: 'Brygada 1918', serif;
+    font-size: 28px; font-weight: 600;
+    line-height: 0.9;
+    letter-spacing: -0.022em;
+    color: var(--ink);
+  }
+  .masthead-title em { font-style: italic; font-weight: 400; color: var(--ink-3); }
+  .masthead-firm {
+    margin-top: 14px;
+    font-family: 'Brygada 1918', serif;
+    font-style: italic;
+    font-size: 13px;
+    color: var(--ink-2);
+  }
+
+  .nav-section {
+    font-family: 'Brygada 1918', serif;
+    font-size: 11px; letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+    padding: 22px 26px 6px;
+  }
+  nav { display: flex; flex-direction: column; gap: 0; padding: 0 14px; }
+  /* Active state: full border on row + gold leading mark, NO border-left stripe */
+  .nav-item {
+    display: grid; grid-template-columns: 18px 1fr auto; gap: 10px;
+    align-items: baseline;
+    padding: 9px 12px;
+    color: var(--ink-2); text-decoration: none;
+    font-family: 'Brygada 1918', serif;
+    font-size: 14px; font-weight: 400;
+    cursor: pointer;
+    border-radius: 0;
+  }
+  .nav-item:hover { color: var(--ink); }
+  .nav-item.active {
+    color: var(--ink); font-weight: 600;
+    background: var(--paper-2);
+  }
+  .nav-item .lead {
+    font-family: 'Brygada 1918', serif;
+    font-size: 12px;
+    color: var(--ink-4);
+  }
+  .nav-item.active .lead { color: var(--gold); }
+  .nav-item .count {
+    font-family: 'Karla', sans-serif;
+    font-size: 11px;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .nav-item.alert .count {
+    background: var(--high);
+    color: var(--paper);
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-weight: 600;
+  }
+
+  .colophon {
+    margin-top: auto;
+    padding: 22px 26px 0;
+    border-top: 1px solid var(--rule);
+  }
+  .colophon p {
+    font-family: 'Brygada 1918', serif;
+    font-style: italic;
+    font-size: 12px;
+    color: var(--ink-3);
+    line-height: 1.55;
+  }
+  .colophon p strong { font-weight: 600; color: var(--ink-2); font-style: normal; }
+
+  /* ============== Content column ============== */
+  main { display: flex; flex-direction: column; min-width: 0; }
+
+  /* Folio bar */
+  .folio {
+    display: flex; align-items: baseline; gap: 16px;
+    padding: 18px 40px 14px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .folio .vol {
+    font-family: 'Brygada 1918', serif;
+    font-size: 12px; letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .folio .vol strong { color: var(--ink); font-weight: 600; }
+  .folio .spacer { flex: 1; }
+  .folio .search {
+    font-family: 'Brygada 1918', serif;
+    font-style: italic; font-size: 14px;
+    color: var(--ink-3);
+    background: transparent; border: 0;
+    border-bottom: 1px solid var(--rule);
+    padding: 4px 12px 4px 0;
+    cursor: pointer;
+    min-width: 200px;
+  }
+  .folio .search:focus-visible { border-bottom-color: var(--ink); outline: 0; }
+  .folio button.icon-btn {
+    width: 32px; height: 32px;
+    background: transparent; border: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--ink-2); position: relative;
+  }
+  .folio button.icon-btn:hover { color: var(--ink); }
+  .folio button.icon-btn svg { width: 14px; height: 14px; }
+  .folio .pip {
+    position: absolute; top: 6px; right: 6px;
+    width: 7px; height: 7px;
+    background: var(--high);
+    border-radius: 999px;
+  }
+  .folio .new-btn {
+    height: 32px; padding: 0 18px;
+    background: var(--ink); color: var(--paper);
+    border: 0;
+    font-family: 'Brygada 1918', serif;
+    font-size: 13px; font-weight: 500;
+    cursor: pointer;
+    letter-spacing: 0.005em;
+  }
+  .folio .new-btn:hover { background: var(--ink-2); }
+  .folio .avatar {
+    width: 32px; height: 32px;
+    background: var(--ink); color: var(--paper);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: 'Brygada 1918', serif;
+    font-style: italic; font-size: 13px;
+    border-radius: 0;
+  }
+
+  /* Cover spread */
+  .spread {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) 1px minmax(0, 1fr);
+    gap: 36px;
+    padding: 56px 40px 48px;
+    border-bottom: 2px solid var(--ink);
+  }
+  .gutter { background: var(--rule); width: 1px; height: auto; }
+
+  .lede h1 {
+    font-family: 'Brygada 1918', serif;
+    font-size: clamp(40px, 5.6vw, 72px);
+    font-weight: 500;
+    letter-spacing: -0.028em;
+    line-height: 1.02;
+    color: var(--ink);
+    text-wrap: pretty;
+  }
+  .lede h1 em {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--ink-3);
+  }
+  /* Drop cap — the editorial moment; solid color only */
+  .lede h1 .cap {
+    font-family: 'Brygada 1918', serif;
+    font-weight: 600;
+    float: left;
+    font-size: clamp(80px, 11vw, 144px);
+    line-height: 0.78;
+    margin: 8px 14px 0 -4px;
+    color: var(--ink);
+    letter-spacing: -0.05em;
+  }
+  .lede h1 .cap.gold { color: var(--gold); }
+
+  .lede .dek {
+    margin-top: 22px;
+    font-family: 'Brygada 1918', serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: clamp(17px, 1.6vw, 21px);
+    line-height: 1.5;
+    color: var(--ink-2);
+    max-width: 60ch;
+  }
+  .lede .byline {
+    margin-top: 18px;
+    font-family: 'Karla', sans-serif;
+    font-size: 12px; letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .lede .byline strong { color: var(--ink); font-weight: 600; }
+
+  /* Sidebar callout — definition list, not stat tiles */
+  .callout dl {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .callout dt {
+    font-family: 'Karla', sans-serif;
+    font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--rule-soft);
+    margin-bottom: 4px;
+  }
+  .callout dd {
+    font-family: 'Brygada 1918', serif;
+    font-size: clamp(28px, 3vw, 40px);
+    font-weight: 500;
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+  .callout dd .qual {
+    display: block;
+    margin-top: 6px;
+    font-family: 'Brygada 1918', serif;
+    font-style: italic;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--ink-3);
+    letter-spacing: 0;
+  }
+  .callout dd.high { color: var(--high); font-style: italic; }
+
+  /* Wire bulletin — full top-bottom rules instead of left-stripe */
+  .wire {
+    margin: 0 40px;
+    border-top: 1px solid var(--ink);
+    border-bottom: 1px solid var(--rule);
+    padding: 22px 0 20px;
+    display: grid;
+    grid-template-columns: 80px 1fr auto;
+    gap: 28px;
+    align-items: baseline;
+  }
+  .wire-num {
+    font-family: 'Brygada 1918', serif;
+    font-style: italic;
+    font-size: 56px;
+    font-weight: 400;
+    color: var(--gold);
+    line-height: 0.85;
+  }
+  .wire-eyebrow {
+    font-family: 'Karla', sans-serif;
+    font-size: 11px; letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--high);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .wire-title {
+    font-family: 'Brygada 1918', serif;
+    font-size: clamp(22px, 2.4vw, 28px);
+    font-weight: 500;
+    line-height: 1.18;
+    letter-spacing: -0.012em;
+    color: var(--ink);
+    text-wrap: balance;
+  }
+  .wire-meta {
+    margin-top: 8px;
+    font-family: 'Brygada 1918', serif;
+    font-style: italic;
+    font-size: 14px;
+    color: var(--ink-3);
+  }
+  .wire-meta a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  .wire-action {
+    height: 36px; padding: 0 18px;
+    background: var(--ink); color: var(--paper);
+    border: 0;
+    font-family: 'Brygada 1918', serif;
+    font-size: 13px; font-weight: 500;
+    cursor: pointer;
+    align-self: center;
+    letter-spacing: 0.005em;
+  }
+  .wire-action:hover { background: var(--ink-2); }
+
+  /* Folio columns */
+  .columns {
+    padding: 36px 40px 48px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+    gap: 36px;
+  }
+  .col-rule { background: var(--rule-soft); height: auto; }
+
+  .section-head {
+    display: grid;
+    grid-template-columns: 36px 1fr auto;
+    gap: 14px;
+    align-items: baseline;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--ink);
+  }
+  .roman {
+    font-family: 'Brygada 1918', serif;
+    font-style: italic;
+    font-size: 24px;
+    color: var(--ink);
+    line-height: 0.85;
+  }
+  .section-title {
+    font-family: 'Brygada 1918', serif;
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--ink);
+    letter-spacing: -0.012em;
+  }
+  .section-title em {
+    font-style: italic;
+    color: var(--ink-3);
+    font-size: 15px;
+    margin-left: 6px;
+    font-weight: 400;
+  }
+  .section-actions {
+    display: flex; gap: 16px; align-self: center;
+  }
+  .section-actions button {
+    background: transparent; border: 0;
+    font-family: 'Brygada 1918', serif;
+    font-style: italic; font-size: 13px;
+    color: var(--ink-3);
+    padding: 0;
+    cursor: pointer;
+  }
+  .section-actions button:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+
+  .rows { list-style: none; padding-top: 4px; }
+  /* Row: full top border on overdue (NOT left-stripe), pale wash on background */
+  .row {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 168px) minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: baseline;
+    padding: 14px 4px;
+    border-bottom: 1px solid var(--rule-fade);
+  }
+  .row:last-child { border-bottom: 0; }
+  .row.overdue {
+    background: var(--high-paper);
+    padding-left: 12px;
+    padding-right: 12px;
+    margin: 0 -8px;
+    /* indication via background tint, not border-left */
+  }
+
+  .when {
+    font-family: 'Karla', sans-serif;
+    font-size: 12px; letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .when.overdue {
+    color: var(--high);
+    font-weight: 600;
+  }
+  .row a.client {
+    font-family: 'Brygada 1918', serif;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--ink);
+    text-decoration: none;
+    line-height: 1.2;
+  }
+  .row a.client:hover { text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+  .row .ditto {
+    font-family: 'Brygada 1918', serif;
+    font-style: italic;
+    font-size: 14px;
+    color: var(--ink-4);
+  }
+  .row .form {
+    font-family: 'Brygada 1918', serif;
+    font-style: italic;
+    font-size: 14px;
+    color: var(--ink-2);
+    line-height: 1.4;
+    text-decoration: none;
+  }
+  .row .form .ai {
+    display: inline-block;
+    margin-left: 8px;
+    font-family: 'Karla', sans-serif;
+    font-style: normal;
+    font-size: 10px; letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--gold);
+    border-bottom: 1px solid var(--gold);
+    padding-bottom: 1px;
+  }
+  .row .tag {
+    font-family: 'Karla', sans-serif;
+    font-size: 10px; letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    align-self: center;
+  }
+
+  /* Pull quote */
+  .pullquote {
+    margin: 56px auto 0;
+    max-width: 56ch;
+    text-align: center;
+    padding: 22px 0;
+    border-top: 1px solid var(--ink);
+    border-bottom: 1px solid var(--ink);
+    position: relative;
+  }
+  .pullquote::before, .pullquote::after {
+    content: '';
+    position: absolute; left: 50%; transform: translateX(-50%);
+    width: 36px; height: 1px; background: var(--paper);
+  }
+  .pullquote::before { top: 0; }
+  .pullquote::after  { bottom: 0; }
+  .pullquote .ornament {
+    color: var(--gold);
+    font-family: 'Brygada 1918', serif;
+    font-style: italic;
+    font-size: 18px;
+    line-height: 1;
+    margin-bottom: 10px;
+    display: block;
+  }
+  .pullquote q {
+    font-family: 'Brygada 1918', serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: clamp(22px, 2.6vw, 32px);
+    line-height: 1.28;
+    letter-spacing: -0.014em;
+    color: var(--ink);
+    quotes: '"' '"';
+    text-wrap: balance;
+  }
+  .pullquote .attr {
+    margin-top: 12px;
+    font-family: 'Karla', sans-serif;
+    font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  .footer-folio {
+    margin-top: 48px;
+    padding: 16px 40px 32px;
+    border-top: 1px solid var(--rule);
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 24px;
+    align-items: baseline;
+    font-family: 'Karla', sans-serif;
+    font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .footer-folio .center {
+    font-family: 'Brygada 1918', serif;
+    font-style: italic;
+    font-size: 14px; letter-spacing: 0;
+    text-transform: none;
+    color: var(--ink);
+  }
+  .footer-folio .right { text-align: right; }
+
+  .direction-tag {
+    position: fixed; bottom: 18px; right: 18px;
+    background: var(--gold); color: var(--paper);
+    padding: 7px 14px;
+    font-family: 'Karla', sans-serif;
+    font-size: 10px; letter-spacing: 0.18em;
+    text-transform: uppercase;
+    z-index: 100;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside>
+    <div class="masthead">
+      <div class="masthead-line">A periodical of state filings</div>
+      <h1 class="masthead-title">DueDate<em>HQ</em></h1>
+      <p class="masthead-firm">Compiled for Sarah Mitchell, CPA</p>
+    </div>
+
+    <div class="nav-section">Sections</div>
+    <nav>
+      <a class="nav-item active"><span class="lead">i.</span><span>Front</span><span class="count"></span></a>
+      <a class="nav-item"><span class="lead">ii.</span><span>To review</span><span class="count">5</span></a>
+      <a class="nav-item"><span class="lead">iii.</span><span>Clients</span><span class="count"></span></a>
+      <a class="nav-item alert"><span class="lead">iv.</span><span>Alerts</span><span class="count">3</span></a>
+      <a class="nav-item"><span class="lead">v.</span><span>Insights</span><span class="count"></span></a>
+      <a class="nav-item"><span class="lead">vi.</span><span>Settings</span><span class="count"></span></a>
+    </nav>
+
+    <div class="colophon">
+      <p>Set in <strong>Brygada 1918</strong> for display, <strong>Karla</strong> for the running text, and <strong>Petrona</strong> for asides.<br>Vol. I · No. 18 · MMXXVI.</p>
+    </div>
+  </aside>
+
+  <main>
+    <div class="folio">
+      <span class="vol">Vol. <strong>I</strong> · No. <strong>18</strong> · April 30, 2026</span>
+      <span class="spacer"></span>
+      <button class="search">Search the archive…</button>
+      <button class="icon-btn" aria-label="Notifications">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <span class="pip"></span>
+      </button>
+      <button class="new-btn">New entry</button>
+      <span class="avatar">SC</span>
+    </div>
+
+    <div class="spread">
+      <div class="lede">
+        <h1><span class="cap">G</span>ood morning, Sarah. <em>Two filings sit overdue, and another eight come due before Friday.</em></h1>
+        <p class="dek">Louisiana issued an automatic Hurricane Delta extension overnight, granting relief to six clients on your roster. Three remain outstanding on documents.</p>
+        <p class="byline">Compiled <strong>Thursday, April 30</strong> · Week 18 of 2026 · Fifty of fifty states monitored</p>
+      </div>
+      <div class="gutter" aria-hidden="true"></div>
+      <aside class="callout">
+        <dl>
+          <div>
+            <dt>Overdue</dt>
+            <dd class="high">02<span class="qual">Requires action today.</span></dd>
+          </div>
+          <div>
+            <dt>Due this week</dt>
+            <dd>08<span class="qual">Across five jurisdictions.</span></dd>
+          </div>
+          <div>
+            <dt>Awaiting documents</dt>
+            <dd>03<span class="qual">Last chase, two days ago.</span></dd>
+          </div>
+        </dl>
+      </aside>
+    </div>
+
+    <div class="wire">
+      <div class="wire-num">§</div>
+      <div>
+        <div class="wire-eyebrow">Wire · Louisiana DOR · Disaster declaration</div>
+        <div class="wire-title">Hurricane Delta extension grants automatic relief through July 15.</div>
+        <div class="wire-meta">Six of your LA clients become eligible. Detected from official sources two hours ago. <a href="#">View source ↗</a></div>
+      </div>
+      <button class="wire-action">Review affected</button>
+    </div>
+
+    <div class="columns">
+      <section>
+        <div class="section-head">
+          <span class="roman">I.</span>
+          <h2 class="section-title">Overdue <em>two filings</em></h2>
+          <div class="section-actions"><button>Export</button><button>Filter</button></div>
+        </div>
+        <ul class="rows">
+          <li class="row overdue">
+            <span class="when overdue">3 d. late</span>
+            <a class="client" href="#">Acme LLC</a>
+            <span class="form">1120-S federal · annual filing</span>
+            <span class="tag">Fed</span>
+          </li>
+          <li class="row overdue">
+            <span class="when overdue">1 d. late</span>
+            <a class="client" href="#">Tessera Holdings</a>
+            <span class="form">CA Form 568 · LLC fee</span>
+            <span class="tag">CA</span>
+          </li>
+        </ul>
+      </section>
+
+      <div class="col-rule" aria-hidden="true"></div>
+
+      <section>
+        <div class="section-head">
+          <span class="roman">II.</span>
+          <h2 class="section-title">This week <em>eight filings</em></h2>
+          <div class="section-actions"><button>Export</button><button>Filter</button></div>
+        </div>
+        <ul class="rows">
+          <li class="row">
+            <span class="when">Today</span>
+            <a class="client" href="#">Wilkins Plumbing</a>
+            <span class="form">LA-CIFT-620 · in progress<span class="ai">Generated · S-Corp · LA</span></span>
+            <span class="tag">LA</span>
+          </li>
+          <li class="row">
+            <span class="when">Tue</span>
+            <a class="client" href="#">Northshore Co</a>
+            <span class="form">TX Franchise Tax · annual report</span>
+            <span class="tag">TX</span>
+          </li>
+          <li class="row">
+            <span class="when">Wed</span>
+            <a class="client" href="#">Pinecrest Inc</a>
+            <span class="form">Form 941 · Q1 2026 quarterly</span>
+            <span class="tag">Fed</span>
+          </li>
+          <li class="row">
+            <span class="when">Thu</span>
+            <a class="client" href="#">Vanderbilt &amp; Sons</a>
+            <span class="form">IT-204 NY-LLC · partnership return</span>
+            <span class="tag">NY</span>
+          </li>
+          <li class="row">
+            <span class="when">Fri</span>
+            <span class="ditto">↪ ditto</span>
+            <span class="form">CA Form 100 · S-Corp annual</span>
+            <span class="tag">CA</span>
+          </li>
+          <li class="row">
+            <span class="when">Fri</span>
+            <a class="client" href="#">Ridgemont Group</a>
+            <span class="form">ST-1 · Illinois Sales/Use</span>
+            <span class="tag">IL</span>
+          </li>
+        </ul>
+      </section>
+    </div>
+
+    <div class="pullquote">
+      <span class="ornament">§ ❦ §</span>
+      <q>Never the last CPA in your state to find out.</q>
+      <p class="attr">— from the thesis</p>
+    </div>
+
+    <div class="footer-folio">
+      <span>DueDateHQ · Vol. I · No. 18</span>
+      <span class="center">page <em>i</em></span>
+      <span class="right">April 30 · MMXXVI</span>
+    </div>
+  </main>
+</div>
+
+<div class="direction-tag">v2 · Editorial</div>
+</body>
+</html>
