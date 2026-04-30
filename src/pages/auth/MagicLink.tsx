@@ -156,7 +156,12 @@ export function MagicLink() {
     // Users click the link in their email; SupabaseAuthBridge catches the
     // SIGNED_IN event on redirect and signs them in. Mock mode (which can't
     // send real emails) keeps the OTP fallback below for local testing.
-    if (!env.useMockApi) {
+    //
+    // Build-time gate via import.meta.env.DEV instead of runtime env check —
+    // Vite replaces this with literal `false` in prod builds, so the entire
+    // OTP form below gets tree-shaken out. Guarantees prod cannot render
+    // the OTP form regardless of misconfigured env vars or cache.
+    if (!import.meta.env.DEV || !env.useMockApi) {
       return (
         <div className="min-h-screen bg-canvas flex items-center justify-center p-6">
           <div className="w-full max-w-md bg-surface border border-line rounded-md p-8 text-center">
