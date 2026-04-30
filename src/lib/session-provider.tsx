@@ -5,7 +5,7 @@ import {
   type ReactNode,
 } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import type { Firm, FirmTier, User } from "../types";
+import type { Firm, FirmTier, StateCode, User } from "../types";
 import { useRemoteSession } from "../hooks/useSession";
 import { useSession as useLocalSession } from "../data/session";
 import { DashboardSkeleton } from "../components/skeletons/DashboardSkeleton";
@@ -81,7 +81,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           firm: {
             id: `local-${local.firmName}`,
             name: local.firmName,
-            primaryStates: local.primaryStates ?? [],
+            primaryStates: (local.primaryStates ?? []) as StateCode[],
             logoStorageKey: null,
             branding: null,
             tier: local.tier,
