@@ -152,6 +152,52 @@ export function MagicLink() {
   };
 
   if (step === "code") {
+    // Link-only path per UX feedback — skip the 6-digit OTP input entirely.
+    // Users click the link in their email; SupabaseAuthBridge catches the
+    // SIGNED_IN event on redirect and signs them in. Mock mode (which can't
+    // send real emails) keeps the OTP fallback below for local testing.
+    if (!env.useMockApi) {
+      return (
+        <div className="min-h-screen bg-canvas flex items-center justify-center p-6">
+          <div className="w-full max-w-md bg-surface border border-line rounded-md p-8 text-center">
+            <button
+              onClick={() => {
+                setStep("email");
+                setError(null);
+              }}
+              className="text-xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-1 absolute"
+            >
+              <ArrowLeft className="w-3 h-3" aria-hidden /> Use a different email
+            </button>
+            <div className="w-14 h-14 rounded-full bg-info-bg border border-info-border flex items-center justify-center text-info-ink mx-auto mt-2">
+              <Mail className="w-6 h-6" aria-hidden />
+            </div>
+            <h1 className="text-xl font-semibold text-ink-900 mt-5">
+              Check your email
+            </h1>
+            <p className="text-sm text-ink-500 mt-2">
+              We sent a sign-in link to{" "}
+              <span className="font-medium text-ink-900">{email}</span>.
+              Click the link to continue — you'll come back signed in.
+            </p>
+
+            <p className="text-2xs text-ink-400 mt-6 pt-4 border-t border-line">
+              Didn't get it? Check spam, or{" "}
+              <button
+                onClick={() => sendCode(new Event("submit") as unknown as React.FormEvent)}
+                className="underline hover:no-underline"
+                disabled={pending}
+              >
+                {pending ? "resending…" : "resend the link"}
+              </button>
+              .
+            </p>
+          </div>
+        </div>
+      );
+    }
+    // Mock-mode fallback — keeps the OTP form so local testing still works
+    // without a real Supabase email send.
     return (
       <div className="min-h-screen bg-canvas flex items-center justify-center p-6">
         <div className="w-full max-w-md bg-surface border border-line rounded-md p-8">
@@ -169,12 +215,10 @@ export function MagicLink() {
             <Mail className="w-5 h-5" aria-hidden />
           </div>
           <h1 className="text-xl font-semibold text-ink-900 mt-4 text-center">
-            Check your email
+            Check your email (mock)
           </h1>
           <p className="text-sm text-ink-500 mt-2 text-center">
-            We sent a 6-digit code to{" "}
-            <span className="font-medium text-ink-900">{email}</span>. Type it
-            below — or click the link in the email if that's easier.
+            Mock mode — type any 6 digits below to sign in as a demo user.
           </p>
 
           <form onSubmit={verifyCode} className="space-y-3 mt-6">
@@ -205,18 +249,6 @@ export function MagicLink() {
               {pending ? "Verifying…" : "Verify and continue"}
             </button>
           </form>
-
-          <p className="text-2xs text-ink-400 mt-4 pt-4 border-t border-line text-center">
-            Didn't get it? Check spam, or{" "}
-            <button
-              onClick={() => sendCode(new Event("submit") as unknown as React.FormEvent)}
-              className="underline hover:no-underline"
-              disabled={pending}
-            >
-              resend the code
-            </button>
-            .
-          </p>
         </div>
       </div>
     );

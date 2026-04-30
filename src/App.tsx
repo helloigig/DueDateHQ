@@ -30,6 +30,7 @@ import { OnboardingPackages } from "./pages/onboarding/OnboardingPackages";
 import { OnboardingDone } from "./pages/onboarding/OnboardingDone";
 import { SessionProvider } from "./lib/session-provider";
 import { SupabaseAuthBridge } from "./lib/supabase-auth-bridge";
+import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { useSession } from "./data/session";
 import { env } from "./config";
 
@@ -71,7 +72,7 @@ export default function App() {
   const supabaseAuthPending = isSupabaseAuthPending();
 
   return (
-    <>
+    <AppErrorBoundary>
       <SupabaseAuthBridge />
       <Routes>
       {/* Public auth routes — outside the AppShell */}
@@ -161,6 +162,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/login" replace />} />
       )}
       </Routes>
-    </>
+    </AppErrorBoundary>
   );
 }

@@ -4,6 +4,7 @@ import { ChevronRight, Mail, CheckCircle2, Megaphone, MessageSquare, Inbox } fro
 import { trpc } from "../lib/api/client";
 import { MOCK_TODO_ITEMS } from "../data/mockTodoItems";
 import type { MockTodoItem, TodoVerb } from "../data/mockTodoItems";
+import { env } from "../config";
 
 // Wire ActionQueue to backend computed-view via trpc.todoItems.list. Falls
 // back to the static frontend mock if the procedure returns empty (e.g., a
@@ -44,12 +45,15 @@ export function ActionQueue() {
   const [expanded, setExpanded] = useState(false);
   const todoQuery = trpc.todoItems.list.useQuery({ limit: 50 });
   const live = todoQuery.data?.items ?? [];
-  // If backend returned anything, use it. Otherwise fall back to the static
-  // frontend mock so design demos still showcase the 9-source variety on a
-  // fresh / un-seeded environment.
-  const sorted: TodoItem[] = (live.length > 0
-    ? (live as TodoItem[])
-    : MOCK_TODO_ITEMS
+  // If we're in real mode (production), trust the BE — empty means empty.
+  // Don't fall back to MOCK_TODO_ITEMS or the user sees fake "actions" come
+  // from nowhere. Mock fallback is only useful in design-demo / mock mode
+  // where the BE can't talk to a database.
+  const isMock = env.useMockApi;
+  const useMockFallback = isMock && live.length === 0;
+  const sorted: TodoItem[] = (useMockFallback
+    ? MOCK_TODO_ITEMS
+    : (live as TodoItem[])
   )
     .slice()
     .sort((a, b) => b.urgencyScore - a.urgencyScore);
