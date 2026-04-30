@@ -15,7 +15,20 @@ import { aiInferences } from "../../db/schema.js";
  * For Phase 0 we expose the recording endpoint + a per-mode summary view
  * so the FE can show "Mode A acceptance: 87% over 30d" in Settings.
  */
-const MODES = ["A", "B", "C", "D", "E"] as const;
+const MODES = ["A", "B", "C", "D", "E", "F"] as const;
+type Mode = (typeof MODES)[number];
+
+/** p50 / p95 percentile from a list of latency-ms values. Returns null when
+ *  the sample is empty. */
+function percentile(values: number[], p: number): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const idx = Math.min(
+    sorted.length - 1,
+    Math.floor((p / 100) * sorted.length),
+  );
+  return sorted[idx] ?? null;
+}
 
 export const aiInferencesRouter = router({
   /** Called by the FE the moment a CPA acts on an AI proposal. */
@@ -46,8 +59,9 @@ export const aiInferencesRouter = router({
     }),
 
   /**
-   * Per-mode acceptance rate over a window. Phase 0 returns coarse stats;
-   * Phase 1 adds drift detection per arch §6.9.
+   * Per-mode acceptance rate + cost + latency over the firm's lifetime.
+   * Returns counts, acceptance rate, total cost, p50/p95 latency. Phase 1
+   * adds drift detection per arch §6.9 (see driftReport below).
    */
   summary: firmProcedure
     .input(z.object({ mode: z.enum(MODES) }).optional())
@@ -70,14 +84,60 @@ export const aiInferencesRouter = router({
         (sum, r) => sum + Number(r.costCents ?? 0),
         0,
       );
+      const latencies = rows
+        .map((r) => r.latencyMs)
+        .filter((n): n is number => typeof n === "number" && n > 0);
       return {
         total,
         actedOn: acted,
         accepted,
         acceptanceRate: acted > 0 ? accepted / acted : null,
         totalCostCents: cost,
+        p50LatencyMs: percentile(latencies, 50),
+        p95LatencyMs: percentile(latencies, 95),
       };
     }),
+
+  /**
+   * Multi-mode overview — returns one summary row per Mode A-F in a single
+   * query. Drives the Settings → AI eval all-modes dashboard. Cheaper than
+   * 6 round-trips when the FE just needs the headline numbers per mode.
+   */
+  summaryAll: firmProcedure.query(async ({ ctx }) => {
+    const rows = await db
+      .select()
+      .from(aiInferences)
+      .where(eq(aiInferences.firmId, ctx.firmId));
+    const byMode = new Map<Mode, typeof rows>();
+    for (const r of rows) {
+      const arr = byMode.get(r.mode as Mode) ?? [];
+      arr.push(r);
+      byMode.set(r.mode as Mode, arr);
+    }
+    return MODES.map((m) => {
+      const modeRows = byMode.get(m) ?? [];
+      const total = modeRows.length;
+      const acted = modeRows.filter((r) => r.wasActedOn !== null).length;
+      const accepted = modeRows.filter((r) => r.wasActedOn === true).length;
+      const cost = modeRows.reduce(
+        (sum, r) => sum + Number(r.costCents ?? 0),
+        0,
+      );
+      const latencies = modeRows
+        .map((r) => r.latencyMs)
+        .filter((n): n is number => typeof n === "number" && n > 0);
+      return {
+        mode: m,
+        total,
+        actedOn: acted,
+        accepted,
+        acceptanceRate: acted > 0 ? accepted / acted : null,
+        totalCostCents: cost,
+        p50LatencyMs: percentile(latencies, 50),
+        p95LatencyMs: percentile(latencies, 95),
+      };
+    });
+  }),
 
   /**
    * Drift report — per-mode acceptance rate bucketed by week. Lets ops

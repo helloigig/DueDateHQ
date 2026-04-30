@@ -927,8 +927,26 @@ export const appRouter = t.router({
           accepted: number;
           acceptanceRate: number | null;
           totalCostCents: number;
+          p50LatencyMs: number | null;
+          p95LatencyMs: number | null;
         }> => NOT_IMPL()
       ),
+    /** Multi-mode overview — one row per Mode A-F in a single query. Drives
+     *  Settings → AI eval all-modes table. */
+    summaryAll: t.procedure.query(
+      async (): Promise<
+        Array<{
+          mode: "A" | "B" | "C" | "D" | "E" | "F";
+          total: number;
+          actedOn: number;
+          accepted: number;
+          acceptanceRate: number | null;
+          totalCostCents: number;
+          p50LatencyMs: number | null;
+          p95LatencyMs: number | null;
+        }>
+      > => NOT_IMPL(),
+    ),
     /** Drift report — per-mode acceptance rate bucketed by ISO week.
      *  Surfaces deteriorating model performance before users complain. */
     driftReport: t.procedure

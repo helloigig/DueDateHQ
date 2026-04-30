@@ -1627,7 +1627,25 @@ export const mockAdapter = {
         accepted: 105,
         acceptanceRate: 105 / 121,
         totalCostCents: 487.2,
+        p50LatencyMs: 850,
+        p95LatencyMs: 2400,
       };
+    },
+    /** Multi-mode overview mock — 6 modes with realistic-shape data. Mode A
+     *  (classify) has highest volume; Mode F (state alerts) has lowest. */
+    summaryAll: async () => {
+      await delay();
+      // Hand-tuned shape so the all-modes table looks realistic in demos.
+      // A = highest volume (every inbound email); D = high volume (every
+      // chase draft); B/C/E = mid; F = low (handful of state announcements).
+      return [
+        { mode: "A" as const, total: 612, actedOn: 588, accepted: 547, acceptanceRate: 547 / 588, totalCostCents: 122.4, p50LatencyMs: 720, p95LatencyMs: 2100 },
+        { mode: "B" as const, total: 89, actedOn: 71, accepted: 64, acceptanceRate: 64 / 71, totalCostCents: 17.8, p50LatencyMs: 880, p95LatencyMs: 2600 },
+        { mode: "C" as const, total: 34, actedOn: 22, accepted: 19, acceptanceRate: 19 / 22, totalCostCents: 6.8, p50LatencyMs: 950, p95LatencyMs: 3100 },
+        { mode: "D" as const, total: 198, actedOn: 174, accepted: 155, acceptanceRate: 155 / 174, totalCostCents: 297.0, p50LatencyMs: 1400, p95LatencyMs: 4200 },
+        { mode: "E" as const, total: 42, actedOn: 28, accepted: 22, acceptanceRate: 22 / 28, totalCostCents: 12.6, p50LatencyMs: 1100, p95LatencyMs: 3500 },
+        { mode: "F" as const, total: 11, actedOn: 8, accepted: 8, acceptanceRate: 1.0, totalCostCents: 4.4, p50LatencyMs: 1850, p95LatencyMs: 5200 },
+      ];
     },
     /** Mock drift report — 8 weeks of buckets, slight downward trend
      *  to exercise both "stable" and "alert" branches in the UI. */
