@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, FileDown, X } from "lucide-react";
 import { TaskHeader } from "../components/TaskHeader";
+import { TaskMiniTimeline } from "../components/TaskMiniTimeline";
 import { ChecklistList } from "../components/ChecklistList";
 import { ActivityTimeline } from "../components/ActivityTimeline";
 import { AiInsightsPanel } from "../components/AiInsightsPanel";
@@ -147,6 +148,13 @@ export function TaskDetail() {
         client={client}
         completionPct={completionPct(checklist)}
       />
+
+      {/* Mini-timeline visualization (NEW per IA v0.7 amendment §3.4 +
+          PRD §9.4.1 TaskMilestone). Anchors the task's progress through
+          5 milestone waypoints (Initial mtg / Collect / Prepare / Review
+          / File). Missing-count badge at in-progress stage per
+          `feedback_gap_over_fill`. */}
+      <TaskMiniTimeline task={task} checklist={checklist} />
 
       <div className="flex items-center justify-end -mt-3">
         <button

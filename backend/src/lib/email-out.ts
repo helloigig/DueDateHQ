@@ -39,6 +39,13 @@ export interface SendEmailInput {
   taskId?: string;
   /** Cc the CPA so they see the auto-replies. PRD §7.2. */
   cc?: string[];
+  /** Optional EmailDraft id — stamped as a provider-side tag/header so
+   *  bounce + complaint webhooks (PRD §5.8) can correlate back to the
+   *  draft for DeliveryEvent persistence. Resend uses `tags`; SES uses
+   *  message tags via SDK; Gmail/Outlook OAuth use a custom header
+   *  (DSN bounces come back through the inbound classifier — see
+   *  `feedback_no_manual_file_shuffle` for the architecture). */
+  emailDraftId?: string;
 }
 
 export interface SendEmailResult {
@@ -123,8 +130,15 @@ async function sendViaOauth(
   }
 
   // Outlook — Graph API /me/sendMail
+  // Custom header X-DueDateHQ-Email-Draft-Id stamps the draft id for DSN
+  // bounce attribution (parsed inbound side via the classifier when a
+  // postmaster bounce DSN comes back through the firm's mailbox).
   const headers = [
     { name: "Reply-To", value: input.replyTo ?? "" },
+    {
+      name: "X-DueDateHQ-Email-Draft-Id",
+      value: input.emailDraftId ?? "",
+    },
   ].filter((h) => h.value);
   const res = await fetch(
     "https://graph.microsoft.com/v1.0/me/sendMail",
@@ -171,6 +185,13 @@ async function sendViaResend(
     input.from ??
     process.env.RESEND_FROM ??
     "DueDateHQ <noreply@duedatehq.com>";
+  // Stamp email_draft_id as a Resend tag so the bounce/complaint webhook
+  // (POST /api/delivery/resend/{secret}) can correlate the event back to
+  // the EmailDraft for DeliveryEvent persistence. Resend tag values must
+  // be ASCII alnum + _-; UUIDs satisfy that.
+  const tags = input.emailDraftId
+    ? [{ name: "email_draft_id", value: input.emailDraftId }]
+    : undefined;
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -185,6 +206,7 @@ async function sendViaResend(
       text: input.body,
       html: input.htmlBody,
       reply_to: input.replyTo,
+      tags,
     }),
   });
   if (!res.ok) {
@@ -208,6 +230,12 @@ function buildRfc822(input: SendEmailInput): string {
   if (input.from) lines.push(`From: ${input.from}`);
   if (input.replyTo) lines.push(`Reply-To: ${input.replyTo}`);
   if (input.cc?.length) lines.push(`Cc: ${input.cc.join(", ")}`);
+  // Custom header for Gmail/Outlook OAuth bounce attribution. DSN bounces
+  // come back via the inbound classifier path; the header lets us tie a
+  // bounce DSN's In-Reply-To / References back to a specific EmailDraft.
+  if (input.emailDraftId) {
+    lines.push(`X-DueDateHQ-Email-Draft-Id: ${input.emailDraftId}`);
+  }
   if (input.htmlBody) {
     lines.push("Content-Type: text/html; charset=UTF-8", "", input.htmlBody);
   } else {

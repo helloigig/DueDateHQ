@@ -32,11 +32,16 @@ import {
   checklistItems,
   clients,
   deadlines,
+  inboundReplies,
   integrations,
   tasks,
 } from "../db/schema.js";
 import { getFreshAccessToken } from "./oauth.js";
 import { classifyDocument, isAiConfigured } from "./ai.js";
+import {
+  buildInboundReplyInsert,
+  classifyInboundLLM,
+} from "./inbound-orchestrator.js";
 import { log, span, captureException } from "./observability.js";
 
 // ───────── Provider abstraction ─────────
@@ -374,6 +379,49 @@ export async function pollMethodBOnce(args: {
             (t) => t.formType && subj.includes(t.formType.toLowerCase()),
           ) ?? clientTasks[0];
         if (!target) continue;
+
+        // v0.8 amendment: persist InboundReply with 7-class top-level
+        // classification (mirrors Method A path in inbound-email.ts so the
+        // todoItems router's reply_pushback / reply_question / reply_ack
+        // sources see Method B inbound the same way they see Method A).
+        // Bytes never leave Gmail/Outlook — providerId is the canonical
+        // pointer (Path E per `feedback_no_manual_file_shuffle`).
+        try {
+          const orchestratorPayload = {
+            gmailMessageId: msg.providerId,
+            fromAddress: msg.from,
+            toAddress: "", // Method B polls the CPA's inbox; the to-address
+            // (CPA's own email) isn't on InboxMessage, leave blank.
+            subject: msg.subject,
+            bodyText: msg.text,
+            attachmentMetadata: msg.attachments.map((a, i) => ({
+              filename: a.filename,
+              mimeType: a.contentType,
+              size: a.size,
+              attachmentIndex: i,
+            })),
+          };
+          const classification = await classifyInboundLLM(
+            orchestratorPayload,
+            process.env.ANTHROPIC_API_KEY,
+          );
+          const reply = buildInboundReplyInsert(
+            args.firmId,
+            orchestratorPayload,
+            classification,
+          );
+          await db
+            .insert(inboundReplies)
+            .values({ ...reply, taskId: target.id });
+        } catch (err) {
+          // Classifier persist failure shouldn't block the existing
+          // attachment-classify + activity event path below — log + drop.
+          captureException(err, {
+            ctx: "method_b.classify_persist",
+            firmId: args.firmId,
+            messageId: msg.providerId,
+          });
+        }
 
         try {
           // For each attachment, run Mode A classify and write a

@@ -59,7 +59,7 @@ const SONNET_MODEL = "claude-sonnet-4-5";
  */
 async function callLLM(args: {
   firmId: string;
-  mode: "A" | "B" | "C" | "D" | "E";
+  mode: "A" | "B" | "C" | "D" | "E" | "F";
   model: string;
   systemPrompt: string;
   userPrompt: string;
@@ -451,10 +451,11 @@ export async function parseAnnouncement(
   try {
     const { text, inferenceId } = await callLLM({
       firmId: input.firmId,
-      // Mode "C" is anomaly-flag in the spec; the scraper parser uses
-      // it as the closest existing bucket. (Worth carving out a Mode F
-      // / Mode G in a follow-up if scraper volume justifies it.)
-      mode: "C",
+      // Mode F = state-change monitoring (v0.8 amendment). Announcement
+      // parsing is the canonical Mode F use case — we run the LLM on
+      // scraped state-authority pages to lift confidence on regex hits
+      // < 0.7 into structured Announcement rows.
+      mode: "F",
       model: HAIKU_MODEL,
       systemPrompt: SCRAPE_SYSTEM_PROMPT,
       userPrompt,

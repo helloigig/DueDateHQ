@@ -32,6 +32,7 @@ import {
   announcementMatches,
   announcements,
   clients,
+  stateAnnouncementSources,
 } from "../db/schema.js";
 import { log, span, captureException } from "./observability.js";
 
@@ -135,6 +136,8 @@ export async function runScraperCycle(
     let lowConfidence = 0;
 
     for (const src of sources) {
+      const cycleStart = new Date();
+      let cycleError: string | null = null;
       try {
         const notices = await fetchSource(src);
         fetched += notices.length;
@@ -171,8 +174,15 @@ export async function runScraperCycle(
           if (bucket === "low") lowConfidence++;
         }
       } catch (err) {
+        cycleError =
+          err instanceof Error ? err.message : String(err);
         captureException(err, { source: src.url });
       }
+      // Write per-state freshness — drives Mode F Health real-per-state
+      // status (IA v0.7 §3.9d). PK is (state_code, authority); we upsert
+      // every cycle so the dashboard reflects last-scraped-at even when
+      // there are no new notices to insert.
+      await recordSourceFreshness(src, cycleStart, cycleError);
     }
 
     log.info("scraper.cycle.result", {
@@ -241,6 +251,93 @@ export async function matchFirm(firmId: string): Promise<number> {
 }
 
 // ---------- Internals ----------
+
+/**
+ * Upsert per-state scrape freshness. PK is (state_code, authority).
+ * Status thresholds match Mode F Health spec (IA v0.7 §3.9d):
+ *   - healthy:     scraped <2h ago and last cycle succeeded
+ *   - stale_short: succeeded >2h ago but <24h ago
+ *   - stale_long:  succeeded >24h ago
+ *   - broken:      ≥3 consecutive errors
+ */
+async function recordSourceFreshness(
+  src: ScraperSource,
+  cycleStart: Date,
+  errMessage: string | null,
+): Promise<void> {
+  try {
+    // Read prior row to compute new consecutiveErrorCount + status.
+    const [prior] = await db
+      .select()
+      .from(stateAnnouncementSources)
+      .where(
+        and(
+          eq(stateAnnouncementSources.stateCode, src.stateCode),
+          eq(stateAnnouncementSources.authority, src.authority),
+        ),
+      );
+    const wasError = errMessage !== null;
+    const consecutiveErrorCount = wasError
+      ? (prior?.consecutiveErrorCount ?? 0) + 1
+      : 0;
+    const lastSuccessAt = wasError
+      ? (prior?.lastSuccessAt ?? null)
+      : cycleStart;
+    let status: "healthy" | "stale_short" | "stale_long" | "broken";
+    if (consecutiveErrorCount >= 3) {
+      status = "broken";
+    } else if (!lastSuccessAt) {
+      status = "stale_long";
+    } else {
+      const ageMs = Date.now() - lastSuccessAt.getTime();
+      const TWO_HOURS = 2 * 60 * 60 * 1000;
+      const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+      status =
+        ageMs < TWO_HOURS
+          ? "healthy"
+          : ageMs < TWENTY_FOUR_HOURS
+            ? "stale_short"
+            : "stale_long";
+    }
+    if (prior) {
+      await db
+        .update(stateAnnouncementSources)
+        .set({
+          sourceUrl: src.url,
+          lastScrapedAt: cycleStart,
+          lastSuccessAt,
+          lastErrorMessage: errMessage,
+          consecutiveErrorCount,
+          status,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(stateAnnouncementSources.stateCode, src.stateCode),
+            eq(stateAnnouncementSources.authority, src.authority),
+          ),
+        );
+    } else {
+      await db.insert(stateAnnouncementSources).values({
+        stateCode: src.stateCode,
+        authority: src.authority,
+        sourceUrl: src.url,
+        lastScrapedAt: cycleStart,
+        lastSuccessAt,
+        lastErrorMessage: errMessage,
+        consecutiveErrorCount,
+        status,
+      });
+    }
+  } catch (err) {
+    // Freshness write failure shouldn't break the cycle — log + continue.
+    log.warn("scraper.freshness_write_failed", {
+      stateCode: src.stateCode,
+      authority: src.authority,
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
 
 async function fetchSource(src: ScraperSource): Promise<ScrapedNotice[]> {
   const res = await fetch(src.url, {

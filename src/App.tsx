@@ -6,6 +6,8 @@ import { ClientDetail } from "./pages/ClientDetail";
 import { TaskDetail } from "./pages/TaskDetail";
 import { Inbox } from "./pages/Inbox";
 import { Insights } from "./pages/Insights";
+import { Mail } from "./pages/Mail";
+import { Timeline } from "./pages/Timeline";
 import { AnnouncementList } from "./pages/AnnouncementList";
 import { AnnouncementDetail } from "./pages/AnnouncementDetail";
 import { Import } from "./pages/Import";
@@ -69,10 +71,24 @@ export default function App() {
           }
         >
           <Route index element={<Dashboard />} />
-          <Route path="to-review" element={<Inbox />} />
+          {/* IA v0.7 amendment §2: 7 sidebar destinations.
+              Today (/) · Timeline (/timeline) · Clients · Mail · Alerts ·
+              Opportunities · Settings */}
+          <Route path="timeline" element={<Timeline />} />
+          <Route path="mail" element={<Mail />} />
+          {/* /legacy/dashboard — old Dashboard view without ActionQueue +
+              Mode F Health. Kept reachable during the v0.7-amendment
+              transition so CPAs can A/B compare and we have a rollback
+              path. Same component, branched on location.pathname. */}
+          <Route path="legacy/dashboard" element={<Dashboard />} />
+          {/* /to-review and /inbox kept as legacy redirects to canonical /mail
+              (Mail surface subsumes the old "review queue" concept per IA v0.7
+              §3.8). Also keep /to-review as a back-compat aliased route to the
+              old Inbox page in case anyone deep-linked it. */}
+          <Route path="to-review" element={<Navigate to="/mail" replace />} />
+          <Route path="inbox" element={<Navigate to="/mail" replace />} />
+          <Route path="legacy/to-review" element={<Inbox />} />
           <Route path="calendar" element={<Calendar />} />
-          {/* Legacy /inbox route — redirect to canonical /to-review */}
-          <Route path="inbox" element={<Navigate to="/to-review" replace />} />
           <Route path="opportunities" element={<Insights />} />
           {/* Legacy /insights route — redirect to canonical /opportunities */}
           <Route path="insights" element={<Navigate to="/opportunities" replace />} />

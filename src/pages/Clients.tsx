@@ -10,6 +10,7 @@ import { ErrorState } from "../components/ErrorState";
 import { useClients } from "../hooks/useClients";
 import { useTriageDeadlines } from "../hooks/useDeadlines";
 import { useAnnouncements } from "../hooks/useAnnouncements";
+import { useStore } from "../data/store";
 import { useFeatureFlags } from "../hooks/useFeatureFlags";
 import { UpgradePrompt } from "../components/UpgradePrompt";
 import { countdownLabel, parseDate, TODAY, daysBetween } from "../data/dateHelpers";
@@ -102,6 +103,50 @@ export function Clients() {
 
   const announcementsQuery = useAnnouncements({ activeOnly: true });
   const announcements = announcementsQuery.data ?? [];
+
+  // Per IA v0.7 amendment §3.2: split "Open" column into Waiting (gap-emphasized
+  // primary signal) + Review (secondary). Compute per-client from checklist
+  // state via store (`feedback_gap_over_fill` — what client hasn't sent is
+  // the loudest column).
+  const { checklistItems, tasks } = useStore();
+  const taskClient = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const t of tasks) m.set(t.id, t.clientId);
+    return m;
+  }, [tasks]);
+  const fleetCounts = useMemo(() => {
+    const out = new Map<string, { waiting: number; review: number; oldestReminderDays: number | null }>();
+    const now = Date.now();
+    for (const ci of checklistItems) {
+      const clientId = taskClient.get(ci.taskId);
+      if (!clientId) continue;
+      const entry =
+        out.get(clientId) ?? { waiting: 0, review: 0, oldestReminderDays: null };
+      if (ci.state === "requested_waiting" || ci.state === "not_requested") {
+        entry.waiting++;
+        if (ci.lastReminderAt) {
+          const days = Math.floor((now - new Date(ci.lastReminderAt).getTime()) / (24 * 60 * 60 * 1000));
+          if (entry.oldestReminderDays == null || days > entry.oldestReminderDays) {
+            entry.oldestReminderDays = days;
+          }
+        }
+      } else if (ci.state === "received_unreviewed" || ci.state === "received_issue") {
+        entry.review++;
+      }
+      out.set(clientId, entry);
+    }
+    return out;
+  }, [checklistItems, taskClient]);
+
+  // Alert-affected clients (for row background tint per §3.2)
+  const alertedClientIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const a of announcements) {
+      if (a.dismissed) continue;
+      for (const id of a.affectedClientIds) s.add(id);
+    }
+    return s;
+  }, [announcements]);
 
   const spotlightCards = useMemo<SpotlightCard[]>(() => {
     const cards: SpotlightCard[] = [];
@@ -439,9 +484,17 @@ export function Clients() {
                 Name
               </SortableTh>
               <th className="text-left px-4 py-2 font-semibold">Tier</th>
-              <SortableTh col="open" sortCol={sortCol} sortDir={sortDir} onClick={toggleSort} align="right">
-                Open
-              </SortableTh>
+              {/* IA v0.7 amendment §3.2: split "Open" → Waiting (primary, gap)
+                  + Review (secondary). Waiting cell tinted by reminder
+                  staleness per `feedback_gap_over_fill`. */}
+              <th className="text-right px-4 py-2 font-semibold" title="Items the client hasn't sent yet (requested_waiting + not_requested)">
+                <span className="inline-flex items-center gap-1">
+                  <span aria-hidden>🚨</span> Waiting
+                </span>
+              </th>
+              <th className="text-right px-4 py-2 font-semibold" title="Items received but waiting on CPA action (received_unreviewed + received_issue)">
+                Review
+              </th>
               <SortableTh col="next" sortCol={sortCol} sortDir={sortDir} onClick={toggleSort} align="right">
                 Next deadline
               </SortableTh>
@@ -449,10 +502,13 @@ export function Clients() {
               <SortableTh col="entity" sortCol={sortCol} sortDir={sortDir} onClick={toggleSort} align="left">
                 Entity
               </SortableTh>
+              <th className="text-center px-2 py-2 font-semibold w-10" title="💎 Opportunity flag — Mode E + Layer B/C signals">
+                <span aria-hidden>💎</span>
+              </th>
             </tr>
           </thead>
           <tbody>
-            {sorted.map(({ c, openCount, next }) => {
+            {sorted.map(({ c, next }) => {
               const nextDays = next
                 ? daysBetween(TODAY, parseDate(next.officialDueDate))
                 : null;
@@ -469,11 +525,38 @@ export function Clients() {
                   navigate(href);
                 }
               };
+              const fc = fleetCounts.get(c.id) ?? {
+                waiting: 0,
+                review: 0,
+                oldestReminderDays: null,
+              };
+              const hasAlert = alertedClientIds.has(c.id);
+              const waitingTone =
+                fc.oldestReminderDays != null && fc.oldestReminderDays > 14
+                  ? "text-danger-solid font-semibold"
+                  : fc.oldestReminderDays != null && fc.oldestReminderDays > 7
+                    ? "text-warning-solid font-semibold"
+                    : fc.waiting > 0
+                      ? "text-ink-900 font-medium"
+                      : "text-ink-400";
+              const rowTint = hasAlert
+                ? "bg-warning-bg/30 hover:bg-warning-bg/50"
+                : "hover:bg-sunken";
+              // Phase 2 mock — Mode E opportunity badge (real wiring Phase 5).
+              // Surface a tag on premium clients with overdue items as a stand-in
+              // until Mode E ships actual advisory triggers.
+              const opportunity =
+                c.tier === "premium" && fc.waiting > 3
+                  ? "C" // churn risk
+                  : c.tier === "premium" && fc.review > 0
+                    ? "P" // pricing
+                    : null;
               return (
                 <tr
                   key={c.id}
                   onClick={onRowClick}
-                  className="border-b border-line last:border-b-0 hover:bg-sunken cursor-pointer"
+                  className={`border-b border-line last:border-b-0 cursor-pointer transition-colors ${rowTint}`}
+                  title={hasAlert ? "1+ active state alert affecting this client" : undefined}
                 >
                   <td className="px-4 py-2.5">
                     <Link
@@ -486,8 +569,30 @@ export function Clients() {
                   <td className="px-4 py-2.5">
                     <TierPill tier={c.tier} />
                   </td>
-                  <td className="px-4 py-2.5 text-right text-ink-700 tabular-nums">
-                    {openCount}
+                  <td className={`px-4 py-2.5 text-right tabular-nums ${waitingTone}`}>
+                    {fc.waiting > 0 ? (
+                      <span title={
+                        fc.oldestReminderDays != null
+                          ? `oldest reminder ${fc.oldestReminderDays}d ago`
+                          : undefined
+                      }>
+                        {fc.waiting}
+                        {fc.oldestReminderDays != null && fc.oldestReminderDays > 0 && (
+                          <span className="text-2xs ml-1 text-ink-400">
+                            ({fc.oldestReminderDays}d)
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="text-ink-300">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">
+                    {fc.review > 0 ? (
+                      <span className="text-info-ink">{fc.review}</span>
+                    ) : (
+                      <span className="text-ink-300">—</span>
+                    )}
                   </td>
                   <td
                     className={`px-4 py-2.5 text-right tabular-nums ${
@@ -503,12 +608,26 @@ export function Clients() {
                     />
                   </td>
                   <td className="px-4 py-2.5 text-ink-700">{c.entityType}</td>
+                  <td className="px-2 py-2.5 text-center">
+                    {opportunity && (
+                      <span
+                        className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-info-bg text-info-ink text-2xs font-semibold tabular-nums"
+                        title={
+                          opportunity === "C"
+                            ? "Churn risk: Premium client with stuck items > 3"
+                            : "Pricing opportunity: review-pending items signal advisory uplift"
+                        }
+                      >
+                        💎{opportunity}
+                      </span>
+                    )}
+                  </td>
                 </tr>
               );
             })}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center">
+                <td colSpan={8} className="px-4 py-8 text-center">
                   <p className="text-sm text-ink-700 font-medium">
                     {hasFilters
                       ? "No clients match the current filters."

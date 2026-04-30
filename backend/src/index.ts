@@ -7,7 +7,17 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { env } from "./env.js";
 import { createContext } from "./trpc/context.js";
 import { appRouter } from "./trpc/_app.js";
-import { fromPostmark, processInboundEmail } from "./lib/inbound-email.js";
+import {
+  fromPostmark,
+  fromSes,
+  processInboundEmail,
+} from "./lib/inbound-email.js";
+import {
+  fromPostmarkDelivery,
+  fromResend,
+  fromSesNotification,
+  persistDeliveryEvent,
+} from "./lib/delivery-webhooks.js";
 import { handleCallback } from "./lib/oauth.js";
 import { startScraperScheduler } from "./lib/scraper.js";
 import { startExportWorker, ARTIFACT_DIR } from "./lib/export-worker.js";
@@ -55,6 +65,93 @@ app.post("/api/inbound/email/postmark/:secret", async (c) => {
     return c.json({ ok: true, matched: !!result, result });
   } catch (err) {
     captureException(err, { route: "/api/inbound/email/postmark" });
+    return c.json({ ok: false, error: "internal" }, 500);
+  }
+});
+
+// AWS SES inbound webhook (Method A — PRD §7.7 + v0.8 amendment §3.5).
+// SES + SNS deliver inbound mail JSON; processInboundEmail runs the same
+// 7-class classifier path as Postmark (per `feedback_unified_ai_surface`).
+app.post("/api/inbound/email/ses/:secret", async (c) => {
+  const secret = c.req.param("secret");
+  if (!secret || secret !== process.env.INBOUND_WEBHOOK_SECRET) {
+    return c.json({ ok: false, error: "unauthorized" }, 401);
+  }
+  try {
+    const body = await c.req.json();
+    const normalized = fromSes(body);
+    if (!normalized) {
+      return c.json({ ok: false, error: "malformed" }, 400);
+    }
+    const result = await processInboundEmail(normalized);
+    return c.json({ ok: true, matched: !!result, result });
+  } catch (err) {
+    captureException(err, { route: "/api/inbound/email/ses" });
+    return c.json({ ok: false, error: "internal" }, 500);
+  }
+});
+
+// ───────── Delivery event webhooks (PRD §5.8) ─────────
+//
+// SES + Postmark POST bounce / complaint / delivery / open events here.
+// Persists to delivery_events table; bounces surface as TodoItems via the
+// todoItems router for the CPA to fix-address or suppress.
+app.post("/api/delivery/postmark/:secret", async (c) => {
+  const secret = c.req.param("secret");
+  if (!secret || secret !== process.env.DELIVERY_WEBHOOK_SECRET) {
+    return c.json({ ok: false, error: "unauthorized" }, 401);
+  }
+  try {
+    const body = await c.req.json();
+    const ev = fromPostmarkDelivery(body);
+    if (!ev) {
+      return c.json({ ok: false, error: "unrecognized_event_type" }, 400);
+    }
+    const result = await persistDeliveryEvent(ev);
+    return c.json({ ok: result.ok, reason: result.reason });
+  } catch (err) {
+    captureException(err, { route: "/api/delivery/postmark" });
+    return c.json({ ok: false, error: "internal" }, 500);
+  }
+});
+
+app.post("/api/delivery/ses/:secret", async (c) => {
+  const secret = c.req.param("secret");
+  if (!secret || secret !== process.env.DELIVERY_WEBHOOK_SECRET) {
+    return c.json({ ok: false, error: "unauthorized" }, 401);
+  }
+  try {
+    const body = await c.req.json();
+    const ev = fromSesNotification(body);
+    if (!ev) {
+      return c.json({ ok: false, error: "unrecognized_event_type" }, 400);
+    }
+    const result = await persistDeliveryEvent(ev);
+    return c.json({ ok: result.ok, reason: result.reason });
+  } catch (err) {
+    captureException(err, { route: "/api/delivery/ses" });
+    return c.json({ ok: false, error: "internal" }, 500);
+  }
+});
+
+// Resend webhook (current outbound provider — see lib/email-out.ts).
+// Resend tags emails with email_draft_id at send time so the bounce /
+// complaint / delivered events route back to the right DeliveryEvent.
+app.post("/api/delivery/resend/:secret", async (c) => {
+  const secret = c.req.param("secret");
+  if (!secret || secret !== process.env.DELIVERY_WEBHOOK_SECRET) {
+    return c.json({ ok: false, error: "unauthorized" }, 401);
+  }
+  try {
+    const body = await c.req.json();
+    const ev = fromResend(body);
+    if (!ev) {
+      return c.json({ ok: false, error: "unrecognized_event_type" }, 400);
+    }
+    const result = await persistDeliveryEvent(ev);
+    return c.json({ ok: result.ok, reason: result.reason });
+  } catch (err) {
+    captureException(err, { route: "/api/delivery/resend" });
     return c.json({ ok: false, error: "internal" }, 500);
   }
 });

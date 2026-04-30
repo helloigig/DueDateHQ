@@ -361,6 +361,334 @@ export const mockAdapter = {
     },
   },
 
+  // todoItems — computed view per PRD §4.8 + IA v0.7 §3.1. Mock adapter
+  // computes from the same in-memory store the rest of the app uses, so
+  // the action queue stays in sync with checklist state changes.
+  todoItems: {
+    list: async (
+      input: { limit?: number } | undefined = undefined,
+    ): Promise<{
+      items: Array<{
+        id: string;
+        source: string;
+        verb: "Send" | "Confirm" | "Apply" | "Discuss";
+        client: string;
+        clientId: string;
+        task?: string;
+        taskId?: string;
+        dueDate?: string;
+        action: string;
+        context: string;
+        stageLabel?: string;
+        daysBehind?: number;
+        urgency: "high" | "medium" | "normal";
+        urgencyScore: number;
+        surface:
+          | "email_draft_modal"
+          | "task_detail"
+          | "alert_detail"
+          | "opportunity_detail"
+          | "bounce_modal";
+      }>;
+      total: number;
+      sourcesPending: string[];
+    }> => {
+      await delay();
+      const limit = input?.limit ?? 50;
+      const { checklistItems, tasks, clients, deadlines, announcements } =
+        getState();
+      const items: Array<{
+        id: string;
+        source: string;
+        verb: "Send" | "Confirm" | "Apply" | "Discuss";
+        client: string;
+        clientId: string;
+        task?: string;
+        taskId?: string;
+        dueDate?: string;
+        action: string;
+        context: string;
+        stageLabel?: string;
+        daysBehind?: number;
+        urgency: "high" | "medium" | "normal";
+        urgencyScore: number;
+        surface:
+          | "email_draft_modal"
+          | "task_detail"
+          | "alert_detail"
+          | "opportunity_detail"
+          | "bounce_modal";
+      }> = [];
+
+      const TIER_WEIGHT: Record<string, number> = {
+        premium: 1.5,
+        standard: 1,
+        custom: 1,
+      };
+      const taskById = new Map(tasks.map((t) => [t.id, t]));
+      const clientById = new Map(clients.map((c) => [c.id, c]));
+      const deadlineById = new Map(deadlines.map((d) => [d.id, d]));
+
+      const proximityFactor = (iso: string | null | undefined): number => {
+        if (!iso) return 1;
+        const days =
+          (new Date(iso).getTime() - Date.now()) / (24 * 60 * 60 * 1000);
+        if (days < 0) return 3;
+        if (days < 7) return 2;
+        if (days < 30) return 1.5;
+        return 1;
+      };
+
+      const urgencyBucket = (s: number): "high" | "medium" | "normal" => {
+        if (s >= 200) return "high";
+        if (s >= 100) return "medium";
+        return "normal";
+      };
+
+      // Sources 1-3: checklist-derived (Mode A inbound, Mode C anomaly,
+      // Mode B reminder due). One pass over checklistItems.
+      for (const ci of checklistItems) {
+        const task = taskById.get(ci.taskId);
+        if (!task) continue;
+        const deadline = deadlineById.get(task.deadlineId);
+        const client = clientById.get(deadline?.clientId ?? "");
+        if (!client || !deadline) continue;
+        const tierW = TIER_WEIGHT[client.tier ?? "standard"] ?? 1;
+        const due = deadline.officialDueDate;
+
+        if (ci.state === "received_issue") {
+          const score = 80 * proximityFactor(due) * tierW;
+          items.push({
+            id: `mode_c-${ci.id}`,
+            source: "mode_c_anomaly",
+            verb: "Confirm",
+            client: client.name,
+            clientId: client.id,
+            task: task.formType,
+            taskId: task.id,
+            dueDate: due,
+            action: `Resolve flag · ${ci.label}`,
+            context:
+              ci.flagReason ?? "Mode C flagged anomaly — review before confirming",
+            stageLabel: "Review",
+            urgency: urgencyBucket(score),
+            urgencyScore: Math.round(score),
+            surface: "task_detail",
+          });
+        } else if (ci.state === "received_unreviewed") {
+          const score = 50 * proximityFactor(due) * tierW;
+          items.push({
+            id: `mode_a-${ci.id}`,
+            source: "mode_a_inbound",
+            verb: "Confirm",
+            client: client.name,
+            clientId: client.id,
+            task: task.formType,
+            taskId: task.id,
+            dueDate: due,
+            action: `Confirm ${ci.label}`,
+            context: `AI ${ci.aiConfidence ?? "medium"} confidence · received and waiting for your decision`,
+            stageLabel: "Review",
+            urgency: urgencyBucket(score),
+            urgencyScore: Math.round(score),
+            surface: "task_detail",
+          });
+        } else if (
+          ci.state === "requested_waiting" ||
+          ci.state === "not_requested"
+        ) {
+          const lastReminder = ci.lastReminderAt
+            ? new Date(ci.lastReminderAt).getTime()
+            : null;
+          const daysSinceReminder = lastReminder
+            ? Math.floor((Date.now() - lastReminder) / (24 * 60 * 60 * 1000))
+            : null;
+          const wm =
+            ci.state === "not_requested"
+              ? 2.0
+              : !lastReminder
+                ? 1.0
+                : daysSinceReminder! > 7
+                  ? 2.5
+                  : daysSinceReminder! > 3
+                    ? 1.5
+                    : 1.0;
+          const stuck = lastReminder
+            ? Math.max(0, daysSinceReminder! * 5)
+            : 0;
+          const score = 50 * wm * proximityFactor(due) * tierW + stuck;
+          const reminderText =
+            daysSinceReminder != null
+              ? `last sent ${daysSinceReminder}d ago`
+              : "not yet requested";
+          items.push({
+            id: `mode_b-${ci.id}`,
+            source: "mode_b_reminder_due",
+            verb: "Send",
+            client: client.name,
+            clientId: client.id,
+            task: task.formType,
+            taskId: task.id,
+            dueDate: due,
+            action: `Send reminder · ${ci.label}`,
+            context: `${reminderText}${lastReminder ? " · draft ready" : ""}`,
+            stageLabel: "Collect",
+            daysBehind:
+              daysSinceReminder != null && daysSinceReminder > 7
+                ? daysSinceReminder
+                : undefined,
+            urgency: urgencyBucket(score),
+            urgencyScore: Math.round(score),
+            surface: "email_draft_modal",
+          });
+        }
+      }
+
+      // Source 6: Mode F alert — active firm announcements.
+      const activeAlerts = announcements.filter(
+        (a) => !a.dismissed && (a.affectedClientIds?.length ?? 0) > 0,
+      );
+      for (const a of activeAlerts.slice(0, 8)) {
+        const matchCount = a.affectedClientIds.length;
+        const score = 100 * (matchCount > 5 ? 1.5 : 1.0);
+        items.push({
+          id: `mode_f-${a.id}`,
+          source: "mode_f_alert",
+          verb: "Apply",
+          client: matchCount === 1 ? "1 client" : `${matchCount} clients`,
+          clientId: "",
+          action: `Apply ${a.title}`,
+          context: `${a.stateCode}: ${a.summary?.slice(0, 80) ?? ""} · matched on ${matchCount} client${matchCount === 1 ? "" : "s"}`,
+          urgency: urgencyBucket(score),
+          urgencyScore: Math.round(score),
+          surface: "alert_detail",
+        });
+      }
+
+      items.sort((a, b) => b.urgencyScore - a.urgencyScore);
+      return {
+        items: items.slice(0, limit),
+        total: items.length,
+        sourcesPending: [
+          "reply_pushback",
+          "reply_question",
+          "delivery_bounce",
+          "mode_d_draft_ready",
+          "mode_e_opportunity",
+        ],
+      };
+    },
+  },
+
+  // taskMilestones — mock returns empty arrays + no-op mutations. Real wiring
+  // happens against the backend when VITE_USE_MOCK_API=false. The mock keeps
+  // returning [] so TaskMiniTimeline falls back to its heuristic derivation
+  // from existing Task fields (clientPrepDate/internalTargetDate/officialDueDate).
+  taskMilestones: {
+    listForTask: async (_input: { taskId: string }) => {
+      await delay();
+      return [] as unknown[];
+    },
+    fleetStack: async (_input?: { waitingOnly?: boolean; limit?: number }) => {
+      await delay();
+      return [] as unknown[];
+    },
+    update: async (_input: unknown) => {
+      await delay();
+      return {} as unknown;
+    },
+    add: async (_input: unknown) => {
+      await delay();
+      return {} as unknown;
+    },
+  },
+
+  // inboundReplies — mock returns empty by default; the static frontend
+  // mock in Mail.tsx covers the design-review-quality variety until real
+  // backend traffic flows.
+  inboundReplies: {
+    list: async (
+      _input?: {
+        taskId?: string;
+        topLevelClass?: string;
+        replyIntent?: string;
+        limit?: number;
+      },
+    ) => {
+      await delay();
+      return [] as unknown[];
+    },
+    markActioned: async (_input: { id: string }) => {
+      await delay();
+      return {} as unknown;
+    },
+    linkToTask: async (_input: { id: string; taskId: string }) => {
+      await delay();
+      return {} as unknown;
+    },
+  },
+
+  // deliveryEvents — mock returns empty issues queue. Mail.tsx Issues tab
+  // shows static mock until SES/Postmark/Resend webhooks fire real events.
+  deliveryEvents: {
+    issues: async (_input?: { limit?: number }) => {
+      await delay();
+      return [] as unknown[];
+    },
+    forDraft: async (_input: { emailDraftId: string }) => {
+      await delay();
+      return [] as unknown[];
+    },
+    suppressEvent: async (_input: { id: number }) => {
+      await delay();
+      return null as unknown;
+    },
+  },
+
+  // modeFHealth — IA v0.7 §3.9d. State-monitoring's own monitoring.
+  modeFHealth: {
+    status: async (): Promise<{
+      overall: "green" | "amber" | "red";
+      total: number;
+      stale: number;
+      lastSyncMinAgo: number | null;
+      nextSyncInMin: number;
+      perState: Array<{
+        code: string;
+        label: string;
+        staleHours: number;
+        status: string;
+      }>;
+      perStateIllustrative: boolean;
+    }> => {
+      await delay();
+      // Per-state breakdown is illustrative until backend exposes
+      // last_scraped_at (Phase 3 follow-up).
+      const perState = [
+        { code: "NY", label: "New York", staleHours: 4, status: "stale_short" },
+        { code: "TX", label: "Texas", staleHours: 12, status: "stale_short" },
+        {
+          code: "CA",
+          label: "California",
+          staleHours: 28,
+          status: "rescrape_running",
+        },
+      ];
+      const longStale = perState.filter((s) => s.staleHours > 24).length;
+      const overall =
+        longStale > 0 ? "red" : perState.length > 0 ? "amber" : "green";
+      return {
+        overall,
+        total: 50,
+        stale: perState.length,
+        lastSyncMinAgo: 14,
+        nextSyncInMin: 16,
+        perState,
+        perStateIllustrative: true,
+      };
+    },
+  },
+
   announcements: {
     list: async (input: { activeOnly?: boolean } = {}) => {
       await delay();

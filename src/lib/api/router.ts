@@ -37,6 +37,83 @@ const NOT_IMPL = () => {
 
 const jsonPassthrough = z.any();
 
+// Row shapes mirroring backend Drizzle return types for v0.8 amendment tables.
+// Kept narrow (only the columns the FE consumes) so refactors land cleanly.
+export type TaskMilestoneRow = {
+  id: string;
+  firmId: string;
+  taskId: string;
+  milestoneType: string;
+  customLabel: string | null;
+  targetDate: string | null;
+  completedDate: string | null;
+  status: "not_started" | "in_progress" | "blocked" | "done" | "overdue";
+  blockerReason: string | null;
+  displayOrder: number;
+  proposedBy: "user" | "ai" | "system";
+};
+
+export type InboundReplyRow = {
+  id: string;
+  firmId: string;
+  taskId: string | null;
+  gmailMessageId: string;
+  fromAddress: string;
+  toAddress: string;
+  subject: string | null;
+  bodyText: string | null;
+  attachmentMetadata: unknown;
+  topLevelClass:
+    | "client_document"
+    | "client_reply_intent"
+    | "agency_correspondence"
+    | "third_party_data"
+    | "payment_confirm"
+    | "vendor_notification"
+    | "spam"
+    | null;
+  replyIntent:
+    | "document_provided"
+    | "timeline_pushback"
+    | "question_asked"
+    | "off_topic"
+    | "mismatched_attachment"
+    | "acknowledgment"
+    | null;
+  intentConfidence: string | null;
+  receivedAt: string | Date;
+  classifiedAt: string | Date | null;
+  cpaActionedAt: string | Date | null;
+};
+
+export type DeliveryEventRow = {
+  id: number;
+  firmId: string;
+  emailDraftId: string;
+  eventType:
+    | "submitted"
+    | "accepted"
+    | "delivered"
+    | "opened"
+    | "replied"
+    | "bounced"
+    | "complained"
+    | "unsubscribed";
+  eventAt: string | Date;
+  bounceReason: string | null;
+  diagnosticText: string | null;
+  suppressedAt: string | Date | null;
+};
+
+export type DeliveryEventIssueRow = {
+  ev: DeliveryEventRow;
+  draft: {
+    id: string;
+    subject: string | null;
+    body: string | null;
+  };
+};
+
 export const appRouter = t.router({
   auth: t.router({
     session: t.procedure.query(
@@ -266,6 +343,125 @@ export const appRouter = t.router({
     rejectScraped: t.procedure
       .input(z.object({ id: z.string() }))
       .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+  }),
+
+  // todoItems — computed view per PRD §4.8 + IA v0.7 §3.1. NOT a stored
+  // table; aggregates from 9 sources (Modes A-F + InboundReply intent +
+  // DeliveryEvent bounces + manual). Frontend renders via ActionQueue.
+  todoItems: t.router({
+    list: t.procedure
+      .input(z.object({ limit: z.number().min(1).max(200).optional() }).optional())
+      .query(
+        async (): Promise<{
+          items: Array<{
+            id: string;
+            source: string;
+            verb: "Send" | "Confirm" | "Apply" | "Discuss";
+            client: string;
+            clientId: string;
+            task?: string;
+            taskId?: string;
+            dueDate?: string;
+            action: string;
+            context: string;
+            stageLabel?: string;
+            daysBehind?: number;
+            urgency: "high" | "medium" | "normal";
+            urgencyScore: number;
+            surface:
+              | "email_draft_modal"
+              | "task_detail"
+              | "alert_detail"
+              | "opportunity_detail"
+              | "bounce_modal";
+          }>;
+          total: number;
+          sourcesPending: string[];
+        }> => NOT_IMPL(),
+      ),
+  }),
+
+  // modeFHealth — IA v0.7 §3.9d. State-monitoring's own monitoring (overall
+  // status from the announcement pipeline; per-state breakdown illustrative
+  // pending Phase 3 backend last_scraped_at).
+  modeFHealth: t.router({
+    status: t.procedure.query(
+      async (): Promise<{
+        overall: "green" | "amber" | "red";
+        total: number;
+        stale: number;
+        lastSyncMinAgo: number | null;
+        nextSyncInMin: number;
+        perState: Array<{
+          code: string;
+          label: string;
+          staleHours: number;
+          status: string;
+        }>;
+        perStateIllustrative: boolean;
+      }> => NOT_IMPL(),
+    ),
+  }),
+
+  // taskMilestones — PRD §9.4.1. Mini-timeline data model. Powers Task detail
+  // header + Timeline destination. AI authority: Mode B writes target_date;
+  // Mode E writes status=blocked; AI cannot write status=done.
+  taskMilestones: t.router({
+    listForTask: t.procedure
+      .input(z.object({ taskId: z.string().uuid() }))
+      .query(async (): Promise<TaskMilestoneRow[]> => NOT_IMPL()),
+    fleetStack: t.procedure
+      .input(
+        z
+          .object({
+            waitingOnly: z.boolean().optional(),
+            limit: z.number().min(1).max(500).optional(),
+          })
+          .optional(),
+      )
+      .query(async (): Promise<TaskMilestoneRow[]> => NOT_IMPL()),
+    update: t.procedure
+      .input(jsonPassthrough)
+      .mutation(async (): Promise<TaskMilestoneRow> => NOT_IMPL()),
+    add: t.procedure
+      .input(jsonPassthrough)
+      .mutation(async (): Promise<TaskMilestoneRow> => NOT_IMPL()),
+  }),
+
+  // inboundReplies — PRD §5.8. Mail Inbox + Task detail conversation surface.
+  // 7-class top-level + 5+1 sub-intent classification persisted here.
+  inboundReplies: t.router({
+    list: t.procedure
+      .input(
+        z
+          .object({
+            taskId: z.string().uuid().optional(),
+            topLevelClass: z.string().optional(),
+            replyIntent: z.string().optional(),
+            limit: z.number().min(1).max(200).optional(),
+          })
+          .optional(),
+      )
+      .query(async (): Promise<InboundReplyRow[]> => NOT_IMPL()),
+    markActioned: t.procedure
+      .input(z.object({ id: z.string().uuid() }))
+      .mutation(async (): Promise<InboundReplyRow> => NOT_IMPL()),
+    linkToTask: t.procedure
+      .input(z.object({ id: z.string().uuid(), taskId: z.string().uuid() }))
+      .mutation(async (): Promise<InboundReplyRow> => NOT_IMPL()),
+  }),
+
+  // deliveryEvents — PRD §5.8. Mail Issues tab + bounce surfacing.
+  deliveryEvents: t.router({
+    issues: t.procedure
+      .input(z.object({ limit: z.number().min(1).max(200).optional() }).optional())
+      .query(async (): Promise<DeliveryEventIssueRow[]> => NOT_IMPL()),
+    forDraft: t.procedure
+      .input(z.object({ emailDraftId: z.string().uuid() }))
+      .query(async (): Promise<DeliveryEventRow[]> => NOT_IMPL()),
+    suppressEvent: t.procedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async (): Promise<DeliveryEventRow | null> => NOT_IMPL()),
   }),
 
   notifications: t.router({

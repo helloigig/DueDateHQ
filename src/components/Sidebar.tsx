@@ -1,27 +1,36 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import {
-  LayoutDashboard,
+  Home,
   Users,
   Bell,
   Settings,
-  CheckSquare,
-  TrendingUp,
+  Mail,
+  Lightbulb,
   PanelLeftClose,
   PanelLeftOpen,
-  CalendarDays,
+  GanttChartSquare,
 } from "lucide-react";
 import { useAnnouncements } from "../hooks/useAnnouncements";
 import { useSession } from "../data/session";
 import { useStore } from "../data/store";
 
+// 7-item sidebar per IA v0.7 amendment §2:
+//   Today / Timeline / Clients / Mail / Alerts / Opportunities / Settings
+//
+// "Today" is reactive — the action queue (per `feedback_gap_over_fill`).
+// "Timeline" is forward-planning — cross-client mini-timeline stack.
+// "Mail" is cross-client communication (per `feedback_unified_ai_surface`,
+//   ships Day 1 even though Method B OAuth volume is initially low).
+// "Opportunities" surfaces Mode E + Layer B/C signals (advisory / churn /
+//   pricing / capacity).
 const primary = [
-  { to: "/", label: "Dashboard", Icon: LayoutDashboard, end: true },
-  { to: "/to-review", label: "To review", Icon: CheckSquare, end: false },
+  { to: "/", label: "Today", Icon: Home, end: true },
+  { to: "/timeline", label: "Timeline", Icon: GanttChartSquare, end: false },
   { to: "/clients", label: "Clients", Icon: Users, end: false },
-  { to: "/calendar", label: "Calendar", Icon: CalendarDays, end: false },
+  { to: "/mail", label: "Mail", Icon: Mail, end: false },
   { to: "/alerts", label: "Alerts", Icon: Bell, end: false },
-  { to: "/opportunities", label: "Opportunities", Icon: TrendingUp, end: false },
+  { to: "/opportunities", label: "Opportunities", Icon: Lightbulb, end: false },
 ];
 
 const COLLAPSED_KEY = "duedatehq.sidebar_collapsed.v1";
@@ -128,12 +137,12 @@ export function Sidebar() {
                   unread > 0 && (
                     <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-danger-solid" />
                   )}
-                {!collapsed && to === "/to-review" && inboxCount > 0 && (
+                {!collapsed && to === "/mail" && inboxCount > 0 && (
                   <span className="ml-auto bg-sunken text-ink-700 text-2xs rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center tabular-nums border border-line">
                     {inboxCount}
                   </span>
                 )}
-                {collapsed && to === "/to-review" && inboxCount > 0 && (
+                {collapsed && to === "/mail" && inboxCount > 0 && (
                   <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-info-solid" />
                 )}
               </>
