@@ -52,14 +52,18 @@ export function isAiConfigured(): boolean {
 const HAIKU_MODEL = "claude-haiku-4-5";
 const SONNET_MODEL = "claude-sonnet-4-5";
 
+// Re-export model constants so other libs (inbound-orchestrator) pick the
+// same defaults without re-spelling them.
+export { HAIKU_MODEL, SONNET_MODEL };
+
 /**
  * Generic LLM call wrapper. Handles error normalization, latency
  * measurement, and ai_inferences row insertion. Returns the raw
  * model output for caller-specific parsing.
  */
-async function callLLM(args: {
+export async function callLLM(args: {
   firmId: string;
-  mode: "A" | "B" | "C" | "D" | "E";
+  mode: "A" | "B" | "C" | "D" | "E" | "F";
   model: string;
   systemPrompt: string;
   userPrompt: string;
@@ -115,8 +119,27 @@ async function callLLM(args: {
     throw err;
   } finally {
     const durationMs = Date.now() - start;
+    // Skip ai_inferences logging for the eval-runner sentinel firmId
+    // (00000000-...) — the FK to firms.id won't match and the insert would
+    // throw on every eval call, spamming Sentry. Real production calls always
+    // have a valid firmId.
+    const isEvalSentinel =
+      args.firmId === "00000000-0000-0000-0000-000000000000";
     // Record the inference even on error — drift detection needs both
     try {
+      if (isEvalSentinel) {
+        // Skip DB write but still emit the structured log so the eval can
+        // see latency + cost.
+        log.info("ai.call", {
+          mode: args.mode,
+          model: args.model,
+          durationMs,
+          costCents: Number(costCents.toFixed(4)),
+          inferenceId: 0,
+          error: errorMsg,
+          ctx: "eval_sentinel_skip_db",
+        });
+      } else {
       const inputHash = createHash("sha256")
         .update(args.systemPrompt)
         .update("\n--\n")
@@ -150,6 +173,7 @@ async function callLLM(args: {
         // We can't return inside finally — the outer try returns first.
         // Stash on the closure via a side channel.
         (returnHook as { id?: number }).id = row.id;
+      }
       }
     } catch (logErr) {
       // Logging failure shouldn't fail the user's request
@@ -451,10 +475,11 @@ export async function parseAnnouncement(
   try {
     const { text, inferenceId } = await callLLM({
       firmId: input.firmId,
-      // Mode "C" is anomaly-flag in the spec; the scraper parser uses
-      // it as the closest existing bucket. (Worth carving out a Mode F
-      // / Mode G in a follow-up if scraper volume justifies it.)
-      mode: "C",
+      // Mode F = state-change monitoring (v0.8 amendment). Announcement
+      // parsing is the canonical Mode F use case — we run the LLM on
+      // scraped state-authority pages to lift confidence on regex hits
+      // < 0.7 into structured Announcement rows.
+      mode: "F",
       model: HAIKU_MODEL,
       systemPrompt: SCRAPE_SYSTEM_PROMPT,
       userPrompt,
@@ -557,6 +582,187 @@ export async function predictArrivalTiming(
     });
     return null;
   }
+}
+
+// ───────── Mode B — TaskMilestone target_date prediction ─────────
+//
+// Per PRD §9.4.1: Mode B can WRITE proposed target_date values for each
+// milestone (yellow zone — CPA reviews). Mirrors `predictArrivalTiming`
+// but at the task-milestone level rather than the per-checklist-item
+// arrival level. The firm — not the client — is the primary predicate
+// (firms have characteristic internal cadence; clients drive arrival).
+
+const MILESTONE_DATES_SYSTEM_PROMPT = `You propose target dates for the 5 default tax-task milestones, given the form type, official due date, and any prior-year history for the firm.
+
+The 5 milestones (in order):
+1. initial_meeting — kickoff / engagement signed / scope confirmed
+2. collect_materials — client has sent everything we need
+3. prepare_workpapers — internal preparation complete
+4. internal_review — second-CPA review complete
+5. file — return / extension submitted to authority
+
+Output strict JSON:
+{
+  "proposals": [
+    {
+      "milestoneType": "initial_meeting" | "collect_materials" | "prepare_workpapers" | "internal_review" | "file",
+      "targetDate": "<YYYY-MM-DD>",
+      "confidence": "high" | "medium" | "low",
+      "rationale": "<one short clause>"
+    },
+    ... (5 entries total, one per milestone, in order)
+  ],
+  "overallConfidence": "high" | "medium" | "low",
+  "basisOfEstimate": "<one short sentence — firm history vs. substrate fallback>"
+}
+
+Rules:
+- targetDate must be ON or BEFORE officialDueDate. The "file" milestone targetDate equals officialDueDate by default unless prior history shows the firm files earlier.
+- Spacing must be monotonically increasing — initial_meeting < collect_materials < prepare_workpapers < internal_review < file.
+- "high" requires ≥2 prior-year matched-form milestone histories for this firm
+- "medium" requires 1 prior year OR substrate-with-firm-tier-known
+- "low" for substrate-only (no firm history available)
+- Substrate defaults (per PRD §4.2 cold-start; offset from officialDueDate):
+  - initial_meeting: -90 days
+  - collect_materials: -60 days
+  - prepare_workpapers: -21 days
+  - internal_review: -7 days
+  - file: 0 days (= officialDueDate)
+- These are starting points — adjust based on form complexity (1065 partnership tighter than 1040), client tier (premium often pushes earlier), and firm history when supplied.
+- Output ONLY valid JSON.`;
+
+export interface PredictMilestoneDatesInput {
+  firmId: string;
+  taskId: string;
+  formType: string;
+  officialDueDate: string; // YYYY-MM-DD
+  clientName?: string;
+  clientTier?: "premium" | "standard" | "basic";
+  /** Prior-year milestone history for this firm × form_type. Each entry:
+   *  {year, milestoneType, targetDate, completedDate}. Recent first. */
+  priorYearHistory?: Array<{
+    year: number;
+    milestoneType: string;
+    targetDate?: string | null;
+    completedDate?: string | null;
+  }>;
+}
+
+export interface MilestoneProposal {
+  milestoneType:
+    | "initial_meeting"
+    | "collect_materials"
+    | "prepare_workpapers"
+    | "internal_review"
+    | "file";
+  targetDate: string;
+  confidence: "high" | "medium" | "low";
+  rationale: string;
+}
+
+export interface PredictMilestoneDatesOutput {
+  proposals: MilestoneProposal[];
+  overallConfidence: "high" | "medium" | "low";
+  basisOfEstimate: string;
+  inferenceId: number;
+}
+
+export async function predictMilestoneTargetDates(
+  input: PredictMilestoneDatesInput,
+): Promise<PredictMilestoneDatesOutput | null> {
+  if (!isAiConfigured()) return substrateMilestoneDates(input);
+  const userPrompt = JSON.stringify({
+    formType: input.formType,
+    officialDueDate: input.officialDueDate,
+    clientTier: input.clientTier ?? "standard",
+    priorYearHistoryCount: input.priorYearHistory?.length ?? 0,
+    priorYearHistory: input.priorYearHistory ?? [],
+  });
+  try {
+    const { text, inferenceId } = await callLLM({
+      firmId: input.firmId,
+      mode: "B",
+      model: HAIKU_MODEL,
+      systemPrompt: MILESTONE_DATES_SYSTEM_PROMPT,
+      userPrompt,
+      maxTokens: 768,
+      context: {
+        taskId: input.taskId,
+        formType: input.formType,
+        officialDueDate: input.officialDueDate,
+      },
+    });
+    const parsed = JSON.parse(text) as Omit<
+      PredictMilestoneDatesOutput,
+      "inferenceId"
+    >;
+    if (!Array.isArray(parsed.proposals) || parsed.proposals.length !== 5) {
+      log.warn("ai.predictMilestoneTargetDates.bad_shape", {
+        textPreview: text.slice(0, 200),
+      });
+      return substrateMilestoneDates(input);
+    }
+    return { ...parsed, inferenceId };
+  } catch (err) {
+    log.warn("ai.predictMilestoneTargetDates.failed", {
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return substrateMilestoneDates(input);
+  }
+}
+
+/**
+ * Substrate fallback — used when no API key is configured, the LLM call
+ * fails, or the response can't be parsed. Returns the PRD §4.2 cold-start
+ * defaults so the FE always gets something to render.
+ */
+function substrateMilestoneDates(
+  input: PredictMilestoneDatesInput,
+): PredictMilestoneDatesOutput {
+  const due = new Date(input.officialDueDate);
+  const offset = (days: number) => {
+    const d = new Date(due);
+    d.setDate(d.getDate() - days);
+    return d.toISOString().slice(0, 10);
+  };
+  return {
+    proposals: [
+      {
+        milestoneType: "initial_meeting",
+        targetDate: offset(90),
+        confidence: "low",
+        rationale: "substrate default (no firm history)",
+      },
+      {
+        milestoneType: "collect_materials",
+        targetDate: offset(60),
+        confidence: "low",
+        rationale: "substrate default (no firm history)",
+      },
+      {
+        milestoneType: "prepare_workpapers",
+        targetDate: offset(21),
+        confidence: "low",
+        rationale: "substrate default (no firm history)",
+      },
+      {
+        milestoneType: "internal_review",
+        targetDate: offset(7),
+        confidence: "low",
+        rationale: "substrate default (no firm history)",
+      },
+      {
+        milestoneType: "file",
+        targetDate: input.officialDueDate,
+        confidence: "low",
+        rationale: "official due date — substrate default",
+      },
+    ],
+    overallConfidence: "low",
+    basisOfEstimate:
+      "PRD §4.2 cold-start substrate (no firm × form-type history available)",
+    inferenceId: 0,
+  };
 }
 
 // ───────── Mode C — anomaly detection on financial values ─────────
@@ -926,4 +1132,198 @@ export async function generateCrossYearInsights(
     });
     return null;
   }
+}
+
+// ───────── Mode E — TaskMilestone blocker detection ─────────
+//
+// Per PRD §9.4.1: Mode E can WRITE proposed `status = blocked` with
+// `blocker_reason` (yellow zone — CPA confirms or dismisses). Detects
+// at-risk milestones so the CPA sees a flag before the deadline slips.
+//
+// Inputs blend three signals:
+//   - Mode B target_date vs. today (proximity)
+//   - ChecklistItem state (waiting on client / awaiting CPA review)
+//   - Prior-year completion patterns ("this client historically misses
+//     Collect by 5d") via importedFacts when available
+//
+// AI authority is yellow zone — proposes only; never auto-blocks. CPA
+// sees the proposal in TaskMiniTimeline (red dot + reason tooltip), can
+// accept (status stays blocked) or dismiss (back to in_progress).
+
+const MILESTONE_BLOCKERS_SYSTEM_PROMPT = `You detect at-risk tax-task milestones, given target dates, checklist state, and prior-year history. The CPA uses your output to focus attention on milestones where intervention is needed.
+
+Return STRICT JSON. For each milestone provided in the input, return one decision:
+{
+  "decisions": [
+    {
+      "milestoneId": "<the input id, verbatim>",
+      "shouldBlock": <bool>,
+      "blockerReason": "<one short clause — only when shouldBlock is true; otherwise empty string>",
+      "confidence": "high" | "medium" | "low"
+    },
+    ... (one decision per input milestone, same order)
+  ]
+}
+
+Rules for "shouldBlock":
+- TRUE when one of:
+  (a) target_date is today or earlier AND status is not "done" — the milestone is overdue or about-to-overdue
+  (b) target_date is within 7 days AND a dependency is unmet (e.g., Collect target in 3 days but 5 checklist items still in requested_waiting)
+  (c) prior-year history shows the same milestone consistently slipped 5+ days for this client AND target_date is within 14 days
+  (d) status is already "in_progress" but no progress has happened (no checklist items moved to received_* state in 7+ days) AND target is within 10 days
+- FALSE for milestones where status="done" — never re-block completed work
+- FALSE for milestones beyond 14-day horizon — too speculative; this is yellow zone, not red
+
+Confidence calibration:
+- "high" — overdue OR clear pattern match (rule a or c with strong history)
+- "medium" — within 7 days + unmet dependency (rule b)
+- "low" — softer signals (rule d) — CPA may dismiss freely
+
+Blocker reason guidance:
+- Be specific: "5 client docs still waiting; collect target in 3d" beats "behind schedule"
+- Reference data when possible: "client missed Collect by 6d in 2024; on similar pace this year"
+- ≤ 80 chars; this surfaces in the milestone tooltip
+
+Output ONLY valid JSON.`;
+
+export interface MilestoneInput {
+  id: string;
+  milestoneType: string;
+  targetDate: string | null;
+  status: string;
+  completedDate: string | null;
+}
+
+export interface DetectMilestoneBlockersInput {
+  firmId: string;
+  taskId: string;
+  formType: string;
+  officialDueDate: string;
+  today: string;
+  milestones: MilestoneInput[];
+  /** Per-checklist-item state summary — drives rule (b) ("dependency unmet"). */
+  checklistSummary: {
+    waitingCount: number; // requested_waiting or not_requested
+    underReviewCount: number; // received_unreviewed or received_issue
+    confirmedCount: number;
+  };
+  /** Prior-year milestone slip history when available — drives rule (c). */
+  priorYearSlippage?: Array<{
+    year: number;
+    milestoneType: string;
+    targetDate?: string | null;
+    completedDate?: string | null;
+    slippageDays?: number; // completedDate - targetDate, positive = late
+  }>;
+}
+
+export interface MilestoneBlockerDecision {
+  milestoneId: string;
+  shouldBlock: boolean;
+  blockerReason: string;
+  confidence: "high" | "medium" | "low";
+}
+
+export interface DetectMilestoneBlockersOutput {
+  decisions: MilestoneBlockerDecision[];
+  inferenceId: number;
+}
+
+export async function detectMilestoneBlockers(
+  input: DetectMilestoneBlockersInput,
+): Promise<DetectMilestoneBlockersOutput | null> {
+  if (!isAiConfigured()) return heuristicMilestoneBlockers(input);
+  const userPrompt = JSON.stringify({
+    formType: input.formType,
+    officialDueDate: input.officialDueDate,
+    today: input.today,
+    milestones: input.milestones,
+    checklistSummary: input.checklistSummary,
+    priorYearSlippage: input.priorYearSlippage ?? [],
+  });
+  try {
+    const { text, inferenceId } = await callLLM({
+      firmId: input.firmId,
+      mode: "E",
+      model: HAIKU_MODEL,
+      systemPrompt: MILESTONE_BLOCKERS_SYSTEM_PROMPT,
+      userPrompt,
+      maxTokens: 1024,
+      context: {
+        taskId: input.taskId,
+        milestoneCount: input.milestones.length,
+        priorYearCount: input.priorYearSlippage?.length ?? 0,
+      },
+    });
+    const parsed = JSON.parse(text) as {
+      decisions?: MilestoneBlockerDecision[];
+    };
+    if (!Array.isArray(parsed.decisions)) {
+      log.warn("ai.detectMilestoneBlockers.bad_shape", {
+        textPreview: text.slice(0, 200),
+      });
+      return heuristicMilestoneBlockers(input);
+    }
+    // Sanity — only return decisions for milestone IDs we actually sent in.
+    const validIds = new Set(input.milestones.map((m) => m.id));
+    const decisions = parsed.decisions
+      .filter((d) => validIds.has(d.milestoneId))
+      .map((d) => ({
+        milestoneId: d.milestoneId,
+        shouldBlock: !!d.shouldBlock,
+        blockerReason: d.blockerReason ?? "",
+        confidence: (["high", "medium", "low"].includes(d.confidence)
+          ? d.confidence
+          : "low") as "high" | "medium" | "low",
+      }));
+    return { decisions, inferenceId };
+  } catch (err) {
+    log.warn("ai.detectMilestoneBlockers.failed", {
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return heuristicMilestoneBlockers(input);
+  }
+}
+
+/**
+ * Heuristic fallback — only fires rule (a) (overdue) since the others
+ * need LLM judgment. Returns shouldBlock=true for not-done milestones
+ * whose target_date is past.
+ */
+function heuristicMilestoneBlockers(
+  input: DetectMilestoneBlockersInput,
+): DetectMilestoneBlockersOutput {
+  const todayMs = new Date(input.today).getTime();
+  const decisions: MilestoneBlockerDecision[] = input.milestones.map((m) => {
+    if (m.status === "done") {
+      return {
+        milestoneId: m.id,
+        shouldBlock: false,
+        blockerReason: "",
+        confidence: "high",
+      };
+    }
+    if (m.targetDate) {
+      const overdue = new Date(m.targetDate).getTime() < todayMs;
+      if (overdue) {
+        const daysLate = Math.round(
+          (todayMs - new Date(m.targetDate).getTime()) /
+            (24 * 60 * 60 * 1000),
+        );
+        return {
+          milestoneId: m.id,
+          shouldBlock: true,
+          blockerReason: `target was ${daysLate}d ago; status still ${m.status}`,
+          confidence: "high",
+        };
+      }
+    }
+    return {
+      milestoneId: m.id,
+      shouldBlock: false,
+      blockerReason: "",
+      confidence: "low",
+    };
+  });
+  return { decisions, inferenceId: 0 };
 }

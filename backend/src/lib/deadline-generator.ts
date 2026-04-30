@@ -1,6 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { db } from "../db/client.js";
 import {
+  clients,
   deadlines,
   serviceTemplates,
   type DeadlineInsert,
@@ -28,13 +29,28 @@ export async function generateDeadlinesForClient(args: {
 
   if (templates.length === 0) return { created: 0 };
 
+  // Look up the client's service_start_date — deadlines that fall before
+  // this date weren't the firm's responsibility, so we skip generating them.
+  // NULL service_start_date means "no boundary" (treated as far past).
+  const [clientRow] = await db
+    .select({ serviceStartDate: clients.serviceStartDate })
+    .from(clients)
+    .where(eq(clients.id, args.clientId));
+  const serviceStart = clientRow?.serviceStartDate ?? null;
+
   const inserts: DeadlineInsert[] = [];
+  let skippedPreServiceStart = 0;
   for (const tmpl of templates) {
     const rule = tmpl.dueDateRule as DueDateRule;
     const periodInput =
       rule.type === "quarterly_fixed" ? `${args.year}` : `${args.year}`;
     const computed = computeDueDate(rule, periodInput);
     for (const c of computed) {
+      // Skip deadlines from before the client's service window.
+      if (serviceStart && c.officialDueDate < serviceStart) {
+        skippedPreServiceStart++;
+        continue;
+      }
       inserts.push({
         firmId: args.firmId,
         clientId: args.clientId,
@@ -47,6 +63,12 @@ export async function generateDeadlinesForClient(args: {
         status: "not_started",
       });
     }
+  }
+  if (skippedPreServiceStart > 0) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `[deadline-generator] skipped ${skippedPreServiceStart} deadlines before service_start=${serviceStart} for client ${args.clientId}`,
+    );
   }
 
   if (inserts.length === 0) return { created: 0 };

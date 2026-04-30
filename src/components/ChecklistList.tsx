@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Plus } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus, ChevronRight, AlertTriangle } from "lucide-react";
 import { ChecklistRow } from "./ChecklistRow";
 import type { ChecklistItem } from "../types";
 import { actions } from "../data/store";
@@ -14,33 +14,64 @@ interface Props {
 }
 
 /**
- * Wraps the per-task checklist rows. Owns the "Add custom item"
- * affordance. Counts shown in the section header give the CPA the
- * Yan-Jing test answer at a glance: "did the client give me 100%?"
+ * Per-task checklist, rendered with gap-over-fill structure (IA v0.7
+ * amendment §3.4 + `feedback_gap_over_fill`):
+ *
+ *   1. 🚨 STILL WAITING ON CLIENT  — primary, bordered, always-expanded.
+ *      Items the *client* hasn't sent yet (requested_waiting + not_requested).
+ *      Header counts show "N items · oldest reminder Xd ago" — instantly
+ *      answers the Yan Jing test ("did the client give me 100%?").
+ *
+ *   2. ⚠ NEEDS YOUR REVIEW  — secondary. Items received but waiting on CPA
+ *      action (received_unreviewed + received_issue).
+ *
+ *   3. ✅ Complete  — collapsed by default. Confirmed + not_applicable items
+ *      live here; one click to expand for audit / lookup.
+ *
+ * No big "all items in one flat list" — that buried the gap.
  */
 export function ChecklistList({ taskId, items, onOpenEmailDraft }: Props) {
   const [adding, setAdding] = useState(false);
   const [newLabel, setNewLabel] = useState("");
+  const [completeOpen, setCompleteOpen] = useState(false);
 
-  const counts = items.reduce(
-    (acc, c) => {
-      if (c.state === "received_confirmed") acc.confirmed++;
-      else if (c.state === "received_unreviewed") acc.unreviewed++;
-      else if (c.state === "received_issue") acc.issue++;
-      else if (c.state === "requested_waiting") acc.waiting++;
-      else if (c.state === "not_applicable") acc.na++;
-      else acc.notRequested++;
-      acc.total++;
-      return acc;
-    },
-    { total: 0, confirmed: 0, unreviewed: 0, issue: 0, waiting: 0, na: 0, notRequested: 0 }
-  );
+  const groups = useMemo(() => {
+    const waiting = items.filter(
+      (c) => c.state === "requested_waiting" || c.state === "not_requested"
+    );
+    const review = items.filter(
+      (c) => c.state === "received_unreviewed" || c.state === "received_issue"
+    );
+    const complete = items.filter(
+      (c) => c.state === "received_confirmed" || c.state === "not_applicable"
+    );
+    return { waiting, review, complete };
+  }, [items]);
 
-  const completionDenominator = counts.total - counts.na;
+  const completionDenominator = items.filter(
+    (c) => c.state !== "not_applicable"
+  ).length;
+  const confirmed = groups.complete.filter(
+    (c) => c.state === "received_confirmed"
+  ).length;
   const pct =
     completionDenominator === 0
       ? 0
-      : Math.round((counts.confirmed / completionDenominator) * 100);
+      : Math.round((confirmed / completionDenominator) * 100);
+
+  // Oldest reminder staleness in the waiting bucket (days). null if no
+  // reminders sent yet for any waiting item.
+  const oldestWaitingDays = useMemo(() => {
+    const reminders = groups.waiting
+      .map((c) => c.lastReminderAt)
+      .filter((d): d is string => !!d);
+    if (reminders.length === 0) return null;
+    const oldest = reminders.sort()[0];
+    const days = Math.floor(
+      (Date.now() - new Date(oldest).getTime()) / (24 * 60 * 60 * 1000)
+    );
+    return days;
+  }, [groups.waiting]);
 
   const submit = () => {
     if (!newLabel.trim()) return;
@@ -50,41 +81,142 @@ export function ChecklistList({ taskId, items, onOpenEmailDraft }: Props) {
   };
 
   return (
-    <section className="bg-surface border border-line rounded-md overflow-hidden">
-      <header className="flex items-center px-4 py-3 border-b border-line gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-700">
-          Checklist
-          <span className="ml-2 text-ink-400 font-normal normal-case tracking-normal">
-            ({counts.confirmed}/{completionDenominator} confirmed · {pct}%)
-          </span>
-        </h2>
-        <div className="flex items-center gap-2 text-2xs text-ink-500 ml-auto">
-          {counts.unreviewed > 0 && (
-            <Pill tone="info">{counts.unreviewed} to review</Pill>
+    <div className="space-y-4">
+      {/* 🚨 STILL WAITING ON CLIENT — primary section, bordered + amber tint */}
+      {groups.waiting.length > 0 && (
+        <section
+          aria-labelledby="still-waiting-heading"
+          className="bg-surface border-2 border-warning-border rounded-md overflow-hidden"
+        >
+          <header className="flex items-center px-4 py-2.5 bg-warning-bg/50 border-b border-warning-border gap-3">
+            <span aria-hidden className="text-base leading-none">
+              🚨
+            </span>
+            <h2
+              id="still-waiting-heading"
+              className="text-xs font-semibold uppercase tracking-wider text-ink-900"
+            >
+              Still waiting on client
+            </h2>
+            <span className="text-2xs text-ink-700 tabular-nums">
+              {groups.waiting.length} of {completionDenominator} items
+              {oldestWaitingDays != null && (
+                <>
+                  <span className="mx-1.5 text-ink-400">·</span>
+                  <span
+                    className={
+                      oldestWaitingDays > 7
+                        ? "text-danger-solid font-semibold"
+                        : oldestWaitingDays > 3
+                          ? "text-warning-solid font-semibold"
+                          : ""
+                    }
+                  >
+                    oldest reminder {oldestWaitingDays}d ago
+                  </span>
+                </>
+              )}
+            </span>
+          </header>
+          <div>
+            {groups.waiting.map((it) => (
+              <ChecklistRow
+                key={it.id}
+                item={it}
+                onOpenEmailDraft={onOpenEmailDraft}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ⚠ NEEDS YOUR REVIEW — secondary section */}
+      {groups.review.length > 0 && (
+        <section
+          aria-labelledby="needs-review-heading"
+          className="bg-surface border border-line rounded-md overflow-hidden"
+        >
+          <header className="flex items-center px-4 py-2.5 border-b border-line gap-3">
+            <AlertTriangle
+              className="w-3.5 h-3.5 text-warning-solid"
+              aria-hidden
+            />
+            <h2
+              id="needs-review-heading"
+              className="text-xs font-semibold uppercase tracking-wider text-ink-700"
+            >
+              Needs your review
+            </h2>
+            <span className="text-2xs text-ink-500 tabular-nums">
+              {groups.review.length}{" "}
+              {groups.review.length === 1 ? "item" : "items"}
+            </span>
+          </header>
+          <div>
+            {groups.review.map((it) => (
+              <ChecklistRow
+                key={it.id}
+                item={it}
+                onOpenEmailDraft={onOpenEmailDraft}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ✅ Complete — collapsed by default; expand for audit/lookup */}
+      {groups.complete.length > 0 && (
+        <section
+          aria-labelledby="complete-heading"
+          className="bg-surface border border-line rounded-md overflow-hidden"
+        >
+          <button
+            onClick={() => setCompleteOpen(!completeOpen)}
+            className="w-full flex items-center px-4 py-2.5 gap-3 hover:bg-sunken/50 transition-colors"
+            aria-expanded={completeOpen}
+            aria-controls="complete-list"
+          >
+            <ChevronRight
+              className={`w-3.5 h-3.5 text-ink-500 transition-transform ${completeOpen ? "rotate-90" : ""}`}
+              aria-hidden
+            />
+            <h2
+              id="complete-heading"
+              className="text-xs font-medium text-ink-500 tracking-wide flex items-center gap-2"
+            >
+              <span className="text-success-solid">✓</span>
+              <span className="tabular-nums">{groups.complete.length}</span>{" "}
+              {groups.complete.length === 1 ? "item" : "items"} complete
+              <span className="text-ink-400">·</span>
+              <span className="tabular-nums">{pct}%</span>
+            </h2>
+          </button>
+          {completeOpen && (
+            <div id="complete-list" className="border-t border-line">
+              {groups.complete.map((it) => (
+                <ChecklistRow
+                  key={it.id}
+                  item={it}
+                  onOpenEmailDraft={onOpenEmailDraft}
+                />
+              ))}
+            </div>
           )}
-          {counts.issue > 0 && (
-            <Pill tone="warn">{counts.issue} flagged</Pill>
-          )}
-          {counts.waiting > 0 && (
-            <Pill tone="neutral">{counts.waiting} waiting</Pill>
-          )}
-          {counts.notRequested > 0 && (
-            <Pill tone="neutral">{counts.notRequested} not requested</Pill>
-          )}
+        </section>
+      )}
+
+      {/* Empty state — every state of the chase has a meaningful collapse */}
+      {items.length === 0 && (
+        <div className="bg-surface border border-line rounded-md px-6 py-8 text-center">
+          <p className="text-sm text-ink-500">
+            No checklist items yet. Add a custom item or assign a Service
+            Package.
+          </p>
         </div>
-      </header>
+      )}
 
-      <div>
-        {items.map((it) => (
-          <ChecklistRow
-            key={it.id}
-            item={it}
-            onOpenEmailDraft={onOpenEmailDraft}
-          />
-        ))}
-      </div>
-
-      <footer className="px-4 py-3 border-t border-line bg-sunken/50">
+      {/* Custom-item add */}
+      <div className="bg-sunken/30 rounded-md px-4 py-2.5 border border-line">
         {adding ? (
           <div className="flex items-center gap-2">
             <input
@@ -125,31 +257,7 @@ export function ChecklistList({ taskId, items, onOpenEmailDraft }: Props) {
             <Plus className="w-3 h-3" aria-hidden /> Add custom item
           </button>
         )}
-      </footer>
-    </section>
-  );
-}
-
-function Pill({
-  tone,
-  children,
-}: {
-  tone: "info" | "warn" | "ok" | "neutral";
-  children: React.ReactNode;
-}) {
-  const styles =
-    tone === "info"
-      ? "bg-info-bg text-info-ink border-info-border"
-      : tone === "warn"
-      ? "bg-warn-bg text-warn-ink border-warn-border"
-      : tone === "ok"
-      ? "bg-ok-bg text-ok-ink border-ok-border"
-      : "bg-sunken text-ink-500 border-line";
-  return (
-    <span
-      className={`text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded border ${styles}`}
-    >
-      {children}
-    </span>
+      </div>
+    </div>
   );
 }

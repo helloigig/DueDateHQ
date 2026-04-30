@@ -25,6 +25,9 @@ import { OnboardingLayer2Widget } from "../components/OnboardingLayer2Widget";
 import { TaskList } from "../components/TaskList";
 import { WelcomeTour } from "../components/WelcomeTour";
 import { CapacityStrip } from "../components/CapacityStrip";
+import { ModeFHealth } from "../components/ModeFHealth";
+import { ActionQueue } from "../components/ActionQueue";
+import { useLocation } from "react-router-dom";
 import type { Announcement } from "../types";
 
 const DONE_STATUSES = new Set(["completed", "filed_extension"]);
@@ -56,6 +59,10 @@ export function Dashboard() {
   const announcementsQuery = useRealtimeAnnouncements();
   const detectMutation = useDetectAnnouncements();
   const { tasks } = useStore();
+  const location = useLocation();
+  // /legacy/dashboard renders the pre-v0.7-amendment view: deadline list only,
+  // no ActionQueue, no Mode F Health. Lets us A/B compare during transition.
+  const isLegacy = location.pathname.startsWith("/legacy");
 
   // One-shot: run the detector on mount (simulates 24h SLA scrape)
   useEffect(() => {
@@ -246,8 +253,24 @@ export function Dashboard() {
       <AnnouncementBanner announcements={activeBanners} />
       <ChaseBanner />
 
-      {/* ────────────────────────────────────────── ZONE 2: the queue */}
+      {/* ZONE 2A: ActionQueue (NEW in v0.7 amendment §3.1) — AI-curated TodoItem
+          feed (PRD §4.8 nine sources, urgency-sorted with waiting_multiplier).
+          This is the "Today" painpoint surface. Hidden on /legacy so the old
+          deadline-list-only Dashboard stays viewable for rollback comparison. */}
+      {!isLegacy && <ActionQueue />}
+
+      {/* ZONE 2B: deadline-grouped task list (the v0.6 Dashboard's heart).
+          Per IA v0.7 amendment §3.1, this is supposed to move entirely to the
+          Timeline destination. We keep it on Today for now as a familiar
+          fallback while CPAs adapt to the new ActionQueue at top — it's a
+          double-run period. Once the ActionQueue proves out, this section
+          collapses to just the Timeline destination. */}
       <TaskList />
+
+      {/* ZONE 3: Mode F Health — state-monitoring's own monitoring (per IA v0.7
+          §3.9d). Overall status derived from announcement query state; per-state
+          breakdown illustrative pending Phase 3 backend. Hidden on /legacy. */}
+      {!isLegacy && <ModeFHealth />}
 
       {/* Below the fold: capacity (≥3-staff firms only — gate inside the
           component). Solo Sarah never sees this; mid-firm Yan Jing always does. */}

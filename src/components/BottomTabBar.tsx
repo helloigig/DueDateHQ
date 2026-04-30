@@ -1,12 +1,14 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Users, Bell, Settings } from "lucide-react";
+import { Home, Users, Mail, Bell } from "lucide-react";
 import { useAnnouncements } from "../hooks/useAnnouncements";
 
+// Per IA v0.7 amendment §2.3: mobile collapses 7 sidebar to 4 most-frequent
+// tab destinations. Timeline + Opportunities + Settings move to overflow.
 const TABS = [
-  { to: "/", label: "Dashboard", Icon: LayoutDashboard, end: true },
+  { to: "/", label: "Today", Icon: Home, end: true },
   { to: "/clients", label: "Clients", Icon: Users, end: false },
+  { to: "/mail", label: "Mail", Icon: Mail, end: false },
   { to: "/alerts", label: "Alerts", Icon: Bell, end: false },
-  { to: "/settings", label: "Settings", Icon: Settings, end: false },
 ];
 
 export function BottomTabBar() {

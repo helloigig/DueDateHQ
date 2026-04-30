@@ -7,12 +7,16 @@ import { db } from "../../db/client.js";
 import {
   clients,
   deadlines,
+  importedFacts,
   servicePackages,
   tasks,
   type ClientInsert,
+  type ImportedFactInsert,
 } from "../../db/schema.js";
 import { generateDeadlinesForClient } from "../../lib/deadline-generator.js";
 import { seedChecklistsForTasks } from "../../lib/checklist-seeder.js";
+import { seedMilestonesForTasks } from "../../lib/milestone-seeder.js";
+import { findFactInconsistencies } from "../../lib/fact-consistency.js";
 import { log } from "../../lib/observability.js";
 
 /**
@@ -35,12 +39,46 @@ const ENTITY_TYPES = [
   "trust",
   "non_profit",
 ] as const;
+type EntityType = (typeof ENTITY_TYPES)[number];
+
+/**
+ * Map display-format entity types to the canonical snake_case enum.
+ * The FE persists user-facing strings like "LLC", "S-Corp", "Individual"
+ * (per src/types.ts EntityType union); the BE schema stores them as
+ * snake_case for SQL friendliness. This normalizer bridges the two.
+ *
+ * Returns the input unchanged if already canonical, lower-snake-cases
+ * otherwise. Unmapped values fall through and Zod rejects them — keeps
+ * the surface tight while supporting the variants the FE actually sends.
+ */
+function normalizeEntityType(input: unknown): unknown {
+  if (typeof input !== "string") return input;
+  const lowered = input.toLowerCase().replace(/-/g, "_").replace(/\s+/g, "_");
+  // Aliases for common variations
+  const map: Record<string, EntityType> = {
+    individual: "individual",
+    llc: "llc",
+    s_corp: "s_corp",
+    scorp: "s_corp",
+    c_corp: "c_corp",
+    ccorp: "c_corp",
+    partnership: "partnership",
+    trust: "trust",
+    non_profit: "non_profit",
+    nonprofit: "non_profit",
+  };
+  return map[lowered] ?? input;
+}
 
 const RowSchema = z.object({
   name: z.string().min(1),
-  entityType: z.enum(ENTITY_TYPES),
-  primaryState: z.string().length(2),
-  contactEmail: z.string().email().optional(),
+  entityType: z.preprocess(normalizeEntityType, z.enum(ENTITY_TYPES)),
+  primaryState: z
+    .string()
+    .min(2)
+    .max(2)
+    .transform((s) => s.toUpperCase()),
+  contactEmail: z.string().email().optional().or(z.literal("")),
   contactPhone: z.string().optional(),
   servicePackage: z.string().optional(),
 });
@@ -218,6 +256,12 @@ export const importsRouter = router({
           contactEmail: row.contactEmail ?? null,
           contactPhone: row.contactPhone ?? null,
           status: "active",
+          // Service starts today by default — deadlines before today won't
+          // be generated for this client. Removes the "8d late" surprise on
+          // freshly-imported clients. P1 enhancement: surface this as an
+          // optional CSV column so CPAs doing back-tax cleanup can override
+          // to an earlier date.
+          serviceStartDate: importedAt.toISOString().slice(0, 10),
           // Stash importId in metadata so undo can find this batch
           // without a separate table.
           metadata: { importId, importedAt: importedAt.toISOString() },
@@ -332,6 +376,16 @@ export const importsRouter = router({
                 })),
               );
               checklistItemsCreated += seeded.created;
+              // Auto-seed Mode B milestone proposals for each new task.
+              // Substrate fallback when ANTHROPIC_API_KEY missing — every
+              // task lands with the 5 milestone slots populated, eliminating
+              // the friction step where CPA had to click "Propose dates".
+              await seedMilestonesForTasks(
+                inserted.map((t) => ({
+                  firmId: ctx.firmId,
+                  taskId: t.id,
+                })),
+              );
             }
           }
         }
@@ -505,6 +559,145 @@ export const importsRouter = router({
         fields: extracted,
         readyForCommit: extracted.confidence >= 0.7,
       };
+    }),
+
+  /**
+   * Commit reviewed prior-year extraction → imported_facts. Closes the
+   * Tier 3 import path: parser extracts → CPA reviews → this writes the
+   * canonical fact rows that Mode E's `generateCrossYearInsights` reads.
+   *
+   * One importedFacts row per significant field. fact_type is the
+   * normalized fact key (prior_agi / forms_filed / k1_sources / entity_type
+   * / ein). value is jsonb — scalars stored as JSON literals, arrays as
+   * arrays. extraction_version="v1" so future Mode A v2 re-extraction batch
+   * can identify which facts to refresh.
+   */
+  commitPriorYearReturn: firmProcedure
+    .input(
+      z.object({
+        clientId: z.string().uuid(),
+        taxYear: z.number().int().min(2000).max(2100),
+        fields: z.object({
+          clientName: z.string().nullable().optional(),
+          ein: z.string().nullable().optional(),
+          entityType: z.string().nullable().optional(),
+          priorAGI: z.number().nullable().optional(),
+          formsFiled: z.array(z.string()).optional(),
+          k1Sources: z.array(z.string()).optional(),
+          confidence: z.number().min(0).max(1),
+        }),
+        sourceStorageKey: z.string().min(1).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Ownership check — caller's firm must own the client.
+      const [client] = await db
+        .select({ id: clients.id })
+        .from(clients)
+        .where(
+          and(eq(clients.id, input.clientId), eq(clients.firmId, ctx.firmId)),
+        );
+      if (!client) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "client_not_in_firm",
+        });
+      }
+
+      // Map confidence → schema enum.
+      const confidence: ImportedFactInsert["confidence"] =
+        input.fields.confidence >= 0.85
+          ? "high"
+          : input.fields.confidence >= 0.7
+            ? "medium"
+            : "low";
+
+      const rows: ImportedFactInsert[] = [];
+      const make = (
+        factType: string,
+        value: unknown,
+        unit: string | null = null,
+      ): ImportedFactInsert => ({
+        firmId: ctx.firmId,
+        clientId: input.clientId,
+        factType,
+        value: value as never,
+        unit,
+        taxYear: input.taxYear,
+        // Tier 3 = prior-year PDF import (PRD §6.6). Provenance fields land
+        // when the PDF source is in Gmail (Method B). For Tier 3 uploads
+        // (Supabase Storage), source_gmail_message_id stays null.
+        sourceGmailMessageId: null,
+        sourceAttachmentIndex: null,
+        sourcePageRange: null,
+        extractionVersion: "v1",
+        gmailMessageStatus: "available",
+        confidence,
+        importTier: 3,
+      });
+
+      if (input.fields.priorAGI != null) {
+        rows.push(make("prior_agi", input.fields.priorAGI, "USD"));
+      }
+      if (
+        input.fields.formsFiled &&
+        input.fields.formsFiled.length > 0
+      ) {
+        rows.push(make("forms_filed", input.fields.formsFiled));
+      }
+      if (input.fields.k1Sources && input.fields.k1Sources.length > 0) {
+        rows.push(make("k1_sources", input.fields.k1Sources));
+      }
+      if (input.fields.entityType) {
+        rows.push(make("entity_type", input.fields.entityType));
+      }
+      if (input.fields.ein) {
+        rows.push(make("ein", input.fields.ein));
+      }
+
+      if (rows.length === 0) {
+        return { inserted: 0, factTypes: [] as string[] };
+      }
+
+      const inserted = await db.insert(importedFacts).values(rows).returning({
+        id: importedFacts.id,
+        factType: importedFacts.factType,
+      });
+      log.info("imports.commitPriorYearReturn.done", {
+        firmId: ctx.firmId,
+        clientId: input.clientId,
+        taxYear: input.taxYear,
+        inserted: inserted.length,
+        factTypes: inserted.map((r) => r.factType),
+      });
+      return {
+        inserted: inserted.length,
+        factTypes: inserted.map((r) => r.factType),
+      };
+    }),
+
+  /**
+   * Cross-fact consistency check — per PRD §9.6 v0.8 amendment.
+   *
+   * Surfaces ImportedFact rows where the same (client × year × fact_type)
+   * has multiple sources with values that disagree beyond tolerance. Mode C-
+   * style flag — CPA picks the canonical value. Optional clientId scopes
+   * the check to one client; without it, walks the whole firm.
+   */
+  factConsistency: firmProcedure
+    .input(
+      z
+        .object({
+          clientId: z.string().uuid().optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      const flags = await findFactInconsistencies({
+        firmId: ctx.firmId,
+        clientId: input?.clientId,
+      });
+      return { flags };
     }),
 });
 

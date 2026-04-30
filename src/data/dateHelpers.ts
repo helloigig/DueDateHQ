@@ -71,7 +71,12 @@ export function formatShortDate(iso: string): string {
 }
 
 export function formatLongDate(iso: string): string {
+  // Guard against undefined / null / empty / malformed inputs — common with
+  // imported clients whose addedAt didn't round-trip cleanly. Without this,
+  // `new Date("").toLocaleDateString()` renders as "Invalid Date" in the UI.
+  if (!iso) return "—";
   const d = parseDate(iso);
+  if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",

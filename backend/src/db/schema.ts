@@ -98,6 +98,13 @@ export const clients = pgTable("clients", {
   county: text("county"),
   notes: text("notes"),
   metadata: jsonb("metadata").notNull().default({}),
+  // Service start date — when the firm took on this client. Defaults to
+  // created_at on insert. Deadline-generator skips rows whose officialDueDate
+  // falls before this date — the firm wasn't responsible for them, so they
+  // shouldn't show up as "8d late" the moment a CPA imports a CSV. Users can
+  // set it explicitly during import or per-client (P1 UI: AddClientModal +
+  // Settings → Firm).
+  serviceStartDate: date("service_start_date"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .default(sql`now()`),
@@ -288,6 +295,24 @@ export const checklistItems = pgTable(
     receivedFilename: text("received_filename"),
     lastReminderAt: timestamp("last_reminder_at", { withTimezone: true }),
     nextReminderAt: timestamp("next_reminder_at", { withTimezone: true }),
+    // v0.8 amendment additions per `feedback_no_manual_file_shuffle` Path E.
+    // These hold AI-derived intelligence; original bytes stay in Gmail/Outlook.
+    // sourceReferences: JSON list of {gmail_message_id, attachment_index,
+    //   page_range?, link_strength, proposed_by, confirmed_at}. 0..N per item;
+    //   handles multi-attachment emails, repeat resends, and 1-PDF-multi-K1
+    //   cases without a separate Document entity (deferred per future
+    //   considerations §1).
+    sourceReferences: jsonb("source_references").notNull().default([]),
+    // inlineText: full extracted text (email body + OCR'd attachments) for
+    //   inline reading without bouncing to Gmail. ~5-30 KB per item.
+    inlineText: text("inline_text"),
+    // embedding: per-item semantic vector for full-text + cross-task search.
+    //   Stored as jsonb (array of floats) for portability; if pgvector is
+    //   provisioned the migration will swap to vector(1536). ~10 KB.
+    embedding: jsonb("embedding"),
+    // thumbnailUrl: signed URL to the 50 KB cached thumbnail (S3). Visual
+    //   identity at-a-glance per IA §3.4.
+    thumbnailUrl: text("thumbnail_url"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .default(sql`now()`),
@@ -416,7 +441,9 @@ export const emailDrafts = pgTable("email_drafts", {
     .default(sql`now()`),
 });
 
-export const aiMode = pgEnum("ai_mode", ["A", "B", "C", "D", "E"]);
+// Mode F added in v0.8 amendment (PRD §4.3) — state change monitoring as
+// first-class AI behavior, alongside Modes A-E.
+export const aiMode = pgEnum("ai_mode", ["A", "B", "C", "D", "E", "F"]);
 
 export const aiInferences = pgTable("ai_inferences", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
@@ -685,6 +712,288 @@ export const exportRuns = pgTable("export_runs", {
     .default(sql`now()`),
 });
 
+// ════════════════════════════════════════════════════════════════════════
+// v0.8 amendment additions — per PRD §17.2 row 27/30/33 + 34-41.
+//
+// These tables operationalize the v0.8 architectural decisions: TaskMilestone
+// (mini-timeline data), ImportedFact (history facts that drive Modes A-F),
+// InboundReply + DeliveryEvent (Path E inbound classification + outbound
+// delivery monitoring), StateAnnouncementSource (Mode F per-state freshness).
+//
+// All additive: zero existing-row migrations; only ALTER TABLE ADD COLUMN
+// and CREATE TABLE statements. Drizzle migration safety preserved.
+// ════════════════════════════════════════════════════════════════════════
+
+// TaskMilestone — per PRD §9.4.1. The mini-timeline data model. Each Task
+// has 0..N TaskMilestones (5 default types ship Day 1 per the schema spec).
+// Rendered in IA v0.7 §3.4 Task detail header + §3.9a Timeline destination.
+export const milestoneType = pgEnum("milestone_type", [
+  "initial_meeting",
+  "collect_materials",
+  "prepare_workpapers",
+  "internal_review",
+  "client_review",
+  "file",
+  "pay",
+]);
+
+export const milestoneStatus = pgEnum("milestone_status", [
+  "not_started",
+  "in_progress",
+  "blocked",
+  "done",
+  "overdue",
+]);
+
+export const taskMilestones = pgTable("task_milestones", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  firmId: uuid("firm_id")
+    .notNull()
+    .references(() => firms.id, { onDelete: "cascade" }),
+  taskId: uuid("task_id")
+    .notNull()
+    .references(() => tasks.id, { onDelete: "cascade" }),
+  milestoneType: milestoneType("milestone_type").notNull(),
+  // Custom milestone label (firms may name their own — P2 firm-custom types
+  // per §9.4.1). Default null = use milestone_type label.
+  customLabel: text("custom_label"),
+  targetDate: date("target_date"),
+  completedDate: date("completed_date"),
+  status: milestoneStatus("status").notNull().default("not_started"),
+  blockerReason: text("blocker_reason"),
+  displayOrder: integer("display_order").notNull().default(0),
+  // AI authority gradient (per §9.4.1):
+  //   - Mode B can WRITE proposed target_date (yellow zone)
+  //   - Mode E can WRITE proposed status=blocked + blocker_reason (yellow)
+  //   - AI cannot WRITE status=done (mirrors §5.3 invariant)
+  // proposedBy tracks origin so UI can surface "AI suggested" hints.
+  proposedBy: actorKind("proposed_by").notNull().default("system"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+});
+
+// TaskMilestoneEvent — append-only audit log of status transitions. Required
+// per §11.3 IRS audit-trail compliance.
+export const taskMilestoneEvents = pgTable("task_milestone_events", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  firmId: uuid("firm_id")
+    .notNull()
+    .references(() => firms.id, { onDelete: "cascade" }),
+  milestoneId: uuid("milestone_id")
+    .notNull()
+    .references(() => taskMilestones.id, { onDelete: "cascade" }),
+  fromStatus: milestoneStatus("from_status"),
+  toStatus: milestoneStatus("to_status").notNull(),
+  actorKind: actorKind("actor_kind").notNull(),
+  actorUserId: uuid("actor_user_id").references(() => users.id),
+  reason: text("reason"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+});
+
+// ImportedFact — per PRD §6.6 + §9.4.1 + §17.2 row 39. Multi-year client
+// facts extracted from inbound documents and prior-year imports. Powers
+// Modes A/B/C/E. v0.8 amendment adds extraction_version provenance +
+// gmail_message_status for graceful Gmail-deletion handling.
+export const importedFactConfidence = pgEnum("imported_fact_confidence", [
+  "high",
+  "medium",
+  "low",
+]);
+
+export const gmailMessageStatus = pgEnum("gmail_message_status", [
+  "available",
+  "gone_404",
+  "pending_check",
+]);
+
+export const importedFacts = pgTable("imported_facts", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  firmId: uuid("firm_id")
+    .notNull()
+    .references(() => firms.id, { onDelete: "cascade" }),
+  clientId: uuid("client_id").references(() => clients.id, {
+    onDelete: "cascade",
+  }),
+  factType: text("fact_type").notNull(),
+  // value is jsonb to handle scalars, dates, dollar amounts, structured.
+  value: jsonb("value").notNull(),
+  unit: text("unit"),
+  taxYear: integer("tax_year"),
+  // Provenance (v0.8 amendment §17.2 row 39):
+  // sourceReference points to gmail_message_id + attachment_index that
+  // produced this fact (when applicable). Allows re-extraction.
+  sourceGmailMessageId: text("source_gmail_message_id"),
+  sourceAttachmentIndex: integer("source_attachment_index"),
+  sourcePageRange: text("source_page_range"),
+  // extractionVersion: which Mode A version produced this fact. Enables
+  // Mode A v2 re-extraction batch jobs.
+  extractionVersion: text("extraction_version").notNull().default("v1"),
+  lastReextractedAt: timestamp("last_reextracted_at", { withTimezone: true }),
+  // gmailMessageStatus: pulled by periodic check; if `gone_404`, the source
+  // is irrecoverable and Mode A v2 cannot re-extract — fact stays at v1.
+  gmailMessageStatus: gmailMessageStatus("gmail_message_status")
+    .notNull()
+    .default("available"),
+  confidence: importedFactConfidence("confidence").notNull().default("medium"),
+  importTier: integer("import_tier").notNull().default(1),
+  importedAt: timestamp("imported_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+});
+
+// InboundReply — per PRD §5.8. Every email arriving via Method A SES forward
+// or Method B OAuth pull lands here. AI 7-class top-level classifier sets
+// `topLevelClass`; 5-sub-intent classifier sets `replyIntent` when class =
+// `client_reply_intent`.
+//
+// CRITICAL per Path E: bytes never copied to our storage. This table stores
+// the gmail_message_id pointer + extracted text + classification metadata.
+// "Open original" actions in UI deep-link back to Gmail.
+export const inboundTopLevelClass = pgEnum("inbound_top_level_class", [
+  "client_document",
+  "client_reply_intent",
+  "agency_correspondence",
+  "third_party_data",
+  "payment_confirm",
+  "vendor_notification",
+  "spam",
+]);
+
+export const inboundReplyIntent = pgEnum("inbound_reply_intent", [
+  "document_provided",
+  "timeline_pushback",
+  "question_asked",
+  "off_topic",
+  "mismatched_attachment",
+  "acknowledgment",
+]);
+
+export const inboundReplies = pgTable("inbound_replies", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  firmId: uuid("firm_id")
+    .notNull()
+    .references(() => firms.id, { onDelete: "cascade" }),
+  // taskId is nullable until Mode A 7-class classifier assigns. Misrouted
+  // inbound stays here with null taskId in a per-firm review queue.
+  taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+  // gmail_message_id is the canonical pointer; the actual email + attachments
+  // live in CPA's Gmail/Outlook permanently (Path E).
+  gmailMessageId: text("gmail_message_id").notNull(),
+  fromAddress: text("from_address").notNull(),
+  toAddress: text("to_address").notNull(),
+  subject: text("subject"),
+  // bodyText: extracted at OAuth-read time, stored locally for inline reading
+  // (per `feedback_no_manual_file_shuffle` content-chain spec).
+  bodyText: text("body_text"),
+  // attachmentMetadata: list of {filename, mime_type, size, attachment_index}
+  // — but NOT the bytes. Bytes stay in Gmail.
+  attachmentMetadata: jsonb("attachment_metadata").notNull().default([]),
+  topLevelClass: inboundTopLevelClass("top_level_class"),
+  replyIntent: inboundReplyIntent("reply_intent"),
+  intentConfidence: numeric("intent_confidence", { precision: 3, scale: 2 }),
+  // suggestedActionJson holds intent-specific routing context (propose-extension
+  // date / draft-reply context / file-as-document target / etc.).
+  suggestedAction: jsonb("suggested_action"),
+  receivedAt: timestamp("received_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+  classifiedAt: timestamp("classified_at", { withTimezone: true }),
+  cpaActionedAt: timestamp("cpa_actioned_at", { withTimezone: true }),
+});
+
+// DeliveryEvent — per PRD §5.8 + §9.6. Outbound email lifecycle events from
+// SES/Postmark webhooks. Bounces and complaints surface in IA v0.7 Mail
+// Issues tab + Today Mailbox card + Task detail bounce banner.
+export const deliveryEventType = pgEnum("delivery_event_type", [
+  "submitted",
+  "accepted",
+  "delivered",
+  "opened",
+  "replied",
+  "bounced",
+  "complained",
+  "unsubscribed",
+]);
+
+export const deliveryBounceReason = pgEnum("delivery_bounce_reason", [
+  "hard_bounce",
+  "soft_bounce",
+  "mailbox_full",
+  "spam_blocked",
+  "address_not_found",
+  "complaint",
+  "unknown",
+]);
+
+export const deliveryEvents = pgTable("delivery_events", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  firmId: uuid("firm_id")
+    .notNull()
+    .references(() => firms.id, { onDelete: "cascade" }),
+  emailDraftId: uuid("email_draft_id")
+    .notNull()
+    .references(() => emailDrafts.id, { onDelete: "cascade" }),
+  eventType: deliveryEventType("event_type").notNull(),
+  eventAt: timestamp("event_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+  rawProviderPayload: jsonb("raw_provider_payload"),
+  bounceReason: deliveryBounceReason("bounce_reason"),
+  diagnosticText: text("diagnostic_text"),
+  // suppressedAt — when bounce led to address suppression (CPA action or
+  // automatic per Settings → Mail bounce policy).
+  suppressedAt: timestamp("suppressed_at", { withTimezone: true }),
+});
+
+// StateAnnouncementSource — per IA v0.7 §3.9d Mode F Health real freshness.
+// Per-state scrape job state. Drives the Mode F Health module's per-state
+// breakdown (currently illustrative; this table provides the real data once
+// the scraper writes here).
+export const stateAnnouncementSourceStatus = pgEnum(
+  "state_announcement_source_status",
+  ["healthy", "stale_short", "stale_long", "rescrape_running", "broken"],
+);
+
+export const stateAnnouncementSources = pgTable(
+  "state_announcement_sources",
+  {
+    stateCode: text("state_code").notNull(),
+    authority: text("authority").notNull(), // 'DOR' / 'SoS' / 'IRS'
+    sourceUrl: text("source_url").notNull(),
+    lastScrapedAt: timestamp("last_scraped_at", { withTimezone: true }),
+    lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
+    lastErrorMessage: text("last_error_message"),
+    consecutiveErrorCount: integer("consecutive_error_count")
+      .notNull()
+      .default(0),
+    nextScheduledScrapeAt: timestamp("next_scheduled_scrape_at", {
+      withTimezone: true,
+    }),
+    status: stateAnnouncementSourceStatus("status")
+      .notNull()
+      .default("healthy"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.stateCode, t.authority] }),
+  }),
+);
+
+// ════════════════════════════════════════════════════════════════════════
+// End v0.8 amendment additions
+// ════════════════════════════════════════════════════════════════════════
+
 export type Firm = typeof firms.$inferSelect;
 export type FirmInsert = typeof firms.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -703,3 +1012,15 @@ export type Notification = typeof notifications.$inferSelect;
 export type Integration = typeof integrations.$inferSelect;
 export type TeamInvite = typeof teamInvites.$inferSelect;
 export type ExportRun = typeof exportRuns.$inferSelect;
+export type TaskMilestone = typeof taskMilestones.$inferSelect;
+export type TaskMilestoneInsert = typeof taskMilestones.$inferInsert;
+export type ImportedFact = typeof importedFacts.$inferSelect;
+export type ImportedFactInsert = typeof importedFacts.$inferInsert;
+export type InboundReply = typeof inboundReplies.$inferSelect;
+export type InboundReplyInsert = typeof inboundReplies.$inferInsert;
+export type DeliveryEvent = typeof deliveryEvents.$inferSelect;
+export type DeliveryEventInsert = typeof deliveryEvents.$inferInsert;
+export type StateAnnouncementSource =
+  typeof stateAnnouncementSources.$inferSelect;
+export type StateAnnouncementSourceInsert =
+  typeof stateAnnouncementSources.$inferInsert;

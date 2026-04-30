@@ -37,6 +37,83 @@ const NOT_IMPL = () => {
 
 const jsonPassthrough = z.any();
 
+// Row shapes mirroring backend Drizzle return types for v0.8 amendment tables.
+// Kept narrow (only the columns the FE consumes) so refactors land cleanly.
+export type TaskMilestoneRow = {
+  id: string;
+  firmId: string;
+  taskId: string;
+  milestoneType: string;
+  customLabel: string | null;
+  targetDate: string | null;
+  completedDate: string | null;
+  status: "not_started" | "in_progress" | "blocked" | "done" | "overdue";
+  blockerReason: string | null;
+  displayOrder: number;
+  proposedBy: "user" | "ai" | "system";
+};
+
+export type InboundReplyRow = {
+  id: string;
+  firmId: string;
+  taskId: string | null;
+  gmailMessageId: string;
+  fromAddress: string;
+  toAddress: string;
+  subject: string | null;
+  bodyText: string | null;
+  attachmentMetadata: unknown;
+  topLevelClass:
+    | "client_document"
+    | "client_reply_intent"
+    | "agency_correspondence"
+    | "third_party_data"
+    | "payment_confirm"
+    | "vendor_notification"
+    | "spam"
+    | null;
+  replyIntent:
+    | "document_provided"
+    | "timeline_pushback"
+    | "question_asked"
+    | "off_topic"
+    | "mismatched_attachment"
+    | "acknowledgment"
+    | null;
+  intentConfidence: string | null;
+  receivedAt: string | Date;
+  classifiedAt: string | Date | null;
+  cpaActionedAt: string | Date | null;
+};
+
+export type DeliveryEventRow = {
+  id: number;
+  firmId: string;
+  emailDraftId: string;
+  eventType:
+    | "submitted"
+    | "accepted"
+    | "delivered"
+    | "opened"
+    | "replied"
+    | "bounced"
+    | "complained"
+    | "unsubscribed";
+  eventAt: string | Date;
+  bounceReason: string | null;
+  diagnosticText: string | null;
+  suppressedAt: string | Date | null;
+};
+
+export type DeliveryEventIssueRow = {
+  ev: DeliveryEventRow;
+  draft: {
+    id: string;
+    subject: string | null;
+    body: string | null;
+  };
+};
+
 export const appRouter = t.router({
   auth: t.router({
     session: t.procedure.query(
@@ -268,6 +345,152 @@ export const appRouter = t.router({
       .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
   }),
 
+  // todoItems — computed view per PRD §4.8 + IA v0.7 §3.1. NOT a stored
+  // table; aggregates from 9 sources (Modes A-F + InboundReply intent +
+  // DeliveryEvent bounces + manual). Frontend renders via ActionQueue.
+  todoItems: t.router({
+    list: t.procedure
+      .input(z.object({ limit: z.number().min(1).max(200).optional() }).optional())
+      .query(
+        async (): Promise<{
+          items: Array<{
+            id: string;
+            source: string;
+            verb: "Send" | "Confirm" | "Apply" | "Discuss";
+            client: string;
+            clientId: string;
+            task?: string;
+            taskId?: string;
+            dueDate?: string;
+            action: string;
+            context: string;
+            stageLabel?: string;
+            daysBehind?: number;
+            urgency: "high" | "medium" | "normal";
+            urgencyScore: number;
+            surface:
+              | "email_draft_modal"
+              | "task_detail"
+              | "alert_detail"
+              | "opportunity_detail"
+              | "bounce_modal";
+          }>;
+          total: number;
+          sourcesPending: string[];
+        }> => NOT_IMPL(),
+      ),
+  }),
+
+  // modeFHealth — IA v0.7 §3.9d. State-monitoring's own monitoring (overall
+  // status from the announcement pipeline; per-state breakdown illustrative
+  // pending Phase 3 backend last_scraped_at).
+  modeFHealth: t.router({
+    status: t.procedure.query(
+      async (): Promise<{
+        overall: "green" | "amber" | "red";
+        total: number;
+        stale: number;
+        lastSyncMinAgo: number | null;
+        nextSyncInMin: number;
+        perState: Array<{
+          code: string;
+          label: string;
+          staleHours: number;
+          status: string;
+        }>;
+        perStateIllustrative: boolean;
+      }> => NOT_IMPL(),
+    ),
+  }),
+
+  // taskMilestones — PRD §9.4.1. Mini-timeline data model. Powers Task detail
+  // header + Timeline destination. AI authority: Mode B writes target_date;
+  // Mode E writes status=blocked; AI cannot write status=done.
+  taskMilestones: t.router({
+    listForTask: t.procedure
+      .input(z.object({ taskId: z.string().uuid() }))
+      .query(async (): Promise<TaskMilestoneRow[]> => NOT_IMPL()),
+    fleetStack: t.procedure
+      .input(
+        z
+          .object({
+            waitingOnly: z.boolean().optional(),
+            limit: z.number().min(1).max(500).optional(),
+          })
+          .optional(),
+      )
+      .query(async (): Promise<TaskMilestoneRow[]> => NOT_IMPL()),
+    /** Mode B propose-and-seed — calls predictMilestoneTargetDates and inserts
+     *  5 default milestones. Idempotent — returns existing on repeat call. */
+    proposeForTask: t.procedure
+      .input(z.object({ taskId: z.string().uuid() }))
+      .mutation(
+        async (): Promise<{
+          proposed: boolean;
+          milestones: TaskMilestoneRow[];
+          overallConfidence?: "high" | "medium" | "low";
+          basisOfEstimate?: string;
+        }> => NOT_IMPL(),
+      ),
+    /** Mode E blocker detection — proposes status="blocked" for at-risk
+     *  milestones (yellow zone). CPA dismisses via update mutation. */
+    detectBlockers: t.procedure
+      .input(z.object({ taskId: z.string().uuid() }))
+      .mutation(
+        async (): Promise<{
+          decisions: Array<{
+            milestoneId: string;
+            shouldBlock: boolean;
+            blockerReason: string;
+            confidence: "high" | "medium" | "low";
+          }>;
+          appliedCount: number;
+        }> => NOT_IMPL(),
+      ),
+    update: t.procedure
+      .input(jsonPassthrough)
+      .mutation(async (): Promise<TaskMilestoneRow> => NOT_IMPL()),
+    add: t.procedure
+      .input(jsonPassthrough)
+      .mutation(async (): Promise<TaskMilestoneRow> => NOT_IMPL()),
+  }),
+
+  // inboundReplies — PRD §5.8. Mail Inbox + Task detail conversation surface.
+  // 7-class top-level + 5+1 sub-intent classification persisted here.
+  inboundReplies: t.router({
+    list: t.procedure
+      .input(
+        z
+          .object({
+            taskId: z.string().uuid().optional(),
+            topLevelClass: z.string().optional(),
+            replyIntent: z.string().optional(),
+            limit: z.number().min(1).max(200).optional(),
+          })
+          .optional(),
+      )
+      .query(async (): Promise<InboundReplyRow[]> => NOT_IMPL()),
+    markActioned: t.procedure
+      .input(z.object({ id: z.string().uuid() }))
+      .mutation(async (): Promise<InboundReplyRow> => NOT_IMPL()),
+    linkToTask: t.procedure
+      .input(z.object({ id: z.string().uuid(), taskId: z.string().uuid() }))
+      .mutation(async (): Promise<InboundReplyRow> => NOT_IMPL()),
+  }),
+
+  // deliveryEvents — PRD §5.8. Mail Issues tab + bounce surfacing.
+  deliveryEvents: t.router({
+    issues: t.procedure
+      .input(z.object({ limit: z.number().min(1).max(200).optional() }).optional())
+      .query(async (): Promise<DeliveryEventIssueRow[]> => NOT_IMPL()),
+    forDraft: t.procedure
+      .input(z.object({ emailDraftId: z.string().uuid() }))
+      .query(async (): Promise<DeliveryEventRow[]> => NOT_IMPL()),
+    suppressEvent: t.procedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async (): Promise<DeliveryEventRow | null> => NOT_IMPL()),
+  }),
+
   notifications: t.router({
     list: t.procedure
       .input(jsonPassthrough.optional())
@@ -349,6 +572,54 @@ export const appRouter = t.router({
             confidence: number;
           };
           readyForCommit: boolean;
+        }> => NOT_IMPL(),
+      ),
+    /** Tier 3 commit — write reviewed prior-year extraction to imported_facts.
+     *  Mode E reads these via generateCrossYearInsights. */
+    commitPriorYearReturn: t.procedure
+      .input(
+        z.object({
+          clientId: z.string().uuid(),
+          taxYear: z.number().int(),
+          fields: z.object({
+            clientName: z.string().nullable().optional(),
+            ein: z.string().nullable().optional(),
+            entityType: z.string().nullable().optional(),
+            priorAGI: z.number().nullable().optional(),
+            formsFiled: z.array(z.string()).optional(),
+            k1Sources: z.array(z.string()).optional(),
+            confidence: z.number(),
+          }),
+          sourceStorageKey: z.string().optional(),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          inserted: number;
+          factTypes: string[];
+        }> => NOT_IMPL(),
+      ),
+    /** Cross-fact consistency check — Mode C-style flag list for ImportedFact
+     *  rows where the same (client × year × fact_type) has multiple sources
+     *  with values that disagree beyond tolerance. */
+    factConsistency: t.procedure
+      .input(z.object({ clientId: z.string().uuid().optional() }).optional())
+      .query(
+        async (): Promise<{
+          flags: Array<{
+            clientId: string;
+            taxYear: number;
+            factType: string;
+            severity: "low" | "medium" | "high";
+            reason: string;
+            values: Array<{
+              factId: number;
+              value: unknown;
+              sourceGmailMessageId: string | null;
+              extractionVersion: string;
+              confidence: string;
+            }>;
+          }>;
         }> => NOT_IMPL(),
       ),
   }),
@@ -656,8 +927,26 @@ export const appRouter = t.router({
           accepted: number;
           acceptanceRate: number | null;
           totalCostCents: number;
+          p50LatencyMs: number | null;
+          p95LatencyMs: number | null;
         }> => NOT_IMPL()
       ),
+    /** Multi-mode overview — one row per Mode A-F in a single query. Drives
+     *  Settings → AI eval all-modes table. */
+    summaryAll: t.procedure.query(
+      async (): Promise<
+        Array<{
+          mode: "A" | "B" | "C" | "D" | "E" | "F";
+          total: number;
+          actedOn: number;
+          accepted: number;
+          acceptanceRate: number | null;
+          totalCostCents: number;
+          p50LatencyMs: number | null;
+          p95LatencyMs: number | null;
+        }>
+      > => NOT_IMPL(),
+    ),
     /** Drift report — per-mode acceptance rate bucketed by ISO week.
      *  Surfaces deteriorating model performance before users complain. */
     driftReport: t.procedure

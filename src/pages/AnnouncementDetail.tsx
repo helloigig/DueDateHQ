@@ -38,8 +38,8 @@ export function AnnouncementDetail() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (ann) setSelected(new Set(ann.affectedClientIds));
-  }, [ann?.id, ann?.affectedClientIds.join(",")]);
+    if (ann) setSelected(new Set(ann.affectedClientIds ?? []));
+  }, [ann?.id, (ann?.affectedClientIds ?? []).join(",")]);
 
   const [flash, setFlash] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<"batch" | null>(null);
@@ -238,11 +238,15 @@ export function AnnouncementDetail() {
         </div>
         <dl className="divide-y divide-slate-100 text-sm">
           <Row label="Summary">{ann.summary}</Row>
-          {ann.counties.length > 0 && (
-            <Row label="Counties">{ann.counties.join(", ")}</Row>
+          {(ann.counties ?? []).length > 0 && (
+            <Row label="Counties">{(ann.counties ?? []).join(", ")}</Row>
           )}
-          <Row label="Entities">{ann.entityTypes.join(" · ")}</Row>
-          <Row label="Taxes">{ann.taxTypes.join(" · ")}</Row>
+          {(ann.entityTypes ?? []).length > 0 && (
+            <Row label="Entities">{(ann.entityTypes ?? []).join(" · ")}</Row>
+          )}
+          {(ann.taxTypes ?? []).length > 0 && (
+            <Row label="Taxes">{(ann.taxTypes ?? []).join(" · ")}</Row>
+          )}
           {ann.oldDeadline && (
             <Row label="Old deadline">{formatLongDate(ann.oldDeadline)}</Row>
           )}
@@ -317,13 +321,13 @@ export function AnnouncementDetail() {
             onClick={toggleAll}
             className="ml-auto text-xs text-indigo-600 hover:underline"
           >
-            {selected.size === ann.affectedClientIds.length
+            {selected.size === (ann.affectedClientIds ?? []).length
               ? "Deselect all"
               : "Select all"}
           </button>
         </div>
         <ul className="divide-y divide-slate-100">
-          {ann.affectedClientIds.map((cid) => {
+          {(ann.affectedClientIds ?? []).map((cid) => {
             const c = clientsById.get(cid);
             if (!c) return null;
             const checked = selected.has(cid);

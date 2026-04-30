@@ -1,15 +1,34 @@
 // DueDateHQ service worker
 // Scope: offline shell + Web Push for state-alert pushes (PRD §8.5 / arch §10.6).
-// Versioned cache: bump CACHE_VERSION to invalidate.
+//
+// Update strategy (the painful lesson learned):
+// - HTML / manifest are NETWORK-FIRST → users always see the freshest deploy.
+//   Without this, the cached index.html references an old asset hash; the
+//   browser tries to load that hash; fails (404 once Vercel garbage-collects
+//   the old chunk); user sees a blank page or stale UI. This was the root
+//   cause of every "but I just deployed..." frustration.
+// - Hashed assets (/assets/*.{js,css}) are CACHE-FIRST → they're immutable
+//   per Vite's content-hash naming, so caching them aggressively is safe and
+//   gives offline-shell support.
+// - skipWaiting() + clients.claim() ensure the new SW takes over immediately
+//   on the next page load, not after the user closes all tabs.
+// - Bump CACHE_VERSION on any breaking change to force a clean slate.
 
-const CACHE_VERSION = "ddhq-v1";
-const SHELL_URLS = ["/", "/index.html", "/manifest.webmanifest", "/icon.svg"];
+const CACHE_VERSION = "ddhq-v3";
+
+// Static, content-immutable assets that are safe to cache aggressively.
+const STATIC_PATHS = [
+  "/manifest.webmanifest",
+  "/icon.svg",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) => cache.addAll(SHELL_URLS))
+    caches
+      .open(CACHE_VERSION)
+      .then((cache) => cache.addAll(STATIC_PATHS))
+      .then(() => self.skipWaiting()),
   );
-  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -20,41 +39,68 @@ self.addEventListener("activate", (event) => {
         Promise.all(
           keys
             .filter((k) => k !== CACHE_VERSION)
-            .map((k) => caches.delete(k))
-        )
+            .map((k) => caches.delete(k)),
+        ),
       )
-      .then(() => self.clients.claim())
+      .then(() => self.clients.claim()),
   );
 });
 
-// Cache-first for the shell; network-first for everything else.
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // Don't intercept HMR / dev-only paths.
+  // Don't intercept HMR / dev paths.
   if (url.pathname.startsWith("/@") || url.pathname.startsWith("/node_modules/")) {
     return;
   }
 
-  if (SHELL_URLS.includes(url.pathname)) {
+  // Network-first for HTML / SPA routes — the entry point must reference
+  // the latest asset hashes from the most recent deploy. Falls back to
+  // cached index.html ONLY when offline.
+  const isHtmlNav =
+    req.mode === "navigate" ||
+    url.pathname === "/" ||
+    url.pathname.endsWith(".html") ||
+    (req.headers.get("accept") || "").includes("text/html");
+  if (isHtmlNav) {
     event.respondWith(
-      caches.match(req).then((cached) => cached || fetch(req))
+      fetch(req)
+        .then((res) => {
+          // Stash the latest HTML for offline fallback.
+          const copy = res.clone();
+          caches.open(CACHE_VERSION).then((cache) => cache.put("/index.html", copy));
+          return res;
+        })
+        .catch(() => caches.match("/index.html").then((c) => c || Response.error())),
     );
     return;
   }
 
-  event.respondWith(
-    fetch(req)
-      .then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
-        return res;
-      })
-      .catch(() => caches.match(req))
+  // Cache-first for hashed assets — Vite gives them content hashes so the
+  // path itself changes when content changes. Safe to cache forever.
+  const isHashedAsset = /^\/assets\/.+\.(js|css|woff2?|png|jpg|jpeg|svg|webp|ico)$/i.test(
+    url.pathname,
   );
+  if (isHashedAsset || STATIC_PATHS.includes(url.pathname)) {
+    event.respondWith(
+      caches.match(req).then((cached) => {
+        if (cached) return cached;
+        return fetch(req).then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
+          return res;
+        });
+      }),
+    );
+    return;
+  }
+
+  // Everything else (API calls, etc.) — pass through to network without
+  // touching cache. Caching API responses without invalidation logic is a
+  // recipe for stale data.
 });
 
 // Web Push handler — fires when the alert pipeline emits announcement.matched.
@@ -91,7 +137,7 @@ self.addEventListener("push", (event) => {
       tag: alertId ? `alert:${alertId}` : "alert",
       data: { alertId, url: alertId ? `/alerts/${alertId}` : "/alerts" },
       requireInteraction: false,
-    })
+    }),
   );
 });
 
@@ -103,6 +149,6 @@ self.addEventListener("notificationclick", (event) => {
       const existing = clients.find((c) => c.url.endsWith(url));
       if (existing) return existing.focus();
       return self.clients.openWindow(url);
-    })
+    }),
   );
 });

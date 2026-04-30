@@ -25,6 +25,12 @@ import {
 import { log, span, captureException } from "./observability.js";
 import { classifyDocument, isAiConfigured } from "./ai.js";
 import { sendEmail } from "./email-out.js";
+import {
+  buildInboundReplyInsert,
+  classifyInboundLLM,
+  type InboundEmail as OrchestratorInbound,
+} from "./inbound-orchestrator.js";
+import { inboundReplies } from "../db/schema.js";
 
 export interface InboundEmail {
   /** RFC-5322 envelope sender */
@@ -278,6 +284,40 @@ export async function processInboundEmail(
         });
       }
 
+      // v0.8 amendment: persist to InboundReply with 7-class top-level
+      // classification per `feedback_no_manual_file_shuffle` Path E.
+      // Bytes never copied — gmailMessageId is the canonical pointer
+      // (we use providerId as a stand-in for non-Gmail providers).
+      try {
+        const orchestratorPayload: OrchestratorInbound = {
+          gmailMessageId: payload.providerId,
+          fromAddress: payload.from,
+          toAddress: payload.to[0] ?? "",
+          subject: payload.subject,
+          bodyText: payload.text,
+          attachmentMetadata: payload.attachments.map((a, i) => ({
+            filename: a.filename,
+            mimeType: a.contentType,
+            size: a.size,
+            attachmentIndex: i,
+          })),
+        };
+        const classification = await classifyInboundLLM(orchestratorPayload, {
+          firmId: task.firmId,
+        });
+        const reply = buildInboundReplyInsert(
+          task.firmId,
+          orchestratorPayload,
+          classification,
+        );
+        // Tie the InboundReply to the matched task (forwarding-token route).
+        await db.insert(inboundReplies).values({ ...reply, taskId: task.id });
+      } catch (err) {
+        // Don't fail the whole inbound flow on classifier error — log + drop
+        // and let the caller still get a successful task match.
+        captureException(err, { route: "inbound_email.classify_persist" });
+      }
+
       return { taskId: task.id, itemsWritten: written };
     },
     { providerId: payload.providerId },
@@ -357,4 +397,77 @@ function buildValidationReply(args: {
     "",
     "Thanks!",
   ].join("\n");
+}
+
+/**
+ * AWS SES inbound webhook → canonical InboundEmail. SES POSTs an SNS
+ * notification wrapping the inbound mail. Two formats:
+ *   1. SES "Inbound Email" rule action → S3 + SNS notification with mail
+ *      headers + a key to S3 (we'd fetch full content). For Phase 2 backend
+ *      ship-today this parser handles the simpler "Inline" delivery format
+ *      where SES inlines the email content into the SNS message body.
+ *   2. SES "Lambda" action → direct Lambda invoke (different code path,
+ *      not used by this Hono webhook).
+ *
+ * Real production deployment uses #1 with S3 fetch — that's a Phase 3 wiring
+ * item. This parser fits the test-and-eval mode: SES dev sandbox forwarding
+ * a JSON snapshot of the email.
+ */
+export function fromSes(body: unknown): InboundEmail | null {
+  if (typeof body !== "object" || body === null) return null;
+  const b = body as Record<string, unknown>;
+
+  // SNS wrapper: extract the Message payload (which is itself JSON-stringified).
+  let messageBody: Record<string, unknown> = b;
+  if (typeof b.Message === "string") {
+    try {
+      messageBody = JSON.parse(b.Message) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+
+  const mail = (messageBody.mail ?? messageBody) as Record<string, unknown>;
+  const headers = (mail.commonHeaders ?? {}) as Record<string, unknown>;
+  const messageId = (mail.messageId ?? messageBody.MessageId ?? "") as string;
+
+  const from = String(
+    Array.isArray(headers.from) ? headers.from[0] : headers.from ?? "",
+  );
+  const toList = Array.isArray(headers.to)
+    ? (headers.to as string[])
+    : typeof headers.to === "string"
+      ? [headers.to]
+      : [];
+  if (toList.length === 0) return null;
+
+  const subject = String(headers.subject ?? "");
+  const receivedAt = headers.date
+    ? new Date(String(headers.date))
+    : new Date();
+
+  // Phase 2 backend ship-today: text body + attachments arrive via S3 fetch
+  // in production; for the inline test format we accept `content` and
+  // `attachments` arrays at the top level.
+  const text = typeof messageBody.content === "string" ? messageBody.content : "";
+  const attachmentsRaw = Array.isArray(messageBody.attachments)
+    ? (messageBody.attachments as Array<Record<string, unknown>>)
+    : [];
+  const attachments: InboundEmail["attachments"] = attachmentsRaw.map((a) => ({
+    filename: String(a.filename ?? a.name ?? "attachment"),
+    contentType: String(a.contentType ?? a.mimeType ?? "application/octet-stream"),
+    size: Number(a.size ?? 0),
+  }));
+
+  if (!from || toList.length === 0 || !messageId) return null;
+
+  return {
+    from,
+    to: toList,
+    subject,
+    text,
+    attachments,
+    receivedAt,
+    providerId: messageId,
+  };
 }

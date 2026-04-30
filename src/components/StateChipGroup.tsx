@@ -11,13 +11,17 @@ export function StateChipGroup({
   maxVisibleNexus = 2,
 }: {
   primary: StateCode;
-  nexus: StateCode[];
+  nexus: StateCode[] | null | undefined;
   maxVisibleNexus?: number;
 }) {
   const base =
     "text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded font-medium";
-  const visible = nexus.slice(0, maxVisibleNexus);
-  const overflow = nexus.slice(maxVisibleNexus);
+  // Defensive default — imported clients with NULL nexus_states crash without
+  // this guard (BE returns array but old or partial-import data sometimes
+  // surfaces undefined; this is the safer contract).
+  const safeNexus = Array.isArray(nexus) ? nexus : [];
+  const visible = safeNexus.slice(0, maxVisibleNexus);
+  const overflow = safeNexus.slice(maxVisibleNexus);
   return (
     <div className="inline-flex items-center gap-1">
       <span

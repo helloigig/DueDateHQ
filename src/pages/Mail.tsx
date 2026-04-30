@@ -1,0 +1,310 @@
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { Inbox as InboxIcon, Send, FileEdit, AlertTriangle, Mail as MailIcon } from "lucide-react";
+import { trpc } from "../lib/api/client";
+
+// Mail surface — per IA v0.7 amendment §3.8.
+//
+// Cross-client communication pivot. Top section is "Reminders Out, Awaiting
+// Reply" (gap-over-fill principle: what client hasn't replied to is the
+// loudest element). Below is 4 tabs (Inbox / Outbox / Drafts / Issues).
+//
+// Wired to live BE: Inbox tab → trpc.inboundReplies.list (Method A SES forward
+// + Method B Gmail/Outlook OAuth pull both write here). Issues tab →
+// trpc.deliveryEvents.issues (bounce/complaint/unsubscribe webhooks). Falls
+// back to static mocks when BE returns empty (fresh / un-seeded firms).
+
+type Tab = "inbox" | "outbox" | "drafts" | "issues";
+
+const REMINDERS_OUT = [
+  {
+    daysSent: 11,
+    client: "Emily Hartfield",
+    task: "K-1 Apex Fund (1040 NY)",
+    address: "emily@hartfield.com",
+  },
+  {
+    daysSent: 9,
+    client: "Marcus Chen",
+    task: "S-Corp books (S-Corp CA)",
+    address: "marcus@chen-llc.com",
+  },
+  {
+    daysSent: 8,
+    client: "Apex Fund",
+    task: "1065 Partner Forms",
+    address: "ops@apexfund.com",
+  },
+];
+
+const INBOX_MOCK = [
+  {
+    intent: "timeline_pushback",
+    client: "Sarah Mitchell",
+    task: "1040 NY",
+    preview: "Hi! K-1 from my fund won't be ready until late July...",
+    receivedHoursAgo: 3,
+  },
+  {
+    intent: "question_asked",
+    client: "Jordan Lee",
+    task: "S-Corp CA",
+    preview: "Quick question — what's the IRA contribution limit this year?",
+    receivedHoursAgo: 7,
+  },
+  {
+    intent: "document_provided",
+    client: "Emily Hartfield",
+    task: "1040 NY",
+    preview: "Attached: W-2 for 2025 (ADP via Acme Corp)",
+    receivedHoursAgo: 14,
+  },
+];
+
+type InboxRow = {
+  intent: string;
+  client: string;
+  task: string;
+  preview: string;
+  receivedHoursAgo: number;
+};
+
+function hoursAgo(iso: string | Date): number {
+  const t = typeof iso === "string" ? new Date(iso).getTime() : iso.getTime();
+  return Math.max(0, Math.floor((Date.now() - t) / (60 * 60 * 1000)));
+}
+
+export function Mail() {
+  const [tab, setTab] = useState<Tab>("inbox");
+  const inboxQuery = trpc.inboundReplies.list.useQuery({ limit: 50 });
+  const issuesQuery = trpc.deliveryEvents.issues.useQuery({ limit: 50 });
+
+  // Map raw inbound_replies rows to the display shape. Without a join to
+  // tasks/clients (held off to keep the router stateless), best-effort
+  // identifiers: from-address as client, subject (or short body) as task.
+  // Polish: add joined fields in a router follow-up to surface real names.
+  const liveInbox: InboxRow[] = (inboxQuery.data ?? []).map((r) => ({
+    intent: r.replyIntent ?? r.topLevelClass ?? "unknown",
+    client: r.fromAddress.split("@")[0] ?? r.fromAddress,
+    task: r.subject?.slice(0, 40) ?? (r.taskId ? "(linked task)" : "(unmatched)"),
+    preview: (r.bodyText ?? r.subject ?? "(no body)").slice(0, 100),
+    receivedHoursAgo: hoursAgo(r.receivedAt),
+  }));
+  const inbox = liveInbox.length > 0 ? liveInbox : INBOX_MOCK;
+  const inboxCount = inbox.length;
+
+  // Mail Issues — bounces/complaints/unsubscribes joined with email_drafts.
+  // The BE returns { ev, draft } so we display ev.eventType / ev.bounceReason
+  // and draft.recipient (when surface lands; right now the schema only carries
+  // subject + body so we show that).
+  const issuesCount = (issuesQuery.data ?? []).length;
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 md:px-6 py-4">
+      <header className="mb-4">
+        <h1 className="text-xl font-semibold text-ink-900 flex items-center gap-2">
+          <MailIcon className="w-5 h-5" aria-hidden />
+          Mail
+        </h1>
+        <p className="text-sm text-ink-500 mt-0.5">
+          Cross-client communication. AI classifies inbound; bytes stay in your
+          email account.
+        </p>
+      </header>
+
+      {/* Reminders Out — gap-over-fill prominent top section per IA v0.7 §3.8 */}
+      <section
+        aria-labelledby="reminders-out-heading"
+        className="rounded-md border-2 border-warning-border bg-warning-bg/40 p-4 mb-6"
+      >
+        <header className="flex items-center justify-between gap-2 mb-3">
+          <h2
+            id="reminders-out-heading"
+            className="text-sm font-semibold text-ink-900 flex items-center gap-2"
+          >
+            <span aria-hidden>🚨</span>
+            Reminders out, awaiting reply
+          </h2>
+          <span className="text-2xs text-ink-500 tabular-nums">
+            18 across 12 clients · oldest 11d · 4 sent &gt; 7d ago
+          </span>
+        </header>
+
+        <ul className="space-y-1.5">
+          {REMINDERS_OUT.map((r) => (
+            <li
+              key={`${r.client}-${r.task}`}
+              className="flex items-center gap-3 px-2 py-1.5 rounded hover:bg-surface text-sm"
+            >
+              <span className="font-mono tabular-nums text-2xs w-10 text-danger-solid font-semibold">
+                {r.daysSent}d
+              </span>
+              <span className="font-medium text-ink-900">{r.client}</span>
+              <span className="text-ink-500 text-xs">·</span>
+              <span className="text-ink-700 text-xs truncate">{r.task}</span>
+              <span className="ml-auto flex items-center gap-2">
+                <button className="px-2 py-1 text-xs bg-surface border border-line rounded hover:bg-sunken">
+                  Re-send
+                </button>
+                <button className="px-2 py-1 text-xs text-ink-500 hover:text-ink-900">
+                  Open task →
+                </button>
+              </span>
+            </li>
+          ))}
+          <li>
+            <button className="text-xs text-ink-500 hover:text-ink-900 px-2 py-1">
+              show 15 more
+            </button>
+          </li>
+        </ul>
+      </section>
+
+      {/* Tabs — Inbox / Outbox / Drafts / Issues */}
+      <div className="border-b border-line mb-3 flex items-center gap-1" role="tablist">
+        {(
+          [
+            { id: "inbox" as Tab, label: "Inbox", Icon: InboxIcon, count: inboxCount },
+            { id: "outbox" as Tab, label: "Outbox", Icon: Send, count: 47 },
+            { id: "drafts" as Tab, label: "Drafts", Icon: FileEdit, count: 12 },
+            { id: "issues" as Tab, label: "Issues", Icon: AlertTriangle, count: issuesCount },
+          ] as const
+        ).map(({ id, label, Icon, count }) => (
+          <button
+            key={id}
+            role="tab"
+            aria-selected={tab === id}
+            onClick={() => setTab(id)}
+            className={`relative flex items-center gap-2 px-3 py-2 text-sm rounded-t -mb-px ${
+              tab === id
+                ? "border-b-2 border-accent text-ink-900 font-medium"
+                : "text-ink-500 hover:text-ink-900"
+            }`}
+          >
+            <Icon className="w-4 h-4" aria-hidden />
+            <span>{label}</span>
+            {count > 0 && (
+              <span className="text-2xs tabular-nums text-ink-400">({count})</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {tab === "inbox" && (
+        <div className="space-y-2">
+          <p className="text-2xs text-ink-400 mb-2 flex items-center gap-2">
+            Sorted: pushback + questions first (need your reply) → documents (need
+            your confirm) → off-topic last.
+            <span className="ml-auto italic">
+              {inboxQuery.isLoading
+                ? "loading inbound classifier feed"
+                : liveInbox.length > 0
+                  ? `live inbound feed · ${liveInbox.length} items from BE`
+                  : "fallback static mock (no live inbound yet)"}
+            </span>
+          </p>
+          {inbox.map((m, i) => (
+            <article
+              key={i}
+              className="rounded-md border border-line bg-surface p-3 hover:bg-sunken/40 cursor-pointer"
+            >
+              <header className="flex items-center gap-2 mb-1.5">
+                <IntentBadge intent={m.intent} />
+                <span className="font-medium text-ink-900 text-sm">{m.client}</span>
+                <span className="text-ink-300 text-xs">·</span>
+                <span className="text-ink-600 text-xs">{m.task}</span>
+                <span className="ml-auto text-2xs text-ink-400 tabular-nums">
+                  {m.receivedHoursAgo}h ago
+                </span>
+              </header>
+              <p className="text-sm text-ink-700 line-clamp-1">{m.preview}</p>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {tab === "outbox" && <PlaceholderTab label="Outbox — sent reminders, last 30 days" />}
+      {tab === "drafts" && <PlaceholderTab label="Drafts — AI-prepared emails awaiting review" />}
+      {tab === "issues" && (
+        <div className="space-y-2">
+          <p className="text-2xs text-ink-400 mb-2 flex items-center gap-2">
+            Bounced / complained / unsubscribed — fix the address or suppress.
+            <span className="ml-auto italic">
+              {issuesQuery.isLoading
+                ? "loading delivery events feed"
+                : (issuesQuery.data?.length ?? 0) > 0
+                  ? `live delivery feed · ${issuesQuery.data?.length} issues from BE`
+                  : "fallback placeholder (no delivery events yet)"}
+            </span>
+          </p>
+          {(issuesQuery.data ?? []).length === 0 ? (
+            <PlaceholderTab label="Issues — no bounces or complaints yet" />
+          ) : (
+            (issuesQuery.data ?? []).map((row, i) => (
+              <article
+                key={i}
+                className="rounded-md border border-danger-border bg-danger-bg/20 p-3"
+              >
+                <header className="flex items-center gap-2 mb-1.5">
+                  <IntentBadge intent={row.ev.eventType} />
+                  <span className="font-medium text-ink-900 text-sm">
+                    {row.draft.subject ?? "(no subject)"}
+                  </span>
+                  <span className="ml-auto text-2xs text-ink-400 tabular-nums">
+                    {hoursAgo(row.ev.eventAt)}h ago
+                  </span>
+                </header>
+                {row.ev.bounceReason && (
+                  <p className="text-2xs text-ink-500">
+                    Reason: <span className="text-danger-ink">{row.ev.bounceReason}</span>
+                    {row.ev.diagnosticText && (
+                      <span className="text-ink-400"> · {row.ev.diagnosticText.slice(0, 80)}</span>
+                    )}
+                  </p>
+                )}
+              </article>
+            ))
+          )}
+        </div>
+      )}
+
+      <p className="mt-6 text-2xs text-ink-400 leading-relaxed">
+        Per <Link to="/settings/integrations" className="underline">Method B (Gmail/Outlook OAuth)</Link>,
+        all inbound is classified by AI into 7 classes (client doc / client reply /
+        agency / 3rd-party data / payment / vendor / spam) and routed to the right
+        client × task. Bytes stay in your email — we hold extracted text + facts +
+        thumbnails. Full mail integration ships in Phase 3.
+      </p>
+    </div>
+  );
+}
+
+function IntentBadge({ intent }: { intent: string }) {
+  const map: Record<
+    string,
+    { label: string; tone: string }
+  > = {
+    timeline_pushback: { label: "pushback", tone: "bg-warning-bg text-warning-ink" },
+    question_asked: { label: "question", tone: "bg-info-bg text-info-ink" },
+    document_provided: { label: "document", tone: "bg-success-bg text-success-ink" },
+    off_topic: { label: "off-topic", tone: "bg-sunken text-ink-500" },
+    mismatched_attachment: { label: "mismatched", tone: "bg-danger-bg text-danger-ink" },
+    acknowledgment: { label: "ack", tone: "bg-sunken text-ink-500" },
+  };
+  const m = map[intent] ?? { label: intent, tone: "bg-sunken text-ink-500" };
+  return (
+    <span
+      className={`text-2xs px-1.5 py-0.5 rounded ${m.tone} font-medium tabular-nums`}
+    >
+      {m.label}
+    </span>
+  );
+}
+
+function PlaceholderTab({ label }: { label: string }) {
+  return (
+    <div className="rounded-md border border-dashed border-line p-8 text-center text-sm text-ink-500">
+      {label} (mock data — full implementation Phase 3)
+    </div>
+  );
+}

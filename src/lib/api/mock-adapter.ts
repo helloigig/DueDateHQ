@@ -29,6 +29,33 @@ import type {
 const delay = (ms = 150) =>
   new Promise((r) => setTimeout(r, ms + Math.random() * 100));
 
+// In-memory mock store for taskMilestones — survives across calls within a
+// page session, cleared on reload. Supports `proposeForTask` round-trips so
+// TaskMiniTimeline can demo the Mode B propose flow without a backend.
+type MockMilestoneRow = {
+  id: string;
+  firmId: string;
+  taskId: string;
+  milestoneType: string;
+  customLabel: string | null;
+  targetDate: string | null;
+  completedDate: string | null;
+  status: "not_started" | "in_progress" | "blocked" | "done" | "overdue";
+  blockerReason: string | null;
+  displayOrder: number;
+  proposedBy: "user" | "ai" | "system";
+};
+const mockMilestoneStore = new Map<string, MockMilestoneRow[]>();
+
+function nextApril15(): string {
+  const now = new Date();
+  const year =
+    now.getMonth() < 3 || (now.getMonth() === 3 && now.getDate() < 15)
+      ? now.getFullYear()
+      : now.getFullYear() + 1;
+  return `${year}-04-15`;
+}
+
 function sessionOrDefault() {
   const s = getSession();
   return {
@@ -361,6 +388,429 @@ export const mockAdapter = {
     },
   },
 
+  // todoItems — computed view per PRD §4.8 + IA v0.7 §3.1. Mock adapter
+  // computes from the same in-memory store the rest of the app uses, so
+  // the action queue stays in sync with checklist state changes.
+  todoItems: {
+    list: async (
+      input: { limit?: number } | undefined = undefined,
+    ): Promise<{
+      items: Array<{
+        id: string;
+        source: string;
+        verb: "Send" | "Confirm" | "Apply" | "Discuss";
+        client: string;
+        clientId: string;
+        task?: string;
+        taskId?: string;
+        dueDate?: string;
+        action: string;
+        context: string;
+        stageLabel?: string;
+        daysBehind?: number;
+        urgency: "high" | "medium" | "normal";
+        urgencyScore: number;
+        surface:
+          | "email_draft_modal"
+          | "task_detail"
+          | "alert_detail"
+          | "opportunity_detail"
+          | "bounce_modal";
+      }>;
+      total: number;
+      sourcesPending: string[];
+    }> => {
+      await delay();
+      const limit = input?.limit ?? 50;
+      const { checklistItems, tasks, clients, deadlines, announcements } =
+        getState();
+      const items: Array<{
+        id: string;
+        source: string;
+        verb: "Send" | "Confirm" | "Apply" | "Discuss";
+        client: string;
+        clientId: string;
+        task?: string;
+        taskId?: string;
+        dueDate?: string;
+        action: string;
+        context: string;
+        stageLabel?: string;
+        daysBehind?: number;
+        urgency: "high" | "medium" | "normal";
+        urgencyScore: number;
+        surface:
+          | "email_draft_modal"
+          | "task_detail"
+          | "alert_detail"
+          | "opportunity_detail"
+          | "bounce_modal";
+      }> = [];
+
+      const TIER_WEIGHT: Record<string, number> = {
+        premium: 1.5,
+        standard: 1,
+        custom: 1,
+      };
+      const taskById = new Map(tasks.map((t) => [t.id, t]));
+      const clientById = new Map(clients.map((c) => [c.id, c]));
+      const deadlineById = new Map(deadlines.map((d) => [d.id, d]));
+
+      const proximityFactor = (iso: string | null | undefined): number => {
+        if (!iso) return 1;
+        const days =
+          (new Date(iso).getTime() - Date.now()) / (24 * 60 * 60 * 1000);
+        if (days < 0) return 3;
+        if (days < 7) return 2;
+        if (days < 30) return 1.5;
+        return 1;
+      };
+
+      const urgencyBucket = (s: number): "high" | "medium" | "normal" => {
+        if (s >= 200) return "high";
+        if (s >= 100) return "medium";
+        return "normal";
+      };
+
+      // Sources 1-3: checklist-derived (Mode A inbound, Mode C anomaly,
+      // Mode B reminder due). One pass over checklistItems.
+      for (const ci of checklistItems) {
+        const task = taskById.get(ci.taskId);
+        if (!task) continue;
+        const deadline = deadlineById.get(task.deadlineId);
+        const client = clientById.get(deadline?.clientId ?? "");
+        if (!client || !deadline) continue;
+        const tierW = TIER_WEIGHT[client.tier ?? "standard"] ?? 1;
+        const due = deadline.officialDueDate;
+
+        if (ci.state === "received_issue") {
+          const score = 80 * proximityFactor(due) * tierW;
+          items.push({
+            id: `mode_c-${ci.id}`,
+            source: "mode_c_anomaly",
+            verb: "Confirm",
+            client: client.name,
+            clientId: client.id,
+            task: task.formType,
+            taskId: task.id,
+            dueDate: due,
+            action: `Resolve flag · ${ci.label}`,
+            context:
+              ci.flagReason ?? "Mode C flagged anomaly — review before confirming",
+            stageLabel: "Review",
+            urgency: urgencyBucket(score),
+            urgencyScore: Math.round(score),
+            surface: "task_detail",
+          });
+        } else if (ci.state === "received_unreviewed") {
+          const score = 50 * proximityFactor(due) * tierW;
+          items.push({
+            id: `mode_a-${ci.id}`,
+            source: "mode_a_inbound",
+            verb: "Confirm",
+            client: client.name,
+            clientId: client.id,
+            task: task.formType,
+            taskId: task.id,
+            dueDate: due,
+            action: `Confirm ${ci.label}`,
+            context: `AI ${ci.aiConfidence ?? "medium"} confidence · received and waiting for your decision`,
+            stageLabel: "Review",
+            urgency: urgencyBucket(score),
+            urgencyScore: Math.round(score),
+            surface: "task_detail",
+          });
+        } else if (
+          ci.state === "requested_waiting" ||
+          ci.state === "not_requested"
+        ) {
+          const lastReminder = ci.lastReminderAt
+            ? new Date(ci.lastReminderAt).getTime()
+            : null;
+          const daysSinceReminder = lastReminder
+            ? Math.floor((Date.now() - lastReminder) / (24 * 60 * 60 * 1000))
+            : null;
+          const wm =
+            ci.state === "not_requested"
+              ? 2.0
+              : !lastReminder
+                ? 1.0
+                : daysSinceReminder! > 7
+                  ? 2.5
+                  : daysSinceReminder! > 3
+                    ? 1.5
+                    : 1.0;
+          const stuck = lastReminder
+            ? Math.max(0, daysSinceReminder! * 5)
+            : 0;
+          const score = 50 * wm * proximityFactor(due) * tierW + stuck;
+          const reminderText =
+            daysSinceReminder != null
+              ? `last sent ${daysSinceReminder}d ago`
+              : "not yet requested";
+          items.push({
+            id: `mode_b-${ci.id}`,
+            source: "mode_b_reminder_due",
+            verb: "Send",
+            client: client.name,
+            clientId: client.id,
+            task: task.formType,
+            taskId: task.id,
+            dueDate: due,
+            action: `Send reminder · ${ci.label}`,
+            context: `${reminderText}${lastReminder ? " · draft ready" : ""}`,
+            stageLabel: "Collect",
+            daysBehind:
+              daysSinceReminder != null && daysSinceReminder > 7
+                ? daysSinceReminder
+                : undefined,
+            urgency: urgencyBucket(score),
+            urgencyScore: Math.round(score),
+            surface: "email_draft_modal",
+          });
+        }
+      }
+
+      // Source 6: Mode F alert — active firm announcements.
+      const activeAlerts = announcements.filter(
+        (a) => !a.dismissed && (a.affectedClientIds?.length ?? 0) > 0,
+      );
+      for (const a of activeAlerts.slice(0, 8)) {
+        const matchCount = a.affectedClientIds.length;
+        const score = 100 * (matchCount > 5 ? 1.5 : 1.0);
+        items.push({
+          id: `mode_f-${a.id}`,
+          source: "mode_f_alert",
+          verb: "Apply",
+          client: matchCount === 1 ? "1 client" : `${matchCount} clients`,
+          clientId: "",
+          action: `Apply ${a.title}`,
+          context: `${a.stateCode}: ${a.summary?.slice(0, 80) ?? ""} · matched on ${matchCount} client${matchCount === 1 ? "" : "s"}`,
+          urgency: urgencyBucket(score),
+          urgencyScore: Math.round(score),
+          surface: "alert_detail",
+        });
+      }
+
+      items.sort((a, b) => b.urgencyScore - a.urgencyScore);
+      return {
+        items: items.slice(0, limit),
+        total: items.length,
+        sourcesPending: [
+          "reply_pushback",
+          "reply_question",
+          "delivery_bounce",
+          "mode_d_draft_ready",
+          "mode_e_opportunity",
+        ],
+      };
+    },
+  },
+
+  // taskMilestones — mock simulates Mode B target_date proposals so the FE
+  // round-trip works in mock mode. proposeForTask synthesizes 5 substrate-
+  // default milestones (per PRD §4.2 cold-start: -90/-60/-21/-7/0 days from
+  // due_date) and stashes them in mockMilestoneStore so subsequent listForTask
+  // calls return them. Real wiring happens against the backend when
+  // VITE_USE_MOCK_API=false — the BE calls predictMilestoneTargetDates.
+  taskMilestones: {
+    listForTask: async (input: { taskId: string }) => {
+      await delay();
+      return mockMilestoneStore.get(input.taskId) ?? [];
+    },
+    fleetStack: async (_input?: { waitingOnly?: boolean; limit?: number }) => {
+      await delay();
+      // Flatten everything we've synthesized so far for the cross-client view
+      return Array.from(mockMilestoneStore.values()).flat();
+    },
+    detectBlockers: async (input: { taskId: string }) => {
+      await delay(400);
+      const existing = mockMilestoneStore.get(input.taskId) ?? [];
+      if (existing.length === 0) {
+        return { decisions: [], appliedCount: 0 };
+      }
+      // Heuristic-only mock: block any not-done milestone whose target_date
+      // is in the past. Mirrors the backend heuristic fallback so dev
+      // demos see meaningful Mode E behavior without an API key.
+      const todayMs = Date.now();
+      let appliedCount = 0;
+      const decisions = existing.map((m) => {
+        if (m.status === "done") {
+          return {
+            milestoneId: m.id,
+            shouldBlock: false,
+            blockerReason: "",
+            confidence: "high" as const,
+          };
+        }
+        if (m.targetDate && new Date(m.targetDate).getTime() < todayMs) {
+          const daysLate = Math.round(
+            (todayMs - new Date(m.targetDate).getTime()) /
+              (24 * 60 * 60 * 1000),
+          );
+          // Apply the block to the in-memory store so listForTask reflects it
+          if (m.status !== "blocked") {
+            m.status = "blocked";
+            m.blockerReason = `target was ${daysLate}d ago; status still ${m.status}`;
+            appliedCount++;
+          }
+          return {
+            milestoneId: m.id,
+            shouldBlock: true,
+            blockerReason: `target was ${daysLate}d ago`,
+            confidence: "high" as const,
+          };
+        }
+        return {
+          milestoneId: m.id,
+          shouldBlock: false,
+          blockerReason: "",
+          confidence: "low" as const,
+        };
+      });
+      return { decisions, appliedCount };
+    },
+    proposeForTask: async (input: { taskId: string }) => {
+      await delay();
+      const existing = mockMilestoneStore.get(input.taskId);
+      if (existing && existing.length > 0) {
+        return { proposed: false, milestones: existing };
+      }
+      // Synthesize 5 substrate milestones from the task's due date if known.
+      // The mock store doesn't have task data; default to ~April 15 of next
+      // year as a reasonable filing-due anchor for demo purposes. Real BE
+      // looks up officialDueDate from the deadline row.
+      const due = nextApril15();
+      const offsetDays = (days: number) => {
+        const d = new Date(due);
+        d.setDate(d.getDate() - days);
+        return d.toISOString().slice(0, 10);
+      };
+      const stages = [
+        { type: "initial_meeting", offset: 90 },
+        { type: "collect_materials", offset: 60 },
+        { type: "prepare_workpapers", offset: 21 },
+        { type: "internal_review", offset: 7 },
+        { type: "file", offset: 0 },
+      ] as const;
+      const synthesized = stages.map((s, idx) => ({
+        id: `mock-mil-${input.taskId}-${idx}`,
+        firmId: "mock-firm",
+        taskId: input.taskId,
+        milestoneType: s.type,
+        customLabel: null,
+        targetDate: s.offset === 0 ? due : offsetDays(s.offset),
+        completedDate: null,
+        status: "not_started" as const,
+        blockerReason: null,
+        displayOrder: idx,
+        proposedBy: "ai" as const,
+      }));
+      mockMilestoneStore.set(input.taskId, synthesized);
+      return {
+        proposed: true,
+        milestones: synthesized,
+        overallConfidence: "low" as const,
+        basisOfEstimate:
+          "mock substrate (PRD §4.2 cold-start defaults — no firm history)",
+      };
+    },
+    update: async (_input: unknown) => {
+      await delay();
+      return {} as unknown;
+    },
+    add: async (_input: unknown) => {
+      await delay();
+      return {} as unknown;
+    },
+  },
+
+  // inboundReplies — mock returns empty by default; the static frontend
+  // mock in Mail.tsx covers the design-review-quality variety until real
+  // backend traffic flows.
+  inboundReplies: {
+    list: async (
+      _input?: {
+        taskId?: string;
+        topLevelClass?: string;
+        replyIntent?: string;
+        limit?: number;
+      },
+    ) => {
+      await delay();
+      return [] as unknown[];
+    },
+    markActioned: async (_input: { id: string }) => {
+      await delay();
+      return {} as unknown;
+    },
+    linkToTask: async (_input: { id: string; taskId: string }) => {
+      await delay();
+      return {} as unknown;
+    },
+  },
+
+  // deliveryEvents — mock returns empty issues queue. Mail.tsx Issues tab
+  // shows static mock until SES/Postmark/Resend webhooks fire real events.
+  deliveryEvents: {
+    issues: async (_input?: { limit?: number }) => {
+      await delay();
+      return [] as unknown[];
+    },
+    forDraft: async (_input: { emailDraftId: string }) => {
+      await delay();
+      return [] as unknown[];
+    },
+    suppressEvent: async (_input: { id: number }) => {
+      await delay();
+      return null as unknown;
+    },
+  },
+
+  // modeFHealth — IA v0.7 §3.9d. State-monitoring's own monitoring.
+  modeFHealth: {
+    status: async (): Promise<{
+      overall: "green" | "amber" | "red";
+      total: number;
+      stale: number;
+      lastSyncMinAgo: number | null;
+      nextSyncInMin: number;
+      perState: Array<{
+        code: string;
+        label: string;
+        staleHours: number;
+        status: string;
+      }>;
+      perStateIllustrative: boolean;
+    }> => {
+      await delay();
+      // Per-state breakdown is illustrative until backend exposes
+      // last_scraped_at (Phase 3 follow-up).
+      const perState = [
+        { code: "NY", label: "New York", staleHours: 4, status: "stale_short" },
+        { code: "TX", label: "Texas", staleHours: 12, status: "stale_short" },
+        {
+          code: "CA",
+          label: "California",
+          staleHours: 28,
+          status: "rescrape_running",
+        },
+      ];
+      const longStale = perState.filter((s) => s.staleHours > 24).length;
+      const overall =
+        longStale > 0 ? "red" : perState.length > 0 ? "amber" : "green";
+      return {
+        overall,
+        total: 50,
+        stale: perState.length,
+        lastSyncMinAgo: 14,
+        nextSyncInMin: 16,
+        perState,
+        perStateIllustrative: true,
+      };
+    },
+  },
+
   announcements: {
     list: async (input: { activeOnly?: boolean } = {}) => {
       await delay();
@@ -583,19 +1033,136 @@ export const mockAdapter = {
       );
       const entityType =
         hash % 3 === 0 ? "LLC" : hash % 3 === 1 ? "S-Corp" : "Individual";
+      // Mock returns above-threshold confidence so the commit button is
+      // exercisable end-to-end in mock mode (real LLM extraction varies).
       return {
         fields: {
-          clientName: null,
-          ein: null,
+          clientName: "Mitchell Demo Client",
+          ein: "12-3456789",
           entityType,
           taxYear: 2024,
-          priorAGI: null,
-          formsFiled: [],
-          k1Sources: [],
-          confidence: 0.4,
+          priorAGI: 145000,
+          formsFiled: ["1040", "Schedule C", "Schedule E"],
+          k1Sources: ["Apex Fund LP"],
+          confidence: 0.82,
         },
-        readyForCommit: false,
+        readyForCommit: true,
       };
+    },
+    /** Mock commit — synthesizes inserted-fact-row counts so the FE round-
+     *  trip works in mock mode. Real BE inserts into imported_facts. */
+    commitPriorYearReturn: async (input: {
+      clientId: string;
+      taxYear: number;
+      fields: {
+        priorAGI?: number | null;
+        formsFiled?: string[];
+        k1Sources?: string[];
+        entityType?: string | null;
+        ein?: string | null;
+      };
+    }) => {
+      await delay();
+      const factTypes: string[] = [];
+      if (input.fields.priorAGI != null) factTypes.push("prior_agi");
+      if (input.fields.formsFiled && input.fields.formsFiled.length > 0)
+        factTypes.push("forms_filed");
+      if (input.fields.k1Sources && input.fields.k1Sources.length > 0)
+        factTypes.push("k1_sources");
+      if (input.fields.entityType) factTypes.push("entity_type");
+      if (input.fields.ein) factTypes.push("ein");
+      return { inserted: factTypes.length, factTypes };
+    },
+    /** Cross-fact consistency — mock returns one illustrative flag per
+     *  client (when clientId provided) so the AiInsightsPanel surface
+     *  renders meaningfully in mock mode. Real BE walks imported_facts
+     *  and flags actual discrepancies. */
+    factConsistency: async (input?: { clientId?: string }) => {
+      await delay();
+      if (!input?.clientId) return { flags: [] };
+      // Hash the clientId so different clients show different flag types
+      // in mock — variety for design review.
+      const hash = Array.from(input.clientId).reduce(
+        (h, c) => (h * 31 + c.charCodeAt(0)) | 0,
+        0,
+      );
+      const m = Math.abs(hash) % 4;
+      // 1 in 4 mock clients shows no flags (the healthy case).
+      if (m === 0) return { flags: [] };
+      const flag =
+        m === 1
+          ? {
+              clientId: input.clientId,
+              taxYear: 2024,
+              factType: "prior_agi",
+              severity: "medium" as const,
+              reason:
+                "prior_agi spreads 12% across sources ($142,000 → $159,000)",
+              values: [
+                {
+                  factId: 1001,
+                  value: 142000,
+                  sourceGmailMessageId: "gm-1040-pdf-2024",
+                  extractionVersion: "v1",
+                  confidence: "high",
+                },
+                {
+                  factId: 1002,
+                  value: 159000,
+                  sourceGmailMessageId: "gm-irs-transcript-2024",
+                  extractionVersion: "v1",
+                  confidence: "medium",
+                },
+              ],
+            }
+          : m === 2
+            ? {
+                clientId: input.clientId,
+                taxYear: 2023,
+                factType: "forms_filed",
+                severity: "medium" as const,
+                reason: "forms_filed: 1 item present in some sources but not others",
+                values: [
+                  {
+                    factId: 2001,
+                    value: ["1040", "Schedule C", "Schedule E"],
+                    sourceGmailMessageId: "gm-1040-pdf-2023",
+                    extractionVersion: "v1",
+                    confidence: "high",
+                  },
+                  {
+                    factId: 2002,
+                    value: ["1040", "Schedule C"],
+                    sourceGmailMessageId: "gm-summary-2023",
+                    extractionVersion: "v1",
+                    confidence: "medium",
+                  },
+                ],
+              }
+            : {
+                clientId: input.clientId,
+                taxYear: 2024,
+                factType: "entity_type",
+                severity: "high" as const,
+                reason: "entity_type extracted as 2 different values across sources",
+                values: [
+                  {
+                    factId: 3001,
+                    value: "S-Corp",
+                    sourceGmailMessageId: "gm-articles-2024",
+                    extractionVersion: "v1",
+                    confidence: "high",
+                  },
+                  {
+                    factId: 3002,
+                    value: "LLC",
+                    sourceGmailMessageId: "gm-1120s-cover-2024",
+                    extractionVersion: "v1",
+                    confidence: "medium",
+                  },
+                ],
+              };
+      return { flags: [flag] };
     },
   },
 
@@ -1060,7 +1627,25 @@ export const mockAdapter = {
         accepted: 105,
         acceptanceRate: 105 / 121,
         totalCostCents: 487.2,
+        p50LatencyMs: 850,
+        p95LatencyMs: 2400,
       };
+    },
+    /** Multi-mode overview mock — 6 modes with realistic-shape data. Mode A
+     *  (classify) has highest volume; Mode F (state alerts) has lowest. */
+    summaryAll: async () => {
+      await delay();
+      // Hand-tuned shape so the all-modes table looks realistic in demos.
+      // A = highest volume (every inbound email); D = high volume (every
+      // chase draft); B/C/E = mid; F = low (handful of state announcements).
+      return [
+        { mode: "A" as const, total: 612, actedOn: 588, accepted: 547, acceptanceRate: 547 / 588, totalCostCents: 122.4, p50LatencyMs: 720, p95LatencyMs: 2100 },
+        { mode: "B" as const, total: 89, actedOn: 71, accepted: 64, acceptanceRate: 64 / 71, totalCostCents: 17.8, p50LatencyMs: 880, p95LatencyMs: 2600 },
+        { mode: "C" as const, total: 34, actedOn: 22, accepted: 19, acceptanceRate: 19 / 22, totalCostCents: 6.8, p50LatencyMs: 950, p95LatencyMs: 3100 },
+        { mode: "D" as const, total: 198, actedOn: 174, accepted: 155, acceptanceRate: 155 / 174, totalCostCents: 297.0, p50LatencyMs: 1400, p95LatencyMs: 4200 },
+        { mode: "E" as const, total: 42, actedOn: 28, accepted: 22, acceptanceRate: 22 / 28, totalCostCents: 12.6, p50LatencyMs: 1100, p95LatencyMs: 3500 },
+        { mode: "F" as const, total: 11, actedOn: 8, accepted: 8, acceptanceRate: 1.0, totalCostCents: 4.4, p50LatencyMs: 1850, p95LatencyMs: 5200 },
+      ];
     },
     /** Mock drift report — 8 weeks of buckets, slight downward trend
      *  to exercise both "stable" and "alert" branches in the UI. */

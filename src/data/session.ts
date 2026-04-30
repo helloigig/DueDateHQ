@@ -97,8 +97,36 @@ export function signIn(input: {
   return s;
 }
 
-export function signOut() {
+/**
+ * Clears both Supabase auth (when not in mock mode) AND the local FirmSession.
+ *
+ * Without the Supabase signOut, the SupabaseAuthBridge's INITIAL_SESSION
+ * listener sees a still-valid Supabase session on the next render and
+ * re-populates the local session — user gets signed back in immediately.
+ *
+ * Async because supabase.auth.signOut() is async; callers can await or
+ * fire-and-forget. We swallow Supabase errors (network down, already signed
+ * out) — the local session always clears regardless.
+ *
+ * Lazy-import of supabase to avoid circular dep at module-load time
+ * (data/session is imported by many places that don't need supabase).
+ */
+export async function signOut() {
+  // Local clear first — this fires our subscribers immediately so any
+  // subscriber-driven UI updates (TopBar avatar, etc.) flip on the same tick.
   write(null);
+  if (typeof window === "undefined") return;
+  try {
+    // Inline check for VITE_USE_MOCK_API to avoid importing config (circular).
+    const useMockApi =
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (import.meta as any).env?.VITE_USE_MOCK_API !== "false";
+    if (useMockApi) return;
+    const { supabase } = await import("../lib/supabase");
+    await supabase().auth.signOut();
+  } catch {
+    /* ignore — local already cleared */
+  }
 }
 
 export function updateSession(patch: Partial<FirmSession>) {

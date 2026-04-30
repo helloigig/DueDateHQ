@@ -5,7 +5,7 @@
  */
 import { trpc } from "../lib/api/client";
 
-export type AiMode = "A" | "B" | "C" | "D" | "E";
+export type AiMode = "A" | "B" | "C" | "D" | "E" | "F";
 
 export function useDriftReport(mode?: AiMode) {
   return trpc.aiInferences.driftReport.useQuery(
@@ -14,6 +14,17 @@ export function useDriftReport(mode?: AiMode) {
       refetchInterval: 5 * 60_000,
     },
   );
+}
+
+/**
+ * All-modes overview — single fetch returning per-Mode summary stats
+ * (acceptance / cost / p50-p95 latency). Drives the Settings → AI eval
+ * all-modes table.
+ */
+export function useAiSummaryAll() {
+  return trpc.aiInferences.summaryAll.useQuery(undefined, {
+    refetchInterval: 5 * 60_000,
+  });
 }
 
 /**

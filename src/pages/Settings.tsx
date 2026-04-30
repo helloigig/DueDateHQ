@@ -39,7 +39,7 @@ import {
   useDisconnect,
   useSyncNow,
 } from "../hooks/useIntegrations";
-import { useDriftReport, useAiStatus } from "../hooks/useDriftReport";
+import { useDriftReport, useAiStatus, useAiSummaryAll } from "../hooks/useDriftReport";
 import { PriorYearUpload } from "../components/PriorYearUpload";
 import { PwaInstallCard } from "../components/PwaInstallCard";
 import {
@@ -414,10 +414,20 @@ function RadioRow({
  * Ops surface, not for everyday CPAs — sits in Settings → AI eval
  * for partners + ops to monitor model performance over time.
  */
+const MODE_LABEL: Record<"A" | "B" | "C" | "D" | "E" | "F", string> = {
+  A: "Classify inbound",
+  B: "Predict timing",
+  C: "Anomaly flags",
+  D: "Draft emails",
+  E: "Cross-year insights",
+  F: "State announcements",
+};
+
 function AiEvalPanel() {
-  const [mode, setMode] = useState<"A" | "D">("A");
+  const [mode, setMode] = useState<"A" | "B" | "C" | "D" | "E" | "F">("A");
   const status = useAiStatus();
   const drift = useDriftReport(mode);
+  const summaryAll = useAiSummaryAll();
 
   const latest = drift.data?.weeks[drift.data.weeks.length - 1];
   const acceptancePct =
@@ -455,12 +465,89 @@ function AiEvalPanel() {
       </Card>
 
       <Card
+        title="All modes overview"
+        description="Acceptance / cost / latency for each AI mode (A-F) over the firm's lifetime. Each row is a separate Mode; click into one for the time-series drift chart below."
+      >
+        {summaryAll.isLoading ? (
+          <p className="text-sm text-ink-500">Loading mode summary…</p>
+        ) : summaryAll.error ? (
+          <p className="text-sm text-danger-ink">
+            Couldn't load mode summary: {summaryAll.error.message}
+          </p>
+        ) : summaryAll.data ? (
+          <div className="overflow-x-auto -mx-2">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-ink-500 uppercase tracking-wider">
+                  <th className="text-left font-semibold px-2 py-1.5">Mode</th>
+                  <th className="text-right font-semibold px-2 py-1.5">Calls</th>
+                  <th className="text-right font-semibold px-2 py-1.5">Acted on</th>
+                  <th className="text-right font-semibold px-2 py-1.5">Accept rate</th>
+                  <th className="text-right font-semibold px-2 py-1.5">Cost</th>
+                  <th className="text-right font-semibold px-2 py-1.5">p50 latency</th>
+                  <th className="text-right font-semibold px-2 py-1.5">p95 latency</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summaryAll.data.map((s) => {
+                  const acceptPct =
+                    s.acceptanceRate !== null
+                      ? Math.round(s.acceptanceRate * 100)
+                      : null;
+                  return (
+                    <tr
+                      key={s.mode}
+                      className={`border-t border-line cursor-pointer hover:bg-sunken/30 ${mode === s.mode ? "bg-sunken/40" : ""}`}
+                      onClick={() => setMode(s.mode)}
+                    >
+                      <td className="px-2 py-2 font-mono">
+                        Mode {s.mode}
+                        <span className="ml-2 text-2xs text-ink-400 font-sans">
+                          {MODE_LABEL[s.mode]}
+                        </span>
+                      </td>
+                      <td className="text-right tabular-nums px-2 py-2 text-ink-700">
+                        {s.total}
+                      </td>
+                      <td className="text-right tabular-nums px-2 py-2 text-ink-500">
+                        {s.actedOn}
+                      </td>
+                      <td className={`text-right tabular-nums px-2 py-2 font-medium ${
+                        acceptPct === null
+                          ? "text-ink-400"
+                          : acceptPct >= 85
+                            ? "text-ok-ink"
+                            : acceptPct >= 70
+                              ? "text-warn-ink"
+                              : "text-danger-ink"
+                      }`}>
+                        {acceptPct === null ? "—" : `${acceptPct}%`}
+                      </td>
+                      <td className="text-right tabular-nums px-2 py-2 text-ink-500">
+                        ${(s.totalCostCents / 100).toFixed(2)}
+                      </td>
+                      <td className="text-right tabular-nums px-2 py-2 text-ink-500">
+                        {s.p50LatencyMs !== null ? `${s.p50LatencyMs}ms` : "—"}
+                      </td>
+                      <td className="text-right tabular-nums px-2 py-2 text-ink-500">
+                        {s.p95LatencyMs !== null ? `${s.p95LatencyMs}ms` : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </Card>
+
+      <Card
         title="Acceptance over time"
         description="What fraction of AI proposals you accept, bucketed by ISO week. Drift = latest week vs trailing 4-week mean. >5pp drop fires the alert below."
       >
-        {/* Mode selector — A/D have real data, others are deterministic */}
-        <div className="flex gap-1 mb-4">
-          {(["A", "D"] as const).map((m) => (
+        {/* Mode selector — full A-F set per v0.8 amendment (Mode F added) */}
+        <div className="flex flex-wrap gap-1 mb-4">
+          {(["A", "B", "C", "D", "E", "F"] as const).map((m) => (
             <button
               key={m}
               onClick={() => setMode(m)}
@@ -473,7 +560,7 @@ function AiEvalPanel() {
             >
               Mode {m}
               <span className="ml-1.5 text-2xs opacity-70">
-                {m === "A" ? "Classify" : "Draft email"}
+                {MODE_LABEL[m]}
               </span>
             </button>
           ))}
