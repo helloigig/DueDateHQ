@@ -9,9 +9,45 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
   if (typeof window === "undefined") return null;
   if (!("serviceWorker" in navigator)) return null;
   // Dev-mode skip — Vite serves modules in ways the SW gets in the way of HMR.
-  if (import.meta.env.DEV) return null;
+  if (import.meta.env.DEV) {
+    // Defensive: if a previous prod-build SW is still registered (e.g. user
+    // visits localhost after duedatehq.space), tear it down so dev HMR works.
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    } catch {
+      /* ignore */
+    }
+    return null;
+  }
   try {
     const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+
+    // Auto-reload when a new SW takes over. Without this, users see the OLD
+    // UI until they manually hard-refresh, even though we shipped a fix.
+    // The flow:
+    //   1. New deploy lands; user opens the app
+    //   2. Browser fetches index.html (network-first per sw.js)
+    //   3. New index.html references new asset hashes — old SW serves it
+    //   4. Browser fetches new sw.js too; finds it changed
+    //   5. New SW installs; old SW activates skipWaiting, new SW takes over
+    //   6. controllerchange fires → we reload → user sees latest code
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+
+    // Check for updates every 60s while the tab is open. Catches the case
+    // where the user has a long-lived tab (a CPA leaving the dashboard open
+    // all day) and we ship a hotfix mid-session.
+    setInterval(() => {
+      reg.update().catch(() => {
+        /* network blip — try again next interval */
+      });
+    }, 60_000);
+
     return reg;
   } catch (err) {
     console.warn("[pwa] sw register failed", err);
