@@ -39,12 +39,46 @@ const ENTITY_TYPES = [
   "trust",
   "non_profit",
 ] as const;
+type EntityType = (typeof ENTITY_TYPES)[number];
+
+/**
+ * Map display-format entity types to the canonical snake_case enum.
+ * The FE persists user-facing strings like "LLC", "S-Corp", "Individual"
+ * (per src/types.ts EntityType union); the BE schema stores them as
+ * snake_case for SQL friendliness. This normalizer bridges the two.
+ *
+ * Returns the input unchanged if already canonical, lower-snake-cases
+ * otherwise. Unmapped values fall through and Zod rejects them — keeps
+ * the surface tight while supporting the variants the FE actually sends.
+ */
+function normalizeEntityType(input: unknown): unknown {
+  if (typeof input !== "string") return input;
+  const lowered = input.toLowerCase().replace(/-/g, "_").replace(/\s+/g, "_");
+  // Aliases for common variations
+  const map: Record<string, EntityType> = {
+    individual: "individual",
+    llc: "llc",
+    s_corp: "s_corp",
+    scorp: "s_corp",
+    c_corp: "c_corp",
+    ccorp: "c_corp",
+    partnership: "partnership",
+    trust: "trust",
+    non_profit: "non_profit",
+    nonprofit: "non_profit",
+  };
+  return map[lowered] ?? input;
+}
 
 const RowSchema = z.object({
   name: z.string().min(1),
-  entityType: z.enum(ENTITY_TYPES),
-  primaryState: z.string().length(2),
-  contactEmail: z.string().email().optional(),
+  entityType: z.preprocess(normalizeEntityType, z.enum(ENTITY_TYPES)),
+  primaryState: z
+    .string()
+    .min(2)
+    .max(2)
+    .transform((s) => s.toUpperCase()),
+  contactEmail: z.string().email().optional().or(z.literal("")),
   contactPhone: z.string().optional(),
   servicePackage: z.string().optional(),
 });
