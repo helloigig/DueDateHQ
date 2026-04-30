@@ -1,0 +1,23 @@
+# Build output (re-built inside the container)
+dist
+tsconfig.tsbuildinfo
+
+# Local dev only — never bake secrets into the image
+.env
+.env.local
+.env.*.local
+
+# Local artifacts created by export-worker; runtime creates them fresh
+.artifacts
+
+# OS / IDE noise
+.DS_Store
+.vscode
+.idea
+
+# Tests / coverage (none yet, but future-proof)
+coverage
+
+# Git
+.git
+.gitignore
