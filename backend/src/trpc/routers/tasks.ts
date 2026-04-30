@@ -11,6 +11,7 @@ import {
   deadlines,
   tasks,
 } from "../../db/schema.js";
+import { trySeedMilestonesForTask } from "../../lib/milestone-seeder.js";
 
 const TASK_STATUS = [
   "not_started",
@@ -173,6 +174,10 @@ export const tasksRouter = router({
         }
         return { id: task.id };
       });
+      // Auto-seed Mode B milestone proposals — fire and forget. Failure
+      // doesn't block task creation; the CPA can still trigger via the
+      // Propose dates button on TaskMiniTimeline if the seed errored.
+      void trySeedMilestonesForTask({ firmId: ctx.firmId, taskId: result.id });
       return { id: result.id, alreadyExists: false as const };
     }),
 

@@ -15,6 +15,7 @@ import {
 } from "../../db/schema.js";
 import { generateDeadlinesForClient } from "../../lib/deadline-generator.js";
 import { seedChecklistsForTasks } from "../../lib/checklist-seeder.js";
+import { seedMilestonesForTasks } from "../../lib/milestone-seeder.js";
 import { log } from "../../lib/observability.js";
 
 /**
@@ -334,6 +335,16 @@ export const importsRouter = router({
                 })),
               );
               checklistItemsCreated += seeded.created;
+              // Auto-seed Mode B milestone proposals for each new task.
+              // Substrate fallback when ANTHROPIC_API_KEY missing — every
+              // task lands with the 5 milestone slots populated, eliminating
+              // the friction step where CPA had to click "Propose dates".
+              await seedMilestonesForTasks(
+                inserted.map((t) => ({
+                  firmId: ctx.firmId,
+                  taskId: t.id,
+                })),
+              );
             }
           }
         }

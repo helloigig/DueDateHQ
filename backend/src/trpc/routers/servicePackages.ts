@@ -13,6 +13,7 @@ import {
   tasks,
 } from "../../db/schema.js";
 import { generateDeadlinesForClient } from "../../lib/deadline-generator.js";
+import { trySeedMilestonesForTask } from "../../lib/milestone-seeder.js";
 
 const ENTITY_TYPES = [
   "LLC",
@@ -230,6 +231,11 @@ export const servicePackagesRouter = router({
               );
             }
           }
+          // Auto-seed Mode B milestone proposals — fire and forget.
+          void trySeedMilestonesForTask({
+            firmId: ctx.firmId,
+            taskId: task.id,
+          });
           count++;
         }
         return count;

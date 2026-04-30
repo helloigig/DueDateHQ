@@ -14,6 +14,7 @@ import {
 } from "../../db/schema.js";
 import { computeDueDate, type DueDateRule } from "../../lib/due-date-rules.js";
 import { ALL_STATES } from "../../lib/states.js";
+import { trySeedMilestonesForTask } from "../../lib/milestone-seeder.js";
 
 const FEDERAL_STATE = "federal";
 const CURRENT_YEAR = new Date().getFullYear();
@@ -311,6 +312,12 @@ export const multistateRouter = router({
             );
             createdChecklistItems += baseline.length;
           }
+          // Auto-seed Mode B milestone proposals — fire and forget per task
+          // so a slow LLM call doesn't block the multi-state wizard.
+          void trySeedMilestonesForTask({
+            firmId: ctx.firmId,
+            taskId: task.id,
+          });
         }
       }
 
