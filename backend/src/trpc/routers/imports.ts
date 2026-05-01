@@ -1,23 +1,45 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import { randomBytes } from "node:crypto";
 import { firmProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
 import {
   clients,
-  deadlines,
   importedFacts,
   servicePackages,
-  tasks,
   type ClientInsert,
   type ImportedFactInsert,
 } from "../../db/schema.js";
-import { generateDeadlinesForClient } from "../../lib/deadline-generator.js";
-import { seedChecklistsForTasks } from "../../lib/checklist-seeder.js";
-import { seedMilestonesForTasks } from "../../lib/milestone-seeder.js";
+import { seedClientWithPackage } from "../../lib/client-package-seeder.js";
 import { findFactInconsistencies } from "../../lib/fact-consistency.js";
 import { log } from "../../lib/observability.js";
+
+/**
+ * Pick a system package as a fallback when the CSV row didn't specify one
+ * (or the name didn't match). Mirrors `servicePackages.suggestForClient`
+ * but operates on an in-memory list so we don't round-trip per row.
+ */
+function pickSuggestedPackage(
+  all: Array<typeof servicePackages.$inferSelect>,
+  entityType: string,
+  primaryState: string,
+): (typeof servicePackages.$inferSelect) | null {
+  const matches = all.filter(
+    (p) =>
+      p.applicableEntityTypes.includes(entityType) &&
+      (p.applicableStates === null ||
+        p.applicableStates.includes(primaryState)),
+  );
+  matches.sort((a, b) => {
+    const aSpecific = a.applicableStates !== null ? 0 : 1;
+    const bSpecific = b.applicableStates !== null ? 0 : 1;
+    if (aSpecific !== bSpecific) return aSpecific - bSpecific;
+    if (a.isSystem !== b.isSystem) return a.isSystem ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+  return matches[0] ?? null;
+}
 
 /**
  * Import / file-format detection. The FE's client-side CSV parser
@@ -282,9 +304,24 @@ export const importsRouter = router({
         ]),
       );
 
-      // Step 2 — for rows with a servicePackage that maps to a real
-      // package, generate deadlines for the current year. Skipped rows
-      // (duplicates) reuse the existing client id.
+      // Step 2 — for each new client, resolve a service package and run
+      // the full chain (deadlines → tasks → checklists → milestones).
+      // Resolution:
+      //   1. row.servicePackage matches a firm or system package by name
+      //   2. otherwise, suggest a system package from (entityType,
+      //      primaryState) so the import never strands a client without
+      //      tasks just because the CSV omitted the column.
+      //
+      // Pre-fetch all visible packages so the suggester is in-memory.
+      const allPackages = await db
+        .select()
+        .from(servicePackages)
+        .where(
+          or(
+            isNull(servicePackages.firmId),
+            eq(servicePackages.firmId, ctx.firmId),
+          )!,
+        );
       const year = new Date().getFullYear();
       let deadlinesCreated = 0;
       let tasksCreated = 0;
@@ -298,97 +335,24 @@ export const importsRouter = router({
         if (!clientId) continue;
         ids.push(clientId);
 
-        if (row.servicePackage) {
-          const pkg = packageByName.get(row.servicePackage.toLowerCase());
-          if (pkg) {
-            const result = await generateDeadlinesForClient({
-              firmId: ctx.firmId,
-              clientId,
-              packageId: pkg.id,
-              year,
-            });
-            deadlinesCreated += result.created;
+        // Resolve the package for this row.
+        const explicit = row.servicePackage
+          ? packageByName.get(row.servicePackage.toLowerCase())
+          : undefined;
+        const pkg =
+          explicit ??
+          pickSuggestedPackage(allPackages, row.entityType, row.primaryState);
+        if (!pkg) continue;
 
-            // Generate one Task per newly-created deadline. The deadline
-            // generator inserted them but didn't create tasks — tasks
-            // are 1:1 with deadlines but live in a separate table with
-            // the per-task forwarding email local part.
-            const newDeadlines = await db
-              .select({ id: deadlines.id })
-              .from(deadlines)
-              .where(
-                and(
-                  eq(deadlines.firmId, ctx.firmId),
-                  eq(deadlines.clientId, clientId),
-                ),
-              );
-            // Skip deadlines that already have tasks (idempotent re-run)
-            const existingTasks = await db
-              .select({ deadlineId: tasks.deadlineId })
-              .from(tasks)
-              .where(eq(tasks.firmId, ctx.firmId));
-            const existingTaskDeadlines = new Set(
-              existingTasks.map((t) => t.deadlineId),
-            );
-            // Pull deadline → service_template map so we can seed
-            // each new task's checklist from the template's
-            // standardChecklist payload.
-            const deadlineToTemplate = await db
-              .select({
-                id: deadlines.id,
-                serviceTemplateId: deadlines.serviceTemplateId,
-              })
-              .from(deadlines)
-              .where(eq(deadlines.firmId, ctx.firmId));
-            const templateByDeadline = new Map(
-              deadlineToTemplate.map((d) => [d.id, d.serviceTemplateId]),
-            );
-            const taskRows = newDeadlines
-              .filter((d) => !existingTaskDeadlines.has(d.id))
-              .map((d) => ({
-                firmId: ctx.firmId,
-                deadlineId: d.id,
-                forwardingEmailLocalPart: forwardingTokenFor(
-                  row.name,
-                  d.id,
-                ),
-              }));
-            if (taskRows.length > 0) {
-              const inserted = await db
-                .insert(tasks)
-                .values(taskRows)
-                .returning({
-                  id: tasks.id,
-                  deadlineId: tasks.deadlineId,
-                });
-              tasksCreated += inserted.length;
-              // Seed baseline checklist items from each task's
-              // service_template.standardChecklist. Without this,
-              // tasks land empty and the inbound classifier has
-              // nothing to match attachments against — the entire
-              // files-from-clients loop breaks here.
-              const seeded = await seedChecklistsForTasks(
-                inserted.map((t) => ({
-                  firmId: ctx.firmId,
-                  taskId: t.id,
-                  serviceTemplateId:
-                    templateByDeadline.get(t.deadlineId) ?? null,
-                })),
-              );
-              checklistItemsCreated += seeded.created;
-              // Auto-seed Mode B milestone proposals for each new task.
-              // Substrate fallback when ANTHROPIC_API_KEY missing — every
-              // task lands with the 5 milestone slots populated, eliminating
-              // the friction step where CPA had to click "Propose dates".
-              await seedMilestonesForTasks(
-                inserted.map((t) => ({
-                  firmId: ctx.firmId,
-                  taskId: t.id,
-                })),
-              );
-            }
-          }
-        }
+        const seed = await seedClientWithPackage({
+          firmId: ctx.firmId,
+          clientId,
+          packageId: pkg.id,
+          year,
+        });
+        deadlinesCreated += seed.deadlinesCreated;
+        tasksCreated += seed.tasksCreated;
+        checklistItemsCreated += seed.checklistItemsCreated;
       }
 
       log.info("imports.commit.done", {
@@ -700,22 +664,6 @@ export const importsRouter = router({
       return { flags };
     }),
 });
-
-/**
- * Per-task forwarding email local part. Format:
- *   <client-firstname>-<short-token>
- * The token is the first 4 hex chars of the deadline id, ensuring
- * uniqueness across the firm without exposing the full UUID.
- */
-function forwardingTokenFor(clientName: string, deadlineId: string): string {
-  const slug = clientName
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 20);
-  const token = deadlineId.replace(/-/g, "").slice(0, 6);
-  return `${slug || "client"}-${token}`;
-}
 
 async function extractPriorYearFields(storageKey: string): Promise<{
   clientName: string | null;
