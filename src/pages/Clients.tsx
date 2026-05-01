@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { AddClientModal } from "../components/AddClientModal";
+import { ExportClientsButton } from "../components/ExportClientsButton";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { MultiSelectChip } from "../components/MultiSelectChip";
 import { SpotlightStrip, type SpotlightCard } from "../components/SpotlightStrip";
@@ -441,6 +442,16 @@ export function Clients() {
         <span className="text-xs text-ink-500 ml-auto">
           {clients.length} of {allClients.length}
         </span>
+        <ExportClientsButton
+          filters={{
+            search: query || undefined,
+            entityType: filters.entity.length ? filters.entity : undefined,
+            state: filters.state.length ? filters.state : undefined,
+            status: filters.status.length ? filters.status : undefined,
+            tier: filters.tier.length ? filters.tier : undefined,
+          }}
+          visibleCount={clients.length}
+        />
         <button
           onClick={() => navigate("/import")}
           className="hidden md:inline-flex text-sm px-3 py-1.5 rounded-md border border-line text-ink-700 hover:bg-sunken"
