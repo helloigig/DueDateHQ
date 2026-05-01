@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Inbox as InboxIcon, Send, FileEdit, AlertTriangle, Mail as MailIcon } from "lucide-react";
 import { trpc } from "../lib/api/client";
@@ -102,10 +102,58 @@ export function Mail() {
         : [];
   const inboxCount = inbox.length;
 
+  // Reminders Out — sent emailDrafts that haven't been replied to yet.
+  // Wired to trpc.emails.awaitingReply (joins through tasks → deadlines
+  // → clients so rows render real client + form names). Mock fallback
+  // only in mock mode — real mode + 0 sent shows the empty state.
+  // FE router types are stale until BE redeploys; cast the proxy access
+  // through `as any` so the Vercel build doesn't fail on a missing key.
+  type ReminderRow = {
+    id: string;
+    taskId?: string;
+    clientId?: string;
+    clientName: string;
+    taskLabel: string;
+    subject: string;
+    toAddress: string;
+    sentAt: string | null;
+    daysSent: number | null;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const remindersOutQuery = (trpc.emails as any).awaitingReply.useQuery({
+    limit: 20,
+  }) as {
+    data?: ReminderRow[];
+    isLoading: boolean;
+    error?: { message: string } | null;
+  };
+  const liveReminders: ReminderRow[] = remindersOutQuery.data ?? [];
+  const reminders: ReminderRow[] =
+    liveReminders.length > 0
+      ? liveReminders
+      : env.useMockData
+        ? REMINDERS_OUT.map((r) => ({
+            id: `mock-${r.client}-${r.task}`,
+            taskId: undefined,
+            clientId: undefined,
+            clientName: r.client,
+            taskLabel: r.task,
+            subject: r.task,
+            toAddress: r.address,
+            sentAt: null,
+            daysSent: r.daysSent,
+          }))
+        : [];
+  const remindersAggregate = useMemo(() => {
+    if (reminders.length === 0) return null;
+    const days = reminders.map((r) => r.daysSent ?? 0);
+    const oldest = days.length ? Math.max(...days) : 0;
+    const overSeven = days.filter((d) => d > 7).length;
+    const uniqueClients = new Set(reminders.map((r) => r.clientName)).size;
+    return { count: reminders.length, oldest, overSeven, uniqueClients };
+  }, [reminders]);
+
   // Mail Issues — bounces/complaints/unsubscribes joined with email_drafts.
-  // The BE returns { ev, draft } so we display ev.eventType / ev.bounceReason
-  // and draft.recipient (when surface lands; right now the schema only carries
-  // subject + body so we show that).
   const issuesCount = (issuesQuery.data ?? []).length;
 
   return (
@@ -135,38 +183,55 @@ export function Mail() {
             Reminders out, awaiting reply
           </h2>
           <span className="text-2xs text-ink-500 tabular-nums">
-            18 across 12 clients · oldest 11d · 4 sent &gt; 7d ago
+            {remindersOutQuery.isLoading
+              ? "loading…"
+              : remindersOutQuery.error
+                ? `backend error: ${remindersOutQuery.error.message.slice(0, 60)}`
+                : remindersAggregate
+                  ? `${remindersAggregate.count} across ${remindersAggregate.uniqueClients} client${remindersAggregate.uniqueClients === 1 ? "" : "s"} · oldest ${remindersAggregate.oldest}d · ${remindersAggregate.overSeven} sent > 7d ago`
+                  : env.useMockData
+                    ? "showing example data (mock mode)"
+                    : "no reminders out yet"}
           </span>
         </header>
 
-        <ul className="space-y-1.5">
-          {REMINDERS_OUT.map((r) => (
-            <li
-              key={`${r.client}-${r.task}`}
-              className="flex items-center gap-3 px-2 py-1.5 rounded hover:bg-surface text-sm"
-            >
-              <span className="font-mono tabular-nums text-2xs w-10 text-danger-solid font-semibold">
-                {r.daysSent}d
-              </span>
-              <span className="font-medium text-ink-900">{r.client}</span>
-              <span className="text-ink-500 text-xs">·</span>
-              <span className="text-ink-700 text-xs truncate">{r.task}</span>
-              <span className="ml-auto flex items-center gap-2">
-                <button className="px-2 py-1 text-xs bg-surface border border-line rounded hover:bg-sunken">
-                  Re-send
-                </button>
-                <button className="px-2 py-1 text-xs text-ink-500 hover:text-ink-900">
-                  Open task →
-                </button>
-              </span>
-            </li>
-          ))}
-          <li>
-            <button className="text-xs text-ink-500 hover:text-ink-900 px-2 py-1">
-              show 15 more
-            </button>
-          </li>
-        </ul>
+        {reminders.length === 0 ? (
+          <p className="text-xs text-ink-500 px-2 py-3">
+            {env.useMockData
+              ? "Mock mode would show example reminders here."
+              : "When you send a chase email and the client hasn't replied, it shows up here."}
+          </p>
+        ) : (
+          <ul className="space-y-1.5">
+            {reminders.map((r) => (
+              <li
+                key={r.id}
+                className="flex items-center gap-3 px-2 py-1.5 rounded hover:bg-surface text-sm"
+              >
+                <span className="font-mono tabular-nums text-2xs w-10 text-danger-solid font-semibold">
+                  {r.daysSent != null ? `${r.daysSent}d` : "—"}
+                </span>
+                <span className="font-medium text-ink-900 truncate">
+                  {r.clientName}
+                </span>
+                <span className="text-ink-500 text-xs">·</span>
+                <span className="text-ink-700 text-xs truncate">
+                  {r.taskLabel}
+                </span>
+                <span className="ml-auto flex items-center gap-2 shrink-0">
+                  {r.clientId && r.taskId ? (
+                    <Link
+                      to={`/clients/${r.clientId}/tasks/${r.taskId}`}
+                      className="px-2 py-1 text-xs text-ink-500 hover:text-ink-900"
+                    >
+                      Open task →
+                    </Link>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {/* Tabs — Inbox / Outbox / Drafts / Issues */}
