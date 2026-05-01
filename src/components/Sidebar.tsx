@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { NavLink } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import {
   Home,
   Users,
@@ -10,10 +10,12 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   GanttChartSquare,
+  UserPlus,
 } from "lucide-react";
 import { useAnnouncements } from "../hooks/useAnnouncements";
 import { useSession } from "../data/session";
 import { useStore } from "../data/store";
+import { useFeatureFlags } from "../hooks/useFeatureFlags";
 
 // 7-item sidebar per IA v0.7 amendment §2:
 //   Today / Timeline / Clients / Mail / Alerts / Opportunities / Settings
@@ -157,6 +159,9 @@ export function Sidebar() {
             Workspace
           </p>
         )}
+
+        <InviteTeammateCard collapsed={collapsed} />
+
         <NavLink
           to="/settings"
           title={collapsed ? "Settings" : undefined}
@@ -204,6 +209,50 @@ export function Sidebar() {
         </button>
       </div>
     </aside>
+  );
+}
+
+/**
+ * Bottom-of-sidebar invite affordance. Surfaces what's already wired in
+ * Settings → Team but at zero clicks of depth, matching Linear/Notion
+ * convention ("Invite people" CTA pinned bottom-left).
+ *
+ * Hidden on solo tier — solo CPAs can't invite (gated by canInviteTeammates
+ * feature flag), and showing a disabled / upgrade CTA would just be noise
+ * on the surface they look at most.
+ *
+ * Collapsed mode: icon-only button matching the rest of the sidebar.
+ */
+function InviteTeammateCard({ collapsed }: { collapsed: boolean }) {
+  const flags = useFeatureFlags();
+  if (!flags.canInviteTeammates) return null;
+
+  if (collapsed) {
+    return (
+      <Link
+        to="/settings/team"
+        title="Invite teammate"
+        aria-label="Invite teammate"
+        className="flex items-center justify-center py-2 rounded-md text-ink-500 hover:bg-sunken hover:text-ink-900 transition-colors"
+      >
+        <UserPlus className="w-4 h-4" aria-hidden />
+      </Link>
+    );
+  }
+
+  return (
+    <Link
+      to="/settings/team"
+      className="group flex items-start gap-2 px-3 py-2 mb-1 rounded-md border border-line bg-surface/40 hover:bg-sunken transition-colors"
+    >
+      <UserPlus className="w-3.5 h-3.5 text-ink-500 shrink-0 mt-0.5" aria-hidden />
+      <div className="flex-1 min-w-0">
+        <div className="text-xs font-medium text-ink-900">Invite teammate</div>
+        <div className="text-2xs text-ink-500 leading-tight mt-0.5">
+          Add a preparer or reviewer to your firm.
+        </div>
+      </div>
+    </Link>
   );
 }
 
