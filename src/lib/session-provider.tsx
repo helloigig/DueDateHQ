@@ -5,7 +5,7 @@ import {
   type ReactNode,
 } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import type { Firm, FirmTier, User } from "../types";
+import type { Firm, FirmTier, StateCode, User } from "../types";
 import { useRemoteSession } from "../hooks/useSession";
 import { useSession as useLocalSession } from "../data/session";
 import { DashboardSkeleton } from "../components/skeletons/DashboardSkeleton";
@@ -75,15 +75,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             email: local.userEmail,
             displayName: local.userName,
             role: "owner",
-            createdAt: local.signedInAt,
-          } as User,
+            timezone: local.timeZone ?? "America/Los_Angeles",
+            lastActiveAt: local.signedInAt,
+          },
           firm: {
             id: `local-${local.firmName}`,
             name: local.firmName,
+            primaryStates: (local.primaryStates ?? []) as StateCode[],
+            logoStorageKey: null,
+            branding: null,
             tier: local.tier,
+            subscriptionStatus: "trialing",
             trialEndsAt: local.trialEndsAt ?? null,
-            createdAt: local.signedInAt,
-          } as Firm,
+            seatLimit: 1,
+            clientLimit: null,
+          },
           tier: local.tier,
         }
       : null;
