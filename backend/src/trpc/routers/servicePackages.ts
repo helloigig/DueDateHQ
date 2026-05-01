@@ -1,19 +1,14 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, desc, eq, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import { firmProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
 import {
-  checklistItems,
   clients,
   clientServicePackages,
-  deadlines,
-  serviceTemplates,
   servicePackages,
-  tasks,
 } from "../../db/schema.js";
-import { generateDeadlinesForClient } from "../../lib/deadline-generator.js";
-import { trySeedMilestonesForTask } from "../../lib/milestone-seeder.js";
+import { seedClientWithPackage } from "../../lib/client-package-seeder.js";
 
 const ENTITY_TYPES = [
   "LLC",
@@ -141,110 +136,29 @@ export const servicePackagesRouter = router({
       });
       if (!pkg) throw new TRPCError({ code: "NOT_FOUND" });
 
-      // Insert assignment if missing.
+      // Record the assignment for the bridge table (used by client detail
+      // to list which packages a client carries).
       await db
         .insert(clientServicePackages)
         .values({ clientId: input.clientId, packageId: input.packageId })
         .onConflictDoNothing();
 
-      // Spawn deadlines for the requested year.
-      const { created } = await generateDeadlinesForClient({
+      // Run the canonical chain (deadlines → tasks → checklists →
+      // milestones). One helper, one source of truth — used by
+      // imports.commit, clients.assignBundle, AND this endpoint.
+      // Earlier this procedure had ~80 lines of duplicated inline logic
+      // that drifted from the import path; the helper unified them.
+      const seed = await seedClientWithPackage({
         firmId: ctx.firmId,
         clientId: input.clientId,
         packageId: input.packageId,
         year: input.year,
       });
 
-      // Also spawn the corresponding Task + Mode-A baseline checklist for
-      // each deadline that doesn't have one yet. Doing it here avoids a
-      // second roundtrip from the FE and keeps the dashboard usable
-      // immediately. Idempotent on (deadline_id) — only creates tasks for
-      // deadlines without one.
-      const allDeadlines = await db
-        .select()
-        .from(deadlines)
-        .where(
-          and(
-            eq(deadlines.firmId, ctx.firmId),
-            eq(deadlines.clientId, input.clientId),
-          ),
-        );
-      const existingTasks = await db
-        .select({ deadlineId: tasks.deadlineId })
-        .from(tasks)
-        .where(
-          and(
-            eq(tasks.firmId, ctx.firmId),
-            inArray(
-              tasks.deadlineId,
-              allDeadlines.map((d) => d.id),
-            ),
-          ),
-        );
-      const taskedDeadlines = new Set(existingTasks.map((t) => t.deadlineId));
-      const taskRowsCreated: number = await (async () => {
-        let count = 0;
-        for (const dl of allDeadlines) {
-          if (taskedDeadlines.has(dl.id)) continue;
-          // forwarding-email local part — mirrors tasks router pattern.
-          const slug = client.name
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "")
-            .slice(0, 16) || "task";
-          const formSlug = dl.formType
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "")
-            .slice(0, 16);
-          const token = Math.random().toString(36).slice(2, 6);
-          const local = `${slug}-${formSlug}-${token}`;
-          const [task] = await db
-            .insert(tasks)
-            .values({
-              firmId: ctx.firmId,
-              deadlineId: dl.id,
-              forwardingEmailLocalPart: local,
-              status: "not_started",
-            })
-            .returning();
-          if (!task) continue;
-          // Mode A baseline checklist from template.standardChecklist.
-          if (dl.serviceTemplateId) {
-            const tmpl = await db.query.serviceTemplates.findFirst({
-              where: eq(serviceTemplates.id, dl.serviceTemplateId),
-            });
-            const baseline =
-              (tmpl?.standardChecklist as Array<{
-                label: string;
-                itemType: string;
-              }> | null) ?? [];
-            if (baseline.length > 0) {
-              await db.insert(checklistItems).values(
-                baseline.map((b, idx) => ({
-                  firmId: ctx.firmId,
-                  taskId: task.id,
-                  label: b.label,
-                  itemType: b.itemType,
-                  sortOrder: idx,
-                  state: "not_requested" as const,
-                  stateChangedByKind: "system" as const,
-                })),
-              );
-            }
-          }
-          // Auto-seed Mode B milestone proposals — fire and forget.
-          void trySeedMilestonesForTask({
-            firmId: ctx.firmId,
-            taskId: task.id,
-          });
-          count++;
-        }
-        return count;
-      })();
-
       return {
         ok: true as const,
-        deadlinesCreated: created,
-        tasksCreated: taskRowsCreated,
+        deadlinesCreated: seed.deadlinesCreated,
+        tasksCreated: seed.tasksCreated,
       };
     }),
 

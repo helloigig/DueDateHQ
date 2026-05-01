@@ -377,7 +377,7 @@ export function Clients() {
           </h2>
           <p className="text-sm text-ink-500 mt-1.5 max-w-md mx-auto">
             One client, two minutes. Once they're in, deadlines auto-generate
-            from the filing bundle you pick.
+            from the service package you pick.
           </p>
           <button
             onClick={() => setAddOpen(true)}
