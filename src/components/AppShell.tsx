@@ -5,6 +5,7 @@ import { BottomTabBar } from "./BottomTabBar";
 import { OfflineBanner } from "./OfflineBanner";
 import { InstallPrompt } from "./InstallPrompt";
 import { Toaster } from "./Toaster";
+import { StatusBanner } from "./StatusBanner";
 import { useSession } from "../data/session";
 import { useStore } from "../data/store";
 
@@ -31,6 +32,7 @@ export function AppShell() {
       </div>
       <div className="flex-1 min-w-0 flex flex-col">
         <TopBar />
+        <StatusBanner />
         {showSetupBanner && (
           <div className="bg-info-bg border-b border-info-border px-4 py-2 text-xs text-info-ink flex items-center gap-2">
             <span>Complete setup to lock in your firm settings.</span>

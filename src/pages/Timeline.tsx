@@ -3,6 +3,7 @@ import { GanttChartSquare, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../lib/api/client";
 import { useStore } from "../data/store";
+import { env } from "../config";
 
 // Timeline destination — per IA v0.7 amendment §3.9a.
 //
@@ -194,12 +195,24 @@ export function Timeline() {
     [fleetQuery.data, tasksById, clientsById],
   );
 
-  const source = liveTimelines.length > 0 ? liveTimelines : MOCK_TIMELINES;
+  // In real mode, never substitute MOCK_TIMELINES — an empty BE should
+  // render an empty state, not fake "Apex Fund" rows that the user can't
+  // act on. Mock fallback is only a design-review aid for mock mode.
+  const source =
+    liveTimelines.length > 0
+      ? liveTimelines
+      : env.useMockData
+        ? MOCK_TIMELINES
+        : [];
   const sourceLabel = fleetQuery.isLoading
     ? "loading milestones…"
-    : liveTimelines.length > 0
-      ? `${liveTimelines.length} live ${liveTimelines.length === 1 ? "task" : "tasks"}`
-      : "showing example data";
+    : fleetQuery.error
+      ? `backend error: ${fleetQuery.error.message.slice(0, 60)}`
+      : liveTimelines.length > 0
+        ? `${liveTimelines.length} live ${liveTimelines.length === 1 ? "task" : "tasks"}`
+        : env.useMockData
+          ? "showing example data (mock mode)"
+          : "no live tasks yet";
 
   // Apply filter
   const filtered = filterWaiting
