@@ -9,11 +9,12 @@ import {
   deadlines,
   deliveryEvents,
   emailDrafts,
+  firms,
   inboundReplies,
   reminderTemplates,
   tasks,
 } from "../../db/schema.js";
-import { sendEmail } from "../../lib/email-sender.js";
+import { sendEmail, fromAddressForFirm } from "../../lib/email-sender.js";
 import { captureException, log } from "../../lib/observability.js";
 
 const TONES = ["formal", "casual", "urgent", "apologetic", "default"] as const;
@@ -124,6 +125,16 @@ export const emailsRouter = router({
         ? `${taskRow.forwardingLocal}@duedatehq.space`
         : undefined;
 
+      // From address: firm name as display, slug as local part. Tax
+      // clients should see "Mitchell CPA <mitchell-cpa@...>", not
+      // "DueDateHQ <noreply@...>" — DueDateHQ stays invisible to the
+      // CPA's clients per `forever_no`.
+      const [firmRow] = await db
+        .select({ name: firms.name })
+        .from(firms)
+        .where(eq(firms.id, ctx.firmId));
+      const fromAddr = firmRow ? fromAddressForFirm(firmRow.name) : undefined;
+
       // Send through Resend BEFORE flipping the row. If Resend errors,
       // the row stays `draft` and the CPA can retry. If Resend is
       // skipped (no API key in dev), we log and proceed — the UI still
@@ -137,6 +148,7 @@ export const emailsRouter = router({
           subject: draft.subject,
           body: draft.body,
           replyTo,
+          from: fromAddr,
         });
         providerId = result.providerId ?? null;
         skipped = !!result.skipped;

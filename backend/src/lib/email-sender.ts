@@ -17,15 +17,35 @@
  *   - On error → throws. Caller decides whether to roll the draft back
  *     to `draft` or keep it `sent` with bounceReason set.
  *
- * From-address default: noreply@duedatehq.space (per project memory —
- * the production domain is .space, not .com). Override per-firm later
- * via firm settings.
+ * From address: built per-firm so the recipient sees the CPA's brand,
+ * not DueDateHQ. Display name = firm.name; local part = slug(firm.name);
+ * domain stays duedatehq.space. Per `forever_no` — DueDateHQ is
+ * invisible to the CPA's clients. Phase 3: per-firm verified domains.
  */
 
 import { Resend } from "resend";
 import { log } from "./observability.js";
 
-const FROM_DEFAULT = "DueDateHQ <noreply@duedatehq.space>";
+const FROM_FALLBACK = "DueDateHQ <noreply@duedatehq.space>";
+
+/**
+ * Build the From line for a firm. Display name = firm name, local part
+ * = ASCII slug derived from it. Examples:
+ *   "Mitchell CPA"          → "Mitchell CPA <mitchell-cpa@duedatehq.space>"
+ *   "Yan Jing & Associates" → "Yan Jing & Associates <yan-jing-associates@duedatehq.space>"
+ */
+export function fromAddressForFirm(firmName: string): string {
+  const slug =
+    firmName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 32) || "firm";
+  // Display name needs comma-stripping so Resend doesn't misinterpret
+  // it as a separator between multiple addresses.
+  const display = firmName.replace(/[",<>]/g, "").trim() || "DueDateHQ";
+  return `${display} <${slug}@duedatehq.space>`;
+}
 
 let _client: Resend | null = null;
 
@@ -74,7 +94,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   }
 
   const { data, error } = await client.emails.send({
-    from: input.from ?? FROM_DEFAULT,
+    from: input.from ?? FROM_FALLBACK,
     to: input.to,
     cc: input.cc ?? undefined,
     replyTo: input.replyTo,
