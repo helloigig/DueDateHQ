@@ -4,7 +4,7 @@ import { TopBar } from "./TopBar";
 import { BottomTabBar } from "./BottomTabBar";
 import { OfflineBanner } from "./OfflineBanner";
 import { InstallPrompt } from "./InstallPrompt";
-import { Toaster } from "./Toaster";
+import { Toaster } from "./ui/sonner";
 import { StatusBanner } from "./StatusBanner";
 import { useSession } from "../data/session";
 import { useStore } from "../data/store";

@@ -8,6 +8,7 @@ import { trpc, createTrpcClient } from "./lib/api/client";
 import { createQueryClient } from "./lib/query-client";
 import { subscribeStore } from "./data/store";
 import { registerServiceWorker } from "./lib/pwa";
+import { TooltipProvider } from "./components/ui/tooltip";
 
 registerServiceWorker();
 
@@ -30,7 +31,9 @@ function Providers({ children }: { children: React.ReactNode }) {
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
-        {children}
+        <TooltipProvider delayDuration={400} skipDelayDuration={200}>
+          {children}
+        </TooltipProvider>
       </QueryClientProvider>
     </trpc.Provider>
   );

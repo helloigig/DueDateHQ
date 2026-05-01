@@ -1,26 +1,16 @@
-import { useEffect, useId } from "react";
-import { useModalDialog } from "../hooks/useModalDialog";
-
-type Size = "sm" | "md" | "lg" | "xl";
-
-const SIZE_CLASS: Record<Size, string> = {
-  sm: "max-w-sm",
-  md: "max-w-md",
-  lg: "max-w-lg",
-  xl: "max-w-2xl",
-};
+import { useId } from "react";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  type DialogSize,
+} from "./ui/dialog";
 
 type Tone = "default" | "danger";
-
-const TONE_HEADER_CLASS: Record<Tone, string> = {
-  default: "bg-surface border-line",
-  danger: "bg-danger-bg border-danger-border",
-};
-
-const TONE_HEADER_INK: Record<Tone, string> = {
-  default: "text-ink-900",
-  danger: "text-danger-ink",
-};
 
 export function Modal({
   open,
@@ -33,47 +23,37 @@ export function Modal({
 }: {
   open: boolean;
   onClose: () => void;
-  size?: Size;
+  size?: DialogSize;
   closeOnBackdrop?: boolean;
   ariaLabelledBy?: string;
   className?: string;
   children: React.ReactNode;
 }) {
-  const dialogRef = useModalDialog(open, onClose);
-
-  // Lock body scroll while open.
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
-
-  if (!open) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 backdrop-blur-sm p-4"
-      onClick={closeOnBackdrop ? onClose : undefined}
-    >
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent
+        size={size}
+        showClose={false}
+        className={className}
         aria-labelledby={ariaLabelledBy}
-        onClick={(e) => e.stopPropagation()}
-        className={[
-          "bg-surface rounded-lg shadow-overlay border border-line w-full outline-none flex flex-col max-h-[90vh]",
-          SIZE_CLASS[size],
-          className,
-        ].join(" ")}
+        onPointerDownOutside={(e) => {
+          if (!closeOnBackdrop) e.preventDefault();
+        }}
+        onInteractOutside={(e) => {
+          if (!closeOnBackdrop) e.preventDefault();
+        }}
+        onOpenAutoFocus={(e) => {
+          const root = e.currentTarget as HTMLElement | null;
+          const target = root?.querySelector<HTMLElement>("[data-autofocus]");
+          if (target) {
+            e.preventDefault();
+            target.focus();
+          }
+        }}
       >
         {children}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -91,31 +71,20 @@ function Header({
   children?: React.ReactNode;
 }) {
   return (
-    <div
-      className={`px-5 py-4 border-b rounded-t-lg ${TONE_HEADER_CLASS[tone]}`}
-    >
+    <DialogHeader tone={tone}>
       {children ?? (
         <>
           {title && (
-            <h2
-              id={id}
-              className={`text-base font-semibold ${TONE_HEADER_INK[tone]}`}
-            >
+            <DialogTitle id={id} tone={tone}>
               {title}
-            </h2>
+            </DialogTitle>
           )}
           {description && (
-            <p
-              className={`text-xs mt-1 ${
-                tone === "danger" ? "text-danger-ink" : "text-ink-500"
-              }`}
-            >
-              {description}
-            </p>
+            <DialogDescription tone={tone}>{description}</DialogDescription>
           )}
         </>
       )}
-    </div>
+    </DialogHeader>
   );
 }
 
@@ -129,13 +98,9 @@ function Body({
   scroll?: boolean;
 }) {
   return (
-    <div
-      className={`px-5 py-4 ${
-        scroll ? "overflow-y-auto" : ""
-      } ${className}`}
-    >
+    <DialogBody className={className} scroll={scroll}>
       {children}
-    </div>
+    </DialogBody>
   );
 }
 
@@ -148,19 +113,10 @@ function Footer({
   align?: "start" | "between" | "end";
   tone?: "default" | "sunken";
 }) {
-  const justify =
-    align === "between"
-      ? "justify-between"
-      : align === "start"
-      ? "justify-start"
-      : "justify-end";
-  const bg = tone === "sunken" ? "bg-sunken" : "bg-surface";
   return (
-    <div
-      className={`px-5 py-3 border-t border-line rounded-b-lg flex items-center gap-2 ${justify} ${bg}`}
-    >
+    <DialogFooter align={align} tone={tone}>
       {children}
-    </div>
+    </DialogFooter>
   );
 }
 
