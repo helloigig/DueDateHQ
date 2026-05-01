@@ -1,4 +1,15 @@
-import { Modal, useModalLabelId } from "./Modal";
+import { useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogBody,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 
 export function ConfirmDialog({
   open,
@@ -22,53 +33,63 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  const labelId = useModalLabelId();
+  const [acked, setAcked] = useState(false);
+  const disabled = !!requireAcknowledge && !acked;
 
   return (
-    <Modal open={open} onClose={onCancel} ariaLabelledBy={labelId} size="md">
-      <Modal.Header id={labelId} title={title} />
+    <AlertDialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) {
+          setAcked(false);
+          onCancel();
+        }
+      }}
+    >
+      <AlertDialogContent size="md">
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription className="sr-only">
+            {typeof body === "string" ? body : title}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
 
-      <Modal.Body className="text-sm text-ink-700 space-y-3">
-        <div>{body}</div>
-        {requireAcknowledge && (
-          <label className="flex items-start gap-2 text-sm text-ink-700">
-            <input
-              type="checkbox"
-              data-ack
-              className="mt-0.5"
-              onChange={(e) => {
-                const btn = (
-                  e.currentTarget.closest('[role="dialog"]') as HTMLElement | null
-                )?.querySelector<HTMLButtonElement>("[data-confirm]");
-                if (btn) btn.disabled = !e.currentTarget.checked;
-              }}
-            />
-            <span>{requireAcknowledge}</span>
-          </label>
-        )}
-      </Modal.Body>
+        <AlertDialogBody className="text-sm text-ink-700 space-y-3">
+          <div>{body}</div>
+          {requireAcknowledge && (
+            <label className="flex items-start gap-2 text-sm text-ink-700">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={acked}
+                onChange={(e) => setAcked(e.target.checked)}
+              />
+              <span>{requireAcknowledge}</span>
+            </label>
+          )}
+        </AlertDialogBody>
 
-      <Modal.Footer tone="sunken">
-        <button
-          onClick={onCancel}
-          className="text-sm px-3 py-1.5 rounded border border-line bg-surface hover:bg-sunken text-ink-700"
-        >
-          {cancelLabel}
-        </button>
-        <button
-          onClick={onConfirm}
-          data-autofocus={requireAcknowledge ? undefined : true}
-          data-confirm
-          disabled={!!requireAcknowledge}
-          className={`text-sm px-3 py-1.5 rounded font-medium text-canvas disabled:opacity-40 disabled:cursor-not-allowed ${
-            destructive
-              ? "bg-danger-solid hover:opacity-90"
-              : "bg-accent hover:bg-accent-hover"
-          }`}
-        >
-          {confirmLabel}
-        </button>
-      </Modal.Footer>
-    </Modal>
+        <AlertDialogFooter>
+          <AlertDialogCancel
+            onClick={() => {
+              setAcked(false);
+              onCancel();
+            }}
+          >
+            {cancelLabel}
+          </AlertDialogCancel>
+          <AlertDialogAction
+            variant={destructive ? "destructive" : "default"}
+            disabled={disabled}
+            onClick={() => {
+              setAcked(false);
+              onConfirm();
+            }}
+          >
+            {confirmLabel}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

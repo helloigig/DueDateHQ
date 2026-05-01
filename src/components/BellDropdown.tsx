@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Bell,
@@ -15,6 +15,7 @@ import {
   useMarkNotificationRead,
   useNotifications as useNotificationList,
 } from "../hooks/useNotifications";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
 type FilterKind = "all" | NotificationKind;
 
@@ -65,7 +66,6 @@ export function BellDropdown() {
   const markAllRead = useMarkAllNotificationsRead();
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<FilterKind>("all");
-  const rootRef = useRef<HTMLDivElement>(null);
 
   const merged: Notification[] = useMemo(() => {
     const ids = new Set(
@@ -86,16 +86,6 @@ export function BellDropdown() {
 
   const unreadCount = merged.filter((n) => !n.read).length;
 
-  useEffect(() => {
-    if (!open) return;
-    const onClick = (e: MouseEvent) => {
-      if (!rootRef.current) return;
-      if (!rootRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    window.addEventListener("mousedown", onClick);
-    return () => window.removeEventListener("mousedown", onClick);
-  }, [open]);
-
   const onItemClick = (n: Notification) => {
     if (n.announcementId) markAnnouncementRead.mutate({ id: n.announcementId });
     else markNotificationRead.mutate({ id: n.id });
@@ -103,94 +93,96 @@ export function BellDropdown() {
   };
 
   return (
-    <div ref={rootRef} className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="relative w-9 h-9 flex items-center justify-center rounded-md text-ink-500 hover:bg-sunken hover:text-ink-900"
-        title="Notifications"
-        aria-label={`Notifications${
-          unreadCount > 0 ? ` (${unreadCount} unread)` : ""
-        }`}
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="relative w-9 h-9 flex items-center justify-center rounded-md text-ink-500 hover:bg-sunken hover:text-ink-900"
+          title="Notifications"
+          aria-label={`Notifications${
+            unreadCount > 0 ? ` (${unreadCount} unread)` : ""
+          }`}
+        >
+          <Bell className="w-4 h-4" aria-hidden />
+          {unreadCount > 0 && (
+            <span className="absolute top-1 right-1 bg-danger-solid text-white text-2xs rounded-full min-w-[1rem] h-4 px-1 flex items-center justify-center tabular-nums">
+              {unreadCount}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        sideOffset={6}
+        className="w-96 p-0 overflow-hidden"
       >
-        <Bell className="w-4 h-4" aria-hidden />
-        {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 bg-danger-solid text-white text-2xs rounded-full min-w-[1rem] h-4 px-1 flex items-center justify-center tabular-nums">
-            {unreadCount}
-          </span>
-        )}
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-full mt-1 w-96 bg-surface border border-line rounded-md shadow-overlay z-40 overflow-hidden">
-          <div className="px-3 py-2 border-b border-line">
-            <div className="flex items-center">
-              <h3 className="text-sm font-semibold text-ink-900">Notifications</h3>
-              <span className="ml-2 text-xs text-ink-500">{unreadCount} unread</span>
-              <button
-                onClick={() => markAllRead.mutate()}
-                disabled={unreadCount === 0}
-                className="ml-auto text-xs text-ink-500 hover:text-ink-900 disabled:opacity-40"
-              >
-                Mark all read
-              </button>
-            </div>
-            <p className="text-2xs text-ink-400 mt-0.5">
-              alerts · bounces · invites · extensions
-            </p>
-          </div>
-
-          <div className="flex gap-1 px-3 py-2 border-b border-line overflow-x-auto">
-            {(
-              [
-                "all",
-                "alert",
-                "bounce",
-                "team_invite",
-                "extension_approved",
-              ] as FilterKind[]
-            ).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${
-                  filter === f
-                    ? "bg-accent text-canvas"
-                    : "bg-sunken text-ink-500 hover:bg-line"
-                }`}
-              >
-                {FILTER_LABELS[f]}
-              </button>
-            ))}
-          </div>
-
-          <ul className="max-h-96 overflow-y-auto">
-            {filtered.length === 0 ? (
-              <li className="px-4 py-6 text-sm text-ink-500 text-center">
-                Nothing here.
-              </li>
-            ) : (
-              filtered.map((n) => (
-                <NotificationItem
-                  key={n.id}
-                  notif={n}
-                  onClick={() => onItemClick(n)}
-                />
-              ))
-            )}
-          </ul>
-
-          <div className="border-t border-line px-3 py-2">
-            <Link
-              to="/alerts"
-              onClick={() => setOpen(false)}
-              className="text-xs text-ink-500 hover:text-ink-900"
+        <div className="px-3 py-2 border-b border-line">
+          <div className="flex items-center">
+            <h3 className="text-sm font-semibold text-ink-900">Notifications</h3>
+            <span className="ml-2 text-xs text-ink-500">{unreadCount} unread</span>
+            <button
+              onClick={() => markAllRead.mutate()}
+              disabled={unreadCount === 0}
+              className="ml-auto text-xs text-ink-500 hover:text-ink-900 disabled:opacity-40"
             >
-              View all alerts →
-            </Link>
+              Mark all read
+            </button>
           </div>
+          <p className="text-2xs text-ink-400 mt-0.5">
+            alerts · bounces · invites · extensions
+          </p>
         </div>
-      )}
-    </div>
+
+        <div className="flex gap-1 px-3 py-2 border-b border-line overflow-x-auto">
+          {(
+            [
+              "all",
+              "alert",
+              "bounce",
+              "team_invite",
+              "extension_approved",
+            ] as FilterKind[]
+          ).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${
+                filter === f
+                  ? "bg-accent text-canvas"
+                  : "bg-sunken text-ink-500 hover:bg-line"
+              }`}
+            >
+              {FILTER_LABELS[f]}
+            </button>
+          ))}
+        </div>
+
+        <ul className="max-h-96 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <li className="px-4 py-6 text-sm text-ink-500 text-center">
+              Nothing here.
+            </li>
+          ) : (
+            filtered.map((n) => (
+              <NotificationItem
+                key={n.id}
+                notif={n}
+                onClick={() => onItemClick(n)}
+              />
+            ))
+          )}
+        </ul>
+
+        <div className="border-t border-line px-3 py-2">
+          <Link
+            to="/alerts"
+            onClick={() => setOpen(false)}
+            className="text-xs text-ink-500 hover:text-ink-900"
+          >
+            View all alerts →
+          </Link>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 

@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, Lock, ShieldCheck, X } from "lucide-react";
+import { Check, Lock, ShieldCheck } from "lucide-react";
 import { actions } from "../data/store";
+import { Button } from "./ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "./ui/dialog";
 
 type Provider = "quickbooks" | "xero";
 
@@ -79,32 +86,35 @@ export function OAuthWireframeModal({ provider, onClose }: Props) {
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 p-4"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget && phase !== "connecting") onClose();
+    <Dialog
+      open={provider !== null}
+      onOpenChange={(o) => {
+        if (!o && phase !== "connecting") onClose();
       }}
     >
-      <div className="bg-surface border border-line rounded-lg shadow-overlay w-full max-w-md overflow-hidden">
+      <DialogContent
+        size="md"
+        showClose={phase !== "connecting"}
+        className="overflow-hidden p-0"
+        onPointerDownOutside={(e) => {
+          if (phase === "connecting") e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (phase === "connecting") e.preventDefault();
+        }}
+      >
         <header className="flex items-center px-5 py-3 border-b border-line">
           <span className="w-8 h-8 rounded-md flex items-center justify-center bg-sunken">
             {provider === "quickbooks" ? <QboLogo /> : <XeroLogo />}
           </span>
-          <h2 className="ml-3 text-sm font-semibold text-ink-900">
+          <DialogTitle className="ml-3 text-sm font-semibold text-ink-900">
             Connect {name}
-          </h2>
-          {phase !== "connecting" && (
-            <button
-              onClick={onClose}
-              className="ml-auto text-ink-500 hover:text-ink-900"
-              aria-label="Close"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
+          </DialogTitle>
         </header>
+        <DialogDescription className="sr-only">
+          Authorize {name} to grant DueDateHQ scoped access to your client and
+          entity data.
+        </DialogDescription>
 
         {phase === "consent" && (
           <div className="px-5 py-4 space-y-3">
@@ -128,19 +138,13 @@ export function OAuthWireframeModal({ provider, onClose }: Props) {
               </p>
             </div>
             <div className="flex items-center gap-2 pt-2">
-              <button
-                onClick={onClose}
-                className="text-sm px-3 py-1.5 rounded text-ink-500 hover:bg-sunken"
-              >
+              <Button variant="ghost" onClick={onClose}>
                 Cancel
-              </button>
-              <button
-                onClick={startConnecting}
-                className="ml-auto text-sm px-4 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover flex items-center gap-1.5"
-              >
+              </Button>
+              <Button onClick={startConnecting} className="ml-auto">
                 <Lock className="w-3.5 h-3.5" aria-hidden />
                 Authorize {name}
-              </button>
+              </Button>
             </div>
             <p className="text-2xs text-ink-400 text-center pt-1">
               Wireframe build — no real OAuth handshake. Production redirects to {name}.
@@ -180,16 +184,13 @@ export function OAuthWireframeModal({ provider, onClose }: Props) {
               package per entity type (LLC → 1065, S-Corp → 1120-S, etc.); you
               can adjust before deadlines auto-generate.
             </p>
-            <button
-              onClick={finish}
-              className="w-full text-sm px-4 py-2 rounded bg-accent text-canvas hover:bg-accent-hover"
-            >
+            <Button onClick={finish} className="w-full">
               Continue → review packages
-            </button>
+            </Button>
           </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
