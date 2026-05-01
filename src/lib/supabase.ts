@@ -23,6 +23,13 @@ export function supabase(): SupabaseClient {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
+      // Magic-link UX: the user often requests the link in browser A and
+      // clicks it in browser B (mobile mail app, work laptop, etc). PKCE
+      // requires the code-verifier stored by browser A, so the click in B
+      // fails silently. Implicit flow puts tokens in the URL hash directly
+      // and works cross-browser. We accept the slightly weaker token-in-URL
+      // posture in exchange for "login actually works."
+      flowType: "implicit",
     },
   });
   return _client;
