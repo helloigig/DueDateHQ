@@ -270,8 +270,13 @@ export function Timeline() {
         </span>
       </div>
 
-      {/* Timeline stack */}
-      <div className="space-y-1">
+      {/* Timeline stack — grouped by client. One row per task under each
+          client header so an 8-task client renders as 8 mini-timelines
+          nested under their name (not 8 separate top-level rows that
+          repeat the client). Order of clients = first appearance in the
+          urgency-sorted task list, so the most-needs-attention client
+          floats to the top. */}
+      <div className="space-y-3">
         {sorted.length === 0 ? (
           <div className="text-center py-12 bg-surface border border-line rounded-md">
             <p className="text-sm text-ink-700 font-medium">
@@ -286,12 +291,97 @@ export function Timeline() {
             </p>
           </div>
         ) : (
-          sorted.map((t) => (
-            <TimelineRow key={t.taskId ?? `${t.client}-${t.task}`} t={t} />
+          groupByClient(sorted).map((group) => (
+            <ClientTimelineGroup key={group.key} group={group} />
           ))
         )}
       </div>
     </div>
+  );
+}
+
+type ClientGroup = {
+  key: string;
+  clientName: string;
+  clientId?: string;
+  tasks: MockTaskTimeline[];
+  totalMissing: number;
+  worstDaysBehind: number;
+};
+
+function groupByClient(rows: MockTaskTimeline[]): ClientGroup[] {
+  const groups = new Map<string, ClientGroup>();
+  for (const t of rows) {
+    const key = t.clientId ?? t.client;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.tasks.push(t);
+      existing.totalMissing += t.missingCount;
+      existing.worstDaysBehind = Math.max(existing.worstDaysBehind, t.daysBehind);
+    } else {
+      groups.set(key, {
+        key,
+        clientName: t.client,
+        clientId: t.clientId,
+        tasks: [t],
+        totalMissing: t.missingCount,
+        worstDaysBehind: t.daysBehind,
+      });
+    }
+  }
+  return Array.from(groups.values());
+}
+
+function ClientTimelineGroup({ group }: { group: ClientGroup }) {
+  const navigate = useNavigate();
+  const navigable = !!group.clientId;
+  const tinted =
+    group.worstDaysBehind > 7
+      ? "bg-danger-bg/20"
+      : group.worstDaysBehind > 0
+        ? "bg-warning-bg/20"
+        : "";
+  return (
+    <section
+      className={`rounded-md border border-line overflow-hidden ${tinted}`}
+    >
+      <header
+        className={`flex items-center gap-3 px-3 py-2 border-b border-line bg-surface/60 ${
+          navigable ? "cursor-pointer hover:bg-sunken/40" : ""
+        }`}
+        onClick={() => {
+          if (navigable) navigate(`/clients/${group.clientId}`);
+        }}
+        role={navigable ? "button" : undefined}
+        title={
+          navigable
+            ? `Open ${group.clientName}`
+            : "Example client — sign in and add real ones to see live timelines"
+        }
+      >
+        <div className="font-semibold text-sm text-ink-900 truncate flex-1 min-w-0">
+          {group.clientName}
+        </div>
+        <span className="text-2xs text-ink-500 tabular-nums whitespace-nowrap">
+          {group.tasks.length} {group.tasks.length === 1 ? "task" : "tasks"}
+        </span>
+        {group.totalMissing > 0 && (
+          <span className="text-2xs font-medium text-warning-solid tabular-nums whitespace-nowrap">
+            · {group.totalMissing} waiting
+          </span>
+        )}
+        {group.worstDaysBehind > 0 && (
+          <span className="text-2xs font-medium text-warning-solid tabular-nums whitespace-nowrap">
+            · {group.worstDaysBehind}d behind
+          </span>
+        )}
+      </header>
+      <ul className="divide-y divide-line/60">
+        {group.tasks.map((t) => (
+          <TimelineRow key={t.taskId ?? `${group.key}-${t.task}`} t={t} />
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -303,26 +393,25 @@ function TimelineRow({ t }: { t: MockTaskTimeline }) {
   const navigable = t.taskId && t.clientId;
 
   return (
-    <button
-      className={`group w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-sunken transition-colors ${tinted} ${
-        navigable ? "" : "cursor-default"
-      }`}
-      onClick={() => {
-        if (navigable) navigate(`/clients/${t.clientId}/tasks/${t.taskId}`);
-      }}
-      title={
-        navigable
-          ? "Open task detail"
-          : "Example row — sign in and add a client to see your real tasks here"
-      }
-    >
-      {/* Identity */}
-      <div className="w-48 shrink-0 min-w-0">
-        <div className="font-medium text-sm text-ink-900 truncate">{t.client}</div>
-        <div className="text-2xs text-ink-500 truncate">
-          {t.task} <span className="text-ink-400">·</span> due {t.dueDate}
+    <li className="list-none">
+      <button
+        className={`group w-full text-left flex items-center gap-3 px-3 py-2 transition-colors ${tinted} ${
+          navigable ? "hover:bg-sunken/60" : "cursor-default"
+        }`}
+        onClick={() => {
+          if (navigable) navigate(`/clients/${t.clientId}/tasks/${t.taskId}`);
+        }}
+        title={
+          navigable
+            ? "Open task detail"
+            : "Example row — sign in and add a client to see your real tasks here"
+        }
+      >
+        {/* Identity — task only; client name is in the group header above */}
+        <div className="w-48 shrink-0 min-w-0">
+          <div className="font-medium text-sm text-ink-900 truncate">{t.task}</div>
+          <div className="text-2xs text-ink-500 truncate">due {t.dueDate}</div>
         </div>
-      </div>
 
       {/* Mini-timeline */}
       <div className="flex-1 flex items-center gap-1.5 min-w-0">
@@ -377,6 +466,7 @@ function TimelineRow({ t }: { t: MockTaskTimeline }) {
           </div>
         )}
       </div>
-    </button>
+      </button>
+    </li>
   );
 }
