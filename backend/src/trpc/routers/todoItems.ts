@@ -187,6 +187,14 @@ export const todoItemsRouter = router({
           ),
         );
 
+      // Mode B reminders bundle per (client, task): one row that says
+      // "Send reminder · 15 docs needed for 1040" instead of 15 separate
+      // "Send reminder · W-2", "Send reminder · 1099-INT" rows. The CPA
+      // sends ONE email per chase loop (PRD §7.3) — surfacing per-item
+      // here turns Today into noise the moment a client is added.
+      type ModeBChecklist = (typeof checklistRows)[number];
+      const modeBBuckets = new Map<string, ModeBChecklist[]>();
+
       for (const row of checklistRows) {
         const tierWeight = TIER_WEIGHT[row.client.tier ?? "standard"] ?? 1;
         const dueDate = row.deadline.officialDueDate;
@@ -243,44 +251,88 @@ export const todoItemsRouter = router({
           row.ci.state === "requested_waiting" ||
           row.ci.state === "not_requested"
         ) {
-          const wm = waitingMultiplierForChecklist(row.ci.state, lastReminderIso);
-          const stuck = stuckBonusForChecklist(lastReminderIso);
-          const score =
-            baseScore("mode_b_reminder_due") *
-              wm *
-              deadlineProximityFactor(dueDate) *
-              tierWeight +
-            stuck;
-          const daysSinceReminder = lastReminderIso
-            ? Math.floor(
-                (Date.now() - new Date(lastReminderIso).getTime()) /
-                  (24 * 60 * 60 * 1000),
-              )
-            : null;
-          const reminderText = daysSinceReminder != null
-            ? `last sent ${daysSinceReminder}d ago`
-            : "not yet requested";
-          items.push({
-            id: `mode_b-${row.ci.id}`,
-            source: "mode_b_reminder_due",
-            verb: verb("mode_b_reminder_due"),
-            client: row.client.name,
-            clientId: row.client.id,
-            task: taskName,
-            taskId: row.task.id,
-            dueDate,
-            action: `Send reminder · ${row.ci.label}`,
-            context: `${reminderText}${lastReminderIso ? " · draft ready" : ""}`,
-            stageLabel: "Collect",
-            daysBehind:
-              daysSinceReminder != null && daysSinceReminder > 7
-                ? daysSinceReminder
-                : undefined,
-            urgency: urgencyBucket(score),
-            urgencyScore: Math.round(score),
-            surface: "email_draft_modal",
-          });
+          // Defer emission — bundle below.
+          const existing = modeBBuckets.get(row.task.id);
+          if (existing) existing.push(row);
+          else modeBBuckets.set(row.task.id, [row]);
         }
+      }
+
+      // Emit ONE Mode B row per task with all waiting items folded in.
+      for (const [, bucket] of modeBBuckets) {
+        const lead = bucket[0];
+        if (!lead) continue;
+        const tierWeight = TIER_WEIGHT[lead.client.tier ?? "standard"] ?? 1;
+        const dueDate = lead.deadline.officialDueDate;
+        const taskName = lead.deadline.formType;
+        // Most-recently-reminded item drives the "last sent" clock — sending
+        // one bundled email refreshes lastReminderAt for every item, so the
+        // freshest timestamp is the most accurate "when was the chase last
+        // touched" signal.
+        const lastReminderIso = bucket
+          .map((r) => r.ci.lastReminderAt?.toISOString() ?? null)
+          .filter((x): x is string => x !== null)
+          .sort()
+          .pop() ?? null;
+        // Score: take the max across the bucket so an urgent item bubbles
+        // the bundled row up. Stuck-duration bonus uses the OLDEST reminder
+        // (so a chase that's been stuck on one doc for weeks still sorts
+        // correctly even if other docs were just added).
+        const oldestReminderIso = bucket
+          .map((r) => r.ci.lastReminderAt?.toISOString() ?? null)
+          .filter((x): x is string => x !== null)
+          .sort()[0] ?? null;
+        const stuck = stuckBonusForChecklist(oldestReminderIso);
+        const score =
+          Math.max(
+            ...bucket.map((r) =>
+              baseScore("mode_b_reminder_due") *
+                waitingMultiplierForChecklist(
+                  r.ci.state,
+                  r.ci.lastReminderAt?.toISOString() ?? null,
+                ) *
+                deadlineProximityFactor(dueDate) *
+                tierWeight,
+            ),
+          ) + stuck;
+        const daysSinceReminder = lastReminderIso
+          ? Math.floor(
+              (Date.now() - new Date(lastReminderIso).getTime()) /
+                (24 * 60 * 60 * 1000),
+            )
+          : null;
+        const reminderText = daysSinceReminder != null
+          ? `last sent ${daysSinceReminder}d ago`
+          : "not yet requested";
+        const labels = bucket.map((r) => r.ci.label);
+        const actionText =
+          bucket.length === 1
+            ? `Send reminder · ${labels[0]}`
+            : `Send reminder · ${bucket.length} items needed for ${taskName}`;
+        const context =
+          bucket.length === 1
+            ? `${reminderText}${lastReminderIso ? " · draft ready" : ""}`
+            : `${reminderText} · ${labels.slice(0, 3).join(", ")}${labels.length > 3 ? ` +${labels.length - 3} more` : ""}`;
+        items.push({
+          id: `mode_b-task-${lead.task.id}`,
+          source: "mode_b_reminder_due",
+          verb: verb("mode_b_reminder_due"),
+          client: lead.client.name,
+          clientId: lead.client.id,
+          task: taskName,
+          taskId: lead.task.id,
+          dueDate,
+          action: actionText,
+          context,
+          stageLabel: "Collect",
+          daysBehind:
+            daysSinceReminder != null && daysSinceReminder > 7
+              ? daysSinceReminder
+              : undefined,
+          urgency: urgencyBucket(score),
+          urgencyScore: Math.round(score),
+          surface: "email_draft_modal",
+        });
       }
 
       // ------- Source 4: Mode D draft ready — emailDrafts in 'draft' state
