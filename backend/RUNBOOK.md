@@ -158,8 +158,11 @@ fly secrets set \
   SUPABASE_URL='https://xxxxx.supabase.co' \
   SUPABASE_ANON_KEY='eyJ...' \
   SUPABASE_SERVICE_ROLE_KEY='eyJ...' \
-  CORS_ORIGIN='https://your-vercel-domain.vercel.app'
+  CORS_ORIGIN='https://your-vercel-domain.vercel.app' \
+  RESEND_API_KEY='re_...'        # outbound email (omit in dev — emails.send logs + skips)
 ```
+
+`RESEND_API_KEY` is optional in dev: `emails.send` writes the row, fires the Activity event, and returns `{ providerSkipped: true }` when the key is missing — useful for running the BE locally without burning send quota. Production requires it; without the key, no chase emails actually leave the building.
 
 ### Deploy
 
