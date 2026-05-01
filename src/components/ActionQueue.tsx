@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, Mail, CheckCircle2, Megaphone, MessageSquare, Inbox } from "lucide-react";
+import { ChevronRight, Mail, CheckCircle2, Megaphone, MessageSquare, Inbox, Sparkles } from "lucide-react";
 import { trpc } from "../lib/api/client";
 import { MOCK_TODO_ITEMS } from "../data/mockTodoItems";
 import type { MockTodoItem, TodoVerb } from "../data/mockTodoItems";
@@ -79,9 +79,16 @@ export function ActionQueue() {
           className="text-sm font-semibold text-ink-900 flex items-center gap-2"
         >
           Action queue
+          <span
+            className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
+            title="AI ranks by urgency + waiting-on-client time + history. You can override the order."
+          >
+            <Sparkles className="w-3 h-3" aria-hidden />
+            AI prioritized
+          </span>
         </h2>
         <span className="text-2xs text-ink-500 tabular-nums">
-          {sorted.length} items need your action · sorted by urgency
+          {sorted.length} items
         </span>
         <span className="ml-auto text-2xs text-ink-400 italic">
           {sourceLabel}
