@@ -6,6 +6,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { actions, useStore } from "../data/store";
+import { trpc } from "../lib/api/client";
 import { useClient } from "../hooks/useClients";
 import { useDeadlinesForClient } from "../hooks/useDeadlines";
 import { useTasksForClient } from "../hooks/useTasks";
@@ -37,7 +38,19 @@ import type {
   Deadline,
 } from "../types";
 
-type Tab = "deadlines" | "documents" | "history" | "notes" | "contacts" | "activity";
+// IA v0.7 §3.3 — five tabs (Engagement default + Habits + Predictions + To
+// Do + Mailbox). Audit log + Documents + Contacts were day-1 surfaces in
+// v0.6; v0.7 demotes them to the overflow menu since the rich tabs cover
+// every primary daily flow.
+type Tab =
+  | "engagement"
+  | "habits"
+  | "predictions"
+  | "todo"
+  | "mailbox"
+  | "documents"
+  | "contacts"
+  | "audit";
 
 export function ClientDetail() {
   const { id } = useParams<{ id: string }>();
@@ -47,7 +60,8 @@ export function ClientDetail() {
   const deadlinesQuery = useDeadlinesForClient(id);
   const client = clientQuery.data ?? null;
   const deadlines = deadlinesQuery.data ?? [];
-  const [tab, setTab] = useState<Tab>("deadlines");
+  const [tab, setTab] = useState<Tab>("engagement");
+  const [overflowOpen, setOverflowOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [addDeadlineOpen, setAddDeadlineOpen] = useState(false);
@@ -226,15 +240,14 @@ export function ClientDetail() {
 
       <ClientAiInsightsCard clientId={client.id} />
 
-      <div className="mt-5 border-b border-line flex gap-1 flex-wrap">
+      <div className="mt-5 border-b border-line flex items-center gap-1 flex-wrap relative">
         {(
           [
-            ["deadlines", `Tasks (${clientDeadlines.filter((d) => d.status !== "completed" && d.status !== "filed_extension").length})`],
-            ["documents", "Documents"],
-            ["history", `History (${clientDeadlines.filter((d) => d.status === "completed" || d.status === "filed_extension").length})`],
-            ["notes", `Notes${client.noteEntries?.length ? ` (${client.noteEntries.length})` : ""}`],
-            ["contacts", "Contacts"],
-            ["activity", `Activity${client.activity?.length ? ` (${client.activity.length})` : ""}`],
+            ["engagement", "🤝 Engagement"],
+            ["habits", "🧠 Habits"],
+            ["predictions", "🔮 Predictions"],
+            ["todo", "✅ To Do"],
+            ["mailbox", "✉️ Mailbox"],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -249,28 +262,77 @@ export function ClientDetail() {
             {label}
           </button>
         ))}
+        {/* Overflow menu — Audit log + the v0.6 surfaces (Documents,
+            Contacts) demoted out of the primary tab strip in v0.7. */}
+        <div className="ml-auto relative">
+          <button
+            onClick={() => setOverflowOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={overflowOpen}
+            className={`px-3 py-2 text-sm ${
+              tab === "documents" || tab === "contacts" || tab === "audit"
+                ? "text-ink-900 border-b-2 border-ink-900 font-medium"
+                : "text-ink-500 hover:text-ink-700"
+            }`}
+            title="More — Audit log, Documents, Contacts"
+          >
+            …
+          </button>
+          {overflowOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full mt-1 w-48 bg-surface border border-line rounded-md shadow-overlay py-1 z-30"
+              onMouseLeave={() => setOverflowOpen(false)}
+            >
+              {(
+                [
+                  ["audit", `Audit log${client.activity?.length ? ` (${client.activity.length})` : ""}`],
+                  ["documents", "Documents"],
+                  ["contacts", "Contacts"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    setTab(key);
+                    setOverflowOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-1.5 text-sm hover:bg-sunken ${
+                    tab === key ? "text-ink-900 font-medium" : "text-ink-700"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="mt-5 space-y-5">
-        {tab === "deadlines" && (
-          <DeadlinesTab
+        {tab === "engagement" && (
+          <EngagementTab
             client={client}
             upcoming={upcoming}
-            thisYear={thisYear}
-            completed={completed}
-            extensions={extensions}
+            allDeadlines={clientDeadlines}
+            onSwitchToToDo={() => setTab("todo")}
+            onSwitchToHabits={() => setTab("habits")}
+          />
+        )}
+        {tab === "habits" && <HabitsTab client={client} />}
+        {tab === "predictions" && <PredictionsTab client={client} />}
+        {tab === "todo" && (
+          <ToDoTab
+            client={client}
             allDeadlines={clientDeadlines}
             onAddDeadline={() => setAddDeadlineOpen(true)}
             onOpenDocuments={() => setTab("documents")}
           />
         )}
+        {tab === "mailbox" && <MailboxTab client={client} />}
         {tab === "documents" && <DocumentsTab client={client} />}
-        {tab === "history" && (
-          <HistoryTab client={client} deadlines={clientDeadlines} />
-        )}
-        {tab === "notes" && <NotesTab client={client} />}
         {tab === "contacts" && <ContactsTab client={client} />}
-        {tab === "activity" && <ActivityTab client={client} />}
+        {tab === "audit" && <ActivityTab client={client} />}
       </div>
 
       <ConfirmDialog
@@ -968,6 +1030,671 @@ function BundleManager({ client }: { client: Client }) {
         ]}
       />
     </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// IA v0.7 §3.3 Client detail tabs — Engagement / Habits / Predictions /
+// To Do / Mailbox. Built from the spec painpoint→design-solution
+// rubric: gap-over-fill (what client hasn't sent is the loudest
+// element), green/yellow/red AI authority, Pattern 4 advisory awakening.
+// ─────────────────────────────────────────────────────────────────────
+
+type EngagementProps = {
+  client: Client;
+  upcoming: Deadline[];
+  allDeadlines: Deadline[];
+  onSwitchToToDo: () => void;
+  onSwitchToHabits: () => void;
+};
+
+function EngagementTab({
+  client,
+  upcoming,
+  allDeadlines,
+  onSwitchToToDo,
+  onSwitchToHabits,
+}: EngagementProps) {
+  const { checklistItems, tasks } = useStore();
+  const insights = useAiInsightsForClient(client.id);
+  const announcementsQuery = trpc.announcements.list.useQuery();
+  const announcements = announcementsQuery.data ?? [];
+
+  const taskIds = useMemo(
+    () => tasks.filter((t) => t.clientId === client.id).map((t) => t.id),
+    [tasks, client.id],
+  );
+  const taskIdSet = useMemo(() => new Set(taskIds), [taskIds]);
+
+  // Gap-over-fill computation: what is this client still owing me?
+  const waiting = useMemo(() => {
+    let count = 0;
+    let oldestDays: number | null = null;
+    const now = Date.now();
+    const taskCounts = new Map<string, number>();
+    for (const ci of checklistItems) {
+      if (!taskIdSet.has(ci.taskId)) continue;
+      if (ci.state !== "requested_waiting" && ci.state !== "not_requested") continue;
+      count++;
+      taskCounts.set(ci.taskId, (taskCounts.get(ci.taskId) ?? 0) + 1);
+      if (ci.lastReminderAt) {
+        const days = Math.floor(
+          (now - new Date(ci.lastReminderAt).getTime()) / (24 * 60 * 60 * 1000),
+        );
+        if (oldestDays == null || days > oldestDays) oldestDays = days;
+      }
+    }
+    return { count, oldestDays, taskCount: taskCounts.size };
+  }, [checklistItems, taskIdSet]);
+
+  const activeAlerts = announcements.filter(
+    (a) => !a.dismissed && a.affectedClientIds.includes(client.id),
+  );
+  const openInsights = insights.filter((i) => i.status === "open");
+  const noteCount = client.noteEntries?.length ?? 0;
+
+  // Relationship score — naive: 5 dots minus stuck-reminder penalty.
+  const relationshipScore = Math.max(
+    1,
+    5 - (waiting.oldestDays != null && waiting.oldestDays > 14 ? 2 : 0) -
+      (waiting.count > 5 ? 1 : 0),
+  );
+
+  return (
+    <div className="space-y-4">
+      {/* 🚨 Currently waiting on — banner-style top metric per IA v0.7 §3.3.1
+          gap-over-fill amendment. Loudest element on the tab. */}
+      {waiting.count > 0 && (
+        <button
+          onClick={onSwitchToToDo}
+          className="w-full text-left rounded-md border-2 border-warn-border bg-warn-bg/40 px-4 py-3 hover:bg-warn-bg/60 transition-colors"
+          title="Open the To Do tab pre-filtered by waiting items"
+        >
+          <p className="text-2xs uppercase tracking-wider text-warn-ink font-semibold">
+            🚨 Currently waiting on {client.name.split(" ")[0]}
+          </p>
+          <p className="text-base font-semibold text-warn-ink mt-1">
+            {waiting.count} item{waiting.count === 1 ? "" : "s"} across{" "}
+            {waiting.taskCount} task{waiting.taskCount === 1 ? "" : "s"}
+            {waiting.oldestDays != null && (
+              <span className="text-warn-ink/80">
+                {" "}
+                · oldest reminder {waiting.oldestDays}d unsent
+              </span>
+            )}
+          </p>
+          <p className="text-2xs text-warn-ink/80 mt-1">
+            Click to open To Do tab → review and chase →
+          </p>
+        </button>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Services + tier */}
+        <section className="md:col-span-2 bg-surface border border-line rounded-md p-4">
+          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
+            Services & engagement
+          </h3>
+          <dl className="mt-2 space-y-1.5 text-sm">
+            <div className="flex gap-3">
+              <dt className="w-32 shrink-0 text-ink-500">Tier</dt>
+              <dd className="text-ink-900 font-medium capitalize">
+                {client.tier ?? "Standard"}
+              </dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-32 shrink-0 text-ink-500">Service packages</dt>
+              <dd className="text-ink-900 flex flex-wrap gap-1">
+                {client.servicePackages.length > 0 ? (
+                  client.servicePackages.map((p) => (
+                    <span
+                      key={p}
+                      className="text-xs px-2 py-0.5 rounded border border-line bg-sunken/40"
+                    >
+                      {p}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-ink-500">— none assigned</span>
+                )}
+              </dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-32 shrink-0 text-ink-500">Open deadlines</dt>
+              <dd className="text-ink-900 font-medium tabular-nums">
+                {allDeadlines.filter(
+                  (d) => d.status !== "completed" && d.status !== "filed_extension",
+                ).length}{" "}
+                <span className="text-ink-500 font-normal">
+                  · {upcoming.length} upcoming
+                </span>
+              </dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-32 shrink-0 text-ink-500">Client since</dt>
+              <dd className="text-ink-900">{formatLongDate(client.addedAt)}</dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-32 shrink-0 text-ink-500">Pricing</dt>
+              <dd className="text-ink-500 italic">
+                Comparable-book benchmark — Phase 1 (Layer C wiring)
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        {/* Relationship + churn signals */}
+        <section className="bg-surface border border-line rounded-md p-4">
+          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
+            Relationship
+          </h3>
+          <p
+            className="text-2xl mt-2 tabular-nums tracking-wider"
+            title={`Score ${relationshipScore} of 5 — falls when reminders stay unsent`}
+            aria-label={`Relationship score ${relationshipScore} of 5`}
+          >
+            {"●".repeat(relationshipScore)}
+            <span className="text-ink-300">{"○".repeat(5 - relationshipScore)}</span>
+          </p>
+          <p className="text-2xs text-ink-500 mt-1">
+            {relationshipScore <= 2
+              ? "At risk — long-stuck items signal fade"
+              : relationshipScore === 3
+                ? "Watch — a few reminders gone unanswered"
+                : "Healthy — recent activity, on cadence"}
+          </p>
+          {waiting.oldestDays != null && waiting.oldestDays > 14 && (
+            <p className="mt-3 text-2xs text-danger-ink bg-danger-bg border border-danger-border rounded px-2 py-1.5">
+              ⚠ Stuck: oldest reminder out {waiting.oldestDays}d.
+            </p>
+          )}
+        </section>
+      </div>
+
+      {/* Active opportunities — Mode E + Pattern 4 awakening prompt. */}
+      <section className="bg-surface border border-line rounded-md p-4">
+        <header className="flex items-center gap-2 mb-2">
+          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
+            Active opportunities
+          </h3>
+          <span
+            className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
+            title="Mode E — AI cross-year pattern detection"
+          >
+            ✨ AI surfaced
+          </span>
+          <span className="ml-auto text-2xs text-ink-500 tabular-nums">
+            {openInsights.length} open
+          </span>
+        </header>
+        {openInsights.length === 0 ? (
+          <p className="text-xs text-ink-500">
+            No advisory triggers right now. Mode E watches multi-year patterns
+            (RSU vests, salary jumps, property changes) and surfaces them here
+            when they appear.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {openInsights.map((i) => (
+              <li key={i.id} className="text-sm">
+                <p className="text-ink-900 font-medium">{i.title}</p>
+                <p className="text-xs text-ink-500 mt-0.5">{i.detail}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Active regulatory impact — alerts touching this client. */}
+      {activeAlerts.length > 0 && (
+        <section className="bg-surface border border-line rounded-md p-4">
+          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold mb-2">
+            Active regulatory impact
+          </h3>
+          <ul className="divide-y divide-line">
+            {activeAlerts.map((a) => (
+              <li key={a.id} className="py-2 first:pt-0 last:pb-0">
+                <Link
+                  to={`/alerts/${a.id}`}
+                  className="text-sm text-ink-900 hover:underline flex items-baseline gap-2"
+                >
+                  <span className="text-2xs font-mono px-1.5 py-0.5 rounded bg-sunken text-ink-700">
+                    {a.stateCode}
+                  </span>
+                  <span className="flex-1 truncate">{a.title}</span>
+                  <span className="text-2xs text-ink-500">Review →</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Notes pointer — full editor lives in Habits. */}
+      <section className="bg-surface border border-line rounded-md p-4 flex items-baseline gap-3">
+        <div className="flex-1">
+          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
+            Notes
+          </h3>
+          <p className="text-sm text-ink-700 mt-0.5">
+            {noteCount > 0
+              ? `${noteCount} note${noteCount === 1 ? "" : "s"} — full editor in Habits.`
+              : "No notes yet. Use the Habits tab to capture firm memory about this client."}
+          </p>
+        </div>
+        <button
+          onClick={onSwitchToHabits}
+          className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken"
+        >
+          Open Habits →
+        </button>
+      </section>
+    </div>
+  );
+}
+
+function HabitsTab({ client }: { client: Client }) {
+  const facts = useImportedFactsForClient(client.id);
+  const insights = useAiInsightsForClient(client.id);
+
+  return (
+    <div className="space-y-4">
+      <section className="bg-surface border border-line rounded-md p-4">
+        <header className="flex items-center gap-2 mb-2">
+          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
+            Multi-year patterns
+          </h3>
+          <span
+            className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
+            title="Mode E + Mode B — narrated from imported history."
+          >
+            ✨ AI narrated
+          </span>
+        </header>
+        {facts.length === 0 && insights.length === 0 ? (
+          <p className="text-xs text-ink-500">
+            <strong className="text-ink-700">Cold start:</strong> Personalized
+            memory unlocks once you import a prior-year return for this client.
+            Until then, AI uses substrate-based defaults (entity + state + cohort)
+            for predictions and reminders.
+          </p>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {facts.slice(0, 6).map((f) => (
+              <li key={f.id} className="text-ink-700">
+                <span className="text-ink-500">{f.itemType}:</span>{" "}
+                <span className="text-ink-900">
+                  {f.observedAmount != null
+                    ? `$${f.observedAmount.toLocaleString()}`
+                    : f.observedDate
+                      ? `arrived ${formatLongDate(f.observedDate)}`
+                      : (f.note ?? "—")}
+                </span>
+                <span className="text-ink-400 text-2xs ml-2">({f.year})</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <NotesTab client={client} />
+    </div>
+  );
+}
+
+function PredictionsTab({ client }: { client: Client }) {
+  const facts = useImportedFactsForClient(client.id);
+  return (
+    <section className="bg-surface border border-line rounded-md p-4">
+      <header className="flex items-center gap-2 mb-2">
+        <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
+          Per-client expected timeline
+        </h3>
+        <span
+          className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
+          title="Mode B — per-client arrival timing prediction"
+        >
+          ✨ Mode B prediction
+        </span>
+      </header>
+      {facts.length === 0 ? (
+        <div className="text-xs text-ink-500 space-y-2">
+          <p>
+            <strong className="text-ink-700">Cold start:</strong> Predictions
+            unlock once you import this client's prior-year history. Until
+            then, AI uses substrate-based generic timing ({client.entityType} ·{" "}
+            {client.primaryState}) so reminders still fire on a sensible
+            cadence.
+          </p>
+          <p>
+            What you'll see here once history lands: per-client expected
+            arrivals (W-2, K-1, 1099-DIV), Mode B reminder schedule, and Mode
+            E anomaly watch list.
+          </p>
+        </div>
+      ) : (
+        <ul className="space-y-2 text-sm">
+          {facts.map((f) => (
+            <li key={f.id} className="text-ink-700">
+              <span className="text-ink-500">{f.itemType}:</span>{" "}
+              <span className="text-ink-900">
+                {f.observedAmount != null
+                  ? `$${f.observedAmount.toLocaleString()}`
+                  : f.observedDate
+                    ? `arrived ${formatLongDate(f.observedDate)}`
+                    : (f.note ?? "—")}
+              </span>
+              <span className="text-ink-400 text-2xs ml-2">({f.year})</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function ToDoTab({
+  client,
+  allDeadlines,
+  onAddDeadline,
+}: {
+  client: Client;
+  allDeadlines: Deadline[];
+  onAddDeadline: () => void;
+  onOpenDocuments: () => void;
+}) {
+  const { checklistItems, tasks } = useStore();
+  const taskIds = useMemo(
+    () => tasks.filter((t) => t.clientId === client.id).map((t) => t.id),
+    [tasks, client.id],
+  );
+  const tasksByIdMap = useMemo(() => {
+    const m = new Map<string, (typeof tasks)[number]>();
+    for (const t of tasks) if (taskIds.includes(t.id)) m.set(t.id, t);
+    return m;
+  }, [tasks, taskIds]);
+  const taskIdSet = useMemo(() => new Set(taskIds), [taskIds]);
+
+  const items = useMemo(
+    () => checklistItems.filter((ci) => taskIdSet.has(ci.taskId)),
+    [checklistItems, taskIdSet],
+  );
+  const stillWaiting = items.filter(
+    (ci) => ci.state === "requested_waiting" || ci.state === "not_requested",
+  );
+  const needsReview = items.filter(
+    (ci) => ci.state === "received_unreviewed" || ci.state === "received_issue",
+  );
+  const completeCount = items.filter(
+    (ci) => ci.state === "received_confirmed" || ci.state === "not_applicable",
+  ).length;
+
+  // Sort waiting by oldest reminder first (gap-over-fill).
+  const waitingSorted = [...stillWaiting].sort((a, b) => {
+    const at = a.lastReminderAt ? new Date(a.lastReminderAt).getTime() : Infinity;
+    const bt = b.lastReminderAt ? new Date(b.lastReminderAt).getTime() : Infinity;
+    return at - bt;
+  });
+
+  const taskLabel = (taskId: string) => {
+    const task = tasksByIdMap.get(taskId);
+    if (!task) return "—";
+    return [task.formType, task.jurisdiction].filter(Boolean).join(" · ") || taskId;
+  };
+
+  const taskHref = (taskId: string) =>
+    `/clients/${client.id}/tasks/${taskId}`;
+
+  return (
+    <div className="space-y-4">
+      {/* 🚨 STILL WAITING ON CLIENT — primary, bordered, always-expanded. */}
+      <section
+        aria-labelledby="todo-still-waiting-heading"
+        className="rounded-md border-2 border-warn-border bg-warn-bg/30 overflow-hidden"
+      >
+        <header className="flex items-baseline gap-2 px-4 py-3 border-b border-warn-border">
+          <h3
+            id="todo-still-waiting-heading"
+            className="text-sm font-semibold text-warn-ink"
+          >
+            🚨 Still waiting on client
+          </h3>
+          <span className="text-2xs text-warn-ink/80 tabular-nums">
+            {stillWaiting.length} item{stillWaiting.length === 1 ? "" : "s"}
+          </span>
+          <button
+            onClick={onAddDeadline}
+            className="ml-auto text-2xs px-2 py-0.5 rounded border border-warn-border text-warn-ink hover:bg-warn-bg/60"
+          >
+            + Add deadline
+          </button>
+        </header>
+        {stillWaiting.length === 0 ? (
+          <p className="px-4 py-4 text-xs text-ink-500">
+            Nothing waiting on this client right now.
+          </p>
+        ) : (
+          <ul className="divide-y divide-warn-border/50">
+            {waitingSorted.map((ci) => {
+              const days = ci.lastReminderAt
+                ? Math.floor(
+                    (Date.now() - new Date(ci.lastReminderAt).getTime()) /
+                      (24 * 60 * 60 * 1000),
+                  )
+                : null;
+              return (
+                <li
+                  key={ci.id}
+                  className="flex items-baseline gap-3 px-4 py-2.5"
+                >
+                  <span className="text-warn-ink shrink-0">
+                    {ci.state === "requested_waiting" ? "⏳" : "⏸"}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-ink-900 truncate">
+                      {ci.label ?? "Item"}
+                    </p>
+                    <p className="text-2xs text-ink-500 truncate">
+                      {taskLabel(ci.taskId)}
+                      {days != null && ` · last reminder ${days}d ago`}
+                      {ci.state === "not_requested" && " · not yet requested"}
+                    </p>
+                  </div>
+                  <Link
+                    to={taskHref(ci.taskId)}
+                    className="text-2xs px-2 py-1 rounded border border-line bg-surface text-ink-700 hover:bg-sunken shrink-0"
+                  >
+                    {ci.state === "requested_waiting"
+                      ? "Send reminder ↗"
+                      : "Request now ↗"}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {/* ⚠ NEEDS YOUR REVIEW — secondary, expanded by default. */}
+      {needsReview.length > 0 && (
+        <section className="bg-surface border border-line rounded-md overflow-hidden">
+          <header className="flex items-baseline gap-2 px-4 py-3 border-b border-line">
+            <h3 className="text-sm font-semibold text-ink-900">
+              ⚠ Needs your review
+            </h3>
+            <span className="text-2xs text-ink-500 tabular-nums">
+              {needsReview.length} item{needsReview.length === 1 ? "" : "s"}
+            </span>
+          </header>
+          <ul className="divide-y divide-line">
+            {needsReview.map((ci) => (
+              <li key={ci.id} className="flex items-baseline gap-3 px-4 py-2.5">
+                <span className="shrink-0">
+                  {ci.state === "received_issue" ? "⚠" : "📥"}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-ink-900 truncate">{ci.label}</p>
+                  <p className="text-2xs text-ink-500 truncate">
+                    {taskLabel(ci.taskId)}
+                    {ci.flagReason && ` · AI flag: ${ci.flagReason}`}
+                  </p>
+                </div>
+                <Link
+                  to={taskHref(ci.taskId)}
+                  className="text-2xs px-2 py-1 rounded border border-line text-ink-700 hover:bg-sunken shrink-0"
+                >
+                  Review ↗
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Open deadlines summary — anchors the per-task entry points so the
+          CPA can navigate to any task's full detail without leaving To Do. */}
+      <section className="bg-surface border border-line rounded-md p-4">
+        <header className="flex items-baseline gap-2 mb-2">
+          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
+            Open deadlines for this client
+          </h3>
+          <span className="text-2xs text-ink-500 tabular-nums">
+            {allDeadlines.filter(
+              (d) => d.status !== "completed" && d.status !== "filed_extension",
+            ).length}{" "}
+            open
+          </span>
+        </header>
+        <ul className="divide-y divide-line">
+          {allDeadlines
+            .filter(
+              (d) => d.status !== "completed" && d.status !== "filed_extension",
+            )
+            .slice(0, 8)
+            .map((d) => (
+              <li key={d.id} className="py-2 first:pt-0 last:pb-0">
+                <div className="text-sm text-ink-900 flex items-baseline gap-3">
+                  <span className="flex-1 truncate">
+                    {d.form} · {d.jurisdiction}
+                  </span>
+                  <span className="text-xs text-ink-500 tabular-nums">
+                    {formatLongDate(d.officialDueDate)}
+                  </span>
+                </div>
+              </li>
+            ))}
+        </ul>
+      </section>
+
+      <p className="text-2xs text-ink-400">
+        ✓ {completeCount} item{completeCount === 1 ? "" : "s"} complete this tax
+        year (open the related task to see source attachments).
+      </p>
+    </div>
+  );
+}
+
+function MailboxTab({ client }: { client: Client }) {
+  const { emailDrafts, tasks } = useStore();
+  const clientTaskIds = useMemo(
+    () => new Set(tasks.filter((t) => t.clientId === client.id).map((t) => t.id)),
+    [tasks, client.id],
+  );
+  const drafts = emailDrafts.filter((d) =>
+    d.taskId ? clientTaskIds.has(d.taskId) : false,
+  );
+  const sent = drafts.filter((d) => d.status === "sent");
+  const pending = drafts.filter(
+    (d) => d.status === "draft" || d.status === "scheduled",
+  );
+
+  return (
+    <div className="space-y-4">
+      <section className="bg-surface border border-line rounded-md overflow-hidden">
+        <header className="flex items-baseline gap-2 px-4 py-3 border-b border-line">
+          <h3 className="text-sm font-semibold text-ink-900">📥 Inbox</h3>
+          <span className="text-2xs text-ink-500">
+            inbound replies from {client.name}
+          </span>
+        </header>
+        <p className="px-4 py-4 text-xs text-ink-500">
+          Inbound replies (Method A forwarding + Method B OAuth pull) appear
+          here, classified by intent (document_provided · timeline_pushback ·
+          question_asked · off_topic · mismatched_attachment). Wires to{" "}
+          <code className="text-2xs">trpc.inboundReplies.listForClient</code>{" "}
+          when the BE adds a per-client filter.
+        </p>
+      </section>
+
+      <section className="bg-surface border border-line rounded-md overflow-hidden">
+        <header className="flex items-baseline gap-2 px-4 py-3 border-b border-line">
+          <h3 className="text-sm font-semibold text-ink-900">📤 Outbox</h3>
+          <span className="text-2xs text-ink-500 tabular-nums">
+            {sent.length} sent
+          </span>
+        </header>
+        {sent.length === 0 ? (
+          <p className="px-4 py-4 text-xs text-ink-500">No sent reminders yet.</p>
+        ) : (
+          <ul className="divide-y divide-line">
+            {sent.slice(0, 8).map((d) => (
+              <li key={d.id} className="px-4 py-2.5">
+                <p className="text-sm text-ink-900 truncate">
+                  {d.subject ?? "Reminder"}
+                </p>
+                <p className="text-2xs text-ink-500 mt-0.5">
+                  {d.sentAt ? formatLongDate(d.sentAt) : "—"} · {d.status}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="bg-surface border border-line rounded-md overflow-hidden">
+        <header className="flex items-baseline gap-2 px-4 py-3 border-b border-line">
+          <h3 className="text-sm font-semibold text-ink-900">📝 Drafts</h3>
+          <span
+            className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
+            title="Mode D — drafts wait for your review before send."
+          >
+            ✨ AI drafted
+          </span>
+          <span className="text-2xs text-ink-500 tabular-nums">
+            {pending.length} awaiting review
+          </span>
+        </header>
+        {pending.length === 0 ? (
+          <p className="px-4 py-4 text-xs text-ink-500">
+            No drafts pending. AI pre-prepares chase emails when an item enters
+            requested_waiting state.
+          </p>
+        ) : (
+          <ul className="divide-y divide-line">
+            {pending.map((d) => (
+              <li key={d.id} className="px-4 py-2.5">
+                <p className="text-sm text-ink-900 truncate">
+                  {d.subject ?? "Reminder"}
+                </p>
+                <p className="text-2xs text-ink-500 mt-0.5 truncate">
+                  {d.body?.slice(0, 80)}…
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="bg-surface border border-line rounded-md p-4">
+        <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold mb-2">
+          Issues
+        </h3>
+        <p className="text-xs text-ink-500">
+          Bounces, complaints, unsubscribes for this client surface here once
+          the BE delivery-events router adds a per-client view.
+        </p>
+      </section>
+    </div>
   );
 }
 
