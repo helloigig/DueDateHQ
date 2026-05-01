@@ -233,13 +233,23 @@ export const importsRouter = router({
       const importId = `imp-${randomBytes(6).toString("hex")}`;
       const importedAt = new Date();
 
-      // Prefetch firm packages once — used for service_package matching.
-      const firmPackages = await db
+      // Prefetch all visible packages once (firm-owned + system). Used
+      // both for explicit name matching AND the suggester fallback.
+      // Earlier code only loaded firm-owned packages, so a CSV value like
+      // "1040 Individual" (a SYSTEM package name) would silently miss
+      // the explicit match and fall through to the suggester even when
+      // the user named it correctly.
+      const allPackages = await db
         .select()
         .from(servicePackages)
-        .where(eq(servicePackages.firmId, ctx.firmId));
+        .where(
+          or(
+            isNull(servicePackages.firmId),
+            eq(servicePackages.firmId, ctx.firmId),
+          )!,
+        );
       const packageByName = new Map(
-        firmPackages.map((p) => [p.name.toLowerCase(), p]),
+        allPackages.map((p) => [p.name.toLowerCase(), p]),
       );
 
       // Existing clients — dedupe by (name, primaryState) per firm.
@@ -311,17 +321,6 @@ export const importsRouter = router({
       //   2. otherwise, suggest a system package from (entityType,
       //      primaryState) so the import never strands a client without
       //      tasks just because the CSV omitted the column.
-      //
-      // Pre-fetch all visible packages so the suggester is in-memory.
-      const allPackages = await db
-        .select()
-        .from(servicePackages)
-        .where(
-          or(
-            isNull(servicePackages.firmId),
-            eq(servicePackages.firmId, ctx.firmId),
-          )!,
-        );
       const year = new Date().getFullYear();
       let deadlinesCreated = 0;
       let tasksCreated = 0;
