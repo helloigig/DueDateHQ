@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { GanttChartSquare, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../lib/api/client";
-import { useStore } from "../data/store";
 import { env } from "../config";
 
 // Timeline destination — per IA v0.7 amendment §3.9a.
@@ -90,35 +89,24 @@ const STAGE_LABELS: Record<Stage, string> = {
   file: "File",
 };
 
-// Group flat per-task milestone rows into the per-task display shape that
-// MOCK_TIMELINES uses. Without joins to tasks/clients (held off to keep the
-// router stateless), per-task identifiers are best-effort: taskId prefix as
-// "client" / "task" labels. Polish: enrich the router with task + client
-// names in a follow-up.
+// BE fleetStack now joins through tasks → deadlines → clients and returns
+// real names alongside each milestone row. Earlier shape only carried
+// taskId, forcing the FE to fall back to a local-store lookup that was
+// always empty in real mode (the FE store is mock-only) — Timeline rows
+// rendered as "Task b3bee883" instead of "Apex Fund · 1040".
 type LiveMilestone = {
   taskId: string;
   milestoneType: string;
   status: "not_started" | "in_progress" | "blocked" | "done" | "overdue";
   targetDate: string | null;
+  clientId: string;
+  clientName: string;
+  formType: string | null;
+  jurisdiction: string | null;
+  officialDueDate: string | null;
 };
 
-interface TaskLite {
-  id: string;
-  clientId: string;
-  formNumber?: string | null;
-  jurisdiction?: string | null;
-  dueDate?: string | null;
-}
-interface ClientLite {
-  id: string;
-  name: string;
-}
-
-function groupLiveMilestones(
-  rows: LiveMilestone[],
-  tasksById: Map<string, TaskLite>,
-  clientsById: Map<string, ClientLite>,
-): MockTaskTimeline[] {
+function groupLiveMilestones(rows: LiveMilestone[]): MockTaskTimeline[] {
   const byTask = new Map<string, LiveMilestone[]>();
   for (const r of rows) {
     const arr = byTask.get(r.taskId) ?? [];
@@ -145,17 +133,17 @@ function groupLiveMilestones(
     const currentIdx = milestoneStatus.findIndex((s) => s === "in_progress");
     const currentStage = stages[currentIdx >= 0 ? currentIdx : 0] ?? "collect";
     const dueMs = ms.find((x) => x.milestoneType === "file")?.targetDate;
-    const task = tasksById.get(taskId);
-    const client = task ? clientsById.get(task.clientId) : null;
-    const dueIso = dueMs ?? task?.dueDate ?? null;
+    const lead = ms[0]!;
+    const dueIso = dueMs ?? lead.officialDueDate;
+    const taskLabel =
+      lead.formType || lead.jurisdiction
+        ? [lead.formType, lead.jurisdiction].filter(Boolean).join(" · ")
+        : "—";
     out.push({
       taskId,
-      clientId: task?.clientId,
-      client: client?.name ?? `Task ${taskId.slice(0, 8)}`,
-      task:
-        task?.formNumber || task?.jurisdiction
-          ? [task.formNumber, task.jurisdiction].filter(Boolean).join(" · ")
-          : (ms[0]?.milestoneType ?? "—"),
+      clientId: lead.clientId,
+      client: lead.clientName,
+      task: taskLabel,
       dueDate: dueIso
         ? new Date(dueIso).toLocaleDateString("en-US", {
             month: "short",
@@ -174,25 +162,15 @@ function groupLiveMilestones(
 export function Timeline() {
   const [filterWaiting, setFilterWaiting] = useState(true);
   const fleetQuery = trpc.taskMilestones.fleetStack.useQuery({});
-  const { tasks, clients } = useStore();
-  const tasksById = useMemo(() => {
-    const m = new Map<string, TaskLite>();
-    for (const t of tasks) m.set(t.id, t as TaskLite);
-    return m;
-  }, [tasks]);
-  const clientsById = useMemo(() => {
-    const m = new Map<string, ClientLite>();
-    for (const c of clients) m.set(c.id, c);
-    return m;
-  }, [clients]);
   const liveTimelines = useMemo(
+    // Cast through unknown — the FE-side router types are stale until the
+    // BE redeploys with the joined fleetStack shape. Runtime contract is
+    // safe; the BE always returns at least the LiveMilestone fields.
     () =>
       groupLiveMilestones(
-        (fleetQuery.data ?? []) as LiveMilestone[],
-        tasksById,
-        clientsById,
+        (fleetQuery.data ?? []) as unknown as LiveMilestone[],
       ),
-    [fleetQuery.data, tasksById, clientsById],
+    [fleetQuery.data],
   );
 
   // In real mode, never substitute MOCK_TIMELINES — an empty BE should

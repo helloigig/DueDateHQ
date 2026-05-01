@@ -3,8 +3,9 @@ import { and, asc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { firmProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
-import { clients } from "../../db/schema.js";
+import { clients, servicePackages } from "../../db/schema.js";
 import { ALL_STATES } from "../../lib/states.js";
+import { seedClientWithPackage } from "../../lib/client-package-seeder.js";
 
 const ENTITY_TYPES = [
   "LLC",
@@ -200,5 +201,72 @@ export const clientsRouter = router({
         .where(and(eq(clients.id, input.id), eq(clients.firmId, ctx.firmId)));
       if (result.count === 0) throw new TRPCError({ code: "NOT_FOUND" });
       return { ok: true as const };
+    }),
+
+  /**
+   * Assign a service package to a client and run the full chain:
+   * deadlines → tasks → checklists → milestones. Same code path the CSV
+   * import uses, so per-client UI and bulk import stay in sync.
+   *
+   * The FE has called this for months via `useAssignBundle` but only the
+   * mock adapter handled it; in real mode it 404'd silently. Wiring it
+   * here closes the gap so a freshly-added client (without a CSV with a
+   * service-package column) can pick up tasks via the Engagement tab.
+   */
+  assignBundle: firmProcedure
+    .input(
+      z.object({
+        clientId: z.string().uuid(),
+        bundleId: z.string().uuid(),
+        year: z.number().int().min(2020).max(2100).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify the client belongs to this firm before doing anything.
+      const [client] = await db
+        .select({ id: clients.id })
+        .from(clients)
+        .where(
+          and(eq(clients.id, input.clientId), eq(clients.firmId, ctx.firmId)),
+        );
+      if (!client) throw new TRPCError({ code: "NOT_FOUND" });
+
+      // Verify the package is visible to this firm (system OR firm-owned).
+      const pkg = await db.query.servicePackages.findFirst({
+        where: and(
+          eq(servicePackages.id, input.bundleId),
+          or(
+            isNull(servicePackages.firmId),
+            eq(servicePackages.firmId, ctx.firmId),
+          )!,
+        ),
+      });
+      if (!pkg) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const result = await seedClientWithPackage({
+        firmId: ctx.firmId,
+        clientId: input.clientId,
+        packageId: pkg.id,
+        year: input.year ?? new Date().getFullYear(),
+      });
+      return { ok: true as const, ...result };
+    }),
+
+  /**
+   * Mirror of assignBundle for the FE's `useUnassignBundle` hook. We
+   * can't safely delete deadlines/tasks/checklists once they exist (the
+   * audit trail breaks, and the CPA may have already chased a client on
+   * a doc). For now this is a no-op that returns ok — Phase 2 wires
+   * archive-style soft deletion. Stub here so the FE call doesn't 404.
+   */
+  unassignBundle: firmProcedure
+    .input(
+      z.object({
+        clientId: z.string().uuid(),
+        bundleId: z.string().uuid(),
+      }),
+    )
+    .mutation(async () => {
+      return { ok: true as const, removed: 0 };
     }),
 });

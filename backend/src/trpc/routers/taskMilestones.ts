@@ -81,9 +81,30 @@ export const taskMilestonesRouter = router({
     )
     .query(async ({ ctx, input }) => {
       const limit = input?.limit ?? 200;
+      // Join through tasks → deadlines → clients so the FE can render real
+      // names ("Apex Fund · 1040") instead of "Task b3bee883". Without
+      // these joins the Timeline page falls back to UUID prefixes —
+      // accurate but unreadable.
       const rows = await db
-        .select()
+        .select({
+          id: taskMilestones.id,
+          taskId: taskMilestones.taskId,
+          milestoneType: taskMilestones.milestoneType,
+          status: taskMilestones.status,
+          targetDate: taskMilestones.targetDate,
+          completedDate: taskMilestones.completedDate,
+          displayOrder: taskMilestones.displayOrder,
+          proposedBy: taskMilestones.proposedBy,
+          formType: deadlines.formType,
+          jurisdiction: deadlines.jurisdiction,
+          officialDueDate: deadlines.officialDueDate,
+          clientId: clients.id,
+          clientName: clients.name,
+        })
         .from(taskMilestones)
+        .innerJoin(tasks, eq(tasks.id, taskMilestones.taskId))
+        .innerJoin(deadlines, eq(deadlines.id, tasks.deadlineId))
+        .innerJoin(clients, eq(clients.id, deadlines.clientId))
         .where(eq(taskMilestones.firmId, ctx.firmId))
         .limit(limit);
       return rows;
