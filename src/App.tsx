@@ -1,18 +1,8 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import { AppShell } from "./components/AppShell";
-import { Dashboard } from "./pages/Dashboard";
-import { Clients } from "./pages/Clients";
-import { ClientDetail } from "./pages/ClientDetail";
-import { TaskDetail } from "./pages/TaskDetail";
-import { Inbox } from "./pages/Inbox";
-import { Insights } from "./pages/Insights";
-import { Mail } from "./pages/Mail";
-import { Timeline } from "./pages/Timeline";
-import { AnnouncementList } from "./pages/AnnouncementList";
-import { AnnouncementDetail } from "./pages/AnnouncementDetail";
-import { Import } from "./pages/Import";
-import { Placeholder } from "./pages/Placeholder";
-import { Settings } from "./pages/Settings";
+// Auth pages stay eagerly imported — they're the entry points (post-signout
+// redirect target + magic-link landing) and are individually tiny. Loading
+// them lazily would just add a Suspense flash on the most-hit page.
 import { Login } from "./pages/Login";
 import { Signup } from "./pages/auth/Signup";
 import { AcceptInvite } from "./pages/auth/AcceptInvite";
@@ -20,19 +10,106 @@ import { ForgotPassword } from "./pages/auth/ForgotPassword";
 import { ResetPassword } from "./pages/auth/ResetPassword";
 import { MagicLink } from "./pages/auth/MagicLink";
 import { Changes } from "./pages/Changes";
-import { Calendar } from "./pages/Calendar";
-import { OnboardingFirm } from "./pages/onboarding/OnboardingFirm";
-import { OnboardingChoosePath } from "./pages/onboarding/OnboardingChoosePath";
-import { OnboardingManual } from "./pages/onboarding/OnboardingManual";
-import { OnboardingDemo } from "./pages/onboarding/OnboardingDemo";
-import { OnboardingImport } from "./pages/onboarding/OnboardingImport";
-import { OnboardingPackages } from "./pages/onboarding/OnboardingPackages";
-import { OnboardingDone } from "./pages/onboarding/OnboardingDone";
+
+// Protected app pages — code-split. Keeps /login bundle small (no
+// Dashboard, Clients, mock seed data, etc. on the entry page).
+const AppShell = lazy(() =>
+  import("./components/AppShell").then((m) => ({ default: m.AppShell })),
+);
+const Dashboard = lazy(() =>
+  import("./pages/Dashboard").then((m) => ({ default: m.Dashboard })),
+);
+const Clients = lazy(() =>
+  import("./pages/Clients").then((m) => ({ default: m.Clients })),
+);
+const ClientDetail = lazy(() =>
+  import("./pages/ClientDetail").then((m) => ({ default: m.ClientDetail })),
+);
+const TaskDetail = lazy(() =>
+  import("./pages/TaskDetail").then((m) => ({ default: m.TaskDetail })),
+);
+const Inbox = lazy(() =>
+  import("./pages/Inbox").then((m) => ({ default: m.Inbox })),
+);
+const Insights = lazy(() =>
+  import("./pages/Insights").then((m) => ({ default: m.Insights })),
+);
+const Mail = lazy(() =>
+  import("./pages/Mail").then((m) => ({ default: m.Mail })),
+);
+const Timeline = lazy(() =>
+  import("./pages/Timeline").then((m) => ({ default: m.Timeline })),
+);
+const AnnouncementList = lazy(() =>
+  import("./pages/AnnouncementList").then((m) => ({
+    default: m.AnnouncementList,
+  })),
+);
+const AnnouncementDetail = lazy(() =>
+  import("./pages/AnnouncementDetail").then((m) => ({
+    default: m.AnnouncementDetail,
+  })),
+);
+const Import = lazy(() =>
+  import("./pages/Import").then((m) => ({ default: m.Import })),
+);
+const Placeholder = lazy(() =>
+  import("./pages/Placeholder").then((m) => ({ default: m.Placeholder })),
+);
+const Settings = lazy(() =>
+  import("./pages/Settings").then((m) => ({ default: m.Settings })),
+);
+const Calendar = lazy(() =>
+  import("./pages/Calendar").then((m) => ({ default: m.Calendar })),
+);
+const OnboardingFirm = lazy(() =>
+  import("./pages/onboarding/OnboardingFirm").then((m) => ({
+    default: m.OnboardingFirm,
+  })),
+);
+const OnboardingChoosePath = lazy(() =>
+  import("./pages/onboarding/OnboardingChoosePath").then((m) => ({
+    default: m.OnboardingChoosePath,
+  })),
+);
+const OnboardingManual = lazy(() =>
+  import("./pages/onboarding/OnboardingManual").then((m) => ({
+    default: m.OnboardingManual,
+  })),
+);
+const OnboardingDemo = lazy(() =>
+  import("./pages/onboarding/OnboardingDemo").then((m) => ({
+    default: m.OnboardingDemo,
+  })),
+);
+const OnboardingImport = lazy(() =>
+  import("./pages/onboarding/OnboardingImport").then((m) => ({
+    default: m.OnboardingImport,
+  })),
+);
+const OnboardingPackages = lazy(() =>
+  import("./pages/onboarding/OnboardingPackages").then((m) => ({
+    default: m.OnboardingPackages,
+  })),
+);
+const OnboardingDone = lazy(() =>
+  import("./pages/onboarding/OnboardingDone").then((m) => ({
+    default: m.OnboardingDone,
+  })),
+);
 import { SessionProvider } from "./lib/session-provider";
 import { SupabaseAuthBridge } from "./lib/supabase-auth-bridge";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { useSession } from "./data/session";
 import { env } from "./config";
+
+function RouteFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-canvas">
+      <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
 
 /**
  * Synchronously detect "Supabase has a session, local FirmSession doesn't" —
@@ -74,6 +151,7 @@ export default function App() {
   return (
     <AppErrorBoundary>
       <SupabaseAuthBridge />
+      <Suspense fallback={<RouteFallback />}>
       <Routes>
       {/* Public auth routes — outside the AppShell */}
       <Route path="/login" element={<Login />} />
@@ -162,6 +240,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/login" replace />} />
       )}
       </Routes>
+      </Suspense>
     </AppErrorBoundary>
   );
 }
