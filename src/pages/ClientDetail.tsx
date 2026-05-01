@@ -6,6 +6,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { actions, useStore } from "../data/store";
+import { trpc } from "../lib/api/client";
 import { useClient } from "../hooks/useClients";
 import { useDeadlinesForClient } from "../hooks/useDeadlines";
 import { useTasksForClient } from "../hooks/useTasks";
@@ -16,7 +17,6 @@ import {
 import { PageSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
 import { bucketOf, formatLongDate, parseDate, TODAY } from "../data/dateHelpers";
-import { DeadlineRow } from "../components/DeadlineRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import {
   AddDeadlineModal,
@@ -26,9 +26,6 @@ import { EditClientModal } from "../components/EditClientModal";
 import { ExportModal } from "../components/ExportModal";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { STATE_NAMES, type StateCode } from "../types";
-import { BUNDLES } from "../data/bundles";
-import { MultiStateWizard } from "../components/multistate/MultiStateWizard";
-import { DocumentMatrixPreview } from "../components/DocumentMatrixPreview";
 import type {
   ActivityEntry,
   ActivityType,
@@ -37,7 +34,19 @@ import type {
   Deadline,
 } from "../types";
 
-type Tab = "deadlines" | "documents" | "history" | "notes" | "contacts" | "activity";
+// IA v0.7 §3.3 — five tabs (Engagement default + Habits + Predictions + To
+// Do + Mailbox). Audit log + Documents + Contacts were day-1 surfaces in
+// v0.6; v0.7 demotes them to the overflow menu since the rich tabs cover
+// every primary daily flow.
+type Tab =
+  | "engagement"
+  | "habits"
+  | "predictions"
+  | "todo"
+  | "mailbox"
+  | "documents"
+  | "contacts"
+  | "audit";
 
 export function ClientDetail() {
   const { id } = useParams<{ id: string }>();
@@ -47,7 +56,8 @@ export function ClientDetail() {
   const deadlinesQuery = useDeadlinesForClient(id);
   const client = clientQuery.data ?? null;
   const deadlines = deadlinesQuery.data ?? [];
-  const [tab, setTab] = useState<Tab>("deadlines");
+  const [tab, setTab] = useState<Tab>("engagement");
+  const [overflowOpen, setOverflowOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [addDeadlineOpen, setAddDeadlineOpen] = useState(false);
@@ -85,34 +95,19 @@ export function ClientDetail() {
 
   const clientDeadlines = deadlines;
 
-  const { upcoming, thisYear, completed, extensions } = useMemo(() => {
-    const upcoming: Deadline[] = [];
-    const thisYear: Deadline[] = [];
-    const completed: Deadline[] = [];
-    const extensions: Deadline[] = [];
+  // The v0.7 Engagement tab only needs the "upcoming" bucket (used to count
+  // how many deadlines are coming this quarter). The full deadline triage
+  // bucketing lives on the Today + Timeline destinations now.
+  const upcoming = useMemo(() => {
+    const out: Deadline[] = [];
     for (const d of clientDeadlines) {
-      if (d.status === "filed_extension") {
-        extensions.push(d);
-        continue;
-      }
-      if (d.status === "completed") {
-        completed.push(d);
-        continue;
-      }
+      if (d.status === "completed" || d.status === "filed_extension") continue;
       const bucket = bucketOf(d.officialDueDate);
       if (bucket === "overdue" || bucket === "this_week" || bucket === "this_month") {
-        upcoming.push(d);
-      } else {
-        thisYear.push(d);
+        out.push(d);
       }
     }
-    const byDate = (a: Deadline, b: Deadline) =>
-      a.officialDueDate.localeCompare(b.officialDueDate);
-    upcoming.sort(byDate);
-    thisYear.sort(byDate);
-    completed.sort(byDate);
-    extensions.sort(byDate);
-    return { upcoming, thisYear, completed, extensions };
+    return out.sort((a, b) => a.officialDueDate.localeCompare(b.officialDueDate));
   }, [clientDeadlines]);
 
   if (clientQuery.isLoading) return <PageSkeleton title="Loading client…" />;
@@ -226,15 +221,14 @@ export function ClientDetail() {
 
       <ClientAiInsightsCard clientId={client.id} />
 
-      <div className="mt-5 border-b border-line flex gap-1 flex-wrap">
+      <div className="mt-5 border-b border-line flex items-center gap-1 flex-wrap relative">
         {(
           [
-            ["deadlines", `Tasks (${clientDeadlines.filter((d) => d.status !== "completed" && d.status !== "filed_extension").length})`],
-            ["documents", "Documents"],
-            ["history", `History (${clientDeadlines.filter((d) => d.status === "completed" || d.status === "filed_extension").length})`],
-            ["notes", `Notes${client.noteEntries?.length ? ` (${client.noteEntries.length})` : ""}`],
-            ["contacts", "Contacts"],
-            ["activity", `Activity${client.activity?.length ? ` (${client.activity.length})` : ""}`],
+            ["engagement", "🤝 Engagement"],
+            ["habits", "🧠 Habits"],
+            ["predictions", "🔮 Predictions"],
+            ["todo", "✅ To Do"],
+            ["mailbox", "✉️ Mailbox"],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -249,28 +243,77 @@ export function ClientDetail() {
             {label}
           </button>
         ))}
+        {/* Overflow menu — Audit log + the v0.6 surfaces (Documents,
+            Contacts) demoted out of the primary tab strip in v0.7. */}
+        <div className="ml-auto relative">
+          <button
+            onClick={() => setOverflowOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={overflowOpen}
+            className={`px-3 py-2 text-sm ${
+              tab === "documents" || tab === "contacts" || tab === "audit"
+                ? "text-ink-900 border-b-2 border-ink-900 font-medium"
+                : "text-ink-500 hover:text-ink-700"
+            }`}
+            title="More — Audit log, Documents, Contacts"
+          >
+            …
+          </button>
+          {overflowOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full mt-1 w-48 bg-surface border border-line rounded-md shadow-overlay py-1 z-30"
+              onMouseLeave={() => setOverflowOpen(false)}
+            >
+              {(
+                [
+                  ["audit", `Audit log${client.activity?.length ? ` (${client.activity.length})` : ""}`],
+                  ["documents", "Documents"],
+                  ["contacts", "Contacts"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    setTab(key);
+                    setOverflowOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-1.5 text-sm hover:bg-sunken ${
+                    tab === key ? "text-ink-900 font-medium" : "text-ink-700"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="mt-5 space-y-5">
-        {tab === "deadlines" && (
-          <DeadlinesTab
+        {tab === "engagement" && (
+          <EngagementTab
             client={client}
             upcoming={upcoming}
-            thisYear={thisYear}
-            completed={completed}
-            extensions={extensions}
+            allDeadlines={clientDeadlines}
+            onSwitchToToDo={() => setTab("todo")}
+            onSwitchToHabits={() => setTab("habits")}
+          />
+        )}
+        {tab === "habits" && <HabitsTab client={client} />}
+        {tab === "predictions" && <PredictionsTab client={client} />}
+        {tab === "todo" && (
+          <ToDoTab
+            client={client}
             allDeadlines={clientDeadlines}
             onAddDeadline={() => setAddDeadlineOpen(true)}
             onOpenDocuments={() => setTab("documents")}
           />
         )}
+        {tab === "mailbox" && <MailboxTab client={client} />}
         {tab === "documents" && <DocumentsTab client={client} />}
-        {tab === "history" && (
-          <HistoryTab client={client} deadlines={clientDeadlines} />
-        )}
-        {tab === "notes" && <NotesTab client={client} />}
         {tab === "contacts" && <ContactsTab client={client} />}
-        {tab === "activity" && <ActivityTab client={client} />}
+        {tab === "audit" && <ActivityTab client={client} />}
       </div>
 
       <ConfirmDialog
@@ -331,238 +374,6 @@ export function ClientDetail() {
   );
 }
 
-function DeadlinesTab({
-  client,
-  upcoming,
-  thisYear,
-  completed,
-  extensions,
-  allDeadlines,
-  onAddDeadline,
-  onOpenDocuments,
-}: {
-  client: Client;
-  upcoming: Deadline[];
-  thisYear: Deadline[];
-  completed: Deadline[];
-  extensions: Deadline[];
-  allDeadlines: Deadline[];
-  onAddDeadline: () => void;
-  onOpenDocuments: () => void;
-}) {
-  const [yearOpen, setYearOpen] = useState(false);
-  const [completedOpen, setCompletedOpen] = useState(false);
-
-  const nextUpcoming = upcoming[0];
-  const nextLabel = nextUpcoming
-    ? `${formatLongDate(nextUpcoming.officialDueDate)} · ${nextUpcoming.form}`
-    : "None scheduled";
-  const nextDaysRaw = nextUpcoming
-    ? Math.round(
-        (parseDate(nextUpcoming.officialDueDate).getTime() - TODAY.getTime()) /
-          86400000
-      )
-    : 0;
-
-  return (
-    <>
-      <BundleManager client={client} />
-
-      {nextUpcoming && (
-        <div className="bg-surface border border-line rounded-lg p-4 text-sm">
-          <span className="text-ink-500">Next up: </span>
-          <span className="text-ink-900 font-medium">{nextLabel}</span>
-          <span className="text-ink-500">
-            {" "}
-            ·{" "}
-            {nextDaysRaw === 0
-              ? "due today"
-              : nextDaysRaw < 0
-              ? `${-nextDaysRaw}d overdue`
-              : `in ${nextDaysRaw}d`}
-          </span>
-        </div>
-      )}
-
-      {/* Promoted from buried in the Documents tab — the multi-year doc
-          lens is one of the strongest IA ideas in the product, but
-          burying it 1 click deep meant CPAs rarely saw it. Here the
-          compact preview surfaces top doc types × current+2 priors. */}
-      <DocumentMatrixPreview
-        clientId={client.id}
-        onOpenFull={onOpenDocuments}
-      />
-
-      <Section
-        title={`Upcoming (${upcoming.length})`}
-        actions={
-          <button
-            onClick={onAddDeadline}
-            className="text-xs px-2.5 py-1 rounded bg-ink-900 text-white hover:bg-ink-900"
-          >
-            + Deadline
-          </button>
-        }
-      >
-        {upcoming.length === 0 ? (
-          <div className="px-4 py-4 text-sm text-ink-500">
-            Nothing upcoming.
-          </div>
-        ) : (
-          upcoming.map((d) => (
-            <DeadlineRow key={d.id} deadline={d} client={client} />
-          ))
-        )}
-      </Section>
-
-      {extensions.length > 0 && (
-        <Section title={`Extensions filed (${extensions.length})`}>
-          {extensions.map((e) => (
-            <ExtensionRow
-              key={e.id}
-              original={e}
-              linked={allDeadlines.find(
-                (d) => d.id === e.linkedExtensionDeadlineId
-              )}
-            />
-          ))}
-        </Section>
-      )}
-
-      <CollapsibleSection
-        title={`This year (${thisYear.length})`}
-        open={yearOpen}
-        onToggle={() => setYearOpen((v) => !v)}
-      >
-        {thisYear.map((d) => (
-          <DeadlineRow key={d.id} deadline={d} client={client} />
-        ))}
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title={`Completed (${completed.length})`}
-        open={completedOpen}
-        onToggle={() => setCompletedOpen((v) => !v)}
-      >
-        {completed.map((d) => (
-          <DeadlineRow key={d.id} deadline={d} client={client} />
-        ))}
-      </CollapsibleSection>
-
-      {client.relatedClientIds && client.relatedClientIds.length > 0 && (
-        <Section title="🔗 Related clients">
-          {client.relatedClientIds.map((id) => (
-            <div key={id} className="px-4 py-2 text-sm text-ink-700">
-              {id}
-            </div>
-          ))}
-        </Section>
-      )}
-    </>
-  );
-}
-
-function ExtensionRow({
-  original,
-  linked,
-}: {
-  original: Deadline;
-  linked?: Deadline;
-}) {
-  const submitted = original.extensionSubmittedAt
-    ? new Date(original.extensionSubmittedAt)
-    : null;
-  const approved = original.extensionApprovedAt
-    ? new Date(original.extensionApprovedAt)
-    : null;
-
-  return (
-    <div className="px-4 py-3 border-b border-line/60 last:border-b-0">
-      <div className="flex items-start gap-3">
-        <span className="text-ink-400 text-lg leading-none pt-1">⏳</span>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-ink-900">
-              {original.form}
-            </span>
-            <span className="text-xs text-ink-500">
-              original due {formatLongDate(original.officialDueDate)}
-            </span>
-            {linked && (
-              <>
-                <span className="text-ink-300">→</span>
-                <span className="text-sm text-ink-900 font-medium">
-                  {formatLongDate(linked.officialDueDate)}
-                </span>
-              </>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 mt-1.5 text-xs">
-            <StatusPill
-              label={
-                submitted
-                  ? `Submitted ${submitted.toLocaleDateString("en-US")}`
-                  : "Not submitted"
-              }
-              tone={submitted ? "filled" : "muted"}
-            />
-            <span className="text-ink-300">·</span>
-            <StatusPill
-              label={
-                approved
-                  ? `Approved ${approved.toLocaleDateString("en-US")}`
-                  : "Awaiting approval"
-              }
-              tone={approved ? "success" : "pending"}
-            />
-            <span className="text-ink-300">·</span>
-            <StatusPill
-              label={
-                linked
-                  ? `Extended deadline ${linked.officialDueDate}`
-                  : "No extension deadline linked"
-              }
-              tone={linked ? "filled" : "muted"}
-            />
-          </div>
-        </div>
-
-        {!approved && submitted && (
-          <button
-            onClick={() => actions.markExtensionApproved(original.id)}
-            className="text-xs px-2.5 py-1 rounded bg-ok-solid text-white hover:bg-ok-solid shrink-0"
-            title="Simulate IRS/state approval"
-          >
-            Mark approved
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function StatusPill({
-  label,
-  tone,
-}: {
-  label: string;
-  tone: "filled" | "muted" | "pending" | "success";
-}) {
-  const cls =
-    tone === "success"
-      ? "bg-ok-bg text-ok-ink border-ok-border"
-      : tone === "pending"
-      ? "bg-warn-bg text-warn-ink border-warn-border"
-      : tone === "filled"
-      ? "bg-sunken text-ink-700 border-line"
-      : "bg-surface text-ink-400 border-line";
-  return (
-    <span className={`px-1.5 py-0.5 rounded border text-[11px] ${cls}`}>
-      {label}
-    </span>
-  );
-}
 
 function NotesTab({ client }: { client: Client }) {
   const [draft, setDraft] = useState("");
@@ -760,214 +571,668 @@ function ActivityItem({ entry }: { entry: ActivityEntry }) {
   );
 }
 
-function Section({
-  title,
-  children,
-  actions,
-}: {
-  title: string;
-  children: React.ReactNode;
-  actions?: React.ReactNode;
-}) {
-  return (
-    <section className="bg-surface border border-line rounded-lg overflow-hidden">
-      <div className="flex items-center px-4 py-3 border-b border-line/60">
-        <h3 className="text-sm font-semibold text-ink-700 flex-1">{title}</h3>
-        {actions}
-      </div>
-      <div>{children}</div>
-    </section>
+// ─────────────────────────────────────────────────────────────────────
+// IA v0.7 §3.3 Client detail tabs — Engagement / Habits / Predictions /
+// To Do / Mailbox. Built from the spec painpoint→design-solution
+// rubric: gap-over-fill (what client hasn't sent is the loudest
+// element), green/yellow/red AI authority, Pattern 4 advisory awakening.
+// ─────────────────────────────────────────────────────────────────────
+
+type EngagementProps = {
+  client: Client;
+  upcoming: Deadline[];
+  allDeadlines: Deadline[];
+  onSwitchToToDo: () => void;
+  onSwitchToHabits: () => void;
+};
+
+function EngagementTab({
+  client,
+  upcoming,
+  allDeadlines,
+  onSwitchToToDo,
+  onSwitchToHabits,
+}: EngagementProps) {
+  const { checklistItems, tasks } = useStore();
+  const insights = useAiInsightsForClient(client.id);
+  const announcementsQuery = trpc.announcements.list.useQuery();
+  const announcements = announcementsQuery.data ?? [];
+
+  const taskIds = useMemo(
+    () => tasks.filter((t) => t.clientId === client.id).map((t) => t.id),
+    [tasks, client.id],
   );
-}
+  const taskIdSet = useMemo(() => new Set(taskIds), [taskIds]);
 
-function CollapsibleSection({
-  title,
-  open,
-  onToggle,
-  children,
-}: {
-  title: string;
-  open: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="bg-surface border border-line rounded-lg overflow-hidden">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center px-4 py-3 text-sm font-semibold text-ink-700 hover:bg-sunken/40"
-      >
-        <span className="flex-1 text-left">{title}</span>
-        <span className="text-ink-400">{open ? "▾" : "▸"}</span>
-      </button>
-      {open && <div>{children}</div>}
-    </section>
+  // Gap-over-fill computation: what is this client still owing me?
+  const waiting = useMemo(() => {
+    let count = 0;
+    let oldestDays: number | null = null;
+    const now = Date.now();
+    const taskCounts = new Map<string, number>();
+    for (const ci of checklistItems) {
+      if (!taskIdSet.has(ci.taskId)) continue;
+      if (ci.state !== "requested_waiting" && ci.state !== "not_requested") continue;
+      count++;
+      taskCounts.set(ci.taskId, (taskCounts.get(ci.taskId) ?? 0) + 1);
+      if (ci.lastReminderAt) {
+        const days = Math.floor(
+          (now - new Date(ci.lastReminderAt).getTime()) / (24 * 60 * 60 * 1000),
+        );
+        if (oldestDays == null || days > oldestDays) oldestDays = days;
+      }
+    }
+    return { count, oldestDays, taskCount: taskCounts.size };
+  }, [checklistItems, taskIdSet]);
+
+  const activeAlerts = announcements.filter(
+    (a) => !a.dismissed && a.affectedClientIds.includes(client.id),
   );
-}
+  const openInsights = insights.filter((i) => i.status === "open");
+  const noteCount = client.noteEntries?.length ?? 0;
 
-function BundleManager({ client }: { client: Client }) {
-  const [picking, setPicking] = useState(false);
-  const [removing, setRemoving] = useState<string | null>(null);
-  const [multistateOpen, setMultistateOpen] = useState(false);
-
-  const assigned = client.servicePackages;
-  const available = BUNDLES.filter(
-    (b) =>
-      b.entityTypes.includes(client.entityType) &&
-      !assigned.includes(b.name)
+  // Relationship score — naive: 5 dots minus stuck-reminder penalty.
+  const relationshipScore = Math.max(
+    1,
+    5 - (waiting.oldestDays != null && waiting.oldestDays > 14 ? 2 : 0) -
+      (waiting.count > 5 ? 1 : 0),
   );
-
-  // Multi-state-eligible entity types per Q1 of the wizard shape brief.
-  // Trust + Individual stay on single-state package picker.
-  const isMultiStateEligible =
-    client.entityType === "LLC" ||
-    client.entityType === "S-Corp" ||
-    client.entityType === "C-Corp" ||
-    client.entityType === "Partnership";
-
-  const onAssign = (id: string) => {
-    actions.assignBundle(client.id, id);
-    setPicking(false);
-  };
-
-  const bundleFromName = (name: string) =>
-    BUNDLES.find((b) => b.name === name);
-
-  const removalTarget = removing ? bundleFromName(removing) : null;
 
   return (
-    <>
-      <div className="bg-surface border border-line rounded-lg p-4">
-        <div className="flex items-center justify-between mb-2 gap-2">
-          <h3 className="text-sm font-semibold text-ink-700">
-            Filing bundles
+    <div className="space-y-4">
+      {/* 🚨 Currently waiting on — banner-style top metric per IA v0.7 §3.3.1
+          gap-over-fill amendment. Loudest element on the tab. */}
+      {waiting.count > 0 && (
+        <button
+          onClick={onSwitchToToDo}
+          className="w-full text-left rounded-md border-2 border-warn-border bg-warn-bg/40 px-4 py-3 hover:bg-warn-bg/60 transition-colors"
+          title="Open the To Do tab pre-filtered by waiting items"
+        >
+          <p className="text-2xs uppercase tracking-wider text-warn-ink font-semibold">
+            🚨 Currently waiting on {client.name.split(" ")[0]}
+          </p>
+          <p className="text-base font-semibold text-warn-ink mt-1">
+            {waiting.count} item{waiting.count === 1 ? "" : "s"} across{" "}
+            {waiting.taskCount} task{waiting.taskCount === 1 ? "" : "s"}
+            {waiting.oldestDays != null && (
+              <span className="text-warn-ink/80">
+                {" "}
+                · oldest reminder {waiting.oldestDays}d unsent
+              </span>
+            )}
+          </p>
+          <p className="text-2xs text-warn-ink/80 mt-1">
+            Click to open To Do tab → review and chase →
+          </p>
+        </button>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Services + tier */}
+        <section className="md:col-span-2 bg-surface border border-line rounded-md p-4">
+          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
+            Services & engagement
           </h3>
-          <div className="flex items-center gap-1.5">
-            {isMultiStateEligible && (
-              <button
-                onClick={() => setMultistateOpen(true)}
-                className="text-xs px-2 py-1 rounded border border-line hover:bg-sunken/40 text-ink-700"
-                title="Pick multiple states; we'll generate the deadlines for federal + each picked state."
-              >
-                + Multi-state…
-              </button>
-            )}
-            {available.length > 0 && (
-              <button
-                onClick={() => setPicking((v) => !v)}
-                className="text-xs px-2 py-1 rounded border border-line hover:bg-sunken/40"
-              >
-                {picking ? "Cancel" : "+ Assign"}
-              </button>
-            )}
-          </div>
-        </div>
+          <dl className="mt-2 space-y-1.5 text-sm">
+            <div className="flex gap-3">
+              <dt className="w-32 shrink-0 text-ink-500">Tier</dt>
+              <dd className="text-ink-900 font-medium capitalize">
+                {client.tier ?? "Standard"}
+              </dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-32 shrink-0 text-ink-500">Service packages</dt>
+              <dd className="text-ink-900 flex flex-wrap gap-1">
+                {client.servicePackages.length > 0 ? (
+                  client.servicePackages.map((p) => (
+                    <span
+                      key={p}
+                      className="text-xs px-2 py-0.5 rounded border border-line bg-sunken/40"
+                    >
+                      {p}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-ink-500">— none assigned</span>
+                )}
+              </dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-32 shrink-0 text-ink-500">Open deadlines</dt>
+              <dd className="text-ink-900 font-medium tabular-nums">
+                {allDeadlines.filter(
+                  (d) => d.status !== "completed" && d.status !== "filed_extension",
+                ).length}{" "}
+                <span className="text-ink-500 font-normal">
+                  · {upcoming.length} upcoming
+                </span>
+              </dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-32 shrink-0 text-ink-500">Client since</dt>
+              <dd className="text-ink-900">{formatLongDate(client.addedAt)}</dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-32 shrink-0 text-ink-500">Pricing</dt>
+              <dd className="text-ink-500 italic">
+                Comparable-book benchmark — Phase 1 (Layer C wiring)
+              </dd>
+            </div>
+          </dl>
+        </section>
 
-        {assigned.length === 0 ? (
-          <p className="text-sm text-ink-500">
-            No filing bundle assigned. Deadlines won't auto-generate until one
-            is assigned.
+        {/* Relationship + churn signals */}
+        <section className="bg-surface border border-line rounded-md p-4">
+          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
+            Relationship
+          </h3>
+          <p
+            className="text-2xl mt-2 tabular-nums tracking-wider"
+            title={`Score ${relationshipScore} of 5 — falls when reminders stay unsent`}
+            aria-label={`Relationship score ${relationshipScore} of 5`}
+          >
+            {"●".repeat(relationshipScore)}
+            <span className="text-ink-300">{"○".repeat(5 - relationshipScore)}</span>
+          </p>
+          <p className="text-2xs text-ink-500 mt-1">
+            {relationshipScore <= 2
+              ? "At risk — long-stuck items signal fade"
+              : relationshipScore === 3
+                ? "Watch — a few reminders gone unanswered"
+                : "Healthy — recent activity, on cadence"}
+          </p>
+          {waiting.oldestDays != null && waiting.oldestDays > 14 && (
+            <p className="mt-3 text-2xs text-danger-ink bg-danger-bg border border-danger-border rounded px-2 py-1.5">
+              ⚠ Stuck: oldest reminder out {waiting.oldestDays}d.
+            </p>
+          )}
+        </section>
+      </div>
+
+      {/* Active opportunities — Mode E + Pattern 4 awakening prompt. */}
+      <section className="bg-surface border border-line rounded-md p-4">
+        <header className="flex items-center gap-2 mb-2">
+          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
+            Active opportunities
+          </h3>
+          <span
+            className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
+            title="Mode E — AI cross-year pattern detection"
+          >
+            ✨ AI surfaced
+          </span>
+          <span className="ml-auto text-2xs text-ink-500 tabular-nums">
+            {openInsights.length} open
+          </span>
+        </header>
+        {openInsights.length === 0 ? (
+          <p className="text-xs text-ink-500">
+            No advisory triggers right now. Mode E watches multi-year patterns
+            (RSU vests, salary jumps, property changes) and surfaces them here
+            when they appear.
           </p>
         ) : (
-          <ul className="text-sm text-ink-700 space-y-1">
-            {assigned.map((pkg) => {
-              const bundle = bundleFromName(pkg);
+          <ul className="space-y-2">
+            {openInsights.map((i) => (
+              <li key={i.id} className="text-sm">
+                <p className="text-ink-900 font-medium">{i.title}</p>
+                <p className="text-xs text-ink-500 mt-0.5">{i.detail}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Active regulatory impact — alerts touching this client. */}
+      {activeAlerts.length > 0 && (
+        <section className="bg-surface border border-line rounded-md p-4">
+          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold mb-2">
+            Active regulatory impact
+          </h3>
+          <ul className="divide-y divide-line">
+            {activeAlerts.map((a) => (
+              <li key={a.id} className="py-2 first:pt-0 last:pb-0">
+                <Link
+                  to={`/alerts/${a.id}`}
+                  className="text-sm text-ink-900 hover:underline flex items-baseline gap-2"
+                >
+                  <span className="text-2xs font-mono px-1.5 py-0.5 rounded bg-sunken text-ink-700">
+                    {a.stateCode}
+                  </span>
+                  <span className="flex-1 truncate">{a.title}</span>
+                  <span className="text-2xs text-ink-500">Review →</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Notes pointer — full editor lives in Habits. */}
+      <section className="bg-surface border border-line rounded-md p-4 flex items-baseline gap-3">
+        <div className="flex-1">
+          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
+            Notes
+          </h3>
+          <p className="text-sm text-ink-700 mt-0.5">
+            {noteCount > 0
+              ? `${noteCount} note${noteCount === 1 ? "" : "s"} — full editor in Habits.`
+              : "No notes yet. Use the Habits tab to capture firm memory about this client."}
+          </p>
+        </div>
+        <button
+          onClick={onSwitchToHabits}
+          className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken"
+        >
+          Open Habits →
+        </button>
+      </section>
+    </div>
+  );
+}
+
+function HabitsTab({ client }: { client: Client }) {
+  const facts = useImportedFactsForClient(client.id);
+  const insights = useAiInsightsForClient(client.id);
+
+  return (
+    <div className="space-y-4">
+      <section className="bg-surface border border-line rounded-md p-4">
+        <header className="flex items-center gap-2 mb-2">
+          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
+            Multi-year patterns
+          </h3>
+          <span
+            className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
+            title="Mode E + Mode B — narrated from imported history."
+          >
+            ✨ AI narrated
+          </span>
+        </header>
+        {facts.length === 0 && insights.length === 0 ? (
+          <p className="text-xs text-ink-500">
+            <strong className="text-ink-700">Cold start:</strong> Personalized
+            memory unlocks once you import a prior-year return for this client.
+            Until then, AI uses substrate-based defaults (entity + state + cohort)
+            for predictions and reminders.
+          </p>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {facts.slice(0, 6).map((f) => (
+              <li key={f.id} className="text-ink-700">
+                <span className="text-ink-500">{f.itemType}:</span>{" "}
+                <span className="text-ink-900">
+                  {f.observedAmount != null
+                    ? `$${f.observedAmount.toLocaleString()}`
+                    : f.observedDate
+                      ? `arrived ${formatLongDate(f.observedDate)}`
+                      : (f.note ?? "—")}
+                </span>
+                <span className="text-ink-400 text-2xs ml-2">({f.year})</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <NotesTab client={client} />
+    </div>
+  );
+}
+
+function PredictionsTab({ client }: { client: Client }) {
+  const facts = useImportedFactsForClient(client.id);
+  return (
+    <section className="bg-surface border border-line rounded-md p-4">
+      <header className="flex items-center gap-2 mb-2">
+        <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
+          Per-client expected timeline
+        </h3>
+        <span
+          className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
+          title="Mode B — per-client arrival timing prediction"
+        >
+          ✨ Mode B prediction
+        </span>
+      </header>
+      {facts.length === 0 ? (
+        <div className="text-xs text-ink-500 space-y-2">
+          <p>
+            <strong className="text-ink-700">Cold start:</strong> Predictions
+            unlock once you import this client's prior-year history. Until
+            then, AI uses substrate-based generic timing ({client.entityType} ·{" "}
+            {client.primaryState}) so reminders still fire on a sensible
+            cadence.
+          </p>
+          <p>
+            What you'll see here once history lands: per-client expected
+            arrivals (W-2, K-1, 1099-DIV), Mode B reminder schedule, and Mode
+            E anomaly watch list.
+          </p>
+        </div>
+      ) : (
+        <ul className="space-y-2 text-sm">
+          {facts.map((f) => (
+            <li key={f.id} className="text-ink-700">
+              <span className="text-ink-500">{f.itemType}:</span>{" "}
+              <span className="text-ink-900">
+                {f.observedAmount != null
+                  ? `$${f.observedAmount.toLocaleString()}`
+                  : f.observedDate
+                    ? `arrived ${formatLongDate(f.observedDate)}`
+                    : (f.note ?? "—")}
+              </span>
+              <span className="text-ink-400 text-2xs ml-2">({f.year})</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function ToDoTab({
+  client,
+  allDeadlines,
+  onAddDeadline,
+}: {
+  client: Client;
+  allDeadlines: Deadline[];
+  onAddDeadline: () => void;
+  onOpenDocuments: () => void;
+}) {
+  const { checklistItems, tasks } = useStore();
+  const taskIds = useMemo(
+    () => tasks.filter((t) => t.clientId === client.id).map((t) => t.id),
+    [tasks, client.id],
+  );
+  const tasksByIdMap = useMemo(() => {
+    const m = new Map<string, (typeof tasks)[number]>();
+    for (const t of tasks) if (taskIds.includes(t.id)) m.set(t.id, t);
+    return m;
+  }, [tasks, taskIds]);
+  const taskIdSet = useMemo(() => new Set(taskIds), [taskIds]);
+
+  const items = useMemo(
+    () => checklistItems.filter((ci) => taskIdSet.has(ci.taskId)),
+    [checklistItems, taskIdSet],
+  );
+  const stillWaiting = items.filter(
+    (ci) => ci.state === "requested_waiting" || ci.state === "not_requested",
+  );
+  const needsReview = items.filter(
+    (ci) => ci.state === "received_unreviewed" || ci.state === "received_issue",
+  );
+  const completeCount = items.filter(
+    (ci) => ci.state === "received_confirmed" || ci.state === "not_applicable",
+  ).length;
+
+  // Sort waiting by oldest reminder first (gap-over-fill).
+  const waitingSorted = [...stillWaiting].sort((a, b) => {
+    const at = a.lastReminderAt ? new Date(a.lastReminderAt).getTime() : Infinity;
+    const bt = b.lastReminderAt ? new Date(b.lastReminderAt).getTime() : Infinity;
+    return at - bt;
+  });
+
+  const taskLabel = (taskId: string) => {
+    const task = tasksByIdMap.get(taskId);
+    if (!task) return "—";
+    return [task.formType, task.jurisdiction].filter(Boolean).join(" · ") || taskId;
+  };
+
+  const taskHref = (taskId: string) =>
+    `/clients/${client.id}/tasks/${taskId}`;
+
+  return (
+    <div className="space-y-4">
+      {/* 🚨 STILL WAITING ON CLIENT — primary, bordered, always-expanded. */}
+      <section
+        aria-labelledby="todo-still-waiting-heading"
+        className="rounded-md border-2 border-warn-border bg-warn-bg/30 overflow-hidden"
+      >
+        <header className="flex items-baseline gap-2 px-4 py-3 border-b border-warn-border">
+          <h3
+            id="todo-still-waiting-heading"
+            className="text-sm font-semibold text-warn-ink"
+          >
+            🚨 Still waiting on client
+          </h3>
+          <span className="text-2xs text-warn-ink/80 tabular-nums">
+            {stillWaiting.length} item{stillWaiting.length === 1 ? "" : "s"}
+          </span>
+          <button
+            onClick={onAddDeadline}
+            className="ml-auto text-2xs px-2 py-0.5 rounded border border-warn-border text-warn-ink hover:bg-warn-bg/60"
+          >
+            + Add deadline
+          </button>
+        </header>
+        {stillWaiting.length === 0 ? (
+          <p className="px-4 py-4 text-xs text-ink-500">
+            Nothing waiting on this client right now.
+          </p>
+        ) : (
+          <ul className="divide-y divide-warn-border/50">
+            {waitingSorted.map((ci) => {
+              const days = ci.lastReminderAt
+                ? Math.floor(
+                    (Date.now() - new Date(ci.lastReminderAt).getTime()) /
+                      (24 * 60 * 60 * 1000),
+                  )
+                : null;
               return (
                 <li
-                  key={pkg}
-                  className="flex items-center gap-2 py-1"
+                  key={ci.id}
+                  className="flex items-baseline gap-3 px-4 py-2.5"
                 >
-                  <span className="text-ink-900">{pkg}</span>
-                  {bundle && (
-                    <span className="text-2xs text-ink-500">
-                      · {bundle.description}
-                    </span>
-                  )}
-                  {bundle && (
-                    <button
-                      onClick={() => setRemoving(pkg)}
-                      className="ml-auto text-2xs text-ink-400 hover:text-danger-ink"
-                    >
-                      Remove
-                    </button>
-                  )}
+                  <span className="text-warn-ink shrink-0">
+                    {ci.state === "requested_waiting" ? "⏳" : "⏸"}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-ink-900 truncate">
+                      {ci.label ?? "Item"}
+                    </p>
+                    <p className="text-2xs text-ink-500 truncate">
+                      {taskLabel(ci.taskId)}
+                      {days != null && ` · last reminder ${days}d ago`}
+                      {ci.state === "not_requested" && " · not yet requested"}
+                    </p>
+                  </div>
+                  <Link
+                    to={taskHref(ci.taskId)}
+                    className="text-2xs px-2 py-1 rounded border border-line bg-surface text-ink-700 hover:bg-sunken shrink-0"
+                  >
+                    {ci.state === "requested_waiting"
+                      ? "Send reminder ↗"
+                      : "Request now ↗"}
+                  </Link>
                 </li>
               );
             })}
           </ul>
         )}
+      </section>
 
-        {picking && available.length > 0 && (
-          <div className="mt-3 border-t border-line/60 pt-3">
-            <p className="text-2xs text-ink-500 mb-2">
-              Available bundles for {client.entityType} clients:
-            </p>
-            <ul className="space-y-1">
-              {available.map((b) => (
-                <li
-                  key={b.id}
-                  className="flex items-center gap-2 p-2 rounded hover:bg-sunken/40"
+      {/* ⚠ NEEDS YOUR REVIEW — secondary, expanded by default. */}
+      {needsReview.length > 0 && (
+        <section className="bg-surface border border-line rounded-md overflow-hidden">
+          <header className="flex items-baseline gap-2 px-4 py-3 border-b border-line">
+            <h3 className="text-sm font-semibold text-ink-900">
+              ⚠ Needs your review
+            </h3>
+            <span className="text-2xs text-ink-500 tabular-nums">
+              {needsReview.length} item{needsReview.length === 1 ? "" : "s"}
+            </span>
+          </header>
+          <ul className="divide-y divide-line">
+            {needsReview.map((ci) => (
+              <li key={ci.id} className="flex items-baseline gap-3 px-4 py-2.5">
+                <span className="shrink-0">
+                  {ci.state === "received_issue" ? "⚠" : "📥"}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-ink-900 truncate">{ci.label}</p>
+                  <p className="text-2xs text-ink-500 truncate">
+                    {taskLabel(ci.taskId)}
+                    {ci.flagReason && ` · AI flag: ${ci.flagReason}`}
+                  </p>
+                </div>
+                <Link
+                  to={taskHref(ci.taskId)}
+                  className="text-2xs px-2 py-1 rounded border border-line text-ink-700 hover:bg-sunken shrink-0"
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm text-ink-900 font-medium">
-                      {b.name}
-                    </div>
-                    <div className="text-2xs text-ink-500">
-                      {b.description} · {b.templates.length} deadline template
-                      {b.templates.length === 1 ? "" : "s"}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => onAssign(b.id)}
-                    className="text-xs px-2.5 py-1 rounded bg-ink-900 text-white hover:bg-ink-900 shrink-0"
-                  >
-                    Assign
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
+                  Review ↗
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
-      <ConfirmDialog
-        open={!!removalTarget}
-        destructive
-        title={`Remove bundle "${removalTarget?.name ?? ""}"?`}
-        body={
-          removalTarget ? (
-            <>
-              <p>
-                Pending (not-started) deadlines generated by this bundle will be
-                deleted. Anything already in progress, completed, or deferred
-                stays.
-              </p>
-              <p className="mt-2 text-xs text-ink-500">
-                This is recorded in the client activity log.
-              </p>
-            </>
-          ) : null
-        }
-        confirmLabel="Remove bundle"
-        onCancel={() => setRemoving(null)}
-        onConfirm={() => {
-          if (removalTarget) {
-            actions.unassignBundle(client.id, removalTarget.id);
-          }
-          setRemoving(null);
-        }}
-      />
-      <MultiStateWizard
-        open={multistateOpen}
-        onClose={() => setMultistateOpen(false)}
-        clientId={client.id}
-        clientName={client.name}
-        initialStates={[
-          client.primaryState,
-          ...(client.nexusStates ?? []),
-        ]}
-      />
-    </>
+      {/* Open deadlines summary — anchors the per-task entry points so the
+          CPA can navigate to any task's full detail without leaving To Do. */}
+      <section className="bg-surface border border-line rounded-md p-4">
+        <header className="flex items-baseline gap-2 mb-2">
+          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
+            Open deadlines for this client
+          </h3>
+          <span className="text-2xs text-ink-500 tabular-nums">
+            {allDeadlines.filter(
+              (d) => d.status !== "completed" && d.status !== "filed_extension",
+            ).length}{" "}
+            open
+          </span>
+        </header>
+        <ul className="divide-y divide-line">
+          {allDeadlines
+            .filter(
+              (d) => d.status !== "completed" && d.status !== "filed_extension",
+            )
+            .slice(0, 8)
+            .map((d) => (
+              <li key={d.id} className="py-2 first:pt-0 last:pb-0">
+                <div className="text-sm text-ink-900 flex items-baseline gap-3">
+                  <span className="flex-1 truncate">
+                    {d.form} · {d.jurisdiction}
+                  </span>
+                  <span className="text-xs text-ink-500 tabular-nums">
+                    {formatLongDate(d.officialDueDate)}
+                  </span>
+                </div>
+              </li>
+            ))}
+        </ul>
+      </section>
+
+      <p className="text-2xs text-ink-400">
+        ✓ {completeCount} item{completeCount === 1 ? "" : "s"} complete this tax
+        year (open the related task to see source attachments).
+      </p>
+    </div>
+  );
+}
+
+function MailboxTab({ client }: { client: Client }) {
+  const { emailDrafts, tasks } = useStore();
+  const clientTaskIds = useMemo(
+    () => new Set(tasks.filter((t) => t.clientId === client.id).map((t) => t.id)),
+    [tasks, client.id],
+  );
+  const drafts = emailDrafts.filter((d) =>
+    d.taskId ? clientTaskIds.has(d.taskId) : false,
+  );
+  const sent = drafts.filter((d) => d.status === "sent");
+  const pending = drafts.filter(
+    (d) => d.status === "draft" || d.status === "scheduled",
+  );
+
+  return (
+    <div className="space-y-4">
+      <section className="bg-surface border border-line rounded-md overflow-hidden">
+        <header className="flex items-baseline gap-2 px-4 py-3 border-b border-line">
+          <h3 className="text-sm font-semibold text-ink-900">📥 Inbox</h3>
+          <span className="text-2xs text-ink-500">
+            inbound replies from {client.name}
+          </span>
+        </header>
+        <p className="px-4 py-4 text-xs text-ink-500">
+          Inbound replies (Method A forwarding + Method B OAuth pull) appear
+          here, classified by intent (document_provided · timeline_pushback ·
+          question_asked · off_topic · mismatched_attachment). Wires to{" "}
+          <code className="text-2xs">trpc.inboundReplies.listForClient</code>{" "}
+          when the BE adds a per-client filter.
+        </p>
+      </section>
+
+      <section className="bg-surface border border-line rounded-md overflow-hidden">
+        <header className="flex items-baseline gap-2 px-4 py-3 border-b border-line">
+          <h3 className="text-sm font-semibold text-ink-900">📤 Outbox</h3>
+          <span className="text-2xs text-ink-500 tabular-nums">
+            {sent.length} sent
+          </span>
+        </header>
+        {sent.length === 0 ? (
+          <p className="px-4 py-4 text-xs text-ink-500">No sent reminders yet.</p>
+        ) : (
+          <ul className="divide-y divide-line">
+            {sent.slice(0, 8).map((d) => (
+              <li key={d.id} className="px-4 py-2.5">
+                <p className="text-sm text-ink-900 truncate">
+                  {d.subject ?? "Reminder"}
+                </p>
+                <p className="text-2xs text-ink-500 mt-0.5">
+                  {d.sentAt ? formatLongDate(d.sentAt) : "—"} · {d.status}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="bg-surface border border-line rounded-md overflow-hidden">
+        <header className="flex items-baseline gap-2 px-4 py-3 border-b border-line">
+          <h3 className="text-sm font-semibold text-ink-900">📝 Drafts</h3>
+          <span
+            className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
+            title="Mode D — drafts wait for your review before send."
+          >
+            ✨ AI drafted
+          </span>
+          <span className="text-2xs text-ink-500 tabular-nums">
+            {pending.length} awaiting review
+          </span>
+        </header>
+        {pending.length === 0 ? (
+          <p className="px-4 py-4 text-xs text-ink-500">
+            No drafts pending. AI pre-prepares chase emails when an item enters
+            requested_waiting state.
+          </p>
+        ) : (
+          <ul className="divide-y divide-line">
+            {pending.map((d) => (
+              <li key={d.id} className="px-4 py-2.5">
+                <p className="text-sm text-ink-900 truncate">
+                  {d.subject ?? "Reminder"}
+                </p>
+                <p className="text-2xs text-ink-500 mt-0.5 truncate">
+                  {d.body?.slice(0, 80)}…
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="bg-surface border border-line rounded-md p-4">
+        <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold mb-2">
+          Issues
+        </h3>
+        <p className="text-xs text-ink-500">
+          Bounces, complaints, unsubscribes for this client surface here once
+          the BE delivery-events router adds a per-client view.
+        </p>
+      </section>
+    </div>
   );
 }
 
@@ -1218,71 +1483,3 @@ function DocumentsTab({ client }: { client: Client }) {
   );
 }
 
-/**
- * History tab — completed deadlines and prior-year deliverables. Closed
- * tasks listed by date.
- */
-function HistoryTab({
-  client,
-  deadlines,
-}: {
-  client: Client;
-  deadlines: Deadline[];
-}) {
-  const closed = deadlines
-    .filter((d) => d.status === "completed" || d.status === "filed_extension")
-    .sort((a, b) => b.officialDueDate.localeCompare(a.officialDueDate));
-
-  if (closed.length === 0) {
-    return (
-      <div className="bg-surface border border-line rounded-lg p-6 text-center text-sm text-ink-500">
-        No closed tasks for {client.name} yet.
-      </div>
-    );
-  }
-
-  // Group by year
-  const byYear = new Map<number, Deadline[]>();
-  for (const d of closed) {
-    const y = parseDate(d.officialDueDate).getFullYear();
-    if (!byYear.has(y)) byYear.set(y, []);
-    byYear.get(y)!.push(d);
-  }
-  const years = Array.from(byYear.keys()).sort((a, b) => b - a);
-
-  return (
-    <div className="space-y-4">
-      {years.map((year) => (
-        <div
-          key={year}
-          className="bg-surface border border-line rounded-lg overflow-hidden"
-        >
-          <header className="px-4 py-2 border-b border-line bg-sunken/40">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-700">
-              {year} ({byYear.get(year)!.length})
-            </h3>
-          </header>
-          <ul className="divide-y divide-slate-100">
-            {byYear.get(year)!.map((d) => (
-              <li
-                key={d.id}
-                className="px-4 py-2.5 flex items-center justify-between text-sm"
-              >
-                <Link
-                  to={`/clients/${client.id}/tasks/t-${d.id}`}
-                  className="text-ink-900 hover:underline"
-                >
-                  {d.form}
-                </Link>
-                <div className="flex items-center gap-3 text-xs text-ink-500">
-                  <span>{d.officialDueDate}</span>
-                  <span className="capitalize">{d.status.replace(/_/g, " ")}</span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-    </div>
-  );
-}
