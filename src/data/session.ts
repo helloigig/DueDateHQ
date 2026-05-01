@@ -118,35 +118,38 @@ export async function signOut() {
   // same tick, so any pre-reload render shows the signed-out state.
   write(null);
 
-  // Step 3 (background): tell Supabase. scope:'local' skips the network
-  // round-trip; we still call it so the auth client tears down its
-  // in-memory session and stops auto-refreshing.
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const useMockApi =
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (import.meta as any).env?.VITE_USE_MOCK_API !== "false";
-    if (!useMockApi) {
-      const { supabase } = await import("../lib/supabase");
-      // Clear Supabase auth from localStorage. The SDK persists tokens
-      // under sb-<project>-auth-token; this nukes them.
-      await supabase().auth.signOut();
-    }
-  } catch {
-    /* ignore — we'll force-clear via the hard reload below */
-  }
-  // Belt-and-suspenders: nuke any leftover Supabase auth keys directly.
-  // If supabase.auth.signOut() hung or errored, this still clears the
-  // tokens so the post-reload page can't re-auth from cached JWT.
+  // Nuke ALL sb-* keys (auth-token, code-verifier, anything else Supabase
+  // persists) BEFORE any await, so even if subsequent steps hang, the
+  // post-reload page can't re-hydrate from cached JWT.
   try {
     for (const k of Object.keys(localStorage)) {
-      if (k.startsWith("sb-") && k.endsWith("-auth-token")) {
-        localStorage.removeItem(k);
-      }
+      if (k.startsWith("sb-")) localStorage.removeItem(k);
+    }
+    for (const k of Object.keys(sessionStorage)) {
+      if (k.startsWith("sb-")) sessionStorage.removeItem(k);
     }
   } catch {
     /* ignore */
   }
+
+  // Tell Supabase to tear down its in-memory session and stop auto-
+  // refreshing. Read the canonical flag from config.ts — earlier code
+  // referenced the obsolete VITE_USE_MOCK_API, which silently skipped
+  // this call once we split into useMockData / useMockAuth.
+  try {
+    const { env } = await import("../config");
+    if (!env.useMockAuth) {
+      const { supabase } = await import("../lib/supabase");
+      // 800ms cap — if Supabase's network call hangs, we still reload.
+      await Promise.race([
+        supabase().auth.signOut(),
+        new Promise((resolve) => setTimeout(resolve, 800)),
+      ]);
+    }
+  } catch {
+    /* ignore — tokens are already gone, hard reload below finishes the job */
+  }
+
   // Hard reload — bypasses all SPA state. window.location.replace so the
   // /login page can't be back-button'd into the signed-in state.
   window.location.replace("/login");
