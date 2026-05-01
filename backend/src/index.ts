@@ -28,10 +28,27 @@ import { log, captureException } from "./lib/observability.js";
 const app = new Hono();
 
 app.use("*", logger());
+
+// CORS_ORIGIN supports three forms:
+//   - "*"                   → echo every request origin (works w/ credentials)
+//   - "https://example.com" → single origin
+//   - "a.com,b.com,c.com"   → comma-separated allowlist
+//
+// Hono's `origin` callback runs per-request. We trim + filter empties so a
+// stray comma or newline in the secret doesn't lock everyone out.
+const corsAllowlist = env.CORS_ORIGIN.split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+const corsAllowAll = corsAllowlist.length === 1 && corsAllowlist[0] === "*";
+
 app.use(
   "*",
   cors({
-    origin: env.CORS_ORIGIN === "*" ? (origin) => origin ?? "*" : env.CORS_ORIGIN,
+    origin: (origin) => {
+      if (!origin) return "*";
+      if (corsAllowAll) return origin;
+      return corsAllowlist.includes(origin) ? origin : null;
+    },
     credentials: true,
     allowHeaders: ["Authorization", "Content-Type"],
   }),
