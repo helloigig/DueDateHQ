@@ -69,9 +69,21 @@ const EMPTY_FILTERS: Filters = {
   servicePackage: [],
 };
 
+// Gap-over-fill smart filters per IA v0.7 §3.2 — boolean predicates over
+// computed roster state. "Has waiting" is on by default so the painpoint
+// surface is the first thing the CPA sees on the fleet view.
+type SmartFilter = "hasWaiting" | "stuck" | "hasAlert" | "hasOpportunity";
+const STUCK_THRESHOLD_DAYS = 14;
+
 export function Clients() {
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  // "Has waiting" defaults ON per IA v0.7 §3.2 + feedback_gap_over_fill.
+  // The fleet view should privilege the painpoint (clients still owe me
+  // something) every time the CPA opens it.
+  const [smartFilters, setSmartFilters] = useState<Set<SmartFilter>>(
+    new Set<SmartFilter>(["hasWaiting"]),
+  );
   const [sortCol, setSortCol] = useState<SortColumn>("open");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [addOpen, setAddOpen] = useState(false);
@@ -259,10 +271,35 @@ export function Clients() {
 
   const sorted = useMemo(() => {
     const dirMul = sortDir === "asc" ? 1 : -1;
-    const rows = clients.map((c) => {
+    let rows = clients.map((c) => {
       const next = nextDeadlineFor(c.id);
       return { c, openCount: countOpenDeadlines(c.id), next };
     });
+    // Smart filters (boolean predicates over computed roster state).
+    // "Has waiting" is the default-on gap-over-fill filter per IA v0.7 §3.2.
+    if (smartFilters.size > 0) {
+      rows = rows.filter(({ c }) => {
+        const fc = fleetCounts.get(c.id);
+        if (smartFilters.has("hasWaiting") && (!fc || fc.waiting === 0)) {
+          return false;
+        }
+        if (
+          smartFilters.has("stuck") &&
+          (!fc || (fc.oldestReminderDays ?? 0) < STUCK_THRESHOLD_DAYS)
+        ) {
+          return false;
+        }
+        if (smartFilters.has("hasAlert") && !alertedClientIds.has(c.id)) {
+          return false;
+        }
+        if (smartFilters.has("hasOpportunity")) {
+          const hasOpp =
+            c.tier === "premium" && ((fc?.waiting ?? 0) > 3 || (fc?.review ?? 0) > 0);
+          if (!hasOpp) return false;
+        }
+        return true;
+      });
+    }
     rows.sort((a, b) => {
       switch (sortCol) {
         case "name":
@@ -280,7 +317,7 @@ export function Clients() {
     });
     return rows;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clients, deadlines, sortCol, sortDir]);
+  }, [clients, deadlines, sortCol, sortDir, smartFilters, fleetCounts, alertedClientIds]);
 
   const activeFilterCount =
     filters.entity.length +
@@ -421,6 +458,77 @@ export function Clients() {
       </div>
 
       <SpotlightStrip cards={spotlightCards} />
+
+      {/* Smart filter chips per IA v0.7 §3.2 — boolean predicates over
+          computed roster state. "Has waiting" is the gap-over-fill default
+          (`feedback_gap_over_fill`); the rest stack as additional refinements. */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-2xs uppercase tracking-wider text-ink-500 font-semibold mr-1">
+          Show
+        </span>
+        <SmartFilterChip
+          active={smartFilters.size === 0}
+          onClick={() => setSmartFilters(new Set())}
+          tooltip="Show every client (clears the gap-over-fill default)"
+        >
+          All
+        </SmartFilterChip>
+        <SmartFilterChip
+          active={smartFilters.has("hasWaiting")}
+          onClick={() =>
+            setSmartFilters((prev) => {
+              const next = new Set(prev);
+              next.has("hasWaiting") ? next.delete("hasWaiting") : next.add("hasWaiting");
+              return next;
+            })
+          }
+          tooltip="Clients with at least one item the client hasn't sent yet"
+          accent="warning"
+        >
+          🚨 Has waiting
+        </SmartFilterChip>
+        <SmartFilterChip
+          active={smartFilters.has("stuck")}
+          onClick={() =>
+            setSmartFilters((prev) => {
+              const next = new Set(prev);
+              next.has("stuck") ? next.delete("stuck") : next.add("stuck");
+              return next;
+            })
+          }
+          tooltip={`Reminder out >${STUCK_THRESHOLD_DAYS} days with no reply`}
+        >
+          Stuck
+        </SmartFilterChip>
+        <SmartFilterChip
+          active={smartFilters.has("hasAlert")}
+          onClick={() =>
+            setSmartFilters((prev) => {
+              const next = new Set(prev);
+              next.has("hasAlert") ? next.delete("hasAlert") : next.add("hasAlert");
+              return next;
+            })
+          }
+          tooltip="At least one active state alert affects this client"
+        >
+          Has alert
+        </SmartFilterChip>
+        <SmartFilterChip
+          active={smartFilters.has("hasOpportunity")}
+          onClick={() =>
+            setSmartFilters((prev) => {
+              const next = new Set(prev);
+              next.has("hasOpportunity")
+                ? next.delete("hasOpportunity")
+                : next.add("hasOpportunity");
+              return next;
+            })
+          }
+          tooltip="AI surfaced a churn or pricing opportunity (Mode E)"
+        >
+          💎 Has opportunity
+        </SmartFilterChip>
+      </div>
 
       <div className="flex items-center gap-2 flex-wrap">
         <MultiSelectChip
@@ -735,6 +843,37 @@ function TierPill({ tier }: { tier: ClientTier | undefined }) {
     >
       {TIER_LABEL[tier]}
     </span>
+  );
+}
+
+function SmartFilterChip({
+  active,
+  onClick,
+  tooltip,
+  accent,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  tooltip?: string;
+  accent?: "warning";
+  children: React.ReactNode;
+}) {
+  const baseTone = active
+    ? accent === "warning"
+      ? "bg-warning-bg border-warning-border text-warning-ink"
+      : "bg-ink-900 border-ink-900 text-canvas"
+    : "bg-surface border-line text-ink-700 hover:bg-sunken";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={tooltip}
+      aria-pressed={active}
+      className={`inline-flex items-center gap-1 text-2xs font-medium px-2.5 py-1 rounded-full border transition-colors ${baseTone}`}
+    >
+      {children}
+    </button>
   );
 }
 
