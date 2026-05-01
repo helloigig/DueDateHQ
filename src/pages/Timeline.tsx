@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { GanttChartSquare } from "lucide-react";
-import { Link } from "react-router-dom";
+import { GanttChartSquare, Sparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { trpc } from "../lib/api/client";
+import { useStore } from "../data/store";
 
 // Timeline destination — per IA v0.7 amendment §3.9a.
 //
@@ -26,6 +27,10 @@ type MockTaskTimeline = {
   daysBehind: number;
   missingCount: number;
   milestoneStatus: ("done" | "in_progress" | "not_started")[];
+  /** Routing: when present, the row links to the real Task detail page.
+   *  Mock rows leave these undefined and the row is read-only. */
+  taskId?: string;
+  clientId?: string;
 };
 
 const MOCK_TIMELINES: MockTaskTimeline[] = [
@@ -96,7 +101,23 @@ type LiveMilestone = {
   targetDate: string | null;
 };
 
-function groupLiveMilestones(rows: LiveMilestone[]): MockTaskTimeline[] {
+interface TaskLite {
+  id: string;
+  clientId: string;
+  formNumber?: string | null;
+  jurisdiction?: string | null;
+  dueDate?: string | null;
+}
+interface ClientLite {
+  id: string;
+  name: string;
+}
+
+function groupLiveMilestones(
+  rows: LiveMilestone[],
+  tasksById: Map<string, TaskLite>,
+  clientsById: Map<string, ClientLite>,
+): MockTaskTimeline[] {
   const byTask = new Map<string, LiveMilestone[]>();
   for (const r of rows) {
     const arr = byTask.get(r.taskId) ?? [];
@@ -123,10 +144,23 @@ function groupLiveMilestones(rows: LiveMilestone[]): MockTaskTimeline[] {
     const currentIdx = milestoneStatus.findIndex((s) => s === "in_progress");
     const currentStage = stages[currentIdx >= 0 ? currentIdx : 0] ?? "collect";
     const dueMs = ms.find((x) => x.milestoneType === "file")?.targetDate;
+    const task = tasksById.get(taskId);
+    const client = task ? clientsById.get(task.clientId) : null;
+    const dueIso = dueMs ?? task?.dueDate ?? null;
     out.push({
-      client: `Task ${taskId.slice(0, 8)}`,
-      task: ms[0]?.milestoneType ?? "—",
-      dueDate: dueMs ? new Date(dueMs).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—",
+      taskId,
+      clientId: task?.clientId,
+      client: client?.name ?? `Task ${taskId.slice(0, 8)}`,
+      task:
+        task?.formNumber || task?.jurisdiction
+          ? [task.formNumber, task.jurisdiction].filter(Boolean).join(" · ")
+          : (ms[0]?.milestoneType ?? "—"),
+      dueDate: dueIso
+        ? new Date(dueIso).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          })
+        : "—",
       currentStage,
       daysBehind: 0,
       missingCount: ms.filter((m) => m.status === "blocked" || m.status === "overdue").length,
@@ -139,17 +173,33 @@ function groupLiveMilestones(rows: LiveMilestone[]): MockTaskTimeline[] {
 export function Timeline() {
   const [filterWaiting, setFilterWaiting] = useState(true);
   const fleetQuery = trpc.taskMilestones.fleetStack.useQuery({});
+  const { tasks, clients } = useStore();
+  const tasksById = useMemo(() => {
+    const m = new Map<string, TaskLite>();
+    for (const t of tasks) m.set(t.id, t as TaskLite);
+    return m;
+  }, [tasks]);
+  const clientsById = useMemo(() => {
+    const m = new Map<string, ClientLite>();
+    for (const c of clients) m.set(c.id, c);
+    return m;
+  }, [clients]);
   const liveTimelines = useMemo(
-    () => groupLiveMilestones((fleetQuery.data ?? []) as LiveMilestone[]),
-    [fleetQuery.data],
+    () =>
+      groupLiveMilestones(
+        (fleetQuery.data ?? []) as LiveMilestone[],
+        tasksById,
+        clientsById,
+      ),
+    [fleetQuery.data, tasksById, clientsById],
   );
 
   const source = liveTimelines.length > 0 ? liveTimelines : MOCK_TIMELINES;
   const sourceLabel = fleetQuery.isLoading
-    ? "loading TaskMilestone feed (PRD §9.4.1)"
+    ? "loading milestones…"
     : liveTimelines.length > 0
-      ? `live TaskMilestone feed · ${liveTimelines.length} tasks from BE`
-      : "fallback static mock (no live milestones yet)";
+      ? `${liveTimelines.length} live ${liveTimelines.length === 1 ? "task" : "tasks"}`
+      : "showing example data";
 
   // Apply filter
   const filtered = filterWaiting
@@ -169,6 +219,13 @@ export function Timeline() {
         <h1 className="text-xl font-semibold text-ink-900 flex items-center gap-2">
           <GanttChartSquare className="w-5 h-5" aria-hidden />
           Timeline
+          <span
+            className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
+            title="Mode B (per-task pacing) — AI estimates target dates for each milestone from your firm's history. You can override any of them."
+          >
+            <Sparkles className="w-3 h-3" aria-hidden />
+            AI paced
+          </span>
         </h1>
         <p className="text-sm text-ink-500 mt-0.5">
           Forward-planning across all active tasks. Each row shows where this task
@@ -202,30 +259,49 @@ export function Timeline() {
 
       {/* Timeline stack */}
       <div className="space-y-1">
-        {sorted.map((t, i) => (
-          <TimelineRow key={i} t={t} />
-        ))}
+        {sorted.length === 0 ? (
+          <div className="text-center py-12 bg-surface border border-line rounded-md">
+            <p className="text-sm text-ink-700 font-medium">
+              {filterWaiting
+                ? "Nothing waiting on a client right now."
+                : "No active tasks yet."}
+            </p>
+            <p className="text-xs text-ink-500 mt-1">
+              {filterWaiting
+                ? "Toggle the filter off to see all tasks, or come back when a deadline gets closer."
+                : "Add a client and a service package — deadlines and milestones populate automatically."}
+            </p>
+          </div>
+        ) : (
+          sorted.map((t) => (
+            <TimelineRow key={t.taskId ?? `${t.client}-${t.task}`} t={t} />
+          ))
+        )}
       </div>
-
-      <p className="mt-8 text-2xs text-ink-400 leading-relaxed">
-        Mock data — Phase 1 scaffold. Real TaskMilestone schema (per PRD §9.4.1)
-        + Mode B per-client target_date predictions land in Phase 2 / Phase 5.
-        Click any row to open <Link to="/clients" className="underline">Task detail</Link>{" "}
-        with full mini-timeline visualization.
-      </p>
     </div>
   );
 }
 
 function TimelineRow({ t }: { t: MockTaskTimeline }) {
+  const navigate = useNavigate();
   const stages: Stage[] = ["initial_meeting", "collect", "prepare", "review", "file"];
   const tinted =
     t.daysBehind > 7 ? "bg-danger-bg/30" : t.daysBehind > 0 ? "bg-warning-bg/30" : "";
+  const navigable = t.taskId && t.clientId;
 
   return (
     <button
-      className={`group w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-sunken transition-colors ${tinted}`}
-      onClick={() => alert("Opens Task detail — Phase 2 wiring")}
+      className={`group w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-sunken transition-colors ${tinted} ${
+        navigable ? "" : "cursor-default"
+      }`}
+      onClick={() => {
+        if (navigable) navigate(`/clients/${t.clientId}/tasks/${t.taskId}`);
+      }}
+      title={
+        navigable
+          ? "Open task detail"
+          : "Example row — sign in and add a client to see your real tasks here"
+      }
     >
       {/* Identity */}
       <div className="w-48 shrink-0 min-w-0">
