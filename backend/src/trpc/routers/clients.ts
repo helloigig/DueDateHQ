@@ -3,7 +3,14 @@ import { and, asc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { firmProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
-import { clients, servicePackages } from "../../db/schema.js";
+import {
+  checklistItems,
+  clients,
+  clientServicePackages,
+  deadlines,
+  servicePackages,
+  tasks,
+} from "../../db/schema.js";
 import { ALL_STATES } from "../../lib/states.js";
 import { seedClientWithPackage } from "../../lib/client-package-seeder.js";
 
@@ -16,6 +23,36 @@ const ENTITY_TYPES = [
   "Trust",
 ] as const;
 const CLIENT_STATUS = ["prospect", "active", "inactive", "archived"] as const;
+
+// CSV-escape one cell — wraps in quotes when the cell contains comma,
+// quote, or newline; doubles inner quotes per RFC 4180.
+function csvCell(s: string): string {
+  if (/[,"\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+const CSV_HEADER = [
+  "Name",
+  "Entity",
+  "Primary state",
+  "Nexus states",
+  "Tier",
+  "Status",
+  "Email",
+  "Phone",
+  "Service packages",
+  "Service start date",
+  "Active tasks",
+  "Waiting docs",
+  "Oldest reminder (days)",
+  "Next deadline",
+  "Last updated",
+].join(",");
+
+function csvFilename(scope: "client" | "clients"): string {
+  const date = new Date().toISOString().slice(0, 10);
+  return `duedatehq-${scope}-${date}.csv`;
+}
 const PAGE_SIZE = 100;
 
 const createInput = z.object({
@@ -201,6 +238,190 @@ export const clientsRouter = router({
         .where(and(eq(clients.id, input.id), eq(clients.firmId, ctx.firmId)));
       if (result.count === 0) throw new TRPCError({ code: "NOT_FOUND" });
       return { ok: true as const };
+    }),
+
+  /**
+   * Bulk + per-client CSV export. Synchronous build — returns the CSV text
+   * as a string; FE creates a blob and triggers download. No worker, no
+   * polling. Sized for firm-scale (<10k clients); >10k goes through the
+   * async export_runs flow (deferred).
+   *
+   * Why CSV (not PDF/JSON/iCal): CPAs are Excel-native data people. The
+   * primary use case is "dump the book + pivot in Excel" — capacity
+   * planning, slice-and-dice, "show me all CA LLCs with deadlines in
+   * March." CSV is the escape hatch when the product can't anticipate
+   * the cut they need. PDF lives on the per-task audit pack only.
+   *
+   * Scope: respects the same filter args as clients.list, plus optional
+   * single `clientId` for the per-client variant. Default = active +
+   * non-archived (matches the Clients page default).
+   *
+   * Columns are opinionated — what a CPA actually pivots on. UUIDs and
+   * internal flags omitted; sensitive notes omitted (safer default).
+   */
+  exportCsv: firmProcedure
+    .input(
+      z
+        .object({
+          clientId: z.string().uuid().optional(),
+          search: z.string().max(200).optional(),
+          state: z.array(z.string()).optional(),
+          entityType: z.array(z.string()).optional(),
+          status: z.array(z.string()).optional(),
+          tier: z.array(z.string()).optional(),
+          includeArchived: z.boolean().default(false),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      // Build the same WHERE clauses as clients.list — keeps the export
+      // and the on-screen list in sync. The user's mental model is
+      // "export what I'm looking at."
+      const filters = [eq(clients.firmId, ctx.firmId)];
+      if (input?.clientId) {
+        filters.push(eq(clients.id, input.clientId));
+      }
+      if (!input?.includeArchived) {
+        filters.push(isNull(clients.archivedAt));
+      }
+      if (input?.status?.length) {
+        filters.push(
+          inArray(
+            clients.status,
+            input.status as (typeof CLIENT_STATUS)[number][],
+          ),
+        );
+      }
+      if (input?.entityType?.length) {
+        filters.push(inArray(clients.entityType, input.entityType));
+      }
+      if (input?.state?.length) {
+        filters.push(inArray(clients.primaryState, input.state));
+      }
+      if (input?.tier?.length) {
+        filters.push(inArray(clients.tier, input.tier));
+      }
+      if (input?.search) {
+        const term = `%${input.search}%`;
+        filters.push(
+          or(ilike(clients.name, term), ilike(clients.contactEmail, term))!,
+        );
+      }
+      const clientRows = await db
+        .select()
+        .from(clients)
+        .where(and(...filters))
+        .orderBy(asc(clients.name));
+
+      if (clientRows.length === 0) {
+        return {
+          filename: csvFilename(input?.clientId ? "client" : "clients"),
+          content: CSV_HEADER + "\n",
+          rowCount: 0,
+        };
+      }
+
+      const clientIds = clientRows.map((c) => c.id);
+
+      // Per-client computed columns — single SQL pass each instead of a
+      // join-explosion that would multiply rows.
+      // 1) active task counts + earliest open deadline.
+      const taskAgg = await db
+        .select({
+          clientId: deadlines.clientId,
+          activeTasks: sql<number>`count(distinct ${tasks.id})::int`,
+          nextDeadline: sql<string | null>`min(${deadlines.officialDueDate}) filter (where ${tasks.status} != 'completed')`,
+        })
+        .from(tasks)
+        .innerJoin(deadlines, eq(deadlines.id, tasks.deadlineId))
+        .where(
+          and(
+            eq(tasks.firmId, ctx.firmId),
+            inArray(deadlines.clientId, clientIds),
+          ),
+        )
+        .groupBy(deadlines.clientId);
+      const taskMap = new Map(taskAgg.map((r) => [r.clientId, r]));
+
+      // 2) waiting-doc counts + oldest reminder per client.
+      const waitingAgg = await db
+        .select({
+          clientId: deadlines.clientId,
+          waitingDocs: sql<number>`count(${checklistItems.id})::int`,
+          oldestReminder: sql<Date | null>`min(${checklistItems.lastReminderAt})`,
+        })
+        .from(checklistItems)
+        .innerJoin(tasks, eq(tasks.id, checklistItems.taskId))
+        .innerJoin(deadlines, eq(deadlines.id, tasks.deadlineId))
+        .where(
+          and(
+            eq(checklistItems.firmId, ctx.firmId),
+            inArray(deadlines.clientId, clientIds),
+            inArray(checklistItems.state, [
+              "requested_waiting",
+              "not_requested",
+            ]),
+          ),
+        )
+        .groupBy(deadlines.clientId);
+      const waitingMap = new Map(waitingAgg.map((r) => [r.clientId, r]));
+
+      // 3) service packages per client.
+      const pkgRows = await db
+        .select({
+          clientId: clientServicePackages.clientId,
+          packageName: servicePackages.name,
+        })
+        .from(clientServicePackages)
+        .innerJoin(
+          servicePackages,
+          eq(servicePackages.id, clientServicePackages.packageId),
+        )
+        .where(inArray(clientServicePackages.clientId, clientIds));
+      const pkgMap = new Map<string, string[]>();
+      for (const r of pkgRows) {
+        const arr = pkgMap.get(r.clientId) ?? [];
+        arr.push(r.packageName);
+        pkgMap.set(r.clientId, arr);
+      }
+
+      const today = new Date();
+      const dayMs = 24 * 60 * 60 * 1000;
+      const lines: string[] = [CSV_HEADER];
+      for (const c of clientRows) {
+        const t = taskMap.get(c.id);
+        const w = waitingMap.get(c.id);
+        const pkgs = pkgMap.get(c.id) ?? [];
+        const oldest =
+          w?.oldestReminder
+            ? Math.floor((today.getTime() - new Date(w.oldestReminder).getTime()) / dayMs)
+            : null;
+        lines.push(
+          [
+            csvCell(c.name),
+            csvCell(c.entityType),
+            csvCell(c.primaryState),
+            csvCell((c.nexusStates ?? []).join("; ")),
+            csvCell(c.tier ?? ""),
+            csvCell(c.status),
+            csvCell(c.contactEmail ?? ""),
+            csvCell(c.contactPhone ?? ""),
+            csvCell(pkgs.join("; ")),
+            csvCell(c.serviceStartDate ?? ""),
+            csvCell(t?.activeTasks?.toString() ?? "0"),
+            csvCell(w?.waitingDocs?.toString() ?? "0"),
+            csvCell(oldest != null ? oldest.toString() : ""),
+            csvCell(t?.nextDeadline ?? ""),
+            csvCell(c.updatedAt.toISOString().slice(0, 10)),
+          ].join(","),
+        );
+      }
+
+      return {
+        filename: csvFilename(input?.clientId ? "client" : "clients"),
+        content: lines.join("\n") + "\n",
+        rowCount: clientRows.length,
+      };
     }),
 
   /**

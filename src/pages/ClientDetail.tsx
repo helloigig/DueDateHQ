@@ -24,6 +24,7 @@ import {
 } from "../components/AddDeadlineModal";
 import { EditClientModal } from "../components/EditClientModal";
 import { ExportModal } from "../components/ExportModal";
+import { ExportClientsButton } from "../components/ExportClientsButton";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { STATE_NAMES, type StateCode } from "../types";
 import type {
@@ -198,12 +199,10 @@ export function ClientDetail() {
             </div>
           )}
         </div>
-        <button
-          onClick={() => setExportOpen(true)}
-          className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40"
-        >
-          Export
-        </button>
+        <ExportClientsButton clientId={client.id} />
+        {/* Legacy ExportModal still mounted (deadline iCal/PDF surfaces) but
+            no longer the default trigger — env.useMockData callers can still
+            reach it via setExportOpen if a future surface needs it. */}
         <button
           onClick={() => setEditOpen(true)}
           className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40"
