@@ -76,9 +76,15 @@ export function signIn(input: {
   userEmail: string;
   tier?: FirmSession["tier"];
 }) {
-  // Preserve trialEndsAt across re-signin — only set it once on first
-  // signup. (In production the BE owns this; the FE just mirrors.)
+  // Preserve fields the BE owns or the user has already set across
+  // sign-in cycles. Without this, every re-login wipes
+  // onboardingComplete / primaryStates / timeZone — the user logs back
+  // in and sees the setup banner reappear despite already finishing.
+  // Only blow these away when the new sign-in is for a DIFFERENT email
+  // (different account).
   const existing = read();
+  const sameAccount =
+    existing != null && existing.userEmail === input.userEmail.trim();
   const trialEndsAt =
     existing?.trialEndsAt ??
     new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -88,10 +94,17 @@ export function signIn(input: {
     userName: input.userName.trim(),
     userEmail: input.userEmail.trim(),
     userInitials: initials(input.userName),
-    tier: input.tier ?? "solo",
-    digestMode: "digest_8am",
+    tier: input.tier ?? (sameAccount ? existing?.tier : undefined) ?? "solo",
+    digestMode: (sameAccount ? existing?.digestMode : undefined) ?? "digest_8am",
     signedInAt: new Date().toISOString(),
     trialEndsAt,
+    onboardingComplete: sameAccount ? existing?.onboardingComplete : undefined,
+    primaryStates: sameAccount ? existing?.primaryStates : undefined,
+    timeZone: sameAccount ? existing?.timeZone : undefined,
+    calendarProvider: sameAccount ? existing?.calendarProvider : undefined,
+    phase2AutoSendPaused: sameAccount
+      ? existing?.phase2AutoSendPaused
+      : undefined,
   };
   write(s);
   return s;

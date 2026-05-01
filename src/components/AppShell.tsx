@@ -8,15 +8,26 @@ import { Toaster } from "./Toaster";
 import { StatusBanner } from "./StatusBanner";
 import { useSession } from "../data/session";
 import { useStore } from "../data/store";
+import { trpc } from "../lib/api/client";
 
 export function AppShell() {
   const session = useSession();
   const { clients } = useStore();
-  // Only nag the user about setup if (a) the flag is unset AND (b) they
-  // genuinely have no clients. If they're on the demo workspace or the
-  // session flag was never flipped but data exists, the banner is noise.
+  // Source of truth for "has the firm been set up": BE clients count.
+  // Local-store clients is always 0 in real mode (the store is FE-only),
+  // so basing the banner on it caused it to nag users who had completed
+  // setup. Falls back to the local count when BE is unreachable so demo /
+  // mock workspaces still see the right state.
+  const beClientsQuery = trpc.clients.list.useQuery(
+    {},
+    { retry: false, refetchOnWindowFocus: false },
+  );
+  const beClientCount = beClientsQuery.data?.items?.length ?? 0;
+  const hasClients = beClientCount > 0 || clients.length > 0;
+  // Show ONLY when: signed in, the flag explicitly says incomplete, AND
+  // the firm genuinely has no clients on either side.
   const showSetupBanner =
-    session && !session.onboardingComplete && clients.length === 0;
+    !!session && session.onboardingComplete !== true && !hasClients;
 
   return (
     <div className="h-screen flex bg-canvas">
