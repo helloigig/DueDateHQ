@@ -36,10 +36,15 @@ app.use("*", logger());
 //
 // Hono's `origin` callback runs per-request. We trim + filter empties so a
 // stray comma or newline in the secret doesn't lock everyone out.
+//
+// Localhost is auto-allowed on any port — Vite picks a different port any
+// time the configured one is taken, so hard-coding ports in the secret
+// breaks dev whenever there's a collision.
 const corsAllowlist = env.CORS_ORIGIN.split(",")
   .map((o) => o.trim())
   .filter(Boolean);
 const corsAllowAll = corsAllowlist.length === 1 && corsAllowlist[0] === "*";
+const LOCALHOST_RE = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 app.use(
   "*",
@@ -47,6 +52,7 @@ app.use(
     origin: (origin) => {
       if (!origin) return "*";
       if (corsAllowAll) return origin;
+      if (LOCALHOST_RE.test(origin)) return origin;
       return corsAllowlist.includes(origin) ? origin : null;
     },
     credentials: true,
