@@ -118,7 +118,12 @@ export function OnboardingFirm() {
 
   const next = async () => {
     setSubmitError(null);
-    if (!env.useMockData) {
+    // Bootstrap requires a real Supabase JWT, not real *data*. Gating on
+    // useMockAuth is correct — useMockData was a typo that skipped
+    // provisioning whenever the dev/staging override flipped data to mock
+    // while keeping auth real, leaving the firm row absent and every
+    // subsequent firmProcedure throwing PRECONDITION_FAILED.
+    if (!env.useMockAuth) {
       try {
         await bootstrap.mutateAsync({
           firmName: firmName.trim(),

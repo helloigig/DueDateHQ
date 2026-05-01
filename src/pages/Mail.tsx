@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Inbox as InboxIcon, Send, FileEdit, AlertTriangle, Mail as MailIcon } from "lucide-react";
 import { trpc } from "../lib/api/client";
+import { env } from "../config";
 
 // Mail surface — per IA v0.7 amendment §3.8.
 //
@@ -90,7 +91,15 @@ export function Mail() {
     preview: (r.bodyText ?? r.subject ?? "(no body)").slice(0, 100),
     receivedHoursAgo: hoursAgo(r.receivedAt),
   }));
-  const inbox = liveInbox.length > 0 ? liveInbox : INBOX_MOCK;
+  // Same rule as Timeline / ActionQueue: in real mode, an empty BE renders
+  // an empty state — never substitute INBOX_MOCK, which produces fake
+  // client names the user can't act on.
+  const inbox =
+    liveInbox.length > 0
+      ? liveInbox
+      : env.useMockData
+        ? INBOX_MOCK
+        : [];
   const inboxCount = inbox.length;
 
   // Mail Issues — bounces/complaints/unsubscribes joined with email_drafts.
@@ -198,9 +207,13 @@ export function Mail() {
             <span className="ml-auto italic">
               {inboxQuery.isLoading
                 ? "loading inbound classifier feed"
-                : liveInbox.length > 0
-                  ? `live inbound feed · ${liveInbox.length} items from BE`
-                  : "fallback static mock (no live inbound yet)"}
+                : inboxQuery.error
+                  ? `backend error: ${inboxQuery.error.message.slice(0, 60)}`
+                  : liveInbox.length > 0
+                    ? `live inbound feed · ${liveInbox.length} items from BE`
+                    : env.useMockData
+                      ? "showing example data (mock mode)"
+                      : "no inbound mail yet"}
             </span>
           </p>
           {inbox.map((m, i) => (
