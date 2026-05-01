@@ -415,7 +415,7 @@ function FormStep(props: {
       </Field>
 
       <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded px-3 py-2">
-        Suggested filing bundle:{" "}
+        Suggested service package:{" "}
         {suggestionLoading ? (
           <span className="text-slate-400">finding the right one…</span>
         ) : suggestedPackageName ? (
@@ -428,7 +428,7 @@ function FormStep(props: {
           </span>
         )}
         <div className="text-slate-500 mt-0.5">
-          We&apos;ll create deadlines from this bundle after you confirm. You
+          We&apos;ll create deadlines from this package after you confirm. You
           can change it anytime on the client page.
         </div>
       </div>
@@ -478,7 +478,7 @@ function ReviewStep(props: {
           <li>The client record is created in your firm.</li>
           {hasPackage && suggestedPackageName ? (
             <li>
-              Filing bundle{" "}
+              Service package{" "}
               <span className="font-medium text-slate-900">
                 {suggestedPackageName}
               </span>{" "}
@@ -487,8 +487,8 @@ function ReviewStep(props: {
             </li>
           ) : (
             <li>
-              No filing bundle is assigned yet — you&apos;ll pick one from the
-              client&apos;s page once it loads.
+              No service package is assigned yet — you&apos;ll pick one from
+              the client&apos;s page once it loads.
             </li>
           )}
           <li>

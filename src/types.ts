@@ -102,7 +102,7 @@ export interface Deadline {
   /** On the NEW extension-period deadline: the id of the original it came from. */
   extensionOfDeadlineId?: string;
 
-  /** Filing bundle that generated this deadline, if any. */
+  /** Service package that generated this deadline, if any. */
   bundleId?: string;
 }
 

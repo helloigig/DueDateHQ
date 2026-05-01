@@ -42,7 +42,7 @@ export const FIELD_MAPPING: FieldMapping[] = [
   { sourceColumn: "Primary State", targetField: "Primary state", confidence: "high" },
   { sourceColumn: "Email", targetField: "Contact email", confidence: "high" },
   { sourceColumn: "Phone", targetField: "Contact phone", confidence: "high" },
-  { sourceColumn: "Service Type", targetField: "Filing bundle", confidence: "low" },
+  { sourceColumn: "Service Type", targetField: "Service package", confidence: "low" },
   { sourceColumn: "Notes", targetField: "Notes", confidence: "high" },
   { sourceColumn: "Client ID (legacy)", targetField: "[Ignore]", confidence: "ignore" },
 ];

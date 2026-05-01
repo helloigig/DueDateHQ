@@ -102,7 +102,7 @@ export function AddDeadlineModal({
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
             {prefill?.sourceNote ??
-              "Use for one-offs not covered by a filing bundle."}
+              "Use for one-offs not covered by a service package."}
           </p>
         </div>
 

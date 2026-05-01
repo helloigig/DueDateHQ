@@ -418,7 +418,7 @@ function humanTargetField(key: string): string {
     primary_state: "Primary state",
     contact_email: "Contact email",
     contact_phone: "Contact phone",
-    bundle: "Filing bundle",
+    bundle: "Service package",
     __ignored__: "[Ignore]",
   };
   return map[key] ?? key;
@@ -574,7 +574,7 @@ function PreviewStep({
           <>
             <p>
               We'll create <strong>{readyCount}</strong> client record
-              {readyCount === 1 ? "" : "s"}, assign filing bundles, and generate
+              {readyCount === 1 ? "" : "s"}, assign service packages, and generate
               this year's deadlines.
             </p>
             {flaggedCount > 0 && (
@@ -771,7 +771,7 @@ function CommittingStep({
       endPct: 40,
     },
     {
-      label: "Assigning filing bundles",
+      label: "Assigning service packages",
       detail: `${Math.min(
         rows.length,
         Math.max(

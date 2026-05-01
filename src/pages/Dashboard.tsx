@@ -22,7 +22,6 @@ import { AnnouncementBanner } from "../components/AnnouncementBanner";
 import { ChaseBanner } from "../components/ChaseBanner";
 import { BlockingAlertsDialog } from "../components/BlockingAlertsDialog";
 import { OnboardingLayer2Widget } from "../components/OnboardingLayer2Widget";
-import { TaskList } from "../components/TaskList";
 import { WelcomeTour } from "../components/WelcomeTour";
 import { CapacityStrip } from "../components/CapacityStrip";
 import { ModeFHealth } from "../components/ModeFHealth";
@@ -260,19 +259,15 @@ export function Dashboard() {
       <AnnouncementBanner announcements={activeBanners} />
       <ChaseBanner />
 
-      {/* ZONE 2A: ActionQueue (NEW in v0.7 amendment §3.1) — AI-curated TodoItem
-          feed (PRD §4.8 nine sources, urgency-sorted with waiting_multiplier).
-          This is the "Today" painpoint surface. Hidden on /legacy so the old
-          deadline-list-only Dashboard stays viewable for rollback comparison. */}
+      {/* ZONE 2: ActionQueue — AI-curated TodoItem feed (PRD §4.8 nine
+          sources, urgency-sorted with waiting_multiplier). This is the
+          single "what to do this morning" surface. The old deadline-grouped
+          TaskList ("Your tasks" with NEEDS YOUR DECISION / BEHIND SCHEDULE
+          / WAITING ON CLIENT filters) was a transitional v0.6 holdover —
+          its three filters duplicated ActionQueue's verbs (Confirm / Send)
+          and Timeline's day-behind tinting. Removed per "one entrance,
+          one name" — see /timeline for cross-deadline forward planning. */}
       {!isLegacy && <ActionQueue />}
-
-      {/* ZONE 2B: deadline-grouped task list (the v0.6 Dashboard's heart).
-          Per IA v0.7 amendment §3.1, this is supposed to move entirely to the
-          Timeline destination. We keep it on Today for now as a familiar
-          fallback while CPAs adapt to the new ActionQueue at top — it's a
-          double-run period. Once the ActionQueue proves out, this section
-          collapses to just the Timeline destination. */}
-      <TaskList />
 
       {/* ZONE 3: Mode F Health — state-monitoring's own monitoring (per IA v0.7
           §3.9d). Overall status derived from announcement query state; per-state
