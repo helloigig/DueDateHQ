@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { NavLink, Route, Routes } from "react-router-dom";
+import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import {
   Mail,
   Bell,
@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   Brain,
   TrendingDown,
+  Sparkles,
 } from "lucide-react";
 import { actions, useStore } from "../data/store";
 import { useImportHistory } from "../hooks/useImports";
@@ -155,12 +156,22 @@ function Row({
 
 function ProfilePanel() {
   const session = useSession();
+  const navigate = useNavigate();
   if (!session) return null;
 
   const onSignOut = () => {
     // signOut handles the hard-reload to /login. No navigate needed —
     // a render between signOut and navigate can crash on stale state.
     void signOut();
+  };
+
+  const replayTour = () => {
+    try {
+      localStorage.removeItem("duedatehq.welcomeTour.dismissed.v1");
+    } catch {
+      /* ignore */
+    }
+    navigate("/");
   };
 
   return (
@@ -190,6 +201,18 @@ function ProfilePanel() {
             value={new Date(session.signedInAt).toLocaleString()}
           />
         </dl>
+      </Card>
+      <Card
+        title="Onboarding"
+        description="Replay the first-run welcome banner and 60-second tour on the dashboard."
+      >
+        <button
+          onClick={replayTour}
+          className="text-sm px-3 py-1.5 rounded-md border border-line text-ink-700 hover:bg-sunken inline-flex items-center gap-1.5"
+        >
+          <Sparkles className="w-3.5 h-3.5" aria-hidden />
+          Replay welcome tour
+        </button>
       </Card>
       <Card title="Session">
         <button
