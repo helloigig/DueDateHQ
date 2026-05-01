@@ -11,13 +11,15 @@ import { EmailDraftModal, type EmailDraftIntent } from "../components/EmailDraft
 import { TaskAuditPackModal } from "../components/TaskAuditPackModal";
 import { useTask } from "../hooks/useTasks";
 import { useChecklist } from "../hooks/useChecklist";
+import { useClient } from "../hooks/useClients";
 import {
   useAiInsightsForClient,
   useImportedFactsForClient,
 } from "../hooks/useAiInsights";
 import { useStore, actions } from "../data/store";
 import { useSession } from "../data/session";
-import type { ChecklistItem } from "../types";
+import { env } from "../config";
+import type { ChecklistItem, Client } from "../types";
 
 /**
  * Task detail — IA §3.4. The keystone interior screen. Holds Layers 2-4 of
@@ -27,8 +29,15 @@ export function TaskDetail() {
   const { id: clientId, taskId } = useParams<{ id: string; taskId: string }>();
   const task = useTask(taskId);
   const checklist = useChecklist(taskId);
-  const { clients } = useStore();
-  const client = clients.find((c) => c.id === clientId) ?? null;
+  // Resolve client from BE in real mode; local store in mock mode. Earlier
+  // code only consulted the local store, which is empty in real mode —
+  // every Task detail page rendered "Task not found" for live data even
+  // when useTask() returned a real row from the BE.
+  const remoteClient = useClient(!env.useMockData ? clientId : undefined);
+  const { clients: storeClients } = useStore();
+  const client: Client | null = env.useMockData
+    ? (storeClients.find((c) => c.id === clientId) ?? null)
+    : (remoteClient.data ?? null);
   const facts = useImportedFactsForClient(clientId);
   const insights = useAiInsightsForClient(clientId);
 
