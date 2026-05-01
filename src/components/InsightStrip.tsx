@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { TrendingUp, ArrowRight, X } from "lucide-react";
+import { TrendingUp, ArrowRight, X, Sparkles } from "lucide-react";
 import { useAllOpenInsights, useResolveInsight } from "../hooks/useAiInsights";
 import { useStore } from "../data/store";
 import { useState } from "react";
@@ -38,9 +38,14 @@ export function InsightStrip() {
         <span className="text-xs uppercase tracking-wider text-ink-700 font-semibold">
           Advisory opportunities
         </span>
-        <span className="ml-2 text-2xs text-ink-500">
-          {visible.length} open
+        <span
+          className="ml-2 inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
+          title="Mode E (cross-year insights) — AI surfaced these from your client history."
+        >
+          <Sparkles className="w-3 h-3" aria-hidden />
+          AI surfaced
         </span>
+        <span className="ml-2 text-2xs text-ink-500">{visible.length} open</span>
       </header>
 
       <div className="px-4 py-3">
