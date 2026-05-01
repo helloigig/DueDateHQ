@@ -24,7 +24,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "./supabase";
-import { signIn, signOut, getSession } from "../data/session";
+import { signIn, clearLocalSession, getSession } from "../data/session";
 import { trpc } from "./api/client";
 import { env } from "../config";
 
@@ -39,7 +39,15 @@ export function SupabaseAuthBridge() {
     const { data: subscription } = supabase().auth.onAuthStateChange(
       async (event, session) => {
         if (event === "SIGNED_OUT") {
-          signOut();
+          // Mirror to local state ONLY — never call signOut() here. signOut()
+          // calls supabase.auth.signOut(), which re-fires the SIGNED_OUT we
+          // just received, recursing this listener and freezing the page.
+          // The signOut button + cross-tab token expiry both eventually land
+          // here; either way, just clear local state. If signOut() is
+          // already running, it'll do the hard reload itself; otherwise
+          // (cross-tab logout, token expired) the next render redirects to
+          // /login via App.tsx's catch-all <Navigate>.
+          if (getSession()) clearLocalSession();
           return;
         }
         if (

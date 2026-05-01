@@ -2,10 +2,17 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Sparkles, ArrowRight, ArrowLeft, Mail } from "lucide-react";
 import { signIn } from "../data/session";
-import { actions } from "../data/store";
 import { authInputClass } from "./auth/AuthShell";
 import { env } from "../config";
 import { supabase } from "../lib/supabase";
+
+// Lazy: only loaded when the user actually triggers sign-in. Keeps the
+// /login bundle small — `data/store` eagerly imports ~49 mock clients +
+// deadlines + tasks which we don't need on the entry page.
+async function loadActions() {
+  const m = await import("../data/store");
+  return m.actions;
+}
 
 /**
  * Sign-IN — passwordless magic-link flow for existing users only.
@@ -52,7 +59,10 @@ export function Login() {
         // reuses whatever's already in the store.
         const isDemoEmail =
           email === "demo@duedatehq.com" || email === "sarah@mitchellcpa.com";
-        if (isDemoEmail) actions.resetToSeeds();
+        if (isDemoEmail) {
+          const actions = await loadActions();
+          actions.resetToSeeds();
+        }
         signIn({
           firmName: isDemoEmail ? "Mitchell CPA (demo)" : "Your firm",
           userName: email.split("@")[0] ?? "you",
@@ -114,7 +124,8 @@ export function Login() {
     }
   };
 
-  const tryDemo = () => {
+  const tryDemo = async () => {
+    const actions = await loadActions();
     actions.resetToSeeds();
     signIn({
       firmName: "Mitchell CPA (demo)",
@@ -247,7 +258,7 @@ export function Login() {
         {/* Demo workspace — only in mock mode + not for invited users */}
         {env.useMockData && !inviteToken && (
           <button
-            onClick={tryDemo}
+            onClick={() => void tryDemo()}
             className="w-full mt-3 bg-surface border border-line hover:border-accent rounded-md p-4 text-left transition-colors group"
           >
             <div className="flex items-start gap-3">

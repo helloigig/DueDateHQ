@@ -98,6 +98,35 @@ export function signIn(input: {
 }
 
 /**
+ * Clear local session state synchronously. Used by:
+ *   - signOut() — full sign-out flow (this + supabase + reload)
+ *   - SupabaseAuthBridge — when supabase fires SIGNED_OUT from another tab
+ *     or token expiry. We mirror to local state but must NOT call signOut(),
+ *     which would re-trigger the very SIGNED_OUT event we're handling and
+ *     recurse the auth listener.
+ */
+export function clearLocalSession() {
+  write(null);
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (k.startsWith("sb-")) localStorage.removeItem(k);
+    }
+    for (const k of Object.keys(sessionStorage)) {
+      if (k.startsWith("sb-")) sessionStorage.removeItem(k);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+// Re-entry guard. signOut() calls supabase.auth.signOut(), which fires the
+// SIGNED_OUT event the auth-bridge listens to. Without this guard, any path
+// that re-enters signOut() (e.g. a stray bridge handler that wasn't yet
+// updated) would loop the 800ms race + redundant window.location.replace
+// calls, freezing the page for seconds.
+let signingOut = false;
+
+/**
  * Sign out: clears Supabase auth + local FirmSession, then HARD-RELOADS
  * the page to /login.
  *
@@ -114,23 +143,10 @@ export function signIn(input: {
  * trade for "logout actually works."
  */
 export async function signOut() {
-  // Synchronous local clear — fires subscribers and updates the UI on the
-  // same tick, so any pre-reload render shows the signed-out state.
-  write(null);
+  if (signingOut) return;
+  signingOut = true;
 
-  // Nuke ALL sb-* keys (auth-token, code-verifier, anything else Supabase
-  // persists) BEFORE any await, so even if subsequent steps hang, the
-  // post-reload page can't re-hydrate from cached JWT.
-  try {
-    for (const k of Object.keys(localStorage)) {
-      if (k.startsWith("sb-")) localStorage.removeItem(k);
-    }
-    for (const k of Object.keys(sessionStorage)) {
-      if (k.startsWith("sb-")) sessionStorage.removeItem(k);
-    }
-  } catch {
-    /* ignore */
-  }
+  clearLocalSession();
 
   // Tell Supabase to tear down its in-memory session and stop auto-
   // refreshing. Read the canonical flag from config.ts — earlier code
@@ -140,10 +156,12 @@ export async function signOut() {
     const { env } = await import("../config");
     if (!env.useMockAuth) {
       const { supabase } = await import("../lib/supabase");
-      // 800ms cap — if Supabase's network call hangs, we still reload.
+      // 400ms cap — if Supabase's network call hangs, we still reload.
+      // Tokens are already cleared from localStorage above, so a hanging
+      // remote signOut just means the server-side session expires naturally.
       await Promise.race([
-        supabase().auth.signOut(),
-        new Promise((resolve) => setTimeout(resolve, 800)),
+        supabase().auth.signOut({ scope: "local" }),
+        new Promise((resolve) => setTimeout(resolve, 400)),
       ]);
     }
   } catch {
