@@ -19,7 +19,12 @@ import {
   persistDeliveryEvent,
 } from "./lib/delivery-webhooks.js";
 import { handleCallback } from "./lib/oauth.js";
-import { startScraperScheduler } from "./lib/scraper.js";
+import {
+  runScraperCycle,
+  startScraperScheduler,
+} from "./lib/scraper.js";
+import { db } from "./db/client.js";
+import { stateAnnouncementSources } from "./db/schema.js";
 import { startExportWorker, ARTIFACT_DIR } from "./lib/export-worker.js";
 import { startMethodBPoller } from "./lib/method-b-poller.js";
 import { startQboSyncScheduler } from "./lib/sync/qbo.js";
@@ -221,6 +226,72 @@ app.use(
     rewriteRequestPath: (path) => path.replace(/^\/exports/, ""),
   }),
 );
+
+// ───────── Scraper admin endpoints ─────────
+//
+// The state-announcement scraper runs hourly via startScraperScheduler.
+// On a freshly-deployed (or auto-suspended) Fly machine the first cycle
+// can sit a long time before firing, which makes the wedge feature
+// invisible during demos and verification. These two routes give ops a
+// way to (a) fire a cycle right now and (b) inspect last-known freshness
+// per source without bouncing into the database.
+//
+// Auth model: run-now requires the same INBOUND_WEBHOOK_SECRET the
+// inbound-email webhooks use — the secret is already in Fly secrets,
+// already rotated when the webhook secrets are. Status is read-only
+// freshness metadata (already surfaced in the FE's Mode F Health
+// widget); no auth needed.
+app.post("/api/scraper/run-now/:secret", async (c) => {
+  const secret = c.req.param("secret");
+  if (!secret || secret !== process.env.INBOUND_WEBHOOK_SECRET) {
+    return c.json({ ok: false, error: "unauthorized" }, 401);
+  }
+  try {
+    const result = await runScraperCycle();
+    log.info("scraper.run_now", result);
+    return c.json({ ok: true, ...result });
+  } catch (err) {
+    captureException(err, { route: "/api/scraper/run-now" });
+    return c.json(
+      {
+        ok: false,
+        error: err instanceof Error ? err.message : "internal",
+      },
+      500,
+    );
+  }
+});
+
+app.get("/api/scraper/status", async (c) => {
+  try {
+    const sources = await db
+      .select()
+      .from(stateAnnouncementSources)
+      .orderBy(stateAnnouncementSources.stateCode);
+    return c.json({
+      ok: true,
+      sources: sources.map((s) => ({
+        stateCode: s.stateCode,
+        authority: s.authority,
+        sourceUrl: s.sourceUrl,
+        lastScrapedAt: s.lastScrapedAt,
+        lastSuccessAt: s.lastSuccessAt,
+        status: s.status,
+        consecutiveErrorCount: s.consecutiveErrorCount,
+        lastErrorMessage: s.lastErrorMessage,
+      })),
+    });
+  } catch (err) {
+    captureException(err, { route: "/api/scraper/status" });
+    return c.json(
+      {
+        ok: false,
+        error: err instanceof Error ? err.message : "internal",
+      },
+      500,
+    );
+  }
+});
 
 // ───────── tRPC ─────────
 app.use(
