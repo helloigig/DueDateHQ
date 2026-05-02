@@ -165,7 +165,7 @@ export const ALERT_TYPE_CONFIG: Record<AnnouncementType, AlertTypeConfig> = {
     tone: "info",
     verdictHeadline: (n, total) =>
       `Affecting ${n} of your ${total} clients`,
-    emptyStateCopy: (ann) =>
+    emptyStateCopy: () =>
       `None of your clients have active estimates affected by this rate change.`,
     primaryVerb: (n) => `Recompute ${fmtCount(n, "estimate")}`,
     primaryAction: "open_recompute_modal",
