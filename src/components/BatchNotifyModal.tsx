@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { Mail, Send } from "lucide-react";
+import { CalendarClock, Mail, Send } from "lucide-react";
 import type { Announcement, Client } from "../types";
+import { actions } from "../data/store";
 import { formatLongDate } from "../data/dateHelpers";
 import { useSession } from "../data/session";
 import { Modal, useModalLabelId } from "./Modal";
@@ -16,10 +17,21 @@ export function BatchNotifyModal({
   announcement: Announcement | null;
   recipients: Client[];
   onClose: () => void;
-  onSent: (count: number) => void;
+  /** Called after send. `adjustedCount` is non-zero when the bundled
+   *  deadline-shift was applied. */
+  onSent: (count: number, adjustedCount: number) => void;
 }) {
   const session = useSession();
   const labelId = useModalLabelId();
+
+  // Disaster extensions carry a deadline shift. We bundle the mutation into
+  // the same review action so the CPA confirms email + calendar move in one
+  // pass — they are two effects of the same decision ("yes, this affects
+  // my clients, do the right thing").
+  const isDisasterShift =
+    announcement?.type === "disaster_extension" &&
+    !!announcement.oldDeadline &&
+    !!announcement.newDeadline;
 
   const defaultSubject = useMemo(() => {
     if (!announcement) return "";
@@ -45,6 +57,7 @@ export function BatchNotifyModal({
   const [subject, setSubject] = useState(defaultSubject);
   const [body, setBody] = useState(defaultBody);
   const [sent, setSent] = useState(false);
+  const [shiftDeadlines, setShiftDeadlines] = useState(true);
 
   // Keep defaults in sync when the dialog opens with a new announcement
   const key = `${announcement?.id ?? ""}:${recipients.length}`;
@@ -53,6 +66,7 @@ export function BatchNotifyModal({
     setSubject(defaultSubject);
     setBody(defaultBody);
     setSent(false);
+    setShiftDeadlines(true);
     setLastKey(key);
   }
 
@@ -66,8 +80,24 @@ export function BatchNotifyModal({
       bodyPreview: body.slice(0, 200),
       recipients: recipients.map((c) => c.contactEmail),
     });
+    let adjustedCount = 0;
+    if (
+      isDisasterShift &&
+      shiftDeadlines &&
+      announcement.oldDeadline &&
+      announcement.newDeadline
+    ) {
+      const ids = recipients.map((c) => c.id);
+      actions.batchAdjustDeadlines(
+        ids,
+        announcement.oldDeadline,
+        announcement.newDeadline,
+        announcement.title
+      );
+      adjustedCount = ids.length;
+    }
     setSent(true);
-    onSent(recipients.length);
+    onSent(recipients.length, adjustedCount);
   };
 
   return (
@@ -76,8 +106,8 @@ export function BatchNotifyModal({
         <div className="flex items-center gap-2">
           <Mail className="w-4 h-4 text-ink-500" aria-hidden />
           <h2 id={labelId} className="text-base font-semibold text-ink-900">
-            Notify {recipients.length} client
-            {recipients.length === 1 ? "" : "s"} by email
+            Review draft for {recipients.length} client
+            {recipients.length === 1 ? "" : "s"}
           </h2>
         </div>
       </Modal.Header>
@@ -87,6 +117,34 @@ export function BatchNotifyModal({
         className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm"
       >
         <div className="md:col-span-2 space-y-3">
+          {isDisasterShift && (
+            <label className="flex items-start gap-3 px-3 py-2.5 rounded border border-info-border bg-info-bg/50">
+              <input
+                type="checkbox"
+                checked={shiftDeadlines}
+                onChange={(e) => setShiftDeadlines(e.target.checked)}
+                className="w-4 h-4 mt-0.5 accent-accent shrink-0"
+              />
+              <span className="flex-1 min-w-0">
+                <span className="flex items-center gap-1.5 text-sm font-medium text-ink-900">
+                  <CalendarClock className="w-3.5 h-3.5" aria-hidden />
+                  Also move {recipients.length} deadline
+                  {recipients.length === 1 ? "" : "s"} from{" "}
+                  {announcement.oldDeadline
+                    ? formatLongDate(announcement.oldDeadline)
+                    : "—"}{" "}
+                  →{" "}
+                  {announcement.newDeadline
+                    ? formatLongDate(announcement.newDeadline)
+                    : "—"}
+                </span>
+                <span className="block text-2xs text-ink-500 mt-0.5">
+                  Updates each client's calendar in the same step. Logged to
+                  activity, revertible per-client.
+                </span>
+              </span>
+            </label>
+          )}
           <label className="block">
             <span className="text-xs font-medium text-ink-700 mb-1 block">
               Subject
@@ -135,8 +193,17 @@ export function BatchNotifyModal({
       {sent && (
         <div className="mx-5 mb-3 rounded border border-ok-border bg-ok-bg text-ok-ink text-sm px-3 py-2">
           Queued to {recipients.length} recipient
-          {recipients.length === 1 ? "" : "s"}. In production this hits the
-          sending provider; here we logged it to the console.
+          {recipients.length === 1 ? "" : "s"}
+          {isDisasterShift && shiftDeadlines && (
+            <>
+              {" "}· {recipients.length} deadline
+              {recipients.length === 1 ? "" : "s"} moved to{" "}
+              {announcement.newDeadline
+                ? formatLongDate(announcement.newDeadline)
+                : "—"}
+            </>
+          )}
+          .
         </div>
       )}
 
@@ -154,7 +221,9 @@ export function BatchNotifyModal({
             className="text-sm px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 flex items-center gap-1.5"
           >
             <Send className="w-3.5 h-3.5" aria-hidden />
-            Send to {recipients.length}
+            {isDisasterShift && shiftDeadlines
+              ? `Send & move ${recipients.length}`
+              : `Send to ${recipients.length}`}
           </button>
         )}
       </Modal.Footer>

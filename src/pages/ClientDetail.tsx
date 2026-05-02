@@ -16,7 +16,7 @@ import {
 } from "../hooks/useAiInsights";
 import { PageSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
-import { bucketOf, formatLongDate, parseDate, TODAY } from "../data/dateHelpers";
+import { bucketOf, daysBetween, formatLongDate, parseDate, TODAY } from "../data/dateHelpers";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import {
   AddDeadlineModal,
@@ -637,175 +637,246 @@ function EngagementTab({
       (waiting.count > 5 ? 1 : 0),
   );
 
+  // Relationship label (compact) — paired with the dot chip in the verdict.
+  const relationshipLabel =
+    relationshipScore <= 2
+      ? "Stuck"
+      : relationshipScore === 3
+        ? "Watch"
+        : "Healthy";
+
+  // Compose the next-deadline-shift sentence for each active alert. When the
+  // alert is a disaster_extension that already shifted a deadline on this
+  // client, we prefer that wording ("1040 deadline shifted Oct 15 → Feb 15")
+  // over the bare alert title — it's the actionable shape Sarah cares about.
+  const shiftedDeadlineForAlert = (annId: string) => {
+    const ann = activeAlerts.find((a) => a.id === annId);
+    if (!ann?.newDeadline) return null;
+    const match = allDeadlines.find(
+      (d) => d.officialDueDate === ann.newDeadline,
+    );
+    return match ? match.form : null;
+  };
+
+  // Pick the dominant signal for the primary verb. Order matches the user's
+  // mental priority: "what blocks this client → what just hit them → what
+  // could grow them → just open the to-do."
+  const primaryAction: { kind: "chase" | "alert" | "todo"; href?: string } =
+    waiting.count > 0
+      ? { kind: "chase" }
+      : activeAlerts.length > 0
+        ? { kind: "alert", href: `/alerts/${activeAlerts[0].id}` }
+        : { kind: "todo" };
+
   return (
     <div className="space-y-4">
-      {/* 🚨 Currently waiting on — banner-style top metric per IA v0.7 §3.3.1
-          gap-over-fill amendment. Loudest element on the tab. */}
-      {waiting.count > 0 && (
-        <button
-          onClick={onSwitchToToDo}
-          className="w-full text-left rounded-md border-2 border-warn-border bg-warn-bg/40 px-4 py-3 hover:bg-warn-bg/60 transition-colors"
-          title="Open the To Do tab pre-filtered by waiting items"
-        >
-          <p className="text-2xs uppercase tracking-wider text-warn-ink font-semibold">
-            🚨 Currently waiting on {client.name.split(" ")[0]}
+      {/* VERDICT BLOCK — the page's single most important thing. Compresses
+          gap (waiting items), shock (regulatory impact on this client), and
+          opportunity (Mode E insights) into three signal lines, with a
+          relationship chip in the corner and one primary verb at the bottom.
+          Replaces what used to be 5 co-equal cards (Services / Relationship /
+          Opportunities / Regulatory / Notes) competing for attention. */}
+      <section className="bg-surface border-2 border-line rounded-md p-4">
+        <header className="flex items-center gap-2 mb-3">
+          <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
+            Status — what's true today
           </p>
-          <p className="text-base font-semibold text-warn-ink mt-1">
-            {waiting.count} item{waiting.count === 1 ? "" : "s"} across{" "}
-            {waiting.taskCount} task{waiting.taskCount === 1 ? "" : "s"}
-            {waiting.oldestDays != null && (
-              <span className="text-warn-ink/80">
-                {" "}
-                · oldest reminder {waiting.oldestDays}d unsent
+          <span className="ml-auto inline-flex items-baseline gap-1.5 text-xs">
+            <span
+              className="tabular-nums tracking-wider"
+              aria-label={`Relationship score ${relationshipScore} of 5`}
+              title={`Score ${relationshipScore} of 5 — falls when reminders stay unsent`}
+            >
+              {"●".repeat(relationshipScore)}
+              <span className="text-ink-300">
+                {"○".repeat(5 - relationshipScore)}
               </span>
-            )}
-          </p>
-          <p className="text-2xs text-warn-ink/80 mt-1">
-            Click to open To Do tab → review and chase →
-          </p>
-        </button>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Services + tier */}
-        <section className="md:col-span-2 bg-surface border border-line rounded-md p-4">
-          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
-            Services & engagement
-          </h3>
-          <dl className="mt-2 space-y-1.5 text-sm">
-            <div className="flex gap-3">
-              <dt className="w-32 shrink-0 text-ink-500">Tier</dt>
-              <dd className="text-ink-900 font-medium capitalize">
-                {client.tier ?? "Standard"}
-              </dd>
-            </div>
-            <div className="flex gap-3">
-              <dt className="w-32 shrink-0 text-ink-500">Service packages</dt>
-              <dd className="text-ink-900 flex flex-wrap gap-1">
-                {client.servicePackages.length > 0 ? (
-                  client.servicePackages.map((p) => (
-                    <span
-                      key={p}
-                      className="text-xs px-2 py-0.5 rounded border border-line bg-sunken/40"
-                    >
-                      {p}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-ink-500">— none assigned</span>
-                )}
-              </dd>
-            </div>
-            <div className="flex gap-3">
-              <dt className="w-32 shrink-0 text-ink-500">Open deadlines</dt>
-              <dd className="text-ink-900 font-medium tabular-nums">
-                {allDeadlines.filter(
-                  (d) => d.status !== "completed" && d.status !== "filed_extension",
-                ).length}{" "}
-                <span className="text-ink-500 font-normal">
-                  · {upcoming.length} upcoming
-                </span>
-              </dd>
-            </div>
-            <div className="flex gap-3">
-              <dt className="w-32 shrink-0 text-ink-500">Client since</dt>
-              <dd className="text-ink-900">{formatLongDate(client.addedAt)}</dd>
-            </div>
-            <div className="flex gap-3">
-              <dt className="w-32 shrink-0 text-ink-500">Pricing</dt>
-              <dd className="text-ink-500 italic">
-                Comparable-book benchmark — Phase 1 (Layer C wiring)
-              </dd>
-            </div>
-          </dl>
-        </section>
-
-        {/* Relationship + churn signals */}
-        <section className="bg-surface border border-line rounded-md p-4">
-          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
-            Relationship
-          </h3>
-          <p
-            className="text-2xl mt-2 tabular-nums tracking-wider"
-            title={`Score ${relationshipScore} of 5 — falls when reminders stay unsent`}
-            aria-label={`Relationship score ${relationshipScore} of 5`}
-          >
-            {"●".repeat(relationshipScore)}
-            <span className="text-ink-300">{"○".repeat(5 - relationshipScore)}</span>
-          </p>
-          <p className="text-2xs text-ink-500 mt-1">
-            {relationshipScore <= 2
-              ? "At risk — long-stuck items signal fade"
-              : relationshipScore === 3
-                ? "Watch — a few reminders gone unanswered"
-                : "Healthy — recent activity, on cadence"}
-          </p>
-          {waiting.oldestDays != null && waiting.oldestDays > 14 && (
-            <p className="mt-3 text-2xs text-danger-ink bg-danger-bg border border-danger-border rounded px-2 py-1.5">
-              ⚠ Stuck: oldest reminder out {waiting.oldestDays}d.
-            </p>
-          )}
-        </section>
-      </div>
-
-      {/* Active opportunities — Mode E + Pattern 4 awakening prompt. */}
-      <section className="bg-surface border border-line rounded-md p-4">
-        <header className="flex items-center gap-2 mb-2">
-          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
-            Active opportunities
-          </h3>
-          <span
-            className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
-            title="Mode E — AI cross-year pattern detection"
-          >
-            ✨ AI surfaced
-          </span>
-          <span className="ml-auto text-2xs text-ink-500 tabular-nums">
-            {openInsights.length} open
+            </span>
+            <span
+              className={
+                relationshipScore <= 2
+                  ? "text-danger-ink font-medium"
+                  : relationshipScore === 3
+                    ? "text-warn-ink"
+                    : "text-ok-ink"
+              }
+            >
+              {relationshipLabel}
+            </span>
           </span>
         </header>
-        {openInsights.length === 0 ? (
-          <p className="text-xs text-ink-500">
-            No advisory triggers right now. Mode E watches multi-year patterns
-            (RSU vests, salary jumps, property changes) and surfaces them here
-            when they appear.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {openInsights.map((i) => (
-              <li key={i.id} className="text-sm">
-                <p className="text-ink-900 font-medium">{i.title}</p>
-                <p className="text-xs text-ink-500 mt-0.5">{i.detail}</p>
-              </li>
-            ))}
-          </ul>
-        )}
+
+        <ul className="space-y-2">
+          {/* Gap signal */}
+          <li className="text-sm flex items-baseline gap-2">
+            {waiting.count > 0 ? (
+              <>
+                <span className="shrink-0">🚨</span>
+                <span className="flex-1 min-w-0">
+                  <strong className="text-ink-900">
+                    Waiting on {client.name.split(" ")[0]}
+                  </strong>
+                  <span className="text-ink-700">
+                    {" — "}
+                    {waiting.count} item{waiting.count === 1 ? "" : "s"} across{" "}
+                    {waiting.taskCount} task{waiting.taskCount === 1 ? "" : "s"}
+                    {waiting.oldestDays != null && waiting.oldestDays > 0 && (
+                      <> · oldest {waiting.oldestDays}d unsent</>
+                    )}
+                  </span>
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="shrink-0 text-ok-ink">✓</span>
+                <span className="flex-1 text-ink-500">
+                  Nothing waiting on this client
+                </span>
+              </>
+            )}
+          </li>
+
+          {/* Shock signal — one line per active alert hitting this client */}
+          {activeAlerts.length > 0 ? (
+            activeAlerts.map((a) => {
+              const shiftedForm = shiftedDeadlineForAlert(a.id);
+              return (
+                <li
+                  key={a.id}
+                  className="text-sm flex items-baseline gap-2"
+                >
+                  <span className="shrink-0">📅</span>
+                  <span className="flex-1 min-w-0">
+                    <strong className="text-ink-900">
+                      {a.stateCode}: {a.title}
+                    </strong>
+                    {a.oldDeadline && a.newDeadline && (
+                      <span className="text-ink-700">
+                        {" "}
+                        ·{" "}
+                        {shiftedForm ? `${shiftedForm} ` : ""}
+                        deadline shifted {formatLongDate(a.oldDeadline)} →{" "}
+                        {formatLongDate(a.newDeadline)}
+                      </span>
+                    )}
+                  </span>
+                  <Link
+                    to={`/alerts/${a.id}`}
+                    className="text-2xs text-accent hover:underline shrink-0"
+                  >
+                    Review →
+                  </Link>
+                </li>
+              );
+            })
+          ) : null}
+
+          {/* Opportunity signal — only when non-empty (zero-state was noise) */}
+          {openInsights.length > 0 && (
+            <li className="text-sm flex items-baseline gap-2">
+              <span className="shrink-0">✨</span>
+              <span className="flex-1 min-w-0">
+                <strong className="text-ink-900">
+                  {openInsights[0].title}
+                </strong>
+                <span className="text-ink-700">
+                  {" "}
+                  · {openInsights[0].detail}
+                </span>
+                {openInsights.length > 1 && (
+                  <span className="text-ink-500">
+                    {" "}
+                    · +{openInsights.length - 1} more
+                  </span>
+                )}
+              </span>
+            </li>
+          )}
+        </ul>
+
+        {/* Primary verb — picks the dominant signal. Only one button — Yuqi's
+            "one entrance, one name" rule. Secondary detail still reachable
+            via tabs (To Do / Mailbox / etc.). */}
+        <div className="mt-4 pt-3 border-t border-line flex items-center gap-2">
+          {primaryAction.kind === "chase" && (
+            <button
+              onClick={onSwitchToToDo}
+              className="px-3 py-1.5 rounded bg-ink-900 text-canvas text-sm font-medium hover:bg-ink-700"
+            >
+              Send {waiting.count} reminder{waiting.count === 1 ? "" : "s"}
+            </button>
+          )}
+          {primaryAction.kind === "alert" && primaryAction.href && (
+            <Link
+              to={primaryAction.href}
+              className="px-3 py-1.5 rounded bg-ink-900 text-canvas text-sm font-medium hover:bg-ink-700"
+            >
+              Review {activeAlerts[0].stateCode} alert
+            </Link>
+          )}
+          {primaryAction.kind === "todo" && (
+            <button
+              onClick={onSwitchToToDo}
+              className="px-3 py-1.5 rounded border border-line text-ink-700 text-sm hover:bg-sunken"
+            >
+              Open To-Do
+            </button>
+          )}
+          <span className="text-2xs text-ink-500">
+            {primaryAction.kind === "chase"
+              ? "Open To-Do tab pre-filtered by waiting items"
+              : primaryAction.kind === "alert"
+                ? "Bundles email draft + deadline shift"
+                : "All tasks for this client"}
+          </span>
+        </div>
       </section>
 
-      {/* Active regulatory impact — alerts touching this client. */}
-      {activeAlerts.length > 0 && (
-        <section className="bg-surface border border-line rounded-md p-4">
-          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold mb-2">
-            Active regulatory impact
-          </h3>
-          <ul className="divide-y divide-line">
-            {activeAlerts.map((a) => (
-              <li key={a.id} className="py-2 first:pt-0 last:pb-0">
-                <Link
-                  to={`/alerts/${a.id}`}
-                  className="text-sm text-ink-900 hover:underline flex items-baseline gap-2"
-                >
-                  <span className="text-2xs font-mono px-1.5 py-0.5 rounded bg-sunken text-ink-700">
-                    {a.stateCode}
-                  </span>
-                  <span className="flex-1 truncate">{a.title}</span>
-                  <span className="text-2xs text-ink-500">Review →</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      {/* REFERENCE STRIP — services, tier, packages, deadline counts, since.
+          Slimmed from a full card to a single condensed row. Pricing line
+          dropped (was a Phase-1 italic placeholder). */}
+      <section className="bg-surface border border-line rounded-md p-3 text-xs flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        <span>
+          <span className="text-ink-500">Tier</span>{" "}
+          <span className="text-ink-900 font-medium capitalize">
+            {client.tier ?? "Standard"}
+          </span>
+        </span>
+        <span className="text-ink-300">·</span>
+        <span className="flex items-center gap-1">
+          <span className="text-ink-500">Packages</span>{" "}
+          {client.servicePackages.length > 0 ? (
+            client.servicePackages.map((p) => (
+              <span
+                key={p}
+                className="px-1.5 py-0.5 rounded border border-line bg-sunken/40 text-2xs"
+              >
+                {p}
+              </span>
+            ))
+          ) : (
+            <span className="text-ink-500">— none assigned</span>
+          )}
+        </span>
+        <span className="text-ink-300">·</span>
+        <span>
+          <span className="text-ink-500">Open deadlines</span>{" "}
+          <span className="text-ink-900 font-medium tabular-nums">
+            {
+              allDeadlines.filter(
+                (d) =>
+                  d.status !== "completed" && d.status !== "filed_extension",
+              ).length
+            }
+          </span>{" "}
+          <span className="text-ink-500">· {upcoming.length} upcoming</span>
+        </span>
+        <span className="text-ink-300">·</span>
+        <span>
+          <span className="text-ink-500">Since</span>{" "}
+          <span className="text-ink-900">{formatLongDate(client.addedAt)}</span>
+        </span>
+      </section>
 
       {/* Notes pointer — full editor lives in Habits. */}
       <section className="bg-surface border border-line rounded-md p-4 flex items-baseline gap-3">
@@ -1088,8 +1159,15 @@ function ToDoTab({
         </section>
       )}
 
-      {/* Open deadlines summary — anchors the per-task entry points so the
-          CPA can navigate to any task's full detail without leaving To Do. */}
+      {/* Open deadlines — full per-task entry points so the CPA can pivot
+          from a deadline directly into its task detail. Each row carries:
+            • form + jurisdiction badge (federal vs state-specific)
+            • status pill (overdue / due-soon / on-track / waiting)
+            • the official due date AND the internal target date — both shift
+              together when a state alert moves the deadline, so the CPA sees
+              the buffer they have, not just the wall date
+            • countdown ("in 12 days", "8 days overdue") for at-a-glance triage
+          Rows are clickable when a Task exists for the deadline (1:1 at MVP). */}
       <section className="bg-surface border border-line rounded-md p-4">
         <header className="flex items-baseline gap-2 mb-2">
           <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
@@ -1108,19 +1186,73 @@ function ToDoTab({
               (d) => d.status !== "completed" && d.status !== "filed_extension",
             )
             .slice(0, 8)
-            .map((d) => (
-              <li key={d.id} className="py-2 first:pt-0 last:pb-0">
-                <div className="text-sm text-ink-900 flex items-baseline gap-3">
-                  <span className="flex-1 truncate">
-                    {d.form} · {d.jurisdiction}
+            .map((d) => {
+              const task = tasksByIdMap.get(`t-${d.id}`) ??
+                Array.from(tasksByIdMap.values()).find((t) => t.deadlineId === d.id);
+              const days = daysBetween(TODAY, parseDate(d.officialDueDate));
+              const isOverdue = days < 0;
+              const isDueSoon = days >= 0 && days <= 7;
+              const countdown = isOverdue
+                ? `${Math.abs(days)}d overdue`
+                : days === 0
+                  ? "due today"
+                  : `in ${days}d`;
+              const pillClass = isOverdue
+                ? "bg-danger-bg text-danger-ink border border-danger-border"
+                : isDueSoon
+                  ? "bg-warn-bg text-warn-ink border border-warn-border"
+                  : "bg-sunken text-ink-700 border border-line";
+              const row = (
+                <div className="text-sm text-ink-900 flex items-baseline gap-3 py-1.5">
+                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-sunken text-ink-700 border border-line shrink-0 uppercase">
+                    {d.jurisdiction}
                   </span>
-                  <span className="text-xs text-ink-500 tabular-nums">
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate">{d.form}</p>
+                    {task && (
+                      <p className="text-2xs text-ink-500 tabular-nums">
+                        Internal target {formatLongDate(task.internalTargetDate)}
+                      </p>
+                    )}
+                  </div>
+                  <span
+                    className={`text-2xs px-1.5 py-0.5 rounded tabular-nums shrink-0 ${pillClass}`}
+                  >
+                    {countdown}
+                  </span>
+                  <span className="text-xs text-ink-500 tabular-nums shrink-0 w-28 text-right">
                     {formatLongDate(d.officialDueDate)}
                   </span>
                 </div>
-              </li>
-            ))}
+              );
+              return (
+                <li key={d.id} className="first:pt-0 last:pb-0">
+                  {task ? (
+                    <Link
+                      to={`/clients/${client.id}/tasks/${task.id}`}
+                      className="block hover:bg-sunken/40 -mx-1 px-1 rounded"
+                      title="Open task detail"
+                    >
+                      {row}
+                    </Link>
+                  ) : (
+                    row
+                  )}
+                </li>
+              );
+            })}
         </ul>
+        {allDeadlines.filter(
+          (d) => d.status !== "completed" && d.status !== "filed_extension",
+        ).length > 8 && (
+          <p className="text-2xs text-ink-500 mt-2">
+            +
+            {allDeadlines.filter(
+              (d) => d.status !== "completed" && d.status !== "filed_extension",
+            ).length - 8}{" "}
+            more open
+          </p>
+        )}
       </section>
 
       <p className="text-2xs text-ink-400">
