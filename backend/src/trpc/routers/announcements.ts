@@ -76,6 +76,7 @@ export const announcementsRouter = router({
         oldDeadline: r.ann.oldDeadline,
         newDeadline: r.ann.newDeadline,
         sourceUrl: r.ann.sourceUrl,
+        relatedSourceUrls: r.ann.relatedSourceUrls,
         sourceAuthority: r.ann.sourceAuthority,
         parseConfidence: r.ann.parseConfidence,
         detectedAt: r.ann.detectedAt.toISOString(),

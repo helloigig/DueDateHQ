@@ -10,6 +10,10 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    // Worktree + parent both have node_modules, so without dedupe Vite
+    // can resolve react from both → "Invalid hook call". Force a single
+    // copy from the worktree.
+    dedupe: ["react", "react-dom"],
   },
   server: {
     port: portEnv,
