@@ -68,7 +68,18 @@ export default {
         overlay: "0 8px 24px rgba(15, 23, 42, 0.12)",
       },
 
-      spacing: {},
+      spacing: {
+        // DueDateHQ rhythm scale (see DESIGN.md "Layout & Spacing").
+        // Anything outside these four values is a bug — use them via
+        // `gap-section`, `p-region`, etc. Tailwind's default 4px scale
+        // (gap-2 = 8, gap-4 = 16, gap-6 = 24, gap-12 = 48) remains
+        // available and produces identical results; the named tokens
+        // exist so intent reads at a glance in JSX.
+        inline:  "8px",   // within a row
+        region:  "16px",  // inside a card
+        card:    "24px",  // card → card
+        section: "48px",  // section → section
+      },
 
       keyframes: {
         "accordion-down": {
