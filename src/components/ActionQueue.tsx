@@ -17,6 +17,7 @@ import type { MockTodoItem, TodoVerb } from "../data/mockTodoItems";
 import { env } from "../config";
 import {
   buildQueueRows,
+  pickPrimaryItem,
   summarizeClientGroup,
   type ClientGroupRow,
   type StateAlertRow,
@@ -179,12 +180,11 @@ function ClientGroupRowView({ row }: { row: ClientGroupRow }) {
           : "Apply";
   const PrimaryIcon = VERB_ICON[primaryVerb];
 
-  // Whole-row primary action: open the most-urgent item's surface. For Send
-  // groups this routes to the client's task detail (where the consolidated
-  // email draft lives); for Confirm / Discuss groups it routes to the
-  // first item's surface.
+  // Whole-row primary action: route to the verb the row's badge promises
+  // (Send > Confirm > Discuss), so a row labeled "Send" never lands on a
+  // Confirm screen. Within a verb, pick the most-urgent item.
   const onRowClick = () => {
-    const top = row.items[0];
+    const top = pickPrimaryItem(row.items) ?? row.items[0];
     navigateForItem(top, navigate);
   };
 

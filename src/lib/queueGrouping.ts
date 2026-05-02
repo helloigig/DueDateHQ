@@ -66,7 +66,37 @@ function earliestDue(items: QueueTodoItem[]): string | undefined {
 }
 
 function groupKey(item: QueueTodoItem): string {
-  return item.clientId ?? `name:${item.client}`;
+  // Live BE returns `clientId: ""` (empty string) for Mode F batch rows
+  // (carved out before this runs) and a UUID for everything else. Mock
+  // adapter omits `clientId` entirely for some sources. Treat both empty
+  // string and undefined as "no canonical id" → fall back to name keying
+  // so a malformed live row can't collapse N unrelated clients into one.
+  if (item.clientId && item.clientId.length > 0) return item.clientId;
+  return `name:${item.client}`;
+}
+
+// Pick the item whose surface the row's primary action should open. The
+// row label promises a verb (e.g. "Send"); the click must land on a row
+// of that verb so label and destination agree. Order: Send > Confirm >
+// Discuss > Apply, breaking ties by urgency_score desc.
+const PRIMARY_VERB_ORDER: MockTodoItem["verb"][] = [
+  "Send",
+  "Confirm",
+  "Discuss",
+  "Apply",
+];
+
+export function pickPrimaryItem(
+  items: QueueTodoItem[],
+): QueueTodoItem | undefined {
+  if (items.length === 0) return undefined;
+  for (const v of PRIMARY_VERB_ORDER) {
+    const matches = items.filter((it) => it.verb === v);
+    if (matches.length > 0) {
+      return matches.slice().sort((a, b) => b.urgencyScore - a.urgencyScore)[0];
+    }
+  }
+  return items[0];
 }
 
 export function buildQueueRows(items: QueueTodoItem[]): QueueRow[] {
