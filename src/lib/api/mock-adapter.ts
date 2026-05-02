@@ -2157,7 +2157,7 @@ export const mockAdapter = {
         deadlineId: string;
         overrideAmountCents?: number;
       }>;
-      ruleJurisdiction: "federal" | "CA" | "NY";
+      ruleJurisdiction: "federal" | "CA" | "NY" | "NJ" | "MA" | "IL" | "AZ";
       ruleTaxYear: number;
     }) => {
       await delay(200);

@@ -362,7 +362,15 @@ export const alertActionsRouter = router({
             overrideAmountCents: z.number().int().nonnegative().optional(),
           }),
         ),
-        ruleJurisdiction: z.enum(["federal", "CA", "NY"]),
+        ruleJurisdiction: z.enum([
+          "federal",
+          "CA",
+          "NY",
+          "NJ",
+          "MA",
+          "IL",
+          "AZ",
+        ]),
         ruleTaxYear: z.number().int().min(2024).max(2030),
       }),
     )

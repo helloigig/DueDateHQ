@@ -1353,7 +1353,15 @@ export const appRouter = t.router({
               overrideAmountCents: z.number().int().optional(),
             }),
           ),
-          ruleJurisdiction: z.enum(["federal", "CA", "NY"]),
+          ruleJurisdiction: z.enum([
+            "federal",
+            "CA",
+            "NY",
+            "NJ",
+            "MA",
+            "IL",
+            "AZ",
+          ]),
           ruleTaxYear: z.number().int(),
         }),
       )
