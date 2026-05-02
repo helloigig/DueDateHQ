@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Link,
   useNavigate,
@@ -27,6 +27,7 @@ import { ExportModal } from "../components/ExportModal";
 import { ExportClientsButton } from "../components/ExportClientsButton";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { STATE_NAMES, type StateCode } from "../types";
+import { bundleByName, type FilingBundle } from "../data/bundles";
 import type {
   ActivityEntry,
   ActivityType,
@@ -184,14 +185,7 @@ export function ClientDetail() {
                 Service package{client.servicePackages.length === 1 ? "" : "s"}:
               </span>
               {client.servicePackages.map((p) => (
-                <Link
-                  key={p}
-                  to="/settings/packages"
-                  className="text-xs px-2 py-0.5 rounded border border-line bg-sunken/40 text-ink-700 hover:bg-sunken"
-                  title={`${p} — generates this client's deadlines automatically. Click to view.`}
-                >
-                  {p}
-                </Link>
+                <PackageChip key={p} packageName={p} client={client} />
               ))}
               <span className="text-2xs text-ink-400">
                 · {clientDeadlines.length} deadline{clientDeadlines.length === 1 ? "" : "s"} auto-generated
@@ -373,6 +367,172 @@ export function ClientDetail() {
   );
 }
 
+
+/**
+ * Service-package chip with a click-to-expand popover that shows the
+ * bundle's actual composition (the specific filings the firm commits to
+ * for clients on this package). Solves the "you can't tell what's actually
+ * inside this bundle" gap — the chip used to deep-link to /settings/packages
+ * which buried the answer two pages away.
+ *
+ * The popover renders against the bundle definition in `data/bundles.ts`,
+ * resolves `JurisdictionSlot` (federal / primary / nexus) into concrete
+ * state codes for THIS client, and shows due dates as MM-DD (no time-of-day,
+ * per `feedback_deadlines_dates_only`).
+ */
+function PackageChip({
+  packageName,
+  client,
+}: {
+  packageName: string;
+  client: Client;
+}) {
+  const [open, setOpen] = useState(false);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+  const bundle = bundleByName(packageName);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  // No matching bundle (firm-custom package) — render a static chip with a
+  // tooltip that explains why no breakdown is available.
+  if (!bundle) {
+    return (
+      <Link
+        to="/settings/packages"
+        className="text-xs px-2 py-0.5 rounded border border-line bg-sunken/40 text-ink-700 hover:bg-sunken"
+        title={`${packageName} — firm-custom package. View definition in Settings.`}
+      >
+        {packageName}
+      </Link>
+    );
+  }
+
+  return (
+    <div className="relative inline-block" ref={popoverRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label={`${packageName} — ${bundle.templates.length} filings included. Click to view.`}
+        className="text-xs px-2 py-0.5 rounded border border-line bg-sunken/40 text-ink-700 hover:bg-sunken inline-flex items-center gap-1"
+      >
+        {packageName}
+        <span className="text-ink-400">▾</span>
+      </button>
+      {open && (
+        <PackageDetailsPopover
+          bundle={bundle}
+          client={client}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function PackageDetailsPopover({
+  bundle,
+  client,
+  onClose,
+}: {
+  bundle: FilingBundle;
+  client: Client;
+  onClose: () => void;
+}) {
+  // Resolve JurisdictionSlot → concrete state label for this client. The
+  // bundle's templates use slot variables ("primary" / "nexus") so the same
+  // bundle definition produces different filings for an LA client vs a CA
+  // client. We render slot labels here instead of fake-state-coded values.
+  const resolveSlot = (slot: "federal" | "primary" | "nexus") => {
+    if (slot === "federal") return { label: "FED", title: "Federal" };
+    if (slot === "primary")
+      return {
+        label: client.primaryState,
+        title: STATE_NAMES[client.primaryState],
+      };
+    return {
+      label: `NX×${client.nexusStates.length}`,
+      title: `Nexus states: ${client.nexusStates.length > 0 ? client.nexusStates.join(", ") : "(none)"}`,
+    };
+  };
+
+  const formatTemplateDate = (month: number, day: number) =>
+    new Date(2000, month - 1, day).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+
+  return (
+    <div
+      role="dialog"
+      aria-label={`${bundle.name} — bundle composition`}
+      className="absolute z-30 left-0 top-full mt-1 w-80 bg-surface border border-line rounded-md shadow-overlay overflow-hidden"
+    >
+      <header className="px-3 py-2 border-b border-line bg-sunken/30">
+        <p className="text-sm font-semibold text-ink-900">{bundle.name}</p>
+        <p className="text-2xs text-ink-500 mt-0.5">{bundle.description}</p>
+      </header>
+      <div className="px-3 py-2 border-b border-line text-2xs text-ink-500 flex items-center gap-3">
+        <span>
+          <span className="text-ink-700 font-medium">
+            {bundle.templates.length}
+          </span>{" "}
+          filing{bundle.templates.length === 1 ? "" : "s"} included
+        </span>
+        <span className="text-ink-300">·</span>
+        <span>
+          Applies to:{" "}
+          <span className="text-ink-700">
+            {bundle.entityTypes.join(" · ")}
+          </span>
+        </span>
+      </div>
+      <ul className="divide-y divide-line max-h-80 overflow-y-auto">
+        {bundle.templates.map((t, i) => {
+          const slot = resolveSlot(t.jurisdiction);
+          return (
+            <li
+              key={`${t.form}-${i}`}
+              className="px-3 py-2 flex items-baseline gap-2 text-sm"
+            >
+              <span
+                className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-sunken text-ink-700 border border-line shrink-0 uppercase tabular-nums"
+                title={slot.title}
+              >
+                {slot.label}
+              </span>
+              <span className="flex-1 text-ink-900 truncate">{t.form}</span>
+              <span className="text-2xs text-ink-500 tabular-nums shrink-0">
+                {formatTemplateDate(t.month, t.day)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <footer className="px-3 py-2 bg-sunken/30 border-t border-line flex items-center justify-between text-2xs">
+        <span className="text-ink-500">
+          Out-of-scope work isn't covered by this package.
+        </span>
+        <Link
+          to="/settings/packages"
+          onClick={onClose}
+          className="text-ink-700 hover:text-ink-900 underline"
+        >
+          Edit package →
+        </Link>
+      </footer>
+    </div>
+  );
+}
 
 function NotesTab({ client }: { client: Client }) {
   const [draft, setDraft] = useState("");
