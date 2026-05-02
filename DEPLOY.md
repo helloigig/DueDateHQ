@@ -26,36 +26,51 @@ fly auth signup       # or `fly auth login` if you already have an account
 
 ### Launch the app
 
+> **Always run `fly` commands from the repo root.** The canonical config
+> is `/fly.toml` + `/Dockerfile` at the worktree root (app name
+> `duedatehq`). The files inside `backend/` (`backend/fly.toml`,
+> `backend/Dockerfile`) are deprecated templates — running `fly deploy`
+> from there creates a **second** app and partially overwrites the live
+> machine config. That's the bug that took the deploy critical on
+> 2026-05-02. See RUNBOOK.md → "Deploying backend to Fly.io" for the
+> source of truth.
+
 ```bash
-cd backend
-fly launch --no-deploy
+fly launch --no-deploy   # from the repo root, not backend/
 ```
 
 When prompted:
-- **App name:** something globally unique. Suggested: `duedatehq-backend-yuqi` or similar (default `duedatehq-backend` is in `fly.toml` but is likely taken).
-- **Region:** `iad` (us-east) is closest to most. Pick `sjc` if you're west-coast-heavy.
-- **Build with existing Dockerfile?** Yes
+- **App name:** the existing app is `duedatehq`. Keep it unless you're standing up a new environment.
+- **Region:** `lhr` is the current primary; pick whatever's closest to your users.
+- **Build with existing Dockerfile?** Yes (the root `Dockerfile`).
 - **Set up Postgres?** **No** — you already have Supabase
 - **Set up Upstash Redis?** No
 - **Deploy now?** **No** — we set secrets first
 
-Fly will edit `fly.toml` with the actual app name. Commit that change.
+Fly will edit the root `fly.toml` with the actual app name. Commit that change.
 
 ### Set secrets
 
 ⚠️ Use `fly secrets set` (not `fly.toml`) so secrets aren't committed.
+**Do not** include `PORT` or `NODE_ENV` here — those live in `fly.toml`'s
+`[env]` block. Fly secrets override `[env]` unconditionally, so a stray
+`PORT=8000` secret silently desyncs the runtime port from `internal_port`,
+the health check goes critical, and traffic stops routing. (This is the
+trap that took prod down on 2026-05-02; run `fly secrets list` after a
+deploy to confirm `PORT` / `NODE_ENV` are *not* listed.)
 
 ```bash
-# Copy values from backend/.env.local (DATABASE_URL etc. are already there)
+# Run from the repo root. Copy values from backend/.env.local
+# (DATABASE_URL etc. are already there).
 # CORS_ORIGIN should be the Vercel URL once you have it (skip for now, set after step 2)
 fly secrets set \
-  DATABASE_URL="$(grep DATABASE_URL .env.local | cut -d= -f2-)" \
-  SUPABASE_URL="$(grep SUPABASE_URL .env.local | cut -d= -f2-)" \
-  SUPABASE_ANON_KEY="$(grep SUPABASE_ANON_KEY .env.local | cut -d= -f2-)" \
-  SUPABASE_SERVICE_ROLE_KEY="$(grep SUPABASE_SERVICE_ROLE_KEY .env.local | cut -d= -f2-)" \
-  ANTHROPIC_API_KEY="$(grep ANTHROPIC_API_KEY .env.local | cut -d= -f2-)" \
-  INBOUND_WEBHOOK_SECRET="$(grep ^INBOUND_WEBHOOK_SECRET .env.local | tail -1 | cut -d= -f2-)" \
-  DELIVERY_WEBHOOK_SECRET="$(grep ^DELIVERY_WEBHOOK_SECRET .env.local | tail -1 | cut -d= -f2-)" \
+  DATABASE_URL="$(grep DATABASE_URL backend/.env.local | cut -d= -f2-)" \
+  SUPABASE_URL="$(grep SUPABASE_URL backend/.env.local | cut -d= -f2-)" \
+  SUPABASE_ANON_KEY="$(grep SUPABASE_ANON_KEY backend/.env.local | cut -d= -f2-)" \
+  SUPABASE_SERVICE_ROLE_KEY="$(grep SUPABASE_SERVICE_ROLE_KEY backend/.env.local | cut -d= -f2-)" \
+  ANTHROPIC_API_KEY="$(grep ANTHROPIC_API_KEY backend/.env.local | cut -d= -f2-)" \
+  INBOUND_WEBHOOK_SECRET="$(grep ^INBOUND_WEBHOOK_SECRET backend/.env.local | tail -1 | cut -d= -f2-)" \
+  DELIVERY_WEBHOOK_SECRET="$(grep ^DELIVERY_WEBHOOK_SECRET backend/.env.local | tail -1 | cut -d= -f2-)" \
   CORS_ORIGIN="*"
 ```
 
