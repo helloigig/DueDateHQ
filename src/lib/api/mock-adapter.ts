@@ -1696,6 +1696,163 @@ export const mockAdapter = {
     },
   },
 
+  // Federal forms catalog — mock substitute for the BE's federal_forms
+  // table. Trimmed to the most common ~15 forms; the FE consumers
+  // (AddDeadlineModal, FilingsTab) treat this as authoritative when
+  // env.useMockData is on.
+  federalForms: {
+    list: async (
+      input?: {
+        search?: string;
+        entityType?: string;
+        category?: string;
+        frequency?: string;
+        status?: string[];
+        includePendingReview?: boolean;
+      },
+    ) => {
+      await delay();
+      const all = MOCK_FEDERAL_FORMS;
+      const allowed = new Set<string>(
+        input?.status ??
+          (input?.includePendingReview
+            ? ["active", "pending_review"]
+            : ["active"]),
+      );
+      const search = input?.search?.toLowerCase() ?? "";
+      return all.filter((f) => {
+        if (!allowed.has(f.status)) return false;
+        if (input?.entityType && !f.entityTypes.includes(input.entityType))
+          return false;
+        if (input?.category && f.category !== input.category) return false;
+        if (input?.frequency && f.frequency !== input.frequency) return false;
+        if (search) {
+          const hay = `${f.formNumber} ${f.formName} ${f.notes ?? ""}`
+            .toLowerCase();
+          if (!hay.includes(search)) return false;
+        }
+        return true;
+      });
+    },
+    getByFormNumber: async ({ formNumber }: { formNumber: string }) => {
+      await delay();
+      const cleaned = formNumber.trim().toUpperCase();
+      return MOCK_FEDERAL_FORMS.find((f) => f.formNumber === cleaned) ?? null;
+    },
+    applicabilityForClient: async ({ clientId }: { clientId: string }) => {
+      await delay();
+      const { clients } = getState();
+      const client = clients.find((c) => c.id === clientId);
+      const entityType = client?.entityType ?? "Individual";
+      const primaryState = client?.primaryState ?? "CA";
+      const CATEGORY_RANK: Record<string, number> = {
+        income: 0,
+        estimated: 1,
+        payroll: 2,
+        info_return: 3,
+        nonprofit: 4,
+        excise: 5,
+        estate_gift: 6,
+        international: 7,
+        other: 8,
+        extension: 9,
+        amendment: 10,
+      };
+      const forms = MOCK_FEDERAL_FORMS.filter(
+        (f) => f.status === "active" && f.entityTypes.includes(entityType),
+      )
+        .map((form) => {
+          const exactMatch = form.entityTypes.length <= 2;
+          const isCurated = form.extractionMethod === "curated";
+          const confidence: "high" | "medium" =
+            exactMatch && isCurated ? "high" : "medium";
+          return {
+            form,
+            confidence,
+            reason: isCurated
+              ? `Curated catalog · ${entityType} listed in entity_types`
+              : `LLM-extracted (${(form.confidenceScore * 100).toFixed(0)}% confidence)`,
+          };
+        })
+        .sort((a, b) => {
+          const ra = CATEGORY_RANK[a.form.category] ?? 99;
+          const rb = CATEGORY_RANK[b.form.category] ?? 99;
+          if (ra !== rb) return ra - rb;
+          return a.form.formNumber.localeCompare(b.form.formNumber);
+        });
+      return {
+        clientId: clientId,
+        entityType,
+        primaryState,
+        forms,
+      };
+    },
+    extractFromLlm: async ({
+      formNumber,
+      hint,
+    }: {
+      formNumber: string;
+      hint?: string;
+    }) => {
+      await delay(300);
+      const cleaned = formNumber.trim().toUpperCase();
+      const existing = MOCK_FEDERAL_FORMS.find(
+        (f) => f.formNumber === cleaned,
+      );
+      if (existing) {
+        return {
+          form: existing,
+          created: false,
+          llmCalled: false,
+          confidence: existing.confidenceScore,
+          needsReview: existing.status === "pending_review",
+        };
+      }
+      const synthesized = {
+        id: `mock-llm-${cleaned}`,
+        formNumber: cleaned,
+        formName: hint?.slice(0, 200) ?? `Form ${cleaned}`,
+        category: "other",
+        entityTypes: [] as string[],
+        frequency: "annual",
+        dueDateRule: null,
+        notes:
+          "Mock LLM extraction. Real backend would populate this from Claude.",
+        irsUrl: null,
+        extractionMethod: "llm" as const,
+        confidenceScore: 0.4,
+        status: "pending_review" as const,
+        lastVerifiedAt: null,
+        lastChangeCheckAt: null,
+      };
+      return {
+        form: synthesized,
+        created: true,
+        llmCalled: true,
+        confidence: 0.4,
+        needsReview: true,
+      };
+    },
+    recentChanges: async () => {
+      await delay();
+      return [];
+    },
+    markChangeReviewed: async () => {
+      await delay();
+      return { ok: true as const };
+    },
+    pollNow: async () => {
+      await delay(200);
+      return {
+        fetched: 0,
+        inserted: 0,
+        changeEvents: 0,
+        lowConfidence: 0,
+        duplicatesSkipped: 0,
+      };
+    },
+  },
+
   multistate: {
     preview: async (input: {
       stateCodes: string[];
@@ -1799,3 +1956,284 @@ export const mockAdapter = {
 } as const;
 
 export type MockAdapter = typeof mockAdapter;
+
+// ─── Mock federal forms catalog ──────────────────────────────────────
+// Trimmed to the most common forms — the BE seed has more (see
+// backend/src/db/federal-forms-data.ts). Status is always 'active' here;
+// real BE has 'pending_review' for low-confidence LLM rows.
+type MockFederalForm = {
+  id: string;
+  formNumber: string;
+  formName: string;
+  category: string;
+  entityTypes: string[];
+  frequency: string;
+  dueDateRule: unknown;
+  notes: string | null;
+  irsUrl: string | null;
+  extractionMethod: "curated" | "llm" | "federal_register";
+  confidenceScore: number;
+  status: "active" | "pending_review" | "deprecated";
+  lastVerifiedAt: string | null;
+  lastChangeCheckAt: string | null;
+};
+
+const MOCK_FEDERAL_FORMS: MockFederalForm[] = [
+  {
+    id: "mock-fed-form-1040",
+    formNumber: "1040",
+    formName: "U.S. Individual Income Tax Return",
+    category: "income",
+    entityTypes: ["Individual"],
+    frequency: "annual",
+    dueDateRule: { type: "annual_fixed", month: 4, day: 15 },
+    notes: "April 15. Extension via Form 4868 to Oct 15; payment still due Apr 15.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-1040",
+    extractionMethod: "curated",
+    confidenceScore: 1.0,
+    status: "active",
+    lastVerifiedAt: null,
+    lastChangeCheckAt: null,
+  },
+  {
+    id: "mock-fed-form-1040-es",
+    formNumber: "1040-ES",
+    formName: "Estimated Tax for Individuals",
+    category: "estimated",
+    entityTypes: ["Individual"],
+    frequency: "quarterly",
+    dueDateRule: {
+      type: "quarterly_fixed",
+      periods: [
+        { month: 4, day: 15 },
+        { month: 6, day: 15 },
+        { month: 9, day: 15 },
+        { month: 1, day: 15 },
+      ],
+    },
+    notes: "Quarterly vouchers; Q4 due Jan 15 of the following year.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-1040-es",
+    extractionMethod: "curated",
+    confidenceScore: 1.0,
+    status: "active",
+    lastVerifiedAt: null,
+    lastChangeCheckAt: null,
+  },
+  {
+    id: "mock-fed-form-1040-x",
+    formNumber: "1040-X",
+    formName: "Amended U.S. Individual Income Tax Return",
+    category: "amendment",
+    entityTypes: ["Individual"],
+    frequency: "per_event",
+    dueDateRule: null,
+    notes:
+      "Within 3 years of original return's due date or 2 years of paying tax, whichever is later.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-1040-x",
+    extractionMethod: "curated",
+    confidenceScore: 1.0,
+    status: "active",
+    lastVerifiedAt: null,
+    lastChangeCheckAt: null,
+  },
+  {
+    id: "mock-fed-form-1120",
+    formNumber: "1120",
+    formName: "U.S. Corporation Income Tax Return",
+    category: "income",
+    entityTypes: ["C-Corp"],
+    frequency: "annual",
+    dueDateRule: { type: "annual_fixed", month: 4, day: 15 },
+    notes: "April 15 calendar year. Fiscal year: 15th day of 4th month after year-end.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-1120",
+    extractionMethod: "curated",
+    confidenceScore: 1.0,
+    status: "active",
+    lastVerifiedAt: null,
+    lastChangeCheckAt: null,
+  },
+  {
+    id: "mock-fed-form-1120-s",
+    formNumber: "1120-S",
+    formName: "U.S. Income Tax Return for an S Corporation",
+    category: "income",
+    entityTypes: ["S-Corp"],
+    frequency: "annual",
+    dueDateRule: { type: "annual_fixed", month: 3, day: 15 },
+    notes: "March 15 calendar year. K-1s to shareholders due same day.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-1120-s",
+    extractionMethod: "curated",
+    confidenceScore: 1.0,
+    status: "active",
+    lastVerifiedAt: null,
+    lastChangeCheckAt: null,
+  },
+  {
+    id: "mock-fed-form-1065",
+    formNumber: "1065",
+    formName: "U.S. Return of Partnership Income",
+    category: "income",
+    entityTypes: ["Partnership", "LLC"],
+    frequency: "annual",
+    dueDateRule: { type: "annual_fixed", month: 3, day: 15 },
+    notes: "March 15 calendar year. K-1s to partners due same day.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-1065",
+    extractionMethod: "curated",
+    confidenceScore: 1.0,
+    status: "active",
+    lastVerifiedAt: null,
+    lastChangeCheckAt: null,
+  },
+  {
+    id: "mock-fed-form-1041",
+    formNumber: "1041",
+    formName: "U.S. Income Tax Return for Estates and Trusts",
+    category: "income",
+    entityTypes: ["Trust"],
+    frequency: "annual",
+    dueDateRule: { type: "annual_fixed", month: 4, day: 15 },
+    notes: "April 15 calendar year. Fiscal year: 15th day of 4th month after year-end.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-1041",
+    extractionMethod: "curated",
+    confidenceScore: 1.0,
+    status: "active",
+    lastVerifiedAt: null,
+    lastChangeCheckAt: null,
+  },
+  {
+    id: "mock-fed-form-941",
+    formNumber: "941",
+    formName: "Employer's Quarterly Federal Tax Return",
+    category: "payroll",
+    entityTypes: ["C-Corp", "S-Corp", "Partnership", "LLC", "Individual"],
+    frequency: "quarterly",
+    dueDateRule: {
+      type: "quarterly_fixed",
+      periods: [
+        { month: 4, day: 30 },
+        { month: 7, day: 31 },
+        { month: 10, day: 31 },
+        { month: 1, day: 31 },
+      ],
+    },
+    notes: "Q1 Apr 30, Q2 Jul 31, Q3 Oct 31, Q4 Jan 31. Reports withheld income tax + FICA.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-941",
+    extractionMethod: "curated",
+    confidenceScore: 1.0,
+    status: "active",
+    lastVerifiedAt: null,
+    lastChangeCheckAt: null,
+  },
+  {
+    id: "mock-fed-form-940",
+    formNumber: "940",
+    formName: "Employer's Annual Federal Unemployment (FUTA) Tax Return",
+    category: "payroll",
+    entityTypes: ["C-Corp", "S-Corp", "Partnership", "LLC", "Individual"],
+    frequency: "annual",
+    dueDateRule: { type: "annual_fixed", month: 1, day: 31 },
+    notes: "Jan 31 covering prior calendar year. Feb 10 if all FUTA deposits timely.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-940",
+    extractionMethod: "curated",
+    confidenceScore: 1.0,
+    status: "active",
+    lastVerifiedAt: null,
+    lastChangeCheckAt: null,
+  },
+  {
+    id: "mock-fed-form-w-2",
+    formNumber: "W-2",
+    formName: "Wage and Tax Statement",
+    category: "info_return",
+    entityTypes: ["C-Corp", "S-Corp", "Partnership", "LLC", "Individual"],
+    frequency: "annual",
+    dueDateRule: { type: "annual_fixed", month: 1, day: 31 },
+    notes: "Jan 31 to employees AND SSA. W-3 transmittal accompanies paper filings.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-w-2",
+    extractionMethod: "curated",
+    confidenceScore: 1.0,
+    status: "active",
+    lastVerifiedAt: null,
+    lastChangeCheckAt: null,
+  },
+  {
+    id: "mock-fed-form-1099-nec",
+    formNumber: "1099-NEC",
+    formName: "Nonemployee Compensation",
+    category: "info_return",
+    entityTypes: ["C-Corp", "S-Corp", "Partnership", "LLC", "Individual"],
+    frequency: "annual",
+    dueDateRule: { type: "annual_fixed", month: 1, day: 31 },
+    notes: "Jan 31 to recipient AND IRS — no paper-vs-efile split.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-1099-nec",
+    extractionMethod: "curated",
+    confidenceScore: 1.0,
+    status: "active",
+    lastVerifiedAt: null,
+    lastChangeCheckAt: null,
+  },
+  {
+    id: "mock-fed-form-1099-misc",
+    formNumber: "1099-MISC",
+    formName: "Miscellaneous Information",
+    category: "info_return",
+    entityTypes: ["C-Corp", "S-Corp", "Partnership", "LLC", "Individual"],
+    frequency: "annual",
+    dueDateRule: { type: "annual_fixed", month: 1, day: 31 },
+    notes: "Recipient by Jan 31. IRS paper Feb 28; e-file Mar 31.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-1099-misc",
+    extractionMethod: "curated",
+    confidenceScore: 1.0,
+    status: "active",
+    lastVerifiedAt: null,
+    lastChangeCheckAt: null,
+  },
+  {
+    id: "mock-fed-form-4868",
+    formNumber: "4868",
+    formName: "Application for Automatic Extension to File 1040",
+    category: "extension",
+    entityTypes: ["Individual"],
+    frequency: "per_event",
+    dueDateRule: { type: "annual_fixed", month: 4, day: 15 },
+    notes: "File by original 1040 due date. Pushes filing to Oct 15; does NOT extend payment.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-4868",
+    extractionMethod: "curated",
+    confidenceScore: 1.0,
+    status: "active",
+    lastVerifiedAt: null,
+    lastChangeCheckAt: null,
+  },
+  {
+    id: "mock-fed-form-7004",
+    formNumber: "7004",
+    formName: "Application for Automatic Extension — Business Returns",
+    category: "extension",
+    entityTypes: ["C-Corp", "S-Corp", "Partnership", "LLC", "Trust"],
+    frequency: "per_event",
+    dueDateRule: null,
+    notes: "File by parent return's original due date. Length depends on form.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-7004",
+    extractionMethod: "curated",
+    confidenceScore: 1.0,
+    status: "active",
+    lastVerifiedAt: null,
+    lastChangeCheckAt: null,
+  },
+  {
+    id: "mock-fed-form-990",
+    formNumber: "990",
+    formName: "Return of Organization Exempt From Income Tax",
+    category: "nonprofit",
+    entityTypes: ["Nonprofit"],
+    frequency: "annual",
+    dueDateRule: { type: "annual_fixed", month: 5, day: 15 },
+    notes: "May 15 calendar year. 6-month extension via Form 8868.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-990",
+    extractionMethod: "curated",
+    confidenceScore: 1.0,
+    status: "active",
+    lastVerifiedAt: null,
+    lastChangeCheckAt: null,
+  },
+];

@@ -1002,6 +1002,144 @@ export const stateAnnouncementSources = pgTable(
 // End v0.8 amendment additions
 // ════════════════════════════════════════════════════════════════════════
 
+// ════════════════════════════════════════════════════════════════════════
+// Federal forms catalog — see migrations/0006_federal_forms.sql for the
+// rationale. The catalog is curated for the common ~30 forms; long-tail
+// rows are filled in on demand via lib/federal-form-extractor.ts (LLM)
+// and by lib/federal-register-poller.ts (when the Federal Register
+// announces a brand-new form). FE consumers — AddDeadlineModal,
+// FilingsTab, AI applicability — read from this table instead of the
+// hardcoded COMMON_FORMS list that used to live in the modal.
+// ════════════════════════════════════════════════════════════════════════
+
+export const federalFormStatus = pgEnum("federal_form_status", [
+  "active",
+  "pending_review",
+  "deprecated",
+]);
+
+export const federalFormExtractionMethod = pgEnum(
+  "federal_form_extraction_method",
+  ["curated", "llm", "federal_register"],
+);
+
+export const federalRegisterSourceStatus = pgEnum(
+  "federal_register_source_status",
+  ["healthy", "stale_short", "stale_long", "broken"],
+);
+
+export const federalFormChangeKind = pgEnum("federal_form_change_kind", [
+  "due_date_change",
+  "form_revision",
+  "new_form",
+  "deprecation",
+  "instructions_update",
+  "other",
+]);
+
+export const federalForms = pgTable("federal_forms", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  formNumber: text("form_number").notNull().unique(),
+  formName: text("form_name").notNull(),
+  category: text("category").notNull(),
+  entityTypes: text("entity_types").array().notNull().default(sql`'{}'::text[]`),
+  frequency: text("frequency").notNull().default("annual"),
+  dueDateRule: jsonb("due_date_rule"),
+  notes: text("notes"),
+  irsUrl: text("irs_url"),
+  extractionMethod: federalFormExtractionMethod("extraction_method")
+    .notNull()
+    .default("curated"),
+  confidenceScore: numeric("confidence_score", { precision: 3, scale: 2 })
+    .notNull()
+    .default("1.0"),
+  status: federalFormStatus("status").notNull().default("active"),
+  lastVerifiedAt: timestamp("last_verified_at", { withTimezone: true }),
+  lastChangeCheckAt: timestamp("last_change_check_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+});
+
+export const federalRegisterNotices = pgTable("federal_register_notices", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  documentNumber: text("document_number").notNull().unique(),
+  title: text("title").notNull(),
+  abstract: text("abstract"),
+  documentType: text("document_type").notNull(),
+  agency: text("agency").notNull(),
+  publicationDate: date("publication_date").notNull(),
+  effectiveDate: date("effective_date"),
+  htmlUrl: text("html_url").notNull(),
+  pdfUrl: text("pdf_url"),
+  referencedFormNumbers: text("referenced_form_numbers")
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
+  changeKind: federalFormChangeKind("change_kind").notNull().default("other"),
+  parseConfidence: text("parse_confidence").notNull().default("medium"),
+  rawPayload: jsonb("raw_payload"),
+  detectedAt: timestamp("detected_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+});
+
+export const federalFormChangeEvents = pgTable("federal_form_change_events", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  formId: uuid("form_id")
+    .notNull()
+    .references(() => federalForms.id, { onDelete: "cascade" }),
+  noticeId: uuid("notice_id")
+    .notNull()
+    .references(() => federalRegisterNotices.id, { onDelete: "cascade" }),
+  changeKind: federalFormChangeKind("change_kind").notNull(),
+  summary: text("summary").notNull(),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  appliedAt: timestamp("applied_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+});
+
+export const federalRegisterSources = pgTable("federal_register_sources", {
+  sourceKey: text("source_key").primaryKey(),
+  label: text("label").notNull(),
+  endpointUrl: text("endpoint_url").notNull(),
+  lastPolledAt: timestamp("last_polled_at", { withTimezone: true }),
+  lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
+  lastErrorMessage: text("last_error_message"),
+  consecutiveErrorCount: integer("consecutive_error_count")
+    .notNull()
+    .default(0),
+  nextScheduledPollAt: timestamp("next_scheduled_poll_at", {
+    withTimezone: true,
+  }),
+  status: federalRegisterSourceStatus("status").notNull().default("healthy"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+});
+
+export type FederalForm = typeof federalForms.$inferSelect;
+export type FederalFormInsert = typeof federalForms.$inferInsert;
+export type FederalRegisterNotice = typeof federalRegisterNotices.$inferSelect;
+export type FederalRegisterNoticeInsert =
+  typeof federalRegisterNotices.$inferInsert;
+export type FederalFormChangeEvent =
+  typeof federalFormChangeEvents.$inferSelect;
+export type FederalFormChangeEventInsert =
+  typeof federalFormChangeEvents.$inferInsert;
+export type FederalRegisterSource =
+  typeof federalRegisterSources.$inferSelect;
+export type FederalRegisterSourceInsert =
+  typeof federalRegisterSources.$inferInsert;
+
 export type Firm = typeof firms.$inferSelect;
 export type FirmInsert = typeof firms.$inferInsert;
 export type User = typeof users.$inferSelect;

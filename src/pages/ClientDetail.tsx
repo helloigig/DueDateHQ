@@ -22,6 +22,7 @@ import {
   AddDeadlineModal,
   type AddDeadlinePrefill,
 } from "../components/AddDeadlineModal";
+import { FilingsTab } from "../components/FilingsTab";
 import { EditClientModal } from "../components/EditClientModal";
 import { ExportModal } from "../components/ExportModal";
 import { ExportClientsButton } from "../components/ExportClientsButton";
@@ -42,6 +43,7 @@ import type {
 // every primary daily flow.
 type Tab =
   | "engagement"
+  | "filings"
   | "habits"
   | "predictions"
   | "todo"
@@ -218,6 +220,7 @@ export function ClientDetail() {
         {(
           [
             ["engagement", "🤝 Engagement"],
+            ["filings", "📋 Filings"],
             ["habits", "🧠 Habits"],
             ["predictions", "🔮 Predictions"],
             ["todo", "✅ To Do"],
@@ -291,6 +294,16 @@ export function ClientDetail() {
             allDeadlines={clientDeadlines}
             onSwitchToToDo={() => setTab("todo")}
             onSwitchToHabits={() => setTab("habits")}
+          />
+        )}
+        {tab === "filings" && (
+          <FilingsTab
+            client={client}
+            deadlines={clientDeadlines}
+            onAddDeadline={(prefill) => {
+              setAddDeadlinePrefill(prefill);
+              setAddDeadlineOpen(true);
+            }}
           />
         )}
         {tab === "habits" && <HabitsTab client={client} />}
