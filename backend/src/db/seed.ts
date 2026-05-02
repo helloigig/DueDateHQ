@@ -13,6 +13,7 @@ import { db } from "./client.js";
 import { reminderTemplates, servicePackages, serviceTemplates } from "./schema.js";
 import { PACKAGES, TEMPLATES } from "./seed-data.js";
 import { REMINDER_TEMPLATES } from "./seed-templates.js";
+import { seedFederalForms } from "./seed-federal-forms.js";
 
 async function seed() {
   // Index existing system packages by name for idempotency.
@@ -102,9 +103,14 @@ async function seed() {
     createdReminderTemplates++;
   }
 
+  // Federal forms catalog — see seed-federal-forms.ts. Bundled here so a
+  // fresh deploy gets one seeder call to populate every system catalog
+  // (packages + reminder templates + federal forms).
+  const federalFormsResult = await seedFederalForms();
+
   // eslint-disable-next-line no-console
   console.log(
-    `[ddhq-backend] seed complete — packages: +${createdPackages}, service templates: +${createdTemplates}, reminder templates: +${createdReminderTemplates}`,
+    `[ddhq-backend] seed complete — packages: +${createdPackages}, service templates: +${createdTemplates}, reminder templates: +${createdReminderTemplates}, federal forms: +${federalFormsResult.inserted} inserted, ${federalFormsResult.updated} updated, ${federalFormsResult.unchanged} unchanged`,
   );
 }
 

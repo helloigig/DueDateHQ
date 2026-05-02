@@ -23,6 +23,11 @@ import {
   runScraperCycle,
   startScraperScheduler,
 } from "./lib/scraper.js";
+import {
+  listFederalRegisterStatus,
+  runFederalRegisterCycle,
+  startFederalRegisterPoller,
+} from "./lib/federal-register-poller.js";
 import { db } from "./db/client.js";
 import { stateAnnouncementSources } from "./db/schema.js";
 import { startExportWorker, ARTIFACT_DIR } from "./lib/export-worker.js";
@@ -268,6 +273,7 @@ app.get("/api/scraper/status", async (c) => {
       .select()
       .from(stateAnnouncementSources)
       .orderBy(stateAnnouncementSources.stateCode);
+    const federalSources = await listFederalRegisterStatus();
     return c.json({
       ok: true,
       sources: sources.map((s) => ({
@@ -280,9 +286,43 @@ app.get("/api/scraper/status", async (c) => {
         consecutiveErrorCount: s.consecutiveErrorCount,
         lastErrorMessage: s.lastErrorMessage,
       })),
+      federalRegister: federalSources.map((s) => ({
+        sourceKey: s.sourceKey,
+        label: s.label,
+        endpointUrl: s.endpointUrl,
+        lastPolledAt: s.lastPolledAt,
+        lastSuccessAt: s.lastSuccessAt,
+        status: s.status,
+        consecutiveErrorCount: s.consecutiveErrorCount,
+        lastErrorMessage: s.lastErrorMessage,
+      })),
     });
   } catch (err) {
     captureException(err, { route: "/api/scraper/status" });
+    return c.json(
+      {
+        ok: false,
+        error: err instanceof Error ? err.message : "internal",
+      },
+      500,
+    );
+  }
+});
+
+// Mirror the state-scraper run-now endpoint for the federal-register
+// poller. Same auth model — INBOUND_WEBHOOK_SECRET is already in Fly
+// secrets, already rotated when the webhook secrets are.
+app.post("/api/federal-register/run-now/:secret", async (c) => {
+  const secret = c.req.param("secret");
+  if (!secret || secret !== process.env.INBOUND_WEBHOOK_SECRET) {
+    return c.json({ ok: false, error: "unauthorized" }, 401);
+  }
+  try {
+    const result = await runFederalRegisterCycle();
+    log.info("federalRegister.run_now", { ...result });
+    return c.json({ ok: true, ...result });
+  } catch (err) {
+    captureException(err, { route: "/api/federal-register/run-now" });
     return c.json(
       {
         ok: false,
@@ -314,6 +354,13 @@ if (env.NODE_ENV !== "test") {
   // dev when you don't want network calls on every server restart.
   if (process.env.SCRAPER_DISABLED !== "1") {
     startScraperScheduler();
+  }
+  // Federal Register poller — federal-side counterpart to the state
+  // scraper. 6h cadence (Fed Register publishes once per business day).
+  // Disabled in dev by default so test runs don't hit the public API
+  // on every backend restart.
+  if (process.env.FEDERAL_REGISTER_DISABLED !== "1") {
+    startFederalRegisterPoller();
   }
   // Method B poller — gated by env so dev runs don't burn quota
   // against the user's real Gmail. Production sets METHOD_B_ENABLED=1.
