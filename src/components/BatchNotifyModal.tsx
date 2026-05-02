@@ -4,6 +4,8 @@ import type { Announcement, Client } from "../types";
 import { actions } from "../data/store";
 import { formatLongDate } from "../data/dateHelpers";
 import { useSession } from "../data/session";
+import { useBatchAdjustFromAnnouncement } from "../hooks/useAnnouncements";
+import { useInvalidateDeadlines } from "../hooks/useDeadlines";
 import { Modal, useModalLabelId } from "./Modal";
 
 export function BatchNotifyModal({
@@ -23,6 +25,14 @@ export function BatchNotifyModal({
 }) {
   const session = useSession();
   const labelId = useModalLabelId();
+  // Persistence path for deadline shifts. Calls the BE
+  // `announcements.batchAdjustDeadlines` mutation, which also cascades to
+  // task_milestones server-side. The local `actions.batchAdjustDeadlines`
+  // we still call below provides the instant optimistic UI update; once
+  // this resolves, the invalidate trigger refetches deadlines/clients
+  // from the BE so the truth wins.
+  const batchAdjustBE = useBatchAdjustFromAnnouncement();
+  const invalidateDeadlines = useInvalidateDeadlines();
 
   // Disaster extensions carry a deadline shift. We bundle the mutation into
   // the same review action so the CPA confirms email + calendar move in one
@@ -88,6 +98,9 @@ export function BatchNotifyModal({
       announcement.newDeadline
     ) {
       const ids = recipients.map((c) => c.id);
+      // Optimistic local mutation — instant UI feedback in mock + real
+      // (the local store is the read source for the FE; tRPC queries
+      // hydrate from BE on next refetch).
       actions.batchAdjustDeadlines(
         ids,
         announcement.oldDeadline,
@@ -95,6 +108,15 @@ export function BatchNotifyModal({
         announcement.title
       );
       adjustedCount = ids.length;
+      // Persist to BE — fire-and-forget; the BE cascades to task_milestones
+      // and records `firm_announcement.batch_adjusted_at`. On success the
+      // mutation invalidates the announcements queries; we add an explicit
+      // deadlines invalidation so ClientDetail / TaskDetail refetch the
+      // BE-shifted dates and the optimistic local state reconciles.
+      batchAdjustBE.mutate(
+        { id: announcement.id },
+        { onSuccess: () => invalidateDeadlines() },
+      );
     }
     setSent(true);
     onSent(recipients.length, adjustedCount);

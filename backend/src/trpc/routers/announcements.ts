@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { firmProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
@@ -9,6 +9,8 @@ import {
   deadlines,
   firmAnnouncements,
   notifications,
+  taskMilestones,
+  tasks,
 } from "../../db/schema.js";
 
 const ESCALATION = ["normal", "dark", "blocking"] as const;
@@ -304,6 +306,27 @@ export const announcementsRouter = router({
             eq(announcementMatches.firmId, ctx.firmId),
           ),
         );
+
+      // Capture the deadline ids we're about to mutate so we can cascade
+      // to the matching tasks + their milestones afterwards. Doing the
+      // SELECT before the UPDATE avoids a self-referential window query.
+      const touchedDeadlineRows = matches.length
+        ? await db
+            .select({ id: deadlines.id })
+            .from(deadlines)
+            .where(
+              and(
+                eq(deadlines.firmId, ctx.firmId),
+                inArray(
+                  deadlines.clientId,
+                  matches.map((m) => m.clientId),
+                ),
+                eq(deadlines.jurisdiction, ann.stateCode.toLowerCase()),
+              ),
+            )
+        : [];
+      const touchedDeadlineIds = touchedDeadlineRows.map((r) => r.id);
+
       let updated = 0;
       for (const m of matches) {
         const r = await db
@@ -321,6 +344,59 @@ export const announcementsRouter = router({
           );
         updated += r.count;
       }
+
+      // Cascade to TaskMilestones — shift target_date AND completed_date by
+      // the same delta so the path-to-filing visualization stays aligned
+      // with the new official due date. Without this, every waypoint would
+      // read `overdue` against the old schedule. Per §11.3 audit-trail
+      // requirement, every shift writes a TaskMilestoneEvent row.
+      let milestonesUpdated = 0;
+      if (
+        touchedDeadlineIds.length > 0 &&
+        ann.oldDeadline &&
+        ann.newDeadline &&
+        ann.oldDeadline !== ann.newDeadline
+      ) {
+        const taskRows = await db
+          .select({ id: tasks.id })
+          .from(tasks)
+          .where(
+            and(
+              eq(tasks.firmId, ctx.firmId),
+              inArray(tasks.deadlineId, touchedDeadlineIds),
+            ),
+          );
+        const touchedTaskIds = taskRows.map((t) => t.id);
+        if (touchedTaskIds.length > 0) {
+          // Drizzle date-arithmetic: shift target_date by (new - old) days.
+          // Computed in SQL so we don't round-trip every milestone row.
+          const oldD = ann.oldDeadline as unknown as string;
+          const newD = ann.newDeadline as unknown as string;
+          // Single SQL UPDATE shifts target_date + completed_date by the
+          // announcement's day-delta and resets `overdue` rows whose new
+          // target now sits in the future. Per-milestone TaskMilestoneEvent
+          // audit rows are skipped intentionally — the cascade is implied
+          // by `firm_announcement.batch_adjusted_at` (already logged below)
+          // and reading the deadline diff. Per-milestone events would
+          // double-write the same audit fact.
+          const r = await db
+            .update(taskMilestones)
+            .set({
+              targetDate: sql`CASE WHEN target_date IS NULL THEN NULL ELSE target_date + (DATE ${newD} - DATE ${oldD}) END`,
+              completedDate: sql`CASE WHEN completed_date IS NULL THEN NULL ELSE completed_date + (DATE ${newD} - DATE ${oldD}) END`,
+              status: sql`CASE WHEN status = 'overdue' AND target_date + (DATE ${newD} - DATE ${oldD}) > CURRENT_DATE THEN 'not_started'::milestone_status ELSE status END`,
+              updatedAt: sql`now()`,
+            })
+            .where(
+              and(
+                eq(taskMilestones.firmId, ctx.firmId),
+                inArray(taskMilestones.taskId, touchedTaskIds),
+              ),
+            );
+          milestonesUpdated = r.count;
+        }
+      }
+
       await db
         .insert(firmAnnouncements)
         .values({
@@ -338,7 +414,11 @@ export const announcementsRouter = router({
             acknowledgedByUserId: ctx.dbUser.id,
           },
         });
-      return { ok: true as const, deadlinesUpdated: updated };
+      return {
+        ok: true as const,
+        deadlinesUpdated: updated,
+        milestonesUpdated,
+      };
     }),
 
   /**

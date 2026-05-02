@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Sparkles, AlertOctagon } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Sparkles, AlertOctagon, Check } from "lucide-react";
 import type { Task, ChecklistItem } from "../types";
 import { trpc } from "../lib/api/client";
 
@@ -21,18 +21,32 @@ import { trpc } from "../lib/api/client";
 // which runs Mode B + inserts 5 rows. Once proposed, the heuristic stops
 // firing and live data drives the visualization.
 
-type Status = "done" | "in_progress" | "not_started" | "overdue" | "blocked";
+/**
+ * Per-waypoint progress on the 5-step path-to-filing. Distinct from
+ * `TaskStatus` (Task lifecycle phase) and `DocumentState` (per-checklist-item
+ * document lifecycle). See cheat sheet at top of `src/types.ts`.
+ */
+type MilestoneProgress =
+  | "done"
+  | "in_progress"
+  | "not_started"
+  | "overdue"
+  | "blocked";
 
 type Waypoint = {
   type: "initial_meeting" | "collect" | "prepare" | "review" | "file";
   label: string;
   targetDate?: string;
-  status: Status;
+  status: MilestoneProgress;
   // count badge — shows missing checklist items at the current stage
   // per `feedback_gap_over_fill` (mini-timeline waypoint badge for waiting)
   missingBadge?: number;
   // Mode E blocker reason — shown in tooltip + tinted dot when status=blocked
   blockerReason?: string;
+  // BE row id — present only when the waypoint maps to a persisted milestone
+  // (i.e. Mode B has proposed). Heuristic-derived waypoints have no id and
+  // therefore can't be advanced; the popover shows a hint instead.
+  milestoneId?: string;
 };
 
 interface Props {
@@ -54,9 +68,32 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
       void milestonesQuery.refetch();
     },
   });
+  const updateMilestone = trpc.taskMilestones.update.useMutation({
+    onSuccess: () => {
+      void milestonesQuery.refetch();
+    },
+  });
   const [lastBlockerSummary, setLastBlockerSummary] = useState<string | null>(
     null,
   );
+
+  // Refetch when batchAdjustDeadlines fires the milestone-shift event for
+  // this task — keeps the visualization in sync with cascaded date moves.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ taskIds: string[] }>).detail;
+      if (detail?.taskIds?.includes(task.id)) {
+        void milestonesQuery.refetch();
+      }
+    };
+    window.addEventListener("ddhq:milestones-shifted", handler);
+    return () =>
+      window.removeEventListener("ddhq:milestones-shifted", handler);
+  }, [task.id, milestonesQuery]);
+
+  const advanceMilestone = (milestoneId: string, status: MilestoneProgress) => {
+    updateMilestone.mutate({ milestoneId, patch: { status } });
+  };
   const liveMilestones = milestonesQuery.data ?? [];
   const hasLive = liveMilestones.length > 0;
   const blockedCount = liveMilestones.filter((m) => m.status === "blocked").length;
@@ -149,6 +186,7 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
             wp={wp}
             isFirst={i === 0}
             isLast={i === waypoints.length - 1}
+            onAdvance={advanceMilestone}
           />
         ))}
       </div>
@@ -157,6 +195,7 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
 }
 
 type LiveMilestone = {
+  id: string;
   milestoneType: string;
   targetDate: string | null;
   completedDate: string | null;
@@ -196,7 +235,7 @@ function milestonesToWaypoints(
   ).length;
   return stages.map((s) => {
     const row = byType.get(s.canonical);
-    const status: Status =
+    const status: MilestoneProgress =
       row?.status === "done"
         ? "done"
         : row?.status === "blocked"
@@ -219,6 +258,7 @@ function milestonesToWaypoints(
       status,
       missingBadge,
       blockerReason: row?.blockerReason ?? undefined,
+      milestoneId: row?.id,
     };
   });
 }
@@ -235,11 +275,29 @@ function Waypoint({
   wp,
   isFirst,
   isLast,
+  onAdvance,
 }: {
   wp: Waypoint;
   isFirst: boolean;
   isLast: boolean;
+  onAdvance: (milestoneId: string, status: MilestoneProgress) => void;
 }) {
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+
+  // Close popover on outside click. The dot button itself stays inside the
+  // ref via the wrapping container so its click toggles instead of closing.
+  useEffect(() => {
+    if (!popoverOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setPopoverOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [popoverOpen]);
+
   const dotClasses = (() => {
     switch (wp.status) {
       case "done":
@@ -258,8 +316,24 @@ function Waypoint({
     ? `${wp.label} — BLOCKED: ${wp.blockerReason}${wp.targetDate ? ` · target ${wp.targetDate}` : ""}`
     : `${wp.label} — ${wp.status.replace("_", " ")}${wp.targetDate ? ` · target ${wp.targetDate}` : ""}`;
 
+  // Heuristic-derived waypoints have no BE row, so they can't be advanced.
+  // Show the same dot but as a static element with a "Run Propose dates first"
+  // hint in the tooltip.
+  const isInteractive = !!wp.milestoneId;
+
+  // The set of states the user can pick from. We omit `overdue` (system-only)
+  // and `blocked` (Mode E proposal — user dismisses via reset, not direct write).
+  const options: Array<{ status: MilestoneProgress; label: string }> = [
+    { status: "done", label: "Mark done" },
+    { status: "in_progress", label: "Mark in progress" },
+    { status: "not_started", label: "Reset to not started" },
+  ];
+
   return (
-    <div className="flex-1 flex flex-col items-center min-w-0 relative">
+    <div
+      className="flex-1 flex flex-col items-center min-w-0 relative"
+      ref={popoverRef}
+    >
       {/* Connector line on left and right (skipped at edges) */}
       <div className="absolute top-2.5 left-0 right-0 flex items-center">
         {!isFirst && (
@@ -282,11 +356,64 @@ function Waypoint({
         )}
       </div>
 
-      {/* Dot */}
-      <div
-        className={`relative z-10 w-3 h-3 rounded-full shrink-0 ${dotClasses}`}
-        title={tooltipText}
-      />
+      {/* Dot — interactive button when a BE milestone exists */}
+      {isInteractive ? (
+        <button
+          type="button"
+          onClick={() => setPopoverOpen((v) => !v)}
+          className={`relative z-10 w-3 h-3 rounded-full shrink-0 cursor-pointer hover:scale-125 transition-transform ${dotClasses}`}
+          title={tooltipText + " · click to advance"}
+          aria-label={`${wp.label} — change progress`}
+          aria-expanded={popoverOpen}
+        />
+      ) : (
+        <div
+          className={`relative z-10 w-3 h-3 rounded-full shrink-0 ${dotClasses}`}
+          title={
+            tooltipText +
+            ' · "Propose dates" first to enable advancing'
+          }
+        />
+      )}
+
+      {/* Popover menu — only when a BE milestone is selected */}
+      {isInteractive && popoverOpen && wp.milestoneId && (
+        <div
+          role="menu"
+          className="absolute z-30 top-7 left-1/2 -translate-x-1/2 min-w-[10rem] bg-surface border border-line rounded-md shadow-lg py-1 text-sm"
+        >
+          {options.map((opt) => {
+            const isCurrent = opt.status === wp.status;
+            return (
+              <button
+                key={opt.status}
+                type="button"
+                role="menuitem"
+                disabled={isCurrent}
+                onClick={() => {
+                  onAdvance(wp.milestoneId!, opt.status);
+                  setPopoverOpen(false);
+                }}
+                className={`w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-sunken disabled:opacity-50 disabled:cursor-not-allowed ${
+                  opt.status === "done"
+                    ? "text-success-solid font-medium"
+                    : "text-ink-700"
+                }`}
+              >
+                {opt.status === "done" && (
+                  <Check className="w-3 h-3" aria-hidden />
+                )}
+                <span className={opt.status === "done" ? "" : "ml-5"}>
+                  {opt.label}
+                </span>
+                {isCurrent && (
+                  <span className="ml-auto text-2xs text-ink-400">current</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Label + date */}
       <div className="mt-2 text-center min-w-0 w-full">
@@ -344,10 +471,10 @@ function deriveWaypoints(task: Task, checklist: ChecklistItem[]): Waypoint[] {
   const isComplete = task.status === "completed";
   const isOverdue = task.status === "overdue" || (today > due && !isComplete);
 
-  const initialStatus: Status = "done"; // assume initial meeting happened
-  const collectStatus: Status =
+  const initialStatus: MilestoneProgress = "done"; // assume initial meeting happened
+  const collectStatus: MilestoneProgress =
     waiting > 0 ? (today > clientPrep! ? "overdue" : "in_progress") : "done";
-  const prepareStatus: Status =
+  const prepareStatus: MilestoneProgress =
     waiting > 0
       ? "not_started"
       : review_pending > 0
@@ -355,13 +482,13 @@ function deriveWaypoints(task: Task, checklist: ChecklistItem[]): Waypoint[] {
         : pct < 1
           ? "in_progress"
           : "done";
-  const reviewStatus: Status =
+  const reviewStatus: MilestoneProgress =
     pct < 1 || prepareStatus !== "done"
       ? "not_started"
       : !isComplete
         ? "in_progress"
         : "done";
-  const fileStatus: Status = isComplete
+  const fileStatus: MilestoneProgress = isComplete
     ? "done"
     : isOverdue
       ? "overdue"

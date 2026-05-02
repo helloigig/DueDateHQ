@@ -47,6 +47,49 @@ type MockMilestoneRow = {
 };
 const mockMilestoneStore = new Map<string, MockMilestoneRow[]>();
 
+/**
+ * Shift every milestone's `target_date` (and `completed_date` when present)
+ * for the given task ids by `deltaDays`. Called by `actions.batchAdjustDeadlines`
+ * when a state alert moves a deadline — keeps the mini-timeline waypoints
+ * aligned with the new official due date instead of leaving them all marked
+ * `overdue` on the old schedule.
+ *
+ * Dispatches a `ddhq:milestones-shifted` window event so live TaskMiniTimeline
+ * instances can invalidate their TanStack query cache and re-render. In the
+ * real BE, this would be a server-side cascade with realtime invalidation
+ * over websockets.
+ */
+export function shiftMilestoneTargetDatesForTasks(
+  taskIds: string[],
+  deltaDays: number,
+): void {
+  if (deltaDays === 0 || taskIds.length === 0) return;
+  const ids = new Set(taskIds);
+  const shift = (iso: string): string => {
+    const d = new Date(iso + "T12:00:00");
+    d.setDate(d.getDate() + deltaDays);
+    return d.toISOString().slice(0, 10);
+  };
+  for (const [taskId, rows] of mockMilestoneStore.entries()) {
+    if (!ids.has(taskId)) continue;
+    for (const r of rows) {
+      if (r.targetDate) r.targetDate = shift(r.targetDate);
+      if (r.completedDate) r.completedDate = shift(r.completedDate);
+      // Re-evaluate overdue: if a previously-overdue milestone's new target
+      // is now in the future, reset to not_started so the badge clears.
+      if (r.status === "overdue" && r.targetDate) {
+        const target = new Date(r.targetDate + "T12:00:00").getTime();
+        if (target > Date.now()) r.status = "not_started";
+      }
+    }
+  }
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("ddhq:milestones-shifted", { detail: { taskIds } }),
+    );
+  }
+}
+
 function nextApril15(): string {
   const now = new Date();
   const year =
@@ -715,8 +758,31 @@ export const mockAdapter = {
           "mock substrate (PRD §4.2 cold-start defaults — no firm history)",
       };
     },
-    update: async (_input: unknown) => {
+    update: async (input: {
+      milestoneId: string;
+      patch: Partial<MockMilestoneRow>;
+    }) => {
       await delay();
+      // Find the row across every task's bucket. The store key is taskId,
+      // so we walk values until the milestone surfaces. Cheap at MVP scale.
+      // §5.3 spirit (AI never writes done) is enforced at the call site —
+      // only the CPA-driven Waypoint popover invokes this mutation; the
+      // proposeForTask + detectBlockers paths do not.
+      for (const rows of mockMilestoneStore.values()) {
+        const idx = rows.findIndex((r) => r.id === input.milestoneId);
+        if (idx === -1) continue;
+        const next = { ...rows[idx], ...input.patch };
+        if (input.patch.status === "done" && !next.completedDate) {
+          next.completedDate = new Date().toISOString().slice(0, 10);
+        } else if (
+          input.patch.status &&
+          input.patch.status !== "done"
+        ) {
+          next.completedDate = null;
+        }
+        rows[idx] = next;
+        return next;
+      }
       return {} as unknown;
     },
     add: async (_input: unknown) => {

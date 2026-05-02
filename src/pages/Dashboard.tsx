@@ -88,8 +88,19 @@ export function Dashboard() {
   const clients = clientsQuery.data?.items ?? [];
   const announcements = announcementsQuery.data ?? [];
 
-  const activeBanners = announcements.filter(
-    (a) => !a.dismissed && a.affectedClientIds.length > 0,
+  // Two distinct slices:
+  //   • activeBanners — every undismissed alert. Passed to AnnouncementBanner,
+  //     which has its own logic for splitting "actionable" rows (affect a
+  //     client OR escalated) from collapsed "news" chips. Stripping the
+  //     non-affecting alerts here used to make the whole banner vanish on
+  //     empty firms — an alert detected against the firm's monitored states
+  //     should always be visible, even if no client currently matches.
+  //   • firmRelevantAlerts — undismissed alerts that hit at least one of
+  //     this firm's clients. Used only for the >72h blocking dialog so we
+  //     don't force-modal an alert no client cares about.
+  const activeBanners = announcements.filter((a) => !a.dismissed);
+  const firmRelevantAlerts = activeBanners.filter(
+    (a) => a.affectedClientIds.length > 0,
   );
 
   const alertsByTier = useMemo(() => {
@@ -99,11 +110,11 @@ export function Dashboard() {
       escalated: [] as Announcement[],
       blocking: [] as Announcement[],
     };
-    for (const a of activeBanners) {
+    for (const a of firmRelevantAlerts) {
       out[escalationTier(hoursSince(a.detectedAt))].push(a);
     }
     return out;
-  }, [activeBanners]);
+  }, [firmRelevantAlerts]);
 
   const alertsSnoozedToday = prefs.alerts_snoozed_until === toIso(TODAY);
   const showBlockingDialog =

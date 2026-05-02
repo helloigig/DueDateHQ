@@ -18,6 +18,43 @@ export const STATE_NAMES: Record<StateCode, string> = {
 
 export type ClientStatus = "active" | "inactive" | "prospect" | "archived";
 
+/**
+ * ────────────────────────────────────────────────────────────────────────────
+ * Status / state field cheat sheet — four state machines, do not conflate.
+ * ────────────────────────────────────────────────────────────────────────────
+ *
+ * Layer 1 · `Deadline.status: DeadlineStatus`
+ *   Lifecycle of a single tax filing for a client. Mirrors `Task.status` 1:1
+ *   at MVP (every Task has exactly one Deadline; `updateTaskStatus` writes
+ *   both). Persisted on the Deadline so legacy callers reading deadlines
+ *   directly see the same lifecycle phase.
+ *
+ * Layer 2 · `Task.status: TaskStatus`
+ *   Same enum as DeadlineStatus, but ownership lives on the Task. This is the
+ *   canonical lifecycle field — Today filters, TaskList rows, and the "Send
+ *   N reminders" verbs all read from here. Mutated only via
+ *   `actions.updateTaskStatus`. AI never auto-promotes (PRD §5.3 spirit).
+ *
+ * Layer 3 · `ChecklistItem.state: DocumentState`
+ *   Per-document lifecycle inside a Task (W-2, K-1, 1099, etc.). Six states
+ *   covering request → wait → received → confirmed/issue/n.a. Mutated only
+ *   via `actions.setChecklistItemState`. **Hard invariant**: only `actor=cpa`
+ *   may promote to `received_confirmed` (PRD §5.3 — enforced in store.ts).
+ *
+ * Layer 2 · `TaskMilestone.status: MilestoneProgress`
+ *   Per-waypoint progress on the 5-step "path to filing" (Initial mtg →
+ *   Collect → Prepare → Review → File). Defined locally in
+ *   `src/components/TaskMiniTimeline.tsx` and `src/pages/Timeline.tsx` to
+ *   avoid collision with the lifecycle enums. AI authority: Mode B writes
+ *   `target_date`; Mode E writes `status=blocked`; AI cannot write
+ *   `status=done`.
+ *
+ * Rule of thumb when reading code:
+ *   • "completed"        → lifecycle (Task / Deadline)
+ *   • "received_*"       → document (ChecklistItem)
+ *   • "done" / "blocked" → milestone (waypoint)
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 export type DeadlineStatus =
   | "not_started"
   | "in_progress"
@@ -343,6 +380,14 @@ export interface DeadlineExtensionMeta {
 
 // -------- v0.7 Layer 2-4 model (Task / ChecklistItem / Activity / Email / AI) --------
 
+/**
+ * Canonical lifecycle phase of a Task. Mirrored to `Deadline.status` by
+ * `actions.updateTaskStatus` so the two stay 1:1.
+ *
+ * **Not the same as** `MilestoneProgress` (per-waypoint progress on the
+ * mini-timeline) or `DocumentState` (per-checklist-item document lifecycle).
+ * See the cheat sheet at the top of this file.
+ */
 export type TaskStatus =
   | "not_started"
   | "in_progress"

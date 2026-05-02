@@ -33,6 +33,7 @@ import {
   suggestBundleForEntity,
 } from "./bundles";
 import { buildTasksFromDeadlines } from "./mockTasks";
+import { shiftMilestoneTargetDatesForTasks } from "../lib/api/mock-adapter";
 import { buildChecklistsFromTasks } from "./mockChecklistItems";
 import { reminderTemplates as seedReminderTemplates } from "./mockReminderTemplates";
 import { importedFacts as seedImportedFacts } from "./mockImportedFacts";
@@ -574,9 +575,13 @@ export const actions = {
     // delta so every downstream view rebounds in lockstep:
     //   • Deadlines power the ClientDetail timeline
     //   • Tasks power the Today / Dashboard "due now" buckets and TaskDetail
+    //   • TaskMilestones power the path-to-filing visualization
     // Without the cascade, ClientDetail would show the new official date
-    // while Today still fires on the old internal target.
+    // while Today still fires on the old internal target — and the
+    // mini-timeline waypoints would all read `overdue` against the old
+    // schedule.
     const deltaDays = isoDeltaDays(oldIso, newIso);
+    const allShiftedTaskIds: string[] = [];
 
     for (const cid of clientIds) {
       const touchedDeadlines = state.deadlines.filter(
@@ -585,6 +590,10 @@ export const actions = {
       if (touchedDeadlines.length === 0) continue;
 
       const touchedDeadlineIds = new Set(touchedDeadlines.map((d) => d.id));
+      const touchedTaskIds = state.tasks
+        .filter((t) => touchedDeadlineIds.has(t.deadlineId))
+        .map((t) => t.id);
+      allShiftedTaskIds.push(...touchedTaskIds);
 
       state = {
         ...state,
@@ -618,6 +627,14 @@ export const actions = {
         } from ${oldIso} → ${newIso}${note}`
       );
     }
+
+    // Cascade to milestones (mock-adapter holds these out-of-band; the helper
+    // mutates the Map and dispatches a `ddhq:milestones-shifted` event so
+    // any open TaskMiniTimeline invalidates its query and re-renders).
+    if (allShiftedTaskIds.length > 0) {
+      shiftMilestoneTargetDatesForTasks(allShiftedTaskIds, deltaDays);
+    }
+
     emit();
   },
 

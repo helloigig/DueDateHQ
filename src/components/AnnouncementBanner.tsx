@@ -83,7 +83,42 @@ export function AnnouncementBanner({
 }: {
   announcements: Announcement[];
 }) {
-  if (announcements.length === 0) return null;
+  // Empty state — render a calm "nothing affecting your clients" stripe
+  // instead of vanishing the section entirely. A silent absence reads as
+  // "the feature isn't working" to a CPA who was promised state monitoring;
+  // an explicit acknowledgement reads as "we checked and you're clear."
+  // Three empty cases all reach this path:
+  //   • Fresh sign-up before any seed data lands
+  //   • Real BE returned [] (scraper hasn't fired or no rows match firm)
+  //   • CPA dismissed every active alert this week
+  if (announcements.length === 0) {
+    return (
+      <section
+        className="bg-surface border border-line rounded-md px-4 py-2.5 flex items-center gap-3"
+        aria-label="State alerts"
+      >
+        <span
+          className="w-2 h-2 rounded-full shrink-0 bg-ok-solid"
+          aria-hidden
+        />
+        <Megaphone className="w-3.5 h-3.5 shrink-0 text-ink-500" aria-hidden />
+        <span className="flex-1 text-sm text-ink-700">
+          <span className="font-medium text-ink-900">All clear.</span>
+          <span className="text-ink-500">
+            {" "}
+            · Monitoring 50 state authorities — nothing affecting your clients
+            right now.
+          </span>
+        </span>
+        <Link
+          to="/alerts"
+          className="text-2xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-0.5 shrink-0"
+        >
+          History <ChevronRight className="w-3 h-3" aria-hidden />
+        </Link>
+      </section>
+    );
+  }
 
   // ── State for the calm-dashboard refactor (was orphaned during merge) ─
   const [showNews, setShowNews] = useState(false);
