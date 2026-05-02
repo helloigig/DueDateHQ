@@ -26,6 +26,7 @@ import { WelcomeTour } from "../components/WelcomeTour";
 import { CapacityStrip } from "../components/CapacityStrip";
 import { ModeFHealth } from "../components/ModeFHealth";
 import { ActionQueue } from "../components/ActionQueue";
+import { JustHappenedStrip } from "../components/JustHappenedStrip";
 import { AiUsageInfo } from "../components/AiUsageInfo";
 import { useLocation } from "react-router-dom";
 import type { Announcement } from "../types";
@@ -88,8 +89,18 @@ export function Dashboard() {
   const clients = clientsQuery.data?.items ?? [];
   const announcements = announcementsQuery.data ?? [];
 
+  // Active announcements that affect this firm's clients now surface as
+  // state-alert rows inside ActionQueue (per "[State notification +
+  // suggested actions = THE surface]" + "[One thing, one entrance, one
+  // name]"). The dashboard banner kept the news-only path: pure news that
+  // doesn't touch any client never makes it into the queue (Mode F gates
+  // on affectedClientIds.length > 0), so without a separate surface it'd
+  // disappear. Banner is kept for that case only.
   const activeBanners = announcements.filter(
     (a) => !a.dismissed && a.affectedClientIds.length > 0,
+  );
+  const newsOnlyBanners = announcements.filter(
+    (a) => !a.dismissed && a.affectedClientIds.length === 0,
   );
 
   const alertsByTier = useMemo(() => {
@@ -125,12 +136,19 @@ export function Dashboard() {
     const pastOfficial = open.filter(
       (t) => t.officialDueDate < todayIso,
     ).length;
+    const dueToday = open.filter((t) => t.officialDueDate === todayIso).length;
     const dueThisWeek = open.filter((t) => {
       const days = daysBetween(TODAY, parseDate(t.officialDueDate));
       return days >= 0 && days <= 7;
     }).length;
     const activeClients = clients.filter((c) => c.status === "active").length;
-    return { pastInternalTarget, pastOfficial, dueThisWeek, activeClients };
+    return {
+      pastInternalTarget,
+      pastOfficial,
+      dueToday,
+      dueThisWeek,
+      activeClients,
+    };
   }, [tasks, clients]);
 
   const todayLabel = useMemo(
@@ -229,6 +247,15 @@ export function Dashboard() {
           </span>{" "}
           <span className="text-ink-500">due this week</span>
         </span>
+        {summary.dueToday > 0 && (
+          <>
+            <span className="text-ink-300">·</span>
+            <span className="text-warn-ink">
+              <span className="font-semibold">{summary.dueToday}</span> filing
+              today
+            </span>
+          </>
+        )}
         {summary.pastInternalTarget > 0 && (
           <>
             <span className="text-ink-300">·</span>
@@ -249,37 +276,59 @@ export function Dashboard() {
         )}
       </p>
 
-      {/* First-run welcome — inline banner now, click to expand into
-          three-slide modal. Day-1 modal interruption was wrong. */}
+      {/* First-run welcome — inline banner, click to expand. */}
       <WelcomeTour />
 
-      {/* ────────────────────────────────────────── ZONE 1: alerts band */}
-      {/* AnnouncementBanner + ChaseBanner self-vanish when empty, so the
-          page stays clean on quiet mornings. No "no alerts today" placeholders. */}
-      <AnnouncementBanner announcements={activeBanners} />
-      <ChaseBanner />
+      {/* ─────────────────────────────────────────────────────────────────
+          Today narrative (5 sections, read top → bottom):
+            1. Just happened — overnight diff (Mode A confirms, replies,
+               Mode C issues). Drained in seconds before chasing starts.
+            2. Action queue — the chase. State alerts pinned at top, then
+               one row per client (max-urgency dot, all outstanding items
+               aggregated, expand to act on individual items).
+            3. Quiet clients — the chase loop's stalled subset (14d+ no
+               reply). Needs a phone call, not another email.
+            4. Mode F Health — state-monitoring's own monitoring.
+            5. Capacity — staff allocation (≥3-staff firms only).
+          State-alert news (no client matches) drops out as a compact
+          chip above the queue. Pure-news doesn't generate queue rows
+          (Mode F gates on affectedClientIds.length > 0). */}
 
-      {/* ZONE 2: ActionQueue — AI-curated TodoItem feed (PRD §4.8 nine
-          sources, urgency-sorted with waiting_multiplier). This is the
-          single "what to do this morning" surface. The old deadline-grouped
-          TaskList ("Your tasks" with NEEDS YOUR DECISION / BEHIND SCHEDULE
-          / WAITING ON CLIENT filters) was a transitional v0.6 holdover —
-          its three filters duplicated ActionQueue's verbs (Confirm / Send)
-          and Timeline's day-behind tinting. Removed per "one entrance,
-          one name" — see /timeline for cross-deadline forward planning. */}
+      {/* §1: Just happened — overnight diff strip. */}
+      <JustHappenedStrip />
+
+      {/* News-only state alerts — pure announcements that don't touch any
+          of this firm's clients. Actionable alerts moved into ActionQueue
+          per "one entrance, one name". */}
+      {newsOnlyBanners.length > 0 && (
+        <AnnouncementBanner announcements={newsOnlyBanners} />
+      )}
+
+      {/* §2: Action queue — AI-curated TodoItem feed (PRD §4.8 nine
+          sources, urgency-sorted with waiting_multiplier). State alerts
+          pinned at the top of the queue (Mode F rows render with a
+          distinct event-shape variant); per-client rows aggregate every
+          outstanding item for that client into a single send. Old per-
+          (client × task × form × state) row layout was theatrical at
+          scale (49 clients × 6 forms = 294 rows). */}
       {!isLegacy && <ActionQueue />}
 
-      {/* ZONE 3: Mode F Health — state-monitoring's own monitoring (per IA v0.7
-          §3.9d). Overall status derived from announcement query state; per-state
-          breakdown illustrative pending Phase 3 backend. Hidden on /legacy. */}
+      {/* §3: Quiet clients — automation has run out. The phone-call
+          subset of in-flight chases (14d+ since last reminder, still
+          waiting). Self-vanishes when zero. */}
+      <ChaseBanner />
+
+      {/* §4: Mode F Health — state-monitoring's own monitoring (per IA
+          v0.7 §3.9d). Overall status from announcement query state; per-
+          state breakdown illustrative pending Phase 3 backend. */}
       {!isLegacy && <ModeFHealth />}
 
-      {/* Below the fold: capacity (≥3-staff firms only — gate inside the
-          component). Solo Sarah never sees this; mid-firm Yan Jing always does. */}
+      {/* §5: Capacity — ≥3-staff firms only (gate inside the component).
+          Solo Sarah never sees this; mid-firm Yan Jing always does. */}
       <CapacityStrip />
 
-      {/* Onboarding layer-2 nudges (e.g., set up forwarding email, connect
-          QBO). Self-gated to fade out once the firm has wired the basics. */}
+      {/* Onboarding layer-2 nudges (set up forwarding email, connect
+          QBO). Self-gated to fade out once the firm wires the basics. */}
       <OnboardingLayer2Widget />
 
       {/* Blocking-alerts overlay — fires only at >72h escalation. Stays as
