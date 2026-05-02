@@ -1,6 +1,17 @@
-# Fly.io app config for the DueDateHQ backend.
+# ⚠️ NOT THE LIVE CONFIG — left here only as a template/reference.
 #
-# Quickstart:
+# The deployed app `duedatehq` is built from the repo-root /fly.toml +
+# /Dockerfile (see RUNBOOK.md "Deploying backend to Fly.io"). This file
+# disagrees on app name, port, region, release_command, and Node version.
+# Running `cd backend && fly deploy` from here will create / update the
+# WRONG app and partially overwrite the live machine config — that's the
+# bug that landed the deploy in a critical state on 2026-05-02.
+#
+# If you genuinely want a separate backend-only deploy in the future,
+# rename the app, update the saved config explicitly, and unblock by
+# coordinating with the root deploy. Otherwise, ignore this file.
+#
+# Original quickstart (kept for the historical record):
 #   1. brew install flyctl                    (one-time)
 #   2. fly auth login                          (one-time)
 #   3. cd backend && fly launch --no-deploy    (creates the app, edits this file)

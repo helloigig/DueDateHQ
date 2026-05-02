@@ -24,36 +24,52 @@
 -- All additive — no destructive changes to existing tables.
 -- ════════════════════════════════════════════════════════════════════════
 
-CREATE TYPE "public"."federal_form_status" AS ENUM(
-  'active',
-  'pending_review',
-  'deprecated'
-);
+-- CREATE TYPE doesn't support IF NOT EXISTS in PostgreSQL, so each ENUM
+-- is wrapped in a DO block that swallows the duplicate_object error. Lets
+-- this migration be re-run safely if drizzle's __drizzle_migrations
+-- tracker drifts (e.g. one deploy applied half the file before crashing,
+-- or someone ran the SQL manually via Supabase). Idempotency is essential
+-- because the only ALTERNATIVE on a partial-apply is hand-editing the
+-- tracker table, which is exactly the kind of brittle ops step we'd
+-- rather not require.
+DO $$ BEGIN
+  CREATE TYPE "public"."federal_form_status" AS ENUM(
+    'active',
+    'pending_review',
+    'deprecated'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 --> statement-breakpoint
 
-CREATE TYPE "public"."federal_form_extraction_method" AS ENUM(
-  'curated',
-  'llm',
-  'federal_register'
-);
+DO $$ BEGIN
+  CREATE TYPE "public"."federal_form_extraction_method" AS ENUM(
+    'curated',
+    'llm',
+    'federal_register'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 --> statement-breakpoint
 
-CREATE TYPE "public"."federal_register_source_status" AS ENUM(
-  'healthy',
-  'stale_short',
-  'stale_long',
-  'broken'
-);
+DO $$ BEGIN
+  CREATE TYPE "public"."federal_register_source_status" AS ENUM(
+    'healthy',
+    'stale_short',
+    'stale_long',
+    'broken'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 --> statement-breakpoint
 
-CREATE TYPE "public"."federal_form_change_kind" AS ENUM(
-  'due_date_change',
-  'form_revision',
-  'new_form',
-  'deprecation',
-  'instructions_update',
-  'other'
-);
+DO $$ BEGIN
+  CREATE TYPE "public"."federal_form_change_kind" AS ENUM(
+    'due_date_change',
+    'form_revision',
+    'new_form',
+    'deprecation',
+    'instructions_update',
+    'other'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 --> statement-breakpoint
 
 CREATE TABLE IF NOT EXISTS "federal_forms" (

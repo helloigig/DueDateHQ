@@ -144,6 +144,17 @@ interface FederalRegisterApiResponse {
   results?: FederalRegisterApiDoc[];
 }
 
+// Postgres error code 42P01 = undefined_table. Drizzle wraps the postgres-js
+// error but preserves the SQLSTATE on `.code`, so this works for both the
+// raw driver error and any rewrapped variant.
+function isMissingRelationError(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const code = (err as { code?: unknown }).code;
+  if (code === "42P01") return true;
+  const message = (err as { message?: unknown }).message;
+  return typeof message === "string" && /relation .* does not exist/i.test(message);
+}
+
 /**
  * Run one poll cycle: fetch all sources, classify each notice, write
  * to federal_register_notices + federal_form_change_events. Returns
@@ -169,9 +180,25 @@ export async function runFederalRegisterCycle(
     // Cache the federal_forms.form_number → id map once per cycle. The
     // FK lookups below would otherwise fire one query per notice, which
     // is wasteful at the catalog's expected ~30-200 row size.
-    const allForms = await db
-      .select({ id: federalForms.id, formNumber: federalForms.formNumber })
-      .from(federalForms);
+    //
+    // If the catalog table is missing (migration 0006 hasn't reached this
+    // database yet), bail with a clear warning rather than throwing on
+    // every cycle. This used to log a stack trace per 6h tick + once at
+    // boot — drowning real signal in Fly logs.
+    let allForms;
+    try {
+      allForms = await db
+        .select({ id: federalForms.id, formNumber: federalForms.formNumber })
+        .from(federalForms);
+    } catch (err) {
+      if (isMissingRelationError(err)) {
+        log.warn("federalRegister.cycle.skipped_migration_pending", {
+          reason: "federal_forms table missing — apply migration 0006",
+        });
+        return result;
+      }
+      throw err;
+    }
     const formIdByNumber = new Map<string, string>();
     for (const f of allForms) formIdByNumber.set(f.formNumber, f.id);
 
@@ -531,11 +558,26 @@ export function stopFederalRegisterPoller(): void {
  * Read freshness rows for /api/scraper/status to render alongside the
  * state announcement sources. Public because index.ts wires it into
  * an admin endpoint.
+ *
+ * Returns [] when the table is missing (migration 0006 not yet applied)
+ * instead of 500'ing the status endpoint — Mode F Health should still
+ * load and surface the state-side rows so the operator has *something*
+ * to look at while the federal side bootstraps.
  */
 export async function listFederalRegisterStatus() {
-  return db
-    .select()
-    .from(federalRegisterSources)
-    .orderBy(federalRegisterSources.sourceKey);
+  try {
+    return await db
+      .select()
+      .from(federalRegisterSources)
+      .orderBy(federalRegisterSources.sourceKey);
+  } catch (err) {
+    if (isMissingRelationError(err)) {
+      log.warn("federalRegister.status.skipped_migration_pending", {
+        reason: "federal_register_sources table missing — apply migration 0006",
+      });
+      return [];
+    }
+    throw err;
+  }
 }
 
