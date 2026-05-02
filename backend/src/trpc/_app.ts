@@ -28,6 +28,7 @@ import { inboundRepliesRouter } from "./routers/inboundReplies.js";
 import { deliveryEventsRouter } from "./routers/deliveryEvents.js";
 import { uploadsRouter } from "./routers/uploads.js";
 import { federalFormsRouter } from "./routers/federalForms.js";
+import { alertActionsRouter } from "./routers/alertActions.js";
 
 export const appRouter = router({
   auth: authRouter,
@@ -66,6 +67,11 @@ export const appRouter = router({
   // Replaces the hardcoded COMMON_FORMS list in AddDeadlineModal and
   // backs FilingsTab + AI applicability per the BE federal_forms table.
   federalForms: federalFormsRouter,
+  // Action procedures for the 5 non-disaster alert variants —
+  //   penalty_relief / pte_change / rate_change / nexus_change.
+  // (form_change procedures are on federalFormsRouter since they mutate
+  //  the catalog directly.)
+  alertActions: alertActionsRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -105,6 +105,30 @@ export const clients = pgTable("clients", {
   // set it explicitly during import or per-client (P1 UI: AddClientModal +
   // Settings → Firm).
   serviceStartDate: date("service_start_date"),
+  // ─── pte_change / nexus_change support (migration 0007) ───────────────
+  // Tax year of the most recent PTE election (CA AB-150, NY PTET, etc.).
+  // Null = never elected; latest year stored regardless of state.
+  pteElectionYear: integer("pte_election_year"),
+  // Computed status — drives PTE-status chip in the verdict block.
+  // Values: 'elected' | 'eligible_not_elected' | 'not_eligible' | 'lapsed'.
+  pteEligibilityStatus: text("pte_eligibility_status"),
+  // Per-state estimated revenue from QBO sync or manual import; powers
+  // nexus_change activity-signal matching. Shape: { "CA": 250000 }.
+  estimatedStateRevenueJsonb: jsonb("estimated_state_revenue_jsonb")
+    .notNull()
+    .default({}),
+  // Per-state employee count (payroll nexus signal).
+  employeeCountByStateJsonb: jsonb("employee_count_by_state_jsonb")
+    .notNull()
+    .default({}),
+  // Marketplace facilitator flag — exempts client from direct sales-tax
+  // registration in many states (Amazon collects on behalf of the seller).
+  hasMarketplaceFacilitator: boolean("has_marketplace_facilitator")
+    .notNull()
+    .default(false),
+  // Auto-pay flag — when true, recomputeEstimates auto-creates a
+  // "update bank instruction" TodoItem after mutation.
+  estimateAutopay: boolean("estimate_autopay").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .default(sql`now()`),
@@ -196,6 +220,18 @@ export const deadlines = pgTable("deadlines", {
   status: deadlineStatus("status").notNull().default("not_started"),
   assignedUserId: uuid("assigned_user_id").references(() => users.id),
   notes: text("notes"),
+  // ─── rate_change / nexus_change support (migration 0007) ─────────────
+  // Estimate amount in cents (avoid float). Nullable — non-estimate
+  // filings (annual returns) don't carry an amount.
+  amountCents: integer("amount_cents"),
+  // Original amount before any rate_change recompute. Populated by
+  // recomputeEstimates so undo can restore.
+  originalAmountCents: integer("original_amount_cents"),
+  // Methodology used for the current estimate amount.
+  estimateMethod: text("estimate_method"),
+  // For nexus contraction cases: deadline marked kept-as-protective
+  // through this filing year, then auto-disables.
+  protectedAfterFilingYear: integer("protected_after_filing_year"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .default(sql`now()`),
@@ -1099,6 +1135,15 @@ export const federalFormChangeEvents = pgTable("federal_form_change_events", {
   summary: text("summary").notNull(),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
   appliedAt: timestamp("applied_at", { withTimezone: true }),
+  // ─── form_change reviewer queue (migration 0007) ─────────────────────
+  rejectedAt: timestamp("rejected_at", { withTimezone: true }),
+  rejectedReason: text("rejected_reason"),
+  appliedBy: uuid("applied_by").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  // Admin's modifications to parsed values before applying. AI may have
+  // misclassified a field; admin edits before commit.
+  userOverridesJsonb: jsonb("user_overrides_jsonb"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .default(sql`now()`),
@@ -1170,3 +1215,214 @@ export type StateAnnouncementSource =
   typeof stateAnnouncementSources.$inferSelect;
 export type StateAnnouncementSourceInsert =
   typeof stateAnnouncementSources.$inferInsert;
+
+// ═════════════════════════════════════════════════════════════════════════
+// Migration 0007 — alert action surfaces (penalty_relief / pte_change /
+// rate_change / nexus_change). Companion docs:
+//   - docs/specs/alert-detail-{variant}.md
+//   - backend/migrations/0007_alert_action_tables.sql
+// ═════════════════════════════════════════════════════════════════════════
+
+export const clientTagKind = pgEnum("client_tag_kind", [
+  "penalty_relief",
+  "amnesty_program",
+  "audit_window",
+  "engagement_note",
+]);
+
+export const clientTagStatus = pgEnum("client_tag_status", [
+  "active",
+  "applied",
+  "expired",
+  "removed",
+]);
+
+export const planningCallTopic = pgEnum("planning_call_topic", [
+  "pte_strategy",
+  "rate_change_review",
+  "nexus_review",
+  "general_planning",
+]);
+
+export const planningCallStatus = pgEnum("planning_call_status", [
+  "proposed",
+  "scheduled",
+  "completed",
+  "missed",
+  "canceled",
+]);
+
+export const planningCallOutcome = pgEnum("planning_call_outcome", [
+  "renewed",
+  "revoked",
+  "opted_in",
+  "deferred",
+  "no_change",
+]);
+
+export const nexusKind = pgEnum("nexus_kind", [
+  "sales",
+  "income",
+  "payroll",
+  "franchise",
+]);
+
+export const nexusStatus = pgEnum("nexus_status", [
+  "not_established",
+  "check_pending",
+  "established",
+  "borderline",
+  "confirmed_no_nexus",
+]);
+
+export const estimateMethod = pgEnum("estimate_method", [
+  "safe_harbor_110",
+  "safe_harbor_100",
+  "current_year_estimate",
+  "prior_year_actual",
+  "manual",
+]);
+
+// ─── client_tags (penalty_relief) ─────────────────────────────────────────
+export const clientTags = pgTable("client_tags", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  firmId: uuid("firm_id")
+    .notNull()
+    .references(() => firms.id, { onDelete: "cascade" }),
+  clientId: uuid("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  alertId: uuid("alert_id").references(() => announcements.id, {
+    onDelete: "set null",
+  }),
+  kind: clientTagKind("kind").notNull().default("penalty_relief"),
+  // Pre-rendered label for Workspace + TaskDetail surfaces.
+  tagText: text("tag_text").notNull(),
+  // Free-form context — full notice ref, reasoning, link to source.
+  tagContext: text("tag_context"),
+  // Null = retroactive (no expiry). Set = auto-EXPIRE on this date.
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  appliedAt: timestamp("applied_at", { withTimezone: true }),
+  // When applied via TaskDetail's "claim relief" button, links to that task.
+  appliedInTaskId: uuid("applied_in_task_id").references(() => tasks.id, {
+    onDelete: "set null",
+  }),
+  removedAt: timestamp("removed_at", { withTimezone: true }),
+  removedReason: text("removed_reason"),
+  status: clientTagStatus("status").notNull().default("active"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+  createdBy: uuid("created_by").references(() => users.id, {
+    onDelete: "set null",
+  }),
+});
+
+// ─── planning_calls (pte_change) ──────────────────────────────────────────
+export const planningCalls = pgTable("planning_calls", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  firmId: uuid("firm_id")
+    .notNull()
+    .references(() => firms.id, { onDelete: "cascade" }),
+  clientId: uuid("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  alertId: uuid("alert_id").references(() => announcements.id, {
+    onDelete: "set null",
+  }),
+  topic: planningCallTopic("topic").notNull(),
+  // Mode E generated bullets shown on the verdict expansion + the eventual
+  // TodoItem on Today. jsonb to preserve order + per-bullet edit later.
+  talkingPointsJson: jsonb("talking_points_json").notNull().default([]),
+  suggestedWindowStart: date("suggested_window_start"),
+  suggestedWindowEnd: date("suggested_window_end"),
+  scheduledLabel: text("scheduled_label"),
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  outcome: planningCallOutcome("outcome"),
+  outcomeNotes: text("outcome_notes"),
+  status: planningCallStatus("status").notNull().default("proposed"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+  createdBy: uuid("created_by").references(() => users.id, {
+    onDelete: "set null",
+  }),
+});
+
+// ─── client_state_nexus (nexus_change) ────────────────────────────────────
+export const clientStateNexus = pgTable("client_state_nexus", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  firmId: uuid("firm_id")
+    .notNull()
+    .references(() => firms.id, { onDelete: "cascade" }),
+  clientId: uuid("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  state: text("state").notNull(),
+  nexusKind: nexusKind("nexus_kind").notNull(),
+  status: nexusStatus("status").notNull().default("not_established"),
+  // Set when status transitions to 'established' from a check.
+  establishedAt: timestamp("established_at", { withTimezone: true }),
+  establishedByAlertId: uuid("established_by_alert_id").references(
+    () => announcements.id,
+    { onDelete: "set null" },
+  ),
+  establishedByUserId: uuid("established_by_user_id").references(
+    () => users.id,
+    { onDelete: "set null" },
+  ),
+  // Contraction case — nexus no longer required but firm chose to keep
+  // filing as protective.
+  keptProtective: boolean("kept_protective").notNull().default(false),
+  keptProtectiveReason: text("kept_protective_reason"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+});
+
+// ─── nexus_questionnaire_runs ─────────────────────────────────────────────
+// Immutable audit of "what did Sarah see / what did Sarah answer." One row
+// per check completion; never updated after write.
+export const nexusQuestionnaireRuns = pgTable("nexus_questionnaire_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  firmId: uuid("firm_id")
+    .notNull()
+    .references(() => firms.id, { onDelete: "cascade" }),
+  clientId: uuid("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  alertId: uuid("alert_id").references(() => announcements.id, {
+    onDelete: "set null",
+  }),
+  state: text("state").notNull(),
+  nexusKind: nexusKind("nexus_kind").notNull(),
+  questionsJsonb: jsonb("questions_jsonb").notNull(),
+  answersJsonb: jsonb("answers_jsonb").notNull(),
+  resultStatus: nexusStatus("result_status").notNull(),
+  confidence: text("confidence").notNull().default("medium"),
+  recommendedFilingsJsonb: jsonb("recommended_filings_jsonb")
+    .notNull()
+    .default([]),
+  completedAt: timestamp("completed_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+  completedBy: uuid("completed_by").references(() => users.id, {
+    onDelete: "set null",
+  }),
+});
+
+export type ClientTag = typeof clientTags.$inferSelect;
+export type ClientTagInsert = typeof clientTags.$inferInsert;
+export type PlanningCall = typeof planningCalls.$inferSelect;
+export type PlanningCallInsert = typeof planningCalls.$inferInsert;
+export type ClientStateNexus = typeof clientStateNexus.$inferSelect;
+export type ClientStateNexusInsert = typeof clientStateNexus.$inferInsert;
+export type NexusQuestionnaireRun =
+  typeof nexusQuestionnaireRuns.$inferSelect;
+export type NexusQuestionnaireRunInsert =
+  typeof nexusQuestionnaireRuns.$inferInsert;
