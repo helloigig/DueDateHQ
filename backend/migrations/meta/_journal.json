@@ -36,6 +36,20 @@
       "when": 1777590000000,
       "tag": "0004_client_service_start_date",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777591000000,
+      "tag": "0005_announcement_related_source_urls",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777592000000,
+      "tag": "0006_federal_forms",
+      "breakpoints": true
     }
   ]
 }
