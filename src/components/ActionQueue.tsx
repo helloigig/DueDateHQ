@@ -1,14 +1,10 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronRight,
-  ChevronDown,
   Mail,
   CheckCircle2,
   Megaphone,
   MessageSquare,
-  Inbox,
-  Sparkles,
   Users,
 } from "lucide-react";
 import { trpc } from "../lib/api/client";
@@ -17,29 +13,24 @@ import type { MockTodoItem, TodoVerb } from "../data/mockTodoItems";
 import { env } from "../config";
 import {
   buildQueueRows,
-  pickPrimaryItem,
-  summarizeClientGroup,
   type ClientGroupRow,
   type StateAlertRow,
   type BulkBatchRow,
   type QueueTodoItem,
 } from "../lib/queueGrouping";
 
-// ActionQueue — per IA v0.7 amendment §3.1 (Today restructure).
+// ActionQueue — per DESIGN.md "Today" spec.
 //
-// One row per (client × email-thread). State alerts (Mode F, fan-out to many
-// clients) and bulk-batch drafts (Mode D "8 routine W-2 follow-ups") render
-// as their own row variants. Per-client rows expand inline to show the
-// individual TodoItems behind the count.
+// One card per client. Inside each card, items grouped by verb (gap-framed:
+// "Still missing" / "Just arrived" / "Question" / "To apply"). Each verb
+// group has its own bulk action button on the right. Items render directly
+// — no chevron-to-reveal. State alerts and bulk-batch rows pin to the top
+// as their own card variants.
 //
-// Sort: state alerts pinned to top, then client groups + bulk rows by
-// max urgency_score desc (PRD §4.8 v0.8 amendment formula).
-//
-// Why grouped: a CPA chasing one client sends one email covering everything
-// outstanding — not 6 separate "Send" emails for 6 separate forms. The
-// queue surface has to mirror that workflow or the row count becomes
-// theatrical (49 clients × 6 forms = 294 rows for Sarah; 600 × 6 = 3600
-// for Yan Jing). See §5.3 invariant + `feedback_state_notif_plus_actions`.
+// Why grouped: a CPA chasing one client sends one email listing every
+// outstanding item — not N separate emails. The queue surface mirrors that
+// workflow. Mirrors the State alerts pattern (one event → many clients →
+// one batch) on the inverted axis (one client → many items → one batch).
 
 const VERB_ICON: Record<TodoVerb, typeof Mail> = {
   Send: Mail,
@@ -48,20 +39,40 @@ const VERB_ICON: Record<TodoVerb, typeof Mail> = {
   Discuss: MessageSquare,
 };
 
-const URGENCY_BORDER: Record<MockTodoItem["urgency"], string> = {
-  high: "border-l-4 border-danger-solid",
-  medium: "border-l-4 border-warning-solid",
-  normal: "border-l-4 border-success-solid",
+// Gap-framed labels per DESIGN.md "Do: privilege the gap." Section header
+// names what's missing or pending; the action button names the fix.
+const VERB_GAP_LABEL: Record<TodoVerb, string> = {
+  Send: "Still missing",
+  Confirm: "Just arrived",
+  Discuss: "Question",
+  Apply: "To apply",
 };
 
+const VERB_BUTTON_LABEL: Record<TodoVerb, string> = {
+  Send: "Send reminder",
+  Confirm: "Confirm receipt",
+  Discuss: "Open thread",
+  Apply: "Review",
+};
+
+// Verbs that aggregate naturally into a single batch action; the rest stay
+// per-item (Discuss = one open thread; Apply = one review per alert).
+const VERB_BATCHES: Record<TodoVerb, boolean> = {
+  Send: true,
+  Confirm: true,
+  Discuss: false,
+  Apply: false,
+};
+
+const VERB_ORDER: TodoVerb[] = ["Send", "Confirm", "Discuss", "Apply"];
+
 const URGENCY_DOT: Record<MockTodoItem["urgency"], string> = {
-  high: "🔴",
-  medium: "🟡",
-  normal: "🟢",
+  high: "bg-danger-solid",
+  medium: "bg-warn-solid",
+  normal: "bg-ok-solid",
 };
 
 export function ActionQueue() {
-  const [expanded, setExpanded] = useState(false);
   const todoQuery = trpc.todoItems.list.useQuery({ limit: 50 });
   const live = todoQuery.data?.items ?? [];
   const isMock = env.useMockData;
@@ -71,62 +82,32 @@ export function ActionQueue() {
     : (live as QueueTodoItem[]);
 
   const rows = buildQueueRows(items);
-  const visibleCount = expanded ? rows.length : 5;
-  const visible = rows.slice(0, visibleCount);
-  const hidden = rows.length - visibleCount;
-
-  const sourceLabel = todoQuery.isLoading
-    ? "loading TodoItem feed (PRD §4.8)"
-    : live.length > 0
-      ? `live TodoItem feed (PRD §4.8) · ${live.length} items from backend`
-      : "fallback static mock (no live TodoItems yet)";
 
   return (
-    <section
-      aria-labelledby="action-queue-heading"
-      className="rounded-md border-2 border-warning-border bg-warning-bg/30 overflow-hidden"
-    >
-      <header className="flex items-center px-4 py-3 border-b border-warning-border gap-3">
-        <Inbox className="w-4 h-4 text-warning-solid" aria-hidden />
+    <section aria-labelledby="action-queue-heading" className="space-y-region">
+      <header className="flex items-center gap-3">
         <h2
           id="action-queue-heading"
-          className="text-sm font-semibold text-ink-900 flex items-center gap-2"
+          className="text-lg font-semibold text-ink-900"
         >
-          Action queue
-          <span
-            className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
-            title="AI ranks by urgency + waiting-on-client time + history. You can override the order."
-          >
-            <Sparkles className="w-3 h-3" aria-hidden />
-            AI prioritized
-          </span>
+          Action queue ({rows.length})
         </h2>
-        <span className="text-2xs text-ink-500 tabular-nums">
-          {rows.length} {rows.length === 1 ? "row" : "rows"} · {items.length}{" "}
-          {items.length === 1 ? "item" : "items"}
-        </span>
-        <span className="ml-auto text-2xs text-ink-400 italic">
-          {sourceLabel}
-        </span>
       </header>
 
-      <ul className="divide-y divide-line">
-        {visible.map((row) => {
-          if (row.kind === "state_alert")
-            return <StateAlertRowView key={row.key} row={row} />;
-          if (row.kind === "bulk_batch")
-            return <BulkBatchRowView key={row.key} row={row} />;
-          return <ClientGroupRowView key={row.key} row={row} />;
-        })}
-      </ul>
-
-      {hidden > 0 && (
-        <button
-          onClick={() => setExpanded(true)}
-          className="w-full px-4 py-2.5 text-xs text-ink-500 hover:text-ink-900 hover:bg-sunken/40 border-t border-line"
-        >
-          Show {hidden} more {hidden === 1 ? "row" : "rows"}
-        </button>
+      {rows.length === 0 ? (
+        <p className="text-sm text-ink-500">
+          Caught up. We'll surface the next action when it arrives.
+        </p>
+      ) : (
+        <div className="space-y-card">
+          {rows.map((row) => {
+            if (row.kind === "state_alert")
+              return <StateAlertCard key={row.key} row={row} />;
+            if (row.kind === "bulk_batch")
+              return <BulkBatchCard key={row.key} row={row} />;
+            return <ClientGroupCard key={row.key} row={row} />;
+          })}
+        </div>
       )}
     </section>
   );
@@ -161,160 +142,162 @@ function navigateForItem(
   else navigate("/mail");
 }
 
-// ── Client group row ──────────────────────────────────────────────────────
-// One row per client. Body shows aggregated verb counts + form list. Click
-// the row to navigate to the client's primary work surface; click the
-// chevron to expand inline and act on individual items.
-function ClientGroupRowView({ row }: { row: ClientGroupRow }) {
-  const [open, setOpen] = useState(false);
+// ── Client card ──────────────────────────────────────────────────────────
+// One card per client, default-expanded. Inside: verb-grouped sub-sections,
+// each with its own bulk action button and item rows.
+function ClientGroupCard({ row }: { row: ClientGroupRow }) {
   const navigate = useNavigate();
-  const summary = summarizeClientGroup(row);
-  const sendCount = row.verbCounts.Send ?? 0;
-  const primaryVerb: TodoVerb =
-    sendCount > 0
-      ? "Send"
-      : row.verbCounts.Confirm
-        ? "Confirm"
-        : row.verbCounts.Discuss
-          ? "Discuss"
-          : "Apply";
-  const PrimaryIcon = VERB_ICON[primaryVerb];
-
-  // Whole-row primary action: route to the verb the row's badge promises
-  // (Send > Confirm > Discuss), so a row labeled "Send" never lands on a
-  // Confirm screen. Within a verb, pick the most-urgent item.
-  const onRowClick = () => {
-    const top = pickPrimaryItem(row.items) ?? row.items[0];
-    navigateForItem(top, navigate);
-  };
+  // Bucket items by verb.
+  const buckets = new Map<TodoVerb, QueueTodoItem[]>();
+  for (const item of row.items) {
+    const arr = buckets.get(item.verb) ?? [];
+    arr.push(item);
+    buckets.set(item.verb, arr);
+  }
 
   return (
-    <li
-      className={`group bg-surface ${URGENCY_BORDER[row.maxUrgency]}`}
+    <article
+      className="bg-surface border border-line rounded-md overflow-hidden"
       data-deadline-row
     >
-      <div className="w-full flex items-stretch">
+      {/* Header zone — client identity + summary metrics */}
+      <header className="px-region py-3 flex items-center gap-3">
+        <span
+          aria-hidden
+          className={`w-2 h-2 rounded-full shrink-0 ${URGENCY_DOT[row.maxUrgency]}`}
+        />
         <button
           type="button"
-          onClick={onRowClick}
-          className="flex-1 text-left px-4 py-3 flex items-start gap-3 hover:bg-sunken/40 transition-colors"
+          onClick={() => row.clientId && navigate(`/clients/${row.clientId}`)}
+          className="text-sm text-ink-900 font-medium hover:underline text-left"
+          title="Open client detail"
         >
-          <span aria-hidden className="text-base shrink-0 leading-tight pt-0.5">
-            {URGENCY_DOT[row.maxUrgency]}
-          </span>
-          <div className="flex-1 min-w-0">
-            {/* Identity line */}
-            <div className="flex items-center gap-2 text-2xs text-ink-500 mb-0.5 flex-wrap">
-              <span className="font-medium text-ink-900">{row.clientName}</span>
-              <span className="text-ink-300">·</span>
-              <span>
-                {row.items.length} {row.items.length === 1 ? "item" : "items"}
-              </span>
-              {row.earliestDueDate && (
-                <>
-                  <span className="text-ink-300">·</span>
-                  <span>earliest due {row.earliestDueDate}</span>
-                </>
-              )}
-              <span className="ml-auto inline-flex items-center gap-1 text-2xs">
-                <PrimaryIcon className="w-3 h-3" aria-hidden />
-                <span className="font-medium text-ink-700">{primaryVerb}</span>
-              </span>
-            </div>
-
-            {/* Action line — verb summary */}
-            <div className="text-sm text-ink-900 font-medium">{summary}</div>
-
-            {/* Context — first item's context as flavor */}
-            <div className="text-2xs text-ink-500 mt-0.5 line-clamp-1">
-              {row.items[0].context}
-            </div>
-          </div>
+          {row.clientName}
         </button>
+        <span className="text-xs text-ink-500 tabular-nums">
+          {row.items.length} {row.items.length === 1 ? "action" : "actions"}
+          {row.earliestDueDate && <> · next {row.earliestDueDate}</>}
+        </span>
+      </header>
 
-        {/* Expand chevron — separate hit target so the row's primary action
-            stays a single click. */}
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-label={open ? "Collapse items" : "Expand items"}
-          aria-expanded={open}
-          className="px-3 flex items-center text-ink-300 hover:text-ink-700 hover:bg-sunken/40 border-l border-line"
-        >
-          {open ? (
-            <ChevronDown className="w-4 h-4" aria-hidden />
-          ) : (
-            <ChevronRight className="w-4 h-4" aria-hidden />
-          )}
-        </button>
+      {/* Verb-grouped sub-sections */}
+      <div className="border-t border-line divide-y divide-line">
+        {VERB_ORDER.map((verb) => {
+          const verbItems = buckets.get(verb);
+          if (!verbItems || verbItems.length === 0) return null;
+          return (
+            <VerbGroup
+              key={verb}
+              verb={verb}
+              items={verbItems}
+              clientName={row.clientName}
+              onItemClick={(item) => navigateForItem(item, navigate)}
+            />
+          );
+        })}
       </div>
-
-      {open && (
-        <ul className="bg-sunken/30 border-t border-line divide-y divide-line">
-          {row.items.map((it) => (
-            <SubItemRow key={it.id} item={it} />
-          ))}
-        </ul>
-      )}
-    </li>
+    </article>
   );
 }
 
-// Sub-item inside an expanded client group. Smaller visual weight; same
-// click-to-act behavior as the v0.6 ActionRow.
-function SubItemRow({ item }: { item: QueueTodoItem }) {
-  const Icon = VERB_ICON[item.verb];
-  const navigate = useNavigate();
+function VerbGroup({
+  verb,
+  items,
+  clientName,
+  onItemClick,
+}: {
+  verb: TodoVerb;
+  items: QueueTodoItem[];
+  clientName: string;
+  onItemClick: (item: QueueTodoItem) => void;
+}) {
+  const Icon = VERB_ICON[verb];
+  const batches = VERB_BATCHES[verb];
+
+  // Bulk action — for Send/Confirm, navigates to first item's surface.
+  // The full multi-item bulk send is wired in a follow-up PR.
+  const onBulkAction = () => {
+    if (items.length > 0) onItemClick(items[0]);
+  };
+
+  return (
+    <div className="px-region py-3 space-y-2">
+      <div className="flex items-center gap-3">
+        <h3 className="text-sm font-medium text-ink-900">
+          {VERB_GAP_LABEL[verb]} ({items.length})
+        </h3>
+        <button
+          type="button"
+          onClick={onBulkAction}
+          className="ml-auto inline-flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-md bg-accent text-canvas hover:bg-accent-hover"
+          title={
+            batches
+              ? `${VERB_BUTTON_LABEL[verb]} for ${clientName}`
+              : `Open ${verb.toLowerCase()} thread`
+          }
+        >
+          <Icon className="w-3.5 h-3.5" aria-hidden />
+          {batches
+            ? `${VERB_BUTTON_LABEL[verb]} (${items.length})`
+            : VERB_BUTTON_LABEL[verb]}
+        </button>
+      </div>
+      <ul className="space-y-1">
+        {items.map((item) => (
+          <ItemRow key={item.id} item={item} onClick={() => onItemClick(item)} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ItemRow({
+  item,
+  onClick,
+}: {
+  item: QueueTodoItem;
+  onClick: () => void;
+}) {
   return (
     <li>
       <button
         type="button"
-        onClick={() => navigateForItem(item, navigate)}
-        className="w-full text-left px-4 py-2 pl-10 flex items-start gap-3 hover:bg-surface transition-colors"
+        onClick={onClick}
+        className="w-full text-left px-2 py-1.5 rounded flex items-center gap-2 text-sm hover:bg-sunken transition-colors"
       >
-        <span aria-hidden className="text-xs shrink-0 leading-tight pt-1">
-          {URGENCY_DOT[item.urgency]}
+        <span
+          aria-hidden
+          className={`w-1.5 h-1.5 rounded-full shrink-0 ${URGENCY_DOT[item.urgency]}`}
+        />
+        <span className="text-ink-900 font-medium">
+          {item.task ?? item.action}
         </span>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 text-2xs text-ink-500 mb-0.5 flex-wrap">
-            {item.task && (
-              <span className="text-ink-700 font-medium">{item.task}</span>
-            )}
-            {item.dueDate && (
-              <>
-                {item.task && <span className="text-ink-300">·</span>}
-                <span>due {item.dueDate}</span>
-              </>
-            )}
-            {item.stageLabel && (
-              <>
-                <span className="text-ink-300">·</span>
-                <span
-                  className={
-                    item.daysBehind && item.daysBehind > 7
-                      ? "text-danger-solid font-semibold"
-                      : item.daysBehind && item.daysBehind > 0
-                        ? "text-warning-solid"
-                        : "text-ink-500"
-                  }
-                >
-                  {item.stageLabel}
-                  {item.daysBehind != null && item.daysBehind > 0 && (
-                    <span className="ml-1">· {item.daysBehind}d behind</span>
-                  )}
-                </span>
-              </>
-            )}
-            <span className="ml-auto inline-flex items-center gap-1 text-2xs">
-              <Icon className="w-3 h-3" aria-hidden />
-              <span className="font-medium text-ink-700">{item.verb}</span>
+        {item.dueDate && (
+          <>
+            <span className="text-ink-300">·</span>
+            <span className="text-ink-500 tabular-nums">{item.dueDate}</span>
+          </>
+        )}
+        {item.daysBehind != null && item.daysBehind > 0 && (
+          <>
+            <span className="text-ink-300">·</span>
+            <span
+              className={`tabular-nums ${
+                item.daysBehind > 7 ? "text-danger-ink font-semibold" : "text-warn-ink"
+              }`}
+            >
+              {item.daysBehind} {item.daysBehind === 1 ? "day" : "days"} behind
             </span>
-          </div>
-          <div className="text-sm text-ink-900">{item.action}</div>
-          <div className="text-2xs text-ink-500 mt-0.5">{item.context}</div>
-        </div>
+          </>
+        )}
+        {item.daysBehind == null && item.stageLabel && (
+          <>
+            <span className="text-ink-300">·</span>
+            <span className="text-ink-500">{item.stageLabel}</span>
+          </>
+        )}
         <ChevronRight
-          className="w-3.5 h-3.5 text-ink-300 shrink-0 mt-1"
+          className="ml-auto w-3.5 h-3.5 text-ink-300 shrink-0"
           aria-hidden
         />
       </button>
@@ -322,88 +305,79 @@ function SubItemRow({ item }: { item: QueueTodoItem }) {
   );
 }
 
-// ── State alert row ───────────────────────────────────────────────────────
-// Mode F state-event row. Different shape: event headline + affected count.
-// Pinned to the top of the queue. The cascade (alert → mutates Task →
-// mutates outstanding TodoItems → re-ranks queue) happens upstream; this
-// row is the "go act on it" entry point.
-function StateAlertRowView({ row }: { row: StateAlertRow }) {
+// ── State alert card (Mode F, fan-out) ──────────────────────────────────
+function StateAlertCard({ row }: { row: StateAlertRow }) {
   const item = row.item;
   const navigate = useNavigate();
   return (
-    <li
-      className={`group bg-info-bg/40 hover:bg-info-bg/60 transition-colors ${URGENCY_BORDER[item.urgency]}`}
+    <article
+      className="bg-info-bg/40 border border-info-border rounded-md overflow-hidden"
       data-deadline-row
     >
       <button
         type="button"
         onClick={() => navigateForItem(item, navigate)}
-        className="w-full text-left px-4 py-3 flex items-start gap-3"
+        className="w-full text-left px-region py-3 flex items-start gap-3 hover:bg-info-bg/60 transition-colors"
       >
-        <span aria-hidden className="text-base shrink-0 leading-tight pt-0.5">
-          🔔
-        </span>
+        <span
+          aria-hidden
+          className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${URGENCY_DOT[item.urgency]}`}
+        />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 text-2xs text-info-ink mb-0.5">
+          <div className="flex items-center gap-2 text-xs text-info-ink mb-0.5">
             <span className="uppercase tracking-wide font-semibold">
               State alert
             </span>
             <span className="text-ink-300">·</span>
             <span className="text-ink-700 font-medium">{item.client}</span>
-            <span className="ml-auto inline-flex items-center gap-1 text-2xs">
-              <Megaphone className="w-3 h-3" aria-hidden />
-              <span className="font-medium text-ink-700">Notify all</span>
-            </span>
           </div>
           <div className="text-sm text-ink-900 font-medium">{item.action}</div>
-          <div className="text-2xs text-ink-500 mt-0.5">{item.context}</div>
+          {item.context && (
+            <div className="text-xs text-ink-500 mt-0.5">{item.context}</div>
+          )}
         </div>
         <ChevronRight
-          className="w-4 h-4 text-ink-300 group-hover:text-ink-700 shrink-0 mt-1"
+          className="w-3.5 h-3.5 text-ink-400 shrink-0 mt-1"
           aria-hidden
         />
       </button>
-    </li>
+    </article>
   );
 }
 
-// ── Bulk batch row ────────────────────────────────────────────────────────
-// Mode D "approve all" batches — multi-client by design (not a single-client
-// chase, so doesn't fit the client-group model). One row, one approve action.
-function BulkBatchRowView({ row }: { row: BulkBatchRow }) {
+// ── Bulk batch card (Mode D, "8 routine W-2 follow-ups") ────────────────
+function BulkBatchCard({ row }: { row: BulkBatchRow }) {
   const item = row.item;
-  const Icon = VERB_ICON[item.verb];
   const navigate = useNavigate();
   return (
-    <li
-      className={`group bg-surface hover:bg-sunken/40 transition-colors ${URGENCY_BORDER[item.urgency]}`}
+    <article
+      className="bg-surface border border-line rounded-md overflow-hidden"
       data-deadline-row
     >
       <button
         type="button"
         onClick={() => navigateForItem(item, navigate)}
-        className="w-full text-left px-4 py-3 flex items-start gap-3"
+        className="w-full text-left px-region py-3 flex items-start gap-3 hover:bg-sunken transition-colors"
       >
-        <span aria-hidden className="text-base shrink-0 leading-tight pt-0.5">
-          {URGENCY_DOT[item.urgency]}
-        </span>
+        <span
+          aria-hidden
+          className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${URGENCY_DOT[item.urgency]}`}
+        />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 text-2xs text-ink-500 mb-0.5">
+          <div className="flex items-center gap-2 text-xs text-ink-500 mb-0.5">
             <Users className="w-3 h-3" aria-hidden />
             <span className="font-medium text-ink-700">{item.client}</span>
-            <span className="ml-auto inline-flex items-center gap-1 text-2xs">
-              <Icon className="w-3 h-3" aria-hidden />
-              <span className="font-medium text-ink-700">{item.verb}</span>
-            </span>
           </div>
           <div className="text-sm text-ink-900 font-medium">{item.action}</div>
-          <div className="text-2xs text-ink-500 mt-0.5">{item.context}</div>
+          {item.context && (
+            <div className="text-xs text-ink-500 mt-0.5">{item.context}</div>
+          )}
         </div>
         <ChevronRight
-          className="w-4 h-4 text-ink-300 group-hover:text-ink-700 shrink-0 mt-1"
+          className="w-3.5 h-3.5 text-ink-400 shrink-0 mt-1"
           aria-hidden
         />
       </button>
-    </li>
+    </article>
   );
 }

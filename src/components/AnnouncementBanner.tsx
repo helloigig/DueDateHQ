@@ -21,6 +21,7 @@ import {
   useDismissAnnouncement,
   useMarkAnnouncementRead,
 } from "../hooks/useAnnouncements";
+import { StateHealthPill } from "./StateHealthPill";
 
 type Tone = "danger" | "warn" | "info";
 
@@ -93,29 +94,20 @@ export function AnnouncementBanner({
   // checked and you're clear."
   if (announcements.length === 0) {
     return (
-      <section
-        className="bg-surface border border-line rounded-md px-4 py-2.5 flex items-center gap-3"
-        aria-label="State alerts"
-      >
-        <span
-          className="w-2 h-2 rounded-full shrink-0 bg-ok-solid"
-          aria-hidden
-        />
-        <Megaphone className="w-3.5 h-3.5 shrink-0 text-ink-500" aria-hidden />
-        <span className="flex-1 text-sm text-ink-700">
-          <span className="font-medium text-ink-900">All clear.</span>
-          <span className="text-ink-500">
-            {" "}
-            · Monitoring 50 state authorities — nothing affecting your clients
-            right now.
-          </span>
-        </span>
-        <Link
-          to="/alerts"
-          className="text-2xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-0.5 shrink-0"
-        >
-          History <ChevronRight className="w-3 h-3" aria-hidden />
-        </Link>
+      <section aria-label="State alerts" className="space-y-region">
+        <header className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-ink-900">State alerts (0)</h2>
+          <StateHealthPill />
+          <Link
+            to="/alerts"
+            className="ml-auto text-xs text-ink-500 hover:text-ink-900"
+          >
+            History
+          </Link>
+        </header>
+        <p className="text-sm text-ink-500">
+          No active alerts. We'll surface anything new.
+        </p>
       </section>
     );
   }
@@ -208,42 +200,44 @@ export function AnnouncementBanner({
   };
 
   // ── Edge case: nothing actionable, only news ─────────────────────────
-  // Render a single compact summary bar so we don't pile up news at the
-  // top. User clicks to peek.
+  // News-only state: pull the section title + StateHealthPill out so the
+  // monitoring signal stays visible, then a compact summary bar.
   if (actionable.length === 0) {
     if (!showNews) {
       const lead = news[0].primary;
       return (
-        <section
-          className="bg-surface border border-line rounded-md"
-          aria-label="State alerts"
-        >
+        <section aria-label="State alerts" className="space-y-region">
+          <header className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-ink-900">
+              State alerts ({news.length})
+            </h2>
+            <StateHealthPill />
+            <Link
+              to="/alerts"
+              className="ml-auto text-xs text-ink-500 hover:text-ink-900"
+            >
+              All alerts
+            </Link>
+          </header>
           <button
             onClick={() => setShowNews(true)}
-            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-sunken/30 transition-colors text-left"
+            className="w-full flex items-center gap-3 px-region py-2.5 bg-surface border border-line rounded-md hover:bg-sunken/30 transition-colors text-left"
           >
-            <span
-              className="w-2 h-2 rounded-full shrink-0 bg-info-solid"
-              aria-hidden
-            />
             <Megaphone
               className="w-3.5 h-3.5 shrink-0 text-info-ink"
               aria-hidden
             />
             <span className="flex-1 min-w-0 text-sm">
-              <span className="font-semibold text-ink-900">
+              <span className="font-medium text-ink-900">
                 {news.length} state-tax news item{news.length === 1 ? "" : "s"}
               </span>
-              <span className="text-ink-500">
-                {" "}
-                · none affect your clients
-              </span>
+              <span className="text-ink-500"> · none affect your clients</span>
               <span className="text-ink-400 truncate">
                 {" "}
                 · latest: {lead.stateCode} {lead.title}
               </span>
             </span>
-            <span className="text-2xs text-ink-500 inline-flex items-center gap-0.5 shrink-0">
+            <span className="text-xs text-ink-500 inline-flex items-center gap-0.5 shrink-0">
               Expand <ChevronDown className="w-3 h-3" aria-hidden />
             </span>
           </button>
@@ -253,57 +247,34 @@ export function AnnouncementBanner({
   }
 
   return (
-    <section
-      className="bg-surface border border-line rounded-md overflow-hidden"
-      aria-label="State alerts"
-    >
-      <header className="flex items-center px-4 py-2 border-b border-line bg-sunken/40 gap-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-700">
-          State alerts
+    <section aria-label="State alerts" className="space-y-region">
+      {/* Section title + inline state-health pill (per DESIGN.md). */}
+      <header className="flex items-center gap-3 flex-wrap">
+        <h2 className="text-lg font-semibold text-ink-900">
+          State alerts ({clusters.length})
         </h2>
-        <span className="text-2xs text-ink-500">
-          {clusters.length}
-          {clusters.length !== totalVisibleAnnouncements && (
-            <span className="text-ink-400">
-              {" "}
-              ({totalVisibleAnnouncements} sources)
-            </span>
-          )}
-          {escalatedCount > 0 && (
-            <>
-              <span className="text-ink-300"> · </span>
-              <span className="text-danger-ink font-medium">
-                {escalatedCount} escalated
-              </span>
-            </>
-          )}
-          {actionable.length > 0 && (
-            <>
-              <span className="text-ink-300"> · </span>
-              <span>
-                {actionable.length} need{actionable.length === 1 ? "s" : ""}{" "}
-                review
-              </span>
-            </>
-          )}
-        </span>
-        <span className="ml-auto flex items-center gap-2">
+        <StateHealthPill />
+        {escalatedCount > 0 && (
+          <span className="text-xs text-danger-ink font-medium">
+            {escalatedCount} escalated
+          </span>
+        )}
+        <span className="ml-auto flex items-center gap-3">
           {unreadCount > 0 && (
             <button
               onClick={markAllRead}
-              className="text-2xs text-ink-500 hover:text-ink-900"
+              className="text-xs text-ink-500 hover:text-ink-900"
             >
               Mark all read
             </button>
           )}
-          <Link
-            to="/alerts"
-            className="block hover:underline"
-          >
-            All alerts <ChevronRight className="w-3 h-3" aria-hidden />
+          <Link to="/alerts" className="text-xs text-ink-500 hover:text-ink-900">
+            All alerts
           </Link>
         </span>
       </header>
+
+      <div className="bg-surface border border-line rounded-md overflow-hidden">
       <ul className="divide-y divide-line">
         {actionable.map((c) => (
           <AlertRow
@@ -353,6 +324,7 @@ export function AnnouncementBanner({
           </li>
         )}
       </ul>
+      </div>
     </section>
   );
 }

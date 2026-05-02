@@ -4,16 +4,12 @@ import { useClients } from "../hooks/useClients";
 import { useTriageDeadlines } from "../hooks/useDeadlines";
 import { useDetectAnnouncements } from "../hooks/useAnnouncements";
 import { useRealtimeAnnouncements } from "../hooks/useRealtimeAnnouncements";
-import { useStore } from "../data/store";
-import { useSession } from "../data/session";
 import { ShortcutsModal } from "../components/ShortcutsModal";
 import { DashboardSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
 import {
   TODAY,
   toIso,
-  daysBetween,
-  parseDate,
   hoursSince,
   escalationTier,
 } from "../data/dateHelpers";
@@ -24,42 +20,31 @@ import { BlockingAlertsDialog } from "../components/BlockingAlertsDialog";
 import { OnboardingLayer2Widget } from "../components/OnboardingLayer2Widget";
 import { WelcomeTour } from "../components/WelcomeTour";
 import { CapacityStrip } from "../components/CapacityStrip";
-import { ModeFHealth } from "../components/ModeFHealth";
 import { ActionQueue } from "../components/ActionQueue";
 import { JustHappenedStrip } from "../components/JustHappenedStrip";
-import { AiUsageInfo } from "../components/AiUsageInfo";
 import { useLocation } from "react-router-dom";
 import type { Announcement } from "../types";
-
-const DONE_STATUSES = new Set(["completed", "filed_extension"]);
 
 /**
  * Dashboard — the morning glance.
  *
- * Two zones above the fold:
- *   1. State-alert band — conditional, vanishes when no actionable alerts
- *   2. The queue — TaskList (urgency-sorted, with chase actions inline)
+ * Three sections, top-to-bottom:
+ *   1. Just happened — overnight diff strip (Mode A confirms, Mode C issues, replies)
+ *   2. State alerts — every undismissed alert with inline state-health pill
+ *   3. Action queue — verb-grouped per-client cards (chase, confirm, etc.)
  *
- * Below the fold: capacity strip (≥3-staff firms only).
+ * Quiet clients banner + Capacity strip render below when relevant.
  *
- * Editorial rules:
- *   • CPAs barely miss official deadlines — so "past official" is rare and
- *     gets a calm-but-clear callout only when nonzero. The operational
- *     signal is "past internal target" (the firm's 1-week buffer is being
- *     eaten), which fires regularly during tax season.
- *   • No big greeting cards or hero stat strips. A thin top strip with the
- *     date and a one-line summary; the queue starts immediately below.
- *   • Welcome tour, PWA install, advisory peek, digest panel are NOT on
- *     this surface (they were noise — moved to Settings, /to-review, or
- *     surfaced via per-row actions in the queue).
+ * Per DESIGN.md, Today is an audit + batch surface, not a daily destination.
+ * Header is date only. Mode F Health is now an inline pill (StateHealthPill)
+ * embedded in the State alerts header — no separate card. Operational summary
+ * and AI-usage chip live in Settings, not on Today.
  */
 export function Dashboard() {
-  const session = useSession();
   const clientsQuery = useClients();
   const triageQuery = useTriageDeadlines();
   const announcementsQuery = useRealtimeAnnouncements();
   const detectMutation = useDetectAnnouncements();
-  const { tasks } = useStore();
   const location = useLocation();
   // /legacy/dashboard renders the pre-v0.7-amendment view: deadline list only,
   // no ActionQueue, no Mode F Health. Lets us A/B compare during transition.
@@ -132,36 +117,6 @@ export function Dashboard() {
     alertsByTier.blocking.length > 0 && !alertsSnoozedToday;
   const [blockingDismissed, setBlockingDismissed] = useState(false);
 
-  // Operational summary. Two distinct signals:
-  //   • pastInternalTarget — task is past its internal target date (1-week
-  //     buffer eaten). Daily-relevant. The signal Sarah actually feels.
-  //   • pastOfficial — task is past the government deadline. Rare. Means
-  //     extension territory. Almost always 0 in a healthy firm.
-  // Plus: dueThisWeek — calendar context. Always shown.
-  const summary = useMemo(() => {
-    const open = tasks.filter((t) => !DONE_STATUSES.has(t.status));
-    const todayIso = toIso(TODAY);
-    const pastInternalTarget = open.filter(
-      (t) => t.internalTargetDate < todayIso && t.officialDueDate >= todayIso,
-    ).length;
-    const pastOfficial = open.filter(
-      (t) => t.officialDueDate < todayIso,
-    ).length;
-    const dueToday = open.filter((t) => t.officialDueDate === todayIso).length;
-    const dueThisWeek = open.filter((t) => {
-      const days = daysBetween(TODAY, parseDate(t.officialDueDate));
-      return days >= 0 && days <= 7;
-    }).length;
-    const activeClients = clients.filter((c) => c.status === "active").length;
-    return {
-      pastInternalTarget,
-      pastOfficial,
-      dueToday,
-      dueThisWeek,
-      activeClients,
-    };
-  }, [tasks, clients]);
-
   const todayLabel = useMemo(
     () =>
       TODAY.toLocaleDateString("en-US", {
@@ -182,7 +137,7 @@ export function Dashboard() {
 
   if (loadError) {
     return (
-      <div className="max-w-5xl mx-auto px-4 md:px-6 py-6">
+      <div className="max-w-[840px] mx-auto px-page-x py-page-y">
         <ErrorState
           title="Couldn't load your dashboard."
           message={loadError instanceof Error ? loadError.message : undefined}
@@ -198,10 +153,7 @@ export function Dashboard() {
 
   if (hasNoClients) {
     return (
-      <div className="max-w-5xl mx-auto px-6 py-12 space-y-6">
-        <div className="flex justify-end">
-          <AiUsageInfo />
-        </div>
+      <div className="max-w-[840px] mx-auto px-page-x py-page-y space-y-card">
         <EmptyState
           title="Let's get your clients in."
           actions={
@@ -220,127 +172,40 @@ export function Dashboard() {
     );
   }
 
-  const firmName = session?.firmName ?? "";
-
   return (
-    <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-4">
-      {/* Thin top strip — date + firm name + AI affordance. No big greeting. */}
-      <header className="flex items-baseline gap-2 text-xs flex-wrap">
-        <span className="text-ink-500">{todayLabel}</span>
-        {firmName && (
-          <>
-            <span className="text-ink-300">·</span>
-            <span className="text-ink-700 font-medium">{firmName}</span>
-          </>
-        )}
-        <span className="ml-auto self-center">
-          <AiUsageInfo />
-        </span>
+    <div className="max-w-[840px] mx-auto px-page-x py-page-y space-y-section">
+      {/* Header — date only. Per DESIGN.md: no greeting, no firm name,
+          no AI-usage chip, no operational summary. The sidebar tells you
+          where you are; the date is the only chrome that changes. */}
+      <header>
+        <h1 className="text-2xl font-semibold text-ink-900">Today</h1>
+        <p className="text-sm text-ink-500 mt-0.5">{todayLabel}</p>
       </header>
 
-      {/* One-line operational summary. Two-tier urgency: warn for past
-          internal target (common), danger for past official (rare). Both
-          conditional — no zero-counts shouted at the CPA. */}
-      <p
-        className="text-sm text-ink-700 flex items-center flex-wrap gap-x-3 gap-y-1 tabular-nums"
-        aria-label="Firm summary"
-      >
-        <span>
-          <span className="text-ink-900 font-semibold">
-            {summary.activeClients}
-          </span>{" "}
-          <span className="text-ink-500">active clients</span>
-        </span>
-        <span className="text-ink-300">·</span>
-        <span>
-          <span className="text-ink-900 font-semibold">
-            {summary.dueThisWeek}
-          </span>{" "}
-          <span className="text-ink-500">due this week</span>
-        </span>
-        {summary.dueToday > 0 && (
-          <>
-            <span className="text-ink-300">·</span>
-            <span className="text-warn-ink">
-              <span className="font-semibold">{summary.dueToday}</span> filing
-              today
-            </span>
-          </>
-        )}
-        {summary.pastInternalTarget > 0 && (
-          <>
-            <span className="text-ink-300">·</span>
-            <span className="text-warn-ink">
-              <span className="font-semibold">{summary.pastInternalTarget}</span>{" "}
-              past internal target
-            </span>
-          </>
-        )}
-        {summary.pastOfficial > 0 && (
-          <>
-            <span className="text-ink-300">·</span>
-            <span className="text-danger-ink">
-              <span className="font-semibold">{summary.pastOfficial}</span>{" "}
-              past official — file extension
-            </span>
-          </>
-        )}
-      </p>
-
-      {/* First-run welcome — inline banner, click to expand. */}
+      {/* First-run welcome — inline banner, click to expand. Self-gated
+          to fade after first session. */}
       <WelcomeTour />
 
-      {/* ─────────────────────────────────────────────────────────────────
-          Today narrative (5 sections, read top → bottom):
-            1. Just happened — overnight diff (Mode A confirms, replies,
-               Mode C issues). Drained in seconds before chasing starts.
-            2. Action queue — the chase. State alerts pinned at top, then
-               one row per client (max-urgency dot, all outstanding items
-               aggregated, expand to act on individual items).
-            3. Quiet clients — the chase loop's stalled subset (14d+ no
-               reply). Needs a phone call, not another email.
-            4. Mode F Health — state-monitoring's own monitoring.
-            5. Capacity — staff allocation (≥3-staff firms only).
-          State-alert news (no client matches) drops out as a compact
-          chip above the queue. Pure-news doesn't generate queue rows
-          (Mode F gates on affectedClientIds.length > 0). */}
-
-      {/* §1: Just happened — overnight diff strip. */}
+      {/* §1: Just happened — overnight diff strip. Auto-hides at 0/0/0. */}
       <JustHappenedStrip />
 
-      {/* State alerts — every undismissed alert. Banner always renders so
-          a fresh firm sees the "All clear" stripe (monitoring 50 states)
-          instead of a silent gap. Actionable rows render full; news-only
-          ones fold into a "N news items" chip. The ActionQueue below
-          carries the *derived actions* for actionable alerts; the banner
-          is the alert surface itself. Both surfaces co-exist by design. */}
+      {/* §2: State alerts — banner always renders so a fresh firm sees
+          the "All clear" stripe (monitoring 50 states). The State-health
+          pill rides inline in the section header (replaces the previous
+          ModeFHealth card on Today, per DESIGN.md). */}
       <AnnouncementBanner announcements={activeBanners} />
 
-      {/* §2: Action queue — AI-curated TodoItem feed (PRD §4.8 nine
-          sources, urgency-sorted with waiting_multiplier). State alerts
-          pinned at the top of the queue (Mode F rows render with a
-          distinct event-shape variant); per-client rows aggregate every
-          outstanding item for that client into a single send. Old per-
-          (client × task × form × state) row layout was theatrical at
-          scale (49 clients × 6 forms = 294 rows). */}
+      {/* §3: Action queue — verb-grouped per-client cards (PRD §4.8). */}
       {!isLegacy && <ActionQueue />}
 
-      {/* §3: Quiet clients — automation has run out. The phone-call
-          subset of in-flight chases (14d+ since last reminder, still
-          waiting). Self-vanishes when zero. */}
+      {/* Quiet clients — temporary placement; folds into the Action
+          queue card stack in a follow-up PR. Self-vanishes at zero. */}
       <ChaseBanner />
 
-      {/* §4: Mode F Health — state-monitoring's own monitoring (per IA
-          v0.7 §3.9d). Overall status from announcement query state; per-
-          state breakdown illustrative pending Phase 3 backend. */}
-      {!isLegacy && <ModeFHealth />}
-
-      {/* §5: Capacity — ≥3-staff firms only (gate inside the component).
-          Solo Sarah never sees this; mid-firm Yan Jing always does. */}
+      {/* Capacity — ≥3-staff firms only (gate inside the component). */}
       <CapacityStrip />
 
-      {/* Onboarding layer-2 nudges (set up forwarding email, connect
-          QBO). Self-gated to fade out once the firm wires the basics. */}
+      {/* Onboarding nudges — self-gates after wiring is done. */}
       <OnboardingLayer2Widget />
 
       {/* Blocking-alerts overlay — fires only at >72h escalation. Stays as
@@ -376,18 +241,6 @@ export function Dashboard() {
           { keys: ["Esc"], label: "Close dialog" },
         ]}
       />
-
-      <div className="pt-2 pb-6 text-2xs text-ink-400 flex items-center justify-end">
-        <button
-          onClick={() => setShortcutsOpen(true)}
-          className="hover:text-ink-700 flex items-center gap-1"
-        >
-          <kbd className="px-1 py-0.5 border border-line rounded font-mono">
-            ?
-          </kbd>
-          for shortcuts
-        </button>
-      </div>
     </div>
   );
 }
@@ -435,9 +288,10 @@ function EmptyStateButton({
   primary?: boolean;
   children: React.ReactNode;
 }) {
+  // Two affordances per DESIGN.md: solid primary or text-only link.
   const cls = primary
     ? "text-sm px-3 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover"
-    : "text-sm px-3 py-1.5 rounded-md border border-line text-ink-700 hover:bg-sunken";
+    : "text-sm text-ink-700 hover:text-ink-900 underline-offset-4 hover:underline";
   return (
     <a href={to} className={cls}>
       {children}
