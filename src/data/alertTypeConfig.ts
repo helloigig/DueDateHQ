@@ -27,12 +27,14 @@ export type AlertTone = "warn" | "info" | "neutral" | "danger";
 
 /** Action a primary/secondary verb dispatches when clicked. */
 export type AlertActionKind =
-  | "open_batch_notify" // existing modal; bundles deadline shift if newDeadline present
-  | "open_batch_notify_no_shift" // existing modal in notify-only mode
-  | "route_admin_queue" // navigate to /settings/federal-forms
-  | "route_calendar_schedule" // navigate to scheduling surface (TodoItem fallback)
-  | "open_recompute_modal" // P1 — RecomputeEstimatesModal (placeholder = batch_notify_no_shift)
-  | "open_nexus_check_modal"; // P1 — NexusCheckModal (placeholder = batch_notify_no_shift)
+  | "open_batch_notify" // disaster_extension; bundles deadline shift + email
+  | "open_batch_notify_no_shift" // generic notify-only fallback
+  | "open_batch_tag_modal" // penalty_relief; tags clients for filing-time review
+  | "open_planning_call_modal" // pte_change; creates planning_calls + Today TodoItems
+  | "open_recompute_modal" // rate_change; recomputes estimate amounts
+  | "open_nexus_check_modal" // nexus_change; per-client questionnaire + add filings
+  | "route_admin_queue" // form_change (admin); navigate to reviewer queue
+  | "route_calendar_schedule"; // P2 — calendar integration placeholder
 
 export interface AlertTypeConfig {
   /** Humanized label for the type chip in the header. */
@@ -134,9 +136,9 @@ export const ALERT_TYPE_CONFIG: Record<AnnouncementType, AlertTypeConfig> = {
     emptyStateCopy: (ann) =>
       `None of your clients have penalties pending in ${ann.stateCode}.`,
     primaryVerb: (n) => `Tag ${fmtCount(n, "client")} for review at filing`,
-    primaryAction: "open_batch_notify_no_shift",
+    primaryAction: "open_batch_tag_modal",
     secondaryVerb: (n) => `Tag + draft ${fmtCount(n, "email")}`,
-    secondaryAction: "open_batch_notify_no_shift",
+    secondaryAction: "open_batch_tag_modal",
     perClientRowChip: (c) => `${c.entityType} · ${c.primaryState}`,
     supportsDeadlineShift: false,
     isAdminGated: false,
@@ -150,7 +152,7 @@ export const ALERT_TYPE_CONFIG: Record<AnnouncementType, AlertTypeConfig> = {
     emptyStateCopy: (ann) =>
       `None of your clients have a PTE election active in ${ann.stateCode}.`,
     primaryVerb: (n) => `Schedule planning ${fmtCount(n, "call")}`,
-    primaryAction: "open_batch_notify_no_shift",
+    primaryAction: "open_planning_call_modal",
     secondaryVerb: (n) => `Draft ${fmtCount(n, "planning email")}`,
     secondaryAction: "open_batch_notify_no_shift",
     perClientRowChip: (c) => `${c.entityType} · ${c.primaryState}`,

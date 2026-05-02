@@ -19,7 +19,13 @@ import {
 } from "../data/alertTypeConfig";
 import { AlertActionBar, AlertTypeChip } from "../components/AlertActionBar";
 import { BatchNotifyModal } from "../components/BatchNotifyModal";
+import { BatchTagModal } from "../components/BatchTagModal";
+import { CatalogChangeReviewPanel } from "../components/CatalogChangeReviewPanel";
 import { DismissWithReasonDialog } from "../components/DismissWithReasonDialog";
+import { NexusCheckModal } from "../components/NexusCheckModal";
+import { RecomputeEstimatesModal } from "../components/RecomputeEstimatesModal";
+import { SchedulePlanningCallModal } from "../components/SchedulePlanningCallModal";
+import { useSession } from "../data/session";
 
 const CONFIDENCE_TONE = {
   high: "bg-emerald-50 text-emerald-700",
@@ -46,6 +52,17 @@ export function AnnouncementDetail() {
   const [flash, setFlash] = useState<string | null>(null);
   const [dismissOpen, setDismissOpen] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
+  // Per-variant modal open state. Only one open at a time; opening one
+  // closes any others. handleAlertAction below picks the right modal.
+  const [tagOpen, setTagOpen] = useState(false);
+  const [planningCallOpen, setPlanningCallOpen] = useState(false);
+  const [recomputeOpen, setRecomputeOpen] = useState(false);
+  const [nexusOpen, setNexusOpen] = useState(false);
+  // Admin gating for the form_change variant. For solo tier (Sarah's
+  // persona — sole-prop CPA) the user is always the owner. Pro/team tiers
+  // will need a real users.role check — added when multi-user comes online.
+  const session = useSession();
+  const isAdmin = session?.tier === "solo" || session?.tier === undefined;
   // Captures the last bundled batch-adjust so the flash banner can offer a
   // one-click undo. Cleared when the banner is dismissed or another action
   // overwrites it. Only set when adjustedCount > 0 — pure email sends are
@@ -162,27 +179,60 @@ export function AnnouncementDetail() {
   const alertCfg = ALERT_TYPE_CONFIG[ann.type];
 
   const handleAlertAction = (kind: AlertActionKind) => {
+    // Reset all variant modals so only one is open at a time.
+    setTagOpen(false);
+    setPlanningCallOpen(false);
+    setRecomputeOpen(false);
+    setNexusOpen(false);
+    setNotifyOpen(false);
+
     switch (kind) {
       case "open_batch_notify":
-      case "open_batch_notify_no_shift":
+        // disaster_extension primary — bundles deadline shift + email.
         setNotifyOpen(true);
         break;
+      case "open_batch_notify_no_shift":
+        // Variant secondaries that need a generic notification email
+        // (e.g. nexus_change "notify only", penalty_relief "tag + email"
+        // when tag-without-email is desired). Routes through the existing
+        // BatchNotifyModal which already supports notify-only mode.
+        setNotifyOpen(true);
+        break;
+      case "open_batch_tag_modal":
+        // penalty_relief — annotative; tags clients for filing-time review.
+        setTagOpen(true);
+        break;
+      case "open_planning_call_modal":
+        // pte_change — conversational; creates planning_calls + Today TodoItems.
+        setPlanningCallOpen(true);
+        break;
+      case "open_recompute_modal":
+        // rate_change — computational; recomputes estimate amounts.
+        setRecomputeOpen(true);
+        break;
+      case "open_nexus_check_modal":
+        // nexus_change — discovery; per-client questionnaire then add filings.
+        setNexusOpen(true);
+        break;
       case "route_admin_queue":
+        // form_change — admin reviewer queue lives at /settings/federal-forms.
+        // For non-admin users the AlertActionBar's primary verb is "Acknowledge"
+        // and routes here only when admin clicks.
         navigate(`/settings/federal-forms?event=${ann.id}`);
         break;
       case "route_calendar_schedule":
-        // P2 — calendar integration; for now, open BatchNotifyModal so CPA
-        // can at least draft an outreach email per client.
-        setNotifyOpen(true);
-        break;
-      case "open_recompute_modal":
-      case "open_nexus_check_modal":
-        // P1 — dedicated modals not yet built. Fall back to BatchNotifyModal
-        // (notify-only mode) so the CPA can still draft an outreach email.
-        setNotifyOpen(true);
+        // P2 — calendar integration. For now the planning_call modal
+        // captures the intent and creates a TodoItem.
+        setPlanningCallOpen(true);
         break;
     }
   };
+
+  // Recipients used by all per-variant modals. Computed once so the modals
+  // share the user's checkbox state.
+  const selectedRecipients = Array.from(selected)
+    .map((cid) => clientsById.get(cid))
+    .filter((c): c is NonNullable<typeof c> => !!c);
 
   const relatedAlerts = ann.relatedAnnouncementIds
     .map((rid) => allAnnouncements.find((a) => a.id === rid))
@@ -262,6 +312,41 @@ export function AnnouncementDetail() {
             </button>
           )}
         </div>
+      )}
+
+      {/* form_change: render the catalog-review panel inline. Admins see a
+          full diff with apply/modify/reject; non-admins see an acknowledge
+          banner. Renders BEFORE the verdict block because the catalog change
+          is the main object — the affected clients list below is supporting
+          context (which clients use the form, informational only). */}
+      {ann.type === "form_change" && (
+        <CatalogChangeReviewPanel
+          announcement={ann}
+          isAdmin={isAdmin}
+          affectedClientCount={ann.affectedClientIds.length}
+          onApply={(overrides) => {
+            console.info("[alerts] applyChangeEvent (mock)", {
+              announcementId: ann.id,
+              overrides,
+            });
+            setFlash(
+              `Catalog updated · ${ann.affectedClientIds.length} clients' form metadata refreshed`,
+            );
+          }}
+          onReject={(reason) => {
+            console.info("[alerts] rejectChangeEvent (mock)", {
+              announcementId: ann.id,
+              reason,
+            });
+            setFlash("Catalog change rejected");
+          }}
+          onAcknowledge={() => {
+            console.info("[alerts] acknowledgeChangeEvent (mock)", {
+              announcementId: ann.id,
+            });
+            setFlash("Acknowledged · removed from Today");
+          }}
+        />
       )}
 
       {/* VERDICT — who's affected + the action they need. Surfaces first because
@@ -507,6 +592,93 @@ export function AnnouncementDetail() {
         open={dismissOpen}
         onConfirm={doDismissWithReason}
         onCancel={() => setDismissOpen(false)}
+      />
+
+      {/* Variant-specific action modals — only one is open at a time per
+          handleAlertAction's reset logic. Each uses selectedRecipients
+          computed from the verdict block's checkboxes. BE handlers are
+          stub-level for now (logs + flash); real backend procedures land
+          in migration 0007 + announcements router updates. */}
+      <BatchTagModal
+        open={tagOpen}
+        announcement={ann}
+        recipients={selectedRecipients}
+        onClose={() => setTagOpen(false)}
+        onConfirm={({ clientIds, composeEmail }) => {
+          console.info("[alerts] tagClientsForRelief (mock)", {
+            announcementId: ann.id,
+            clientIds,
+            composeEmail,
+          });
+          setTagOpen(false);
+          setFlash(
+            `${clientIds.length} client${clientIds.length === 1 ? "" : "s"} tagged · Untag (24h window)`,
+          );
+        }}
+      />
+
+      <SchedulePlanningCallModal
+        open={planningCallOpen}
+        announcement={ann}
+        recipients={selectedRecipients}
+        onClose={() => setPlanningCallOpen(false)}
+        onConfirm={({ clientIds, suggestedWindow, composeEmail }) => {
+          console.info("[alerts] schedulePlanningCalls (mock)", {
+            announcementId: ann.id,
+            clientIds,
+            suggestedWindow,
+            composeEmail,
+          });
+          setPlanningCallOpen(false);
+          setFlash(
+            `${clientIds.length} call${clientIds.length === 1 ? "" : "s"} flagged on Today queue · Open queue`,
+          );
+        }}
+      />
+
+      <RecomputeEstimatesModal
+        open={recomputeOpen}
+        announcement={ann}
+        recipients={selectedRecipients}
+        onClose={() => setRecomputeOpen(false)}
+        onConfirm={({ selections, composeEmail }) => {
+          const totalEstimates = selections.reduce(
+            (acc, s) => acc + s.estimateIds.length,
+            0,
+          );
+          console.info("[alerts] recomputeEstimates (mock)", {
+            announcementId: ann.id,
+            selections,
+            composeEmail,
+          });
+          setRecomputeOpen(false);
+          setFlash(
+            `${totalEstimates} estimate${totalEstimates === 1 ? "" : "s"} recomputed · Undo (5min)`,
+          );
+        }}
+      />
+
+      <NexusCheckModal
+        open={nexusOpen}
+        announcement={ann}
+        recipients={selectedRecipients}
+        onClose={() => setNexusOpen(false)}
+        onConfirm={({ clientId, answers, selectedFilings, notifyOnly }) => {
+          console.info("[alerts] runNexusCheck (mock)", {
+            announcementId: ann.id,
+            clientId,
+            answers,
+            selectedFilings,
+            notifyOnly,
+          });
+          if (notifyOnly) {
+            setFlash(`Notification queued for client · No filings added`);
+          } else {
+            setFlash(
+              `${selectedFilings.length} filing${selectedFilings.length === 1 ? "" : "s"} added · Undo (24h)`,
+            );
+          }
+        }}
       />
     </div>
   );
