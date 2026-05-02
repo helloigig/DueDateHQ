@@ -1,7 +1,10 @@
 # fly.toml app configuration file generated for duedatehq on 2026-04-27T21:17:21Z
 #
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+# Source of truth for `fly deploy` from the repo root. The Dockerfile in this
+# directory builds backend/ into a Node image. Frontend deploys to Vercel
+# separately (vercel.json).
 #
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 
 app = 'duedatehq'
 primary_region = 'lhr'
@@ -9,12 +12,22 @@ primary_region = 'lhr'
 [build]
   dockerfile = "Dockerfile"
 
+# Database migration — runs ONCE per deploy, before the new app version is
+# routed traffic. Fails the deploy if migration errors out, so a broken
+# migration never reaches production. Without this block, releases silently
+# skip migrations and `relation "..." does not exist` shows up at runtime.
+[deploy]
+  release_command = "node dist/db/migrate.js"
+
 [env]
   NODE_ENV = "production"
-  PORT = "8000"
+  # Must match [http_service].internal_port below; the app reads PORT and
+  # binds to it (see backend/src/env.ts + backend/src/index.ts). 8080 is
+  # Fly's de-facto default and matches the saved machine config.
+  PORT = "8080"
 
 [http_service]
-  internal_port = 8000
+  internal_port = 8080
   force_https = true
   # Keep one machine always running. Without this, Fly stops idle
   # machines and the in-process scraper interval (1-hour cadence in

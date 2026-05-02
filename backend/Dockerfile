@@ -1,3 +1,8 @@
+# ⚠️ NOT THE LIVE BUILD — pairs with backend/fly.toml which is also a stale
+# template. The actual Fly image for app `duedatehq` is built from the
+# repo-root Dockerfile (see RUNBOOK.md). Mixing these caused a port-mismatch
+# outage on 2026-05-02. Don't deploy from here.
+#
 # Multi-stage Node 24 build for Fly.io.
 # Node 24 is required because `--env-file-if-exists` was added in Node 21
 # and we use it in the start script + db:migrate + eval scripts.

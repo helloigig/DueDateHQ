@@ -162,6 +162,16 @@ fly secrets set \
   RESEND_API_KEY='re_...'        # outbound email (omit in dev — emails.send logs + skips)
 ```
 
+> **⚠️ Don't bulk-paste from `.env.local` — `PORT` and `NODE_ENV` belong in
+> `[env]`, not in secrets.** Fly secrets override `fly.toml` `[env]`
+> unconditionally. If you `fly secrets set NODE_ENV=development PORT=8000`
+> (e.g. by piping `cat .env.local | xargs fly secrets set`), the runtime
+> will silently disagree with `fly.toml` forever — port mismatch → health
+> check fails on the configured `internal_port` → traffic stops routing.
+> This bit us on 2026-05-02 (took prod down for hours). Run
+> `fly secrets list` after first deploy and unset anything that duplicates
+> a `[env]` key.
+
 `RESEND_API_KEY` is optional in dev: `emails.send` writes the row, fires the Activity event, and returns `{ providerSkipped: true }` when the key is missing — useful for running the BE locally without burning send quota. Production requires it; without the key, no chase emails actually leave the building.
 
 ### Deploy
