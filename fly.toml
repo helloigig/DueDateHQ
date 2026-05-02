@@ -16,9 +16,14 @@ primary_region = 'lhr'
 [http_service]
   internal_port = 8000
   force_https = true
+  # Keep one machine always running. Without this, Fly stops idle
+  # machines and the in-process scraper interval (1-hour cadence in
+  # backend/src/lib/scraper.ts) dies with them — leading to silent
+  # no-data periods. The second machine still auto-stops when idle to
+  # save on cost.
   auto_stop_machines = 'stop'
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
   processes = ['app']
 
 [[http_service.checks]]
