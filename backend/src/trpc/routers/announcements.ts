@@ -138,7 +138,7 @@ export const announcementsRouter = router({
         parseConfidence: r.ann.parseConfidence,
         detectedAt: r.ann.detectedAt.toISOString(),
         effectiveDate: r.ann.effectiveDate,
-        affectedClientIds: byAnn.get(r.ann.id) ?? [],
+        affectedClientIds: clientsByAnn.get(r.ann.id) ?? [],
         // Per-firm overlay
         read: r.firmAnn?.acknowledgedAt != null,
         dismissed: r.firmAnn?.dismissedAt != null,
