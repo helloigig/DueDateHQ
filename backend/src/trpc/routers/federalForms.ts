@@ -379,6 +379,123 @@ export const federalFormsRouter = router({
     }),
 
   /**
+   * Apply a parsed catalog change to the federal_forms catalog.
+   * Admin-only in production (TODO: wire users.role check). Optionally
+   * accepts userOverrides — when present, those values override the
+   * AI-parsed values for specific fields.
+   *
+   * In a transaction:
+   *   1. Update federal_forms with the new values (per field).
+   *   2. Mark federal_form_change_events.applied_at = now() + applied_by.
+   *   3. Update federal_forms.last_change_check_at.
+   */
+  applyChangeEvent: firmProcedure
+    .input(
+      z.object({
+        eventId: z.number().int(),
+        // Per-field overrides — admin can edit before applying.
+        // Shape: { notes?: string, irsUrl?: string, dueDateRule?: unknown, ... }
+        userOverrides: z.record(z.string(), z.unknown()).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const event = await db.query.federalFormChangeEvents.findFirst({
+        where: eq(federalFormChangeEvents.id, input.eventId),
+      });
+      if (!event) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      if (event.appliedAt || event.rejectedAt) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Change event already resolved",
+        });
+      }
+      // V1: only the `summary` field is parsed by the regex/LLM pipeline
+      // and rolled into federal_forms.notes. V2: structured diff per field.
+      const overrides = input.userOverrides ?? {};
+      const noteValue =
+        typeof overrides.notes === "string" ? overrides.notes : event.summary;
+      const now = new Date();
+      // Update the catalog row.
+      await db
+        .update(federalForms)
+        .set({
+          notes: noteValue,
+          lastChangeCheckAt: now,
+          updatedAt: now,
+        })
+        .where(eq(federalForms.id, event.formId));
+      // Mark the event applied.
+      await db
+        .update(federalFormChangeEvents)
+        .set({
+          appliedAt: now,
+          appliedBy: ctx.dbUser.id,
+          userOverridesJsonb: input.userOverrides ?? null,
+          reviewedAt: now,
+        })
+        .where(eq(federalFormChangeEvents.id, input.eventId));
+      return {
+        applied: true as const,
+        appliedAt: now.toISOString(),
+        fieldsApplied: Object.keys(overrides).length > 0
+          ? Object.keys(overrides)
+          : ["notes"],
+      };
+    }),
+
+  /**
+   * Reject a parsed catalog change. Admin-only. Reason is required so
+   * the parser feedback loop can learn from rejections.
+   */
+  rejectChangeEvent: firmProcedure
+    .input(
+      z.object({
+        eventId: z.number().int(),
+        reason: z.string().min(1).max(500),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const event = await db.query.federalFormChangeEvents.findFirst({
+        where: eq(federalFormChangeEvents.id, input.eventId),
+      });
+      if (!event) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      if (event.appliedAt || event.rejectedAt) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Change event already resolved",
+        });
+      }
+      const now = new Date();
+      await db
+        .update(federalFormChangeEvents)
+        .set({
+          rejectedAt: now,
+          rejectedReason: input.reason,
+          reviewedAt: now,
+        })
+        .where(eq(federalFormChangeEvents.id, input.eventId));
+      return { rejected: true as const, rejectedAt: now.toISOString() };
+    }),
+
+  /**
+   * Non-admin acknowledge — marks the event as seen by this user without
+   * mutating the catalog. (V2: per-user acknowledgment table; V1: just
+   * removes from this user's Today queue via a different mechanism.)
+   * Returns { ok: true } unconditionally for now since per-user state
+   * isn't yet modeled in the BE.
+   */
+  acknowledgeChangeEvent: firmProcedure
+    .input(z.object({ eventId: z.number().int() }))
+    .mutation(async () => {
+      // No-op in V1. Future: write to user_change_event_acks (user, event, ts).
+      return { ok: true as const };
+    }),
+
+  /**
    * On-demand poll. Mirrors `/api/scraper/run-now` for the state
    * announcement scraper. Available to any signed-in user — the
    * cycle is idempotent so spamming it isn't dangerous, and it's

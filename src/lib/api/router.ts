@@ -1232,6 +1232,40 @@ export const appRouter = t.router({
     markChangeReviewed: t.procedure
       .input(z.object({ eventId: z.number().int(), applied: z.boolean() }))
       .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    /** Admin applies a parsed catalog change. Optional per-field
+     *  userOverrides edit AI-parsed values before commit. */
+    applyChangeEvent: t.procedure
+      .input(
+        z.object({
+          eventId: z.number().int(),
+          userOverrides: z.record(z.string(), z.unknown()).optional(),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          applied: true;
+          appliedAt: string;
+          fieldsApplied: string[];
+        }> => NOT_IMPL(),
+      ),
+    /** Admin rejects with required reason; feeds parser feedback loop. */
+    rejectChangeEvent: t.procedure
+      .input(
+        z.object({
+          eventId: z.number().int(),
+          reason: z.string().min(1).max(500),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          rejected: true;
+          rejectedAt: string;
+        }> => NOT_IMPL(),
+      ),
+    /** Non-admin acknowledge — read-only mark-as-seen. */
+    acknowledgeChangeEvent: t.procedure
+      .input(z.object({ eventId: z.number().int() }))
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
     pollNow: t.procedure.mutation(
       async (): Promise<{
         fetched: number;
@@ -1241,6 +1275,187 @@ export const appRouter = t.router({
         duplicatesSkipped: number;
       }> => NOT_IMPL(),
     ),
+  }),
+
+  /** Action surfaces for the 5 non-disaster alertType variants —
+   *  penalty_relief / pte_change / rate_change / nexus_change.
+   *  (form_change procedures live on federalForms above since they
+   *  mutate the catalog directly.) */
+  alertActions: t.router({
+    // ─── penalty_relief ──────────────────────────────────────────────────
+    tagClientsForRelief: t.procedure
+      .input(
+        z.object({
+          announcementId: z.string(),
+          clientIds: z.array(z.string()).min(1),
+          expiresAt: z.string().nullable(),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          taggedCount: number;
+          duplicateCount: number;
+          failedCount: number;
+        }> => NOT_IMPL(),
+      ),
+    markTagApplied: t.procedure
+      .input(z.object({ tagId: z.string(), taskId: z.string().optional() }))
+      .mutation(
+        async (): Promise<{ ok: true; appliedAt?: string }> => NOT_IMPL(),
+      ),
+    untag: t.procedure
+      .input(z.object({ tagId: z.string(), reason: z.string().min(1) }))
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+
+    // ─── pte_change ──────────────────────────────────────────────────────
+    schedulePlanningCalls: t.procedure
+      .input(
+        z.object({
+          announcementId: z.string(),
+          clientIds: z.array(z.string()).min(1),
+          suggestedWindow: z.enum([
+            "this_week",
+            "next_2_weeks",
+            "before_deadline",
+          ]),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          callsCreated: number;
+          todoItemsAdded: number;
+        }> => NOT_IMPL(),
+      ),
+    markPlanningCallCompleted: t.procedure
+      .input(
+        z.object({
+          callId: z.string(),
+          outcome: z.enum([
+            "renewed",
+            "revoked",
+            "opted_in",
+            "deferred",
+            "no_change",
+          ]),
+          notes: z.string().optional(),
+        }),
+      )
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+
+    // ─── rate_change ─────────────────────────────────────────────────────
+    recomputeEstimates: t.procedure
+      .input(
+        z.object({
+          announcementId: z.string(),
+          selections: z.array(
+            z.object({
+              deadlineId: z.string(),
+              overrideAmountCents: z.number().int().optional(),
+            }),
+          ),
+          ruleJurisdiction: z.enum(["federal", "CA", "NY"]),
+          ruleTaxYear: z.number().int(),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          recomputedCount: number;
+          bankUpdateTodos: number;
+          undoToken: string;
+          expiresAt: string;
+        }> => NOT_IMPL(),
+      ),
+    undoRecomputeEstimates: t.procedure
+      .input(z.object({ undoToken: z.string() }))
+      .mutation(
+        async (): Promise<{ restoredCount: number }> => NOT_IMPL(),
+      ),
+
+    // ─── nexus_change ────────────────────────────────────────────────────
+    getNexusQuestionnaire: t.procedure
+      .input(
+        z.object({
+          state: z.string().length(2),
+          nexusKind: z.enum(["sales", "income", "payroll", "franchise"]),
+        }),
+      )
+      .query(
+        async (): Promise<{
+          state: string;
+          nexusKind: string;
+          thresholdSummary: string;
+          ruleEffectiveDate: string;
+          questions: Array<{ id: string; text: string }>;
+          suggestedFilings: Array<{
+            formCode: string;
+            formName: string;
+            caveat?: string;
+            preCheckedOnEstablished: boolean;
+          }>;
+        } | null> => NOT_IMPL(),
+      ),
+    runNexusCheck: t.procedure
+      .input(
+        z.object({
+          announcementId: z.string(),
+          clientId: z.string(),
+          state: z.string().length(2),
+          nexusKind: z.enum(["sales", "income", "payroll", "franchise"]),
+          answers: z.record(z.string(), z.boolean()),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          status:
+            | "established"
+            | "borderline"
+            | "confirmed_no_nexus";
+          confidence: "high" | "medium" | "low";
+          reason: string;
+          recommendedFilings: Array<{
+            formCode: string;
+            formName: string;
+            caveat?: string;
+            preCheckedOnEstablished: boolean;
+          }>;
+        }> => NOT_IMPL(),
+      ),
+    addNexusFilings: t.procedure
+      .input(
+        z.object({
+          announcementId: z.string(),
+          clientId: z.string(),
+          state: z.string().length(2),
+          filings: z.array(
+            z.object({
+              formCode: z.string(),
+              formName: z.string(),
+              dueDate: z.string().optional(),
+            }),
+          ),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          filingsAdded: number;
+          clientId: string;
+        }> => NOT_IMPL(),
+      ),
+    markFilingsProtective: t.procedure
+      .input(
+        z.object({
+          announcementId: z.string(),
+          deadlineIds: z.array(z.string()).min(1),
+          reason: z.string().min(1),
+          protectedThroughYear: z.number().int(),
+        }),
+      )
+      .mutation(
+        async (): Promise<{
+          markedCount: number;
+          protectedThroughYear: number;
+        }> => NOT_IMPL(),
+      ),
   }),
 
   multistate: t.router({

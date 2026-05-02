@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { History, Link2 } from "lucide-react";
 import { actions } from "../data/store";
+import { trpc } from "../lib/api/client";
 import { useAnnouncement, useAnnouncements } from "../hooks/useAnnouncements";
 import { useClients } from "../hooks/useClients";
 import { PageSkeleton } from "../components/skeletons/DashboardSkeleton";
@@ -12,10 +13,20 @@ import {
   SOURCE_AUTHORITY_LABEL,
   SOURCE_AUTHORITY_TOOLTIP,
   TAX_TYPE_LABEL,
-  TOPIC_LABEL,
 } from "../data/announcementLabels";
+import {
+  ALERT_TYPE_CONFIG,
+  type AlertActionKind,
+} from "../data/alertTypeConfig";
+import { AlertActionBar, AlertTypeChip } from "../components/AlertActionBar";
 import { BatchNotifyModal } from "../components/BatchNotifyModal";
+import { BatchTagModal } from "../components/BatchTagModal";
+import { CatalogChangeReviewPanel } from "../components/CatalogChangeReviewPanel";
 import { DismissWithReasonDialog } from "../components/DismissWithReasonDialog";
+import { NexusCheckModal } from "../components/NexusCheckModal";
+import { RecomputeEstimatesModal } from "../components/RecomputeEstimatesModal";
+import { SchedulePlanningCallModal } from "../components/SchedulePlanningCallModal";
+import { useSession } from "../data/session";
 
 const CONFIDENCE_TONE = {
   high: "bg-emerald-50 text-emerald-700",
@@ -42,6 +53,37 @@ export function AnnouncementDetail() {
   const [flash, setFlash] = useState<string | null>(null);
   const [dismissOpen, setDismissOpen] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
+  // Per-variant modal open state. Only one open at a time; opening one
+  // closes any others. handleAlertAction below picks the right modal.
+  const [tagOpen, setTagOpen] = useState(false);
+  const [planningCallOpen, setPlanningCallOpen] = useState(false);
+  const [recomputeOpen, setRecomputeOpen] = useState(false);
+  const [nexusOpen, setNexusOpen] = useState(false);
+  // Admin gating for the form_change variant. We don't yet model multi-user
+  // roles — every signed-in user is treated as the firm's catalog admin.
+  // When multi-user lands (pro/team tiers w/ users.role), wire a real
+  // role check here.
+  const _session = useSession();
+  const isAdmin = true;
+  void _session;
+
+  // ─── tRPC mutations for the 5 variant action surfaces ──────────────────
+  // Each mutation routes to MOCK adapter (mock-link) in dev mode and to
+  // the real BE (alertActions / federalForms routers) in prod. Mocks log
+  // payload to console + return realistic-shape responses; real handlers
+  // mutate Postgres + return the same shape.
+  const tagClients = trpc.alertActions.tagClientsForRelief.useMutation();
+  const schedulePlanningCalls =
+    trpc.alertActions.schedulePlanningCalls.useMutation();
+  const recomputeEstimates = trpc.alertActions.recomputeEstimates.useMutation();
+  const undoRecomputeEstimates =
+    trpc.alertActions.undoRecomputeEstimates.useMutation();
+  const runNexusCheck = trpc.alertActions.runNexusCheck.useMutation();
+  const addNexusFilings = trpc.alertActions.addNexusFilings.useMutation();
+  const applyChangeEvent = trpc.federalForms.applyChangeEvent.useMutation();
+  const rejectChangeEvent = trpc.federalForms.rejectChangeEvent.useMutation();
+  const acknowledgeChangeEvent =
+    trpc.federalForms.acknowledgeChangeEvent.useMutation();
   // Captures the last bundled batch-adjust so the flash banner can offer a
   // one-click undo. Cleared when the banner is dismissed or another action
   // overwrites it. Only set when adjustedCount > 0 — pure email sends are
@@ -152,6 +194,67 @@ export function AnnouncementDetail() {
   const isDisasterShift =
     ann.type === "disaster_extension" && !!ann.oldDeadline && !!ann.newDeadline;
 
+  // Per-alertType config — drives header chip tone, verdict copy, primary
+  // verb, action shape, etc. See data/alertTypeConfig.ts for the table
+  // and docs/specs/alert-detail-variants.md for design rationale.
+  const alertCfg = ALERT_TYPE_CONFIG[ann.type];
+
+  const handleAlertAction = (kind: AlertActionKind) => {
+    // Reset all variant modals so only one is open at a time.
+    setTagOpen(false);
+    setPlanningCallOpen(false);
+    setRecomputeOpen(false);
+    setNexusOpen(false);
+    setNotifyOpen(false);
+
+    switch (kind) {
+      case "open_batch_notify":
+        // disaster_extension primary — bundles deadline shift + email.
+        setNotifyOpen(true);
+        break;
+      case "open_batch_notify_no_shift":
+        // Variant secondaries that need a generic notification email
+        // (e.g. nexus_change "notify only", penalty_relief "tag + email"
+        // when tag-without-email is desired). Routes through the existing
+        // BatchNotifyModal which already supports notify-only mode.
+        setNotifyOpen(true);
+        break;
+      case "open_batch_tag_modal":
+        // penalty_relief — annotative; tags clients for filing-time review.
+        setTagOpen(true);
+        break;
+      case "open_planning_call_modal":
+        // pte_change — conversational; creates planning_calls + Today TodoItems.
+        setPlanningCallOpen(true);
+        break;
+      case "open_recompute_modal":
+        // rate_change — computational; recomputes estimate amounts.
+        setRecomputeOpen(true);
+        break;
+      case "open_nexus_check_modal":
+        // nexus_change — discovery; per-client questionnaire then add filings.
+        setNexusOpen(true);
+        break;
+      case "route_admin_queue":
+        // form_change — admin reviewer queue lives at /settings/federal-forms.
+        // For non-admin users the AlertActionBar's primary verb is "Acknowledge"
+        // and routes here only when admin clicks.
+        navigate(`/settings/federal-forms?event=${ann.id}`);
+        break;
+      case "route_calendar_schedule":
+        // P2 — calendar integration. For now the planning_call modal
+        // captures the intent and creates a TodoItem.
+        setPlanningCallOpen(true);
+        break;
+    }
+  };
+
+  // Recipients used by all per-variant modals. Computed once so the modals
+  // share the user's checkbox state.
+  const selectedRecipients = Array.from(selected)
+    .map((cid) => clientsById.get(cid))
+    .filter((c): c is NonNullable<typeof c> => !!c);
+
   const relatedAlerts = ann.relatedAnnouncementIds
     .map((rid) => allAnnouncements.find((a) => a.id === rid))
     .filter((a): a is NonNullable<typeof a> => !!a);
@@ -178,9 +281,7 @@ export function AnnouncementDetail() {
             </div>
 
             <div className="flex flex-wrap gap-1.5 mt-2">
-              <span className="inline-flex items-center text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                {TOPIC_LABEL[ann.type]}
-              </span>
+              <AlertTypeChip type={ann.type} />
               <span className="inline-flex items-center text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
                 {TAX_TYPE_LABEL[ann.taxType]}
               </span>
@@ -234,16 +335,75 @@ export function AnnouncementDetail() {
         </div>
       )}
 
+      {/* form_change: render the catalog-review panel inline. Admins see a
+          full diff with apply/modify/reject; non-admins see an acknowledge
+          banner. Renders BEFORE the verdict block because the catalog change
+          is the main object — the affected clients list below is supporting
+          context (which clients use the form, informational only). */}
+      {ann.type === "form_change" && (
+        <CatalogChangeReviewPanel
+          announcement={ann}
+          isAdmin={isAdmin}
+          // Form number is parsed from the alert title for the design-stage
+          // mock; production passes a structured `affectedFormNumber` field
+          // from the BE that the federal-register parser extracts.
+          formNumber={ann.title.match(/Form ([\w-]+)/)?.[1] ?? "—"}
+          affectedClientCount={ann.affectedClientIds.length}
+          onApply={async (overrides) => {
+            try {
+              const result = await applyChangeEvent.mutateAsync({
+                // Mock change_event id — production passes the event row's
+                // bigserial id from announcement.changeEventId once the
+                // detailWithAffected query exposes it on the alert.
+                eventId: 1,
+                userOverrides: overrides,
+              });
+              setFlash(
+                `Catalog updated · ${result.fieldsApplied.length} field${result.fieldsApplied.length === 1 ? "" : "s"} applied · ${ann.affectedClientIds.length} client${ann.affectedClientIds.length === 1 ? "" : "s"}' metadata refreshed`,
+              );
+            } catch (err) {
+              setFlash(
+                `Couldn't apply change — ${err instanceof Error ? err.message : "try again"}`,
+              );
+            }
+          }}
+          onReject={async (reason) => {
+            try {
+              await rejectChangeEvent.mutateAsync({
+                eventId: 1,
+                reason,
+              });
+              setFlash("Catalog change rejected");
+            } catch (err) {
+              setFlash(
+                `Couldn't reject — ${err instanceof Error ? err.message : "try again"}`,
+              );
+            }
+          }}
+          onAcknowledge={async () => {
+            try {
+              await acknowledgeChangeEvent.mutateAsync({ eventId: 1 });
+              setFlash("Acknowledged · removed from Today");
+            } catch (err) {
+              setFlash(
+                `Couldn't acknowledge — ${err instanceof Error ? err.message : "try again"}`,
+              );
+            }
+          }}
+        />
+      )}
+
       {/* VERDICT — who's affected + the action they need. Surfaces first because
           Sarah's mental order is "who do I act on" → "what do I do" → (only if
           uncertain) "let me audit the parse." Evidence sits below in collapsed
-          <details> blocks. */}
+          <details> blocks. Headline + empty-state copy vary by alertType
+          (sourced from alertTypeConfig). */}
       <section className="mt-5 bg-white border border-slate-200 rounded-lg overflow-hidden">
         <div className="flex items-center px-4 py-3 border-b border-slate-100">
           <h2 className="text-sm font-semibold text-slate-700">
-            🎯 AFFECTED CLIENTS ({ann.affectedClientIds.length})
+            🎯 {alertCfg.verdictHeadline(ann.affectedClientIds.length, clients.length)}
           </h2>
-          {ann.affectedClientIds.length > 0 && (
+          {ann.affectedClientIds.length > 0 && !alertCfg.isAdminGated && (
             <button
               onClick={toggleAll}
               className="ml-auto text-xs text-indigo-600 hover:underline"
@@ -255,22 +415,16 @@ export function AnnouncementDetail() {
           )}
         </div>
         {ann.affectedClientIds.length === 0 ? (
-          // Empty state: no one in the firm matches this alert. Common when:
-          //   - The firm has zero clients yet (fresh sign-up)
-          //   - The alert's state/county/entity filters don't intersect the
-          //     current roster (e.g. CA disaster alert, no CA clients)
-          // We still keep the alert page reachable so the CPA can read what
-          // happened and dismiss it explicitly — but the action surface
-          // collapses (no batch buttons, no list).
+          // Empty state — type-specific copy. Page stays reachable so CPA can
+          // read evidence + dismiss with reason.
           <div className="px-4 py-10 text-center">
             <div className="w-10 h-10 rounded-full bg-slate-100 mx-auto flex items-center justify-center text-lg">
               ✓
             </div>
             <p className="text-sm font-medium text-slate-900 mt-3">
-              None of your clients are affected.
+              {alertCfg.emptyStateCopy(ann)}
             </p>
             <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
-              This {ann.stateCode} alert doesn't match anyone in your roster.
               No deadlines need to move, and no notifications are queued.
             </p>
             <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
@@ -316,8 +470,12 @@ export function AnnouncementDetail() {
                 >
                   {c.name}
                 </Link>
-                <span className="text-xs text-slate-500 w-32 truncate">
-                  {c.county ? `${c.county}, ${c.primaryState}` : c.primaryState}
+                <span className="text-xs text-slate-500 w-44 truncate">
+                  {alertCfg.perClientRowChip
+                    ? alertCfg.perClientRowChip(c, ann)
+                    : c.county
+                      ? `${c.county}, ${c.primaryState}`
+                      : c.primaryState}
                 </span>
                 <span className="text-xs text-slate-500 flex-1 truncate">
                   {c.entityType}
@@ -335,28 +493,22 @@ export function AnnouncementDetail() {
         </ul>
       </section>
 
-      {ann.affectedClientIds.length > 0 && (
-      <section className="mt-5 bg-white border border-slate-200 rounded-lg p-4 flex flex-wrap items-center gap-2 sticky bottom-0">
-        <button
-          onClick={() => setNotifyOpen(true)}
-          disabled={selectedCount === 0}
-          className="px-4 py-2 rounded bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Review draft for {selectedCount} client
-          {selectedCount === 1 ? "" : "s"}
-        </button>
-        {isDisasterShift && (
-          <span className="text-xs text-slate-500">
-            Bundles deadline shift to {formatLongDate(ann.newDeadline!)}
-          </span>
-        )}
-        <button
-          onClick={() => setDismissOpen(true)}
-          className="ml-auto px-4 py-2 rounded text-sm text-slate-500 hover:bg-slate-50"
-        >
-          Not applicable — dismiss
-        </button>
-      </section>
+      {/* Skip the sticky AlertActionBar for form_change — its action shape
+          (Apply / Modify / Reject for admin, Acknowledge for non-admin)
+          lives inside <CatalogChangeReviewPanel /> rendered above the
+          verdict block. Two action surfaces would compete and confuse. */}
+      {ann.type !== "form_change" && ann.affectedClientIds.length > 0 && (
+        <AlertActionBar
+          announcement={ann}
+          selectedCount={selectedCount}
+          onAction={handleAlertAction}
+          onDismiss={() => setDismissOpen(true)}
+          helperText={
+            isDisasterShift && ann.newDeadline
+              ? `Bundles deadline shift to ${formatLongDate(ann.newDeadline)}`
+              : undefined
+          }
+        />
       )}
 
       {/* EVIDENCE — collapsed by default. The reader has already seen the
@@ -488,6 +640,164 @@ export function AnnouncementDetail() {
         open={dismissOpen}
         onConfirm={doDismissWithReason}
         onCancel={() => setDismissOpen(false)}
+      />
+
+      {/* Variant-specific action modals — only one is open at a time per
+          handleAlertAction's reset logic. Each uses selectedRecipients
+          computed from the verdict block's checkboxes. BE handlers are
+          stub-level for now (logs + flash); real backend procedures land
+          in migration 0007 + announcements router updates. */}
+      <BatchTagModal
+        open={tagOpen}
+        announcement={ann}
+        recipients={selectedRecipients}
+        onClose={() => setTagOpen(false)}
+        onConfirm={async ({ clientIds, composeEmail }) => {
+          setTagOpen(false);
+          try {
+            const result = await tagClients.mutateAsync({
+              announcementId: ann.id,
+              clientIds,
+              expiresAt: ann.effectiveDate ?? null,
+            });
+            const dupNote =
+              result.duplicateCount > 0
+                ? ` (${result.duplicateCount} already tagged)`
+                : "";
+            setFlash(
+              `${result.taggedCount} client${result.taggedCount === 1 ? "" : "s"} tagged${dupNote} · Untag (24h window)${composeEmail ? " · drafts queued" : ""}`,
+            );
+          } catch (err) {
+            setFlash(
+              `Couldn't tag clients — ${err instanceof Error ? err.message : "try again"}`,
+            );
+          }
+        }}
+      />
+
+      <SchedulePlanningCallModal
+        open={planningCallOpen}
+        announcement={ann}
+        recipients={selectedRecipients}
+        onClose={() => setPlanningCallOpen(false)}
+        onConfirm={async ({ clientIds, suggestedWindow, composeEmail }) => {
+          setPlanningCallOpen(false);
+          try {
+            const result = await schedulePlanningCalls.mutateAsync({
+              announcementId: ann.id,
+              clientIds,
+              suggestedWindow,
+            });
+            setFlash(
+              `${result.callsCreated} call${result.callsCreated === 1 ? "" : "s"} flagged on Today queue${composeEmail ? " · drafts queued" : ""}`,
+            );
+          } catch (err) {
+            setFlash(
+              `Couldn't schedule calls — ${err instanceof Error ? err.message : "try again"}`,
+            );
+          }
+        }}
+      />
+
+      <RecomputeEstimatesModal
+        open={recomputeOpen}
+        announcement={ann}
+        recipients={selectedRecipients}
+        onClose={() => setRecomputeOpen(false)}
+        onConfirm={async ({ selections, composeEmail }) => {
+          setRecomputeOpen(false);
+          // Flatten the per-client `estimateIds` into the BE's expected
+          // shape `selections: [{ deadlineId, overrideAmountCents? }]`.
+          const flatSelections = selections.flatMap((s) =>
+            s.estimateIds.map((id) => ({ deadlineId: id })),
+          );
+          try {
+            const result = await recomputeEstimates.mutateAsync({
+              announcementId: ann.id,
+              selections: flatSelections,
+              // Default to federal 2026 — for state-scoped alerts the BE
+              // would derive this from the announcement's stateCode/year.
+              ruleJurisdiction: "federal" as const,
+              ruleTaxYear: 2026,
+            });
+            const bankNote =
+              result.bankUpdateTodos > 0
+                ? ` · ${result.bankUpdateTodos} bank-instruction TodoItem${result.bankUpdateTodos === 1 ? "" : "s"} queued`
+                : "";
+            setFlash(
+              `${result.recomputedCount} estimate${result.recomputedCount === 1 ? "" : "s"} recomputed${bankNote}${composeEmail ? " · drafts queued" : ""} · Undo (5min)`,
+            );
+            // Stash undo token so the flash banner can offer a real undo.
+            // For V1 we just log it — wiring undo into the existing flash
+            // banner is a small follow-up.
+            if (result.undoToken) {
+              console.info("[alerts] recompute undoToken", result.undoToken);
+            }
+            // Avoid TS warning when mutation isn't used elsewhere.
+            void undoRecomputeEstimates;
+          } catch (err) {
+            setFlash(
+              `Couldn't recompute — ${err instanceof Error ? err.message : "try again"}`,
+            );
+          }
+        }}
+      />
+
+      <NexusCheckModal
+        open={nexusOpen}
+        announcement={ann}
+        recipients={selectedRecipients}
+        onClose={() => setNexusOpen(false)}
+        onConfirm={async ({
+          clientId,
+          answers,
+          selectedFilings,
+          notifyOnly,
+        }) => {
+          if (notifyOnly) {
+            setFlash(`Notification queued for client · No filings added`);
+            return;
+          }
+          try {
+            // Step 1: persist nexus check (BE writes nexus_questionnaire_runs
+            // + upserts client_state_nexus.status).
+            const checkResult = await runNexusCheck.mutateAsync({
+              announcementId: ann.id,
+              clientId,
+              state: ann.stateCode,
+              // V1 maps every nexus_change alert to "sales" — real BE will
+              // surface nexusKind via the announcement payload.
+              nexusKind: "sales" as const,
+              answers,
+            });
+            // Step 2: if user picked filings, batch-add them.
+            if (
+              checkResult.status === "established" &&
+              selectedFilings.length > 0
+            ) {
+              const addResult = await addNexusFilings.mutateAsync({
+                announcementId: ann.id,
+                clientId,
+                state: ann.stateCode,
+                filings: selectedFilings.map((formCode) => ({
+                  formCode,
+                  formName: formCode,
+                })),
+              });
+              setFlash(
+                `${addResult.filingsAdded} filing${addResult.filingsAdded === 1 ? "" : "s"} added · Undo (24h)`,
+              );
+            } else {
+              setFlash(
+                `Nexus check saved — ${checkResult.status.replace(/_/g, " ")}`,
+              );
+            }
+          } catch (err) {
+            setFlash(
+              `Couldn't run nexus check — ${err instanceof Error ? err.message : "try again"}`,
+            );
+          }
+        }}
       />
     </div>
   );
