@@ -103,6 +103,16 @@ export function bundleById(id: string): FilingBundle | undefined {
   return BUNDLES.find((b) => b.id === id);
 }
 
+/**
+ * Resolve a service-package string to its bundle definition. Clients store
+ * package strings by display name (e.g. "S-Corp Standard"), not by id, so
+ * the FE needs a name-keyed lookup to render the bundle's composition.
+ * Returns undefined for firm-custom packages that don't match a system bundle.
+ */
+export function bundleByName(name: string): FilingBundle | undefined {
+  return BUNDLES.find((b) => b.name === name);
+}
+
 export function suggestBundleForEntity(entity: EntityType): FilingBundle {
   // Pick first bundle that supports this entity type.
   return BUNDLES.find((b) => b.entityTypes.includes(entity)) ?? BUNDLES[0];
