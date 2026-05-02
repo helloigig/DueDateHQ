@@ -272,24 +272,26 @@ export const alertActionsRouter = router({
           end.setDate(today.getDate() + 30);
         }
       }
-      // Generate per-client talking points.
-      const toInsert = clientRows.map((c) => {
-        const points = generatePteTalkingPoints({
-          announcement: ann,
-          client: c,
-        });
-        return {
-          firmId: ctx.firmId,
-          clientId: c.id,
-          alertId: input.announcementId,
-          topic: "pte_strategy" as const,
-          talkingPointsJson: pointsToJson(points),
-          suggestedWindowStart: start.toISOString().slice(0, 10),
-          suggestedWindowEnd: end.toISOString().slice(0, 10),
-          status: "proposed" as const,
-          createdBy: ctx.dbUser.id,
-        };
-      });
+      // Generate per-client talking points. LLM-backed when
+      // ANTHROPIC_API_KEY is set; template-based fallback otherwise.
+      // Concurrent fanout — Haiku handles bursts fine, and a 50-client
+      // batch finishes in ~2s instead of 50× sequential ~600ms each.
+      const allPoints = await Promise.all(
+        clientRows.map((c) =>
+          generatePteTalkingPoints({ announcement: ann, client: c }),
+        ),
+      );
+      const toInsert = clientRows.map((c, i) => ({
+        firmId: ctx.firmId,
+        clientId: c.id,
+        alertId: input.announcementId,
+        topic: "pte_strategy" as const,
+        talkingPointsJson: pointsToJson(allPoints[i] ?? []),
+        suggestedWindowStart: start.toISOString().slice(0, 10),
+        suggestedWindowEnd: end.toISOString().slice(0, 10),
+        status: "proposed" as const,
+        createdBy: ctx.dbUser.id,
+      }));
       const inserted = await db
         .insert(planningCalls)
         .values(toInsert)
