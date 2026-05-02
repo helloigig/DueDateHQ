@@ -1833,9 +1833,113 @@ export const mockAdapter = {
         needsReview: true,
       };
     },
-    recentChanges: async () => {
+    recentChanges: async (input?: {
+      limit?: number;
+      includeReviewed?: boolean;
+    }) => {
       await delay();
-      return [];
+      // Sample mock events so the SettingsFederalFormsPanel has data to
+      // render in MOCK mode. Real BE writes these from federal-register-
+      // poller. Each row mirrors backend/src/trpc/routers/federalForms.ts
+      // recentChanges projection.
+      const allEvents: Array<{
+        eventId: number;
+        changeKind: string;
+        summary: string;
+        createdAt: string;
+        reviewedAt: string | null;
+        appliedAt: string | null;
+        form: { id: string; formNumber: string; formName: string };
+        notice: {
+          id: string;
+          documentNumber: string;
+          title: string;
+          publicationDate: string;
+          htmlUrl: string;
+          parseConfidence: string;
+        };
+      }> = [
+        {
+          eventId: 1,
+          changeKind: "instructions_update",
+          summary:
+            "Form 941 instructions clarify Q1 deposit reconciliation rules — see updated §3.2.",
+          createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+          reviewedAt: null,
+          appliedAt: null,
+          form: { id: "f941", formNumber: "941", formName: "Employer's Quarterly Federal Tax Return" },
+          notice: {
+            id: "n-fr-2026-12345",
+            documentNumber: "2026-12345",
+            title: "Updated Instructions for Form 941 — Q1 2026 deposit clarifications",
+            publicationDate: "2026-04-29",
+            htmlUrl: "https://www.federalregister.gov/documents/2026/04/29/2026-12345",
+            parseConfidence: "high",
+          },
+        },
+        {
+          eventId: 2,
+          changeKind: "form_revision",
+          summary:
+            "Schedule K-3 reporting requirements expanded — partner-level detail now required for all foreign-source income.",
+          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+          reviewedAt: null,
+          appliedAt: null,
+          form: {
+            id: "fk3",
+            formNumber: "Schedule K-3",
+            formName: "Partner's Share of Income, Deductions, Credits — International",
+          },
+          notice: {
+            id: "n-fr-2026-11890",
+            documentNumber: "2026-11890",
+            title: "Final Rule — Schedule K-3 partner-level reporting expansion",
+            publicationDate: "2026-04-25",
+            htmlUrl: "https://www.federalregister.gov/documents/2026/04/25/2026-11890",
+            parseConfidence: "medium",
+          },
+        },
+        {
+          eventId: 3,
+          changeKind: "due_date_change",
+          summary:
+            "Form 1099-K transactional threshold delayed: $5K minimum (was $600) for 2024 reporting.",
+          createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+          reviewedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+          appliedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+          form: { id: "f1099k", formNumber: "1099-K", formName: "Payment Card and Third Party Network Transactions" },
+          notice: {
+            id: "n-fr-2026-09001",
+            documentNumber: "2026-09001",
+            title: "Notice 2024-85 — 1099-K transition relief for 2024",
+            publicationDate: "2026-04-22",
+            htmlUrl: "https://www.federalregister.gov/documents/2026/04/22/2026-09001",
+            parseConfidence: "high",
+          },
+        },
+        {
+          eventId: 4,
+          changeKind: "other",
+          summary:
+            "E-file mandate threshold lowered to 10 returns — affects payroll and information-return filers.",
+          createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
+          reviewedAt: null,
+          appliedAt: null,
+          form: { id: "f8508", formNumber: "8508", formName: "Application for a Waiver from Electronic Filing of Information Returns" },
+          notice: {
+            id: "n-fr-2026-07770",
+            documentNumber: "2026-07770",
+            title: "Final Rule — Section 6011(e) e-file threshold change",
+            publicationDate: "2026-04-19",
+            htmlUrl: "https://www.federalregister.gov/documents/2026/04/19/2026-07770",
+            parseConfidence: "low",
+          },
+        },
+      ];
+      const limit = input?.limit ?? 50;
+      return allEvents
+        .filter((e) => input?.includeReviewed || !e.reviewedAt)
+        .slice(0, limit);
     },
     markChangeReviewed: async () => {
       await delay();
