@@ -3,7 +3,38 @@ import type { Client, StateCode } from "../types";
 import { actions } from "../data/store";
 import { toIso, addDays, TODAY } from "../data/dateHelpers";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { FEDERAL_FORMS } from "../data/federalForms";
+
+// Curated short list of the most common selections for quick picking.
+// Pinned at the top of the dropdown so the day-to-day case is one click.
+const COMMON_FORMS = [
+  "1040 (federal)",
+  "1040 (extension)",
+  "1065 (federal)",
+  "1065 (extension)",
+  "1120 (federal)",
+  "1120 (extension)",
+  "1120-S (federal)",
+  "1120-S (extension)",
+  "1041 (trust)",
+  "Q1 estimate (federal)",
+  "Q2 estimate (federal)",
+  "Q3 estimate (federal)",
+  "Q4 estimate (federal)",
+  "Sales tax Q",
+  "PTE election",
+];
 import { trpc } from "../lib/api/client";
+
+// Long list — every federal form from the catalog. Rendered as a separate
+// optgroup so the CPA can pick a niche form (Form 5471 for foreign corp,
+// Form 990-EZ for nonprofit, etc.) without falling back to free-text.
+// Each catalog entry surfaces its form code + name so the CPA sees what
+// they're picking.
+const CATALOG_FORM_OPTIONS = FEDERAL_FORMS.map((f) => ({
+  value: `${f.code} (federal)`,
+  label: `Form ${f.code} — ${f.name.length > 60 ? f.name.slice(0, 57) + "…" : f.name}`,
+}));
 
 export interface AddDeadlinePrefill {
   form?: string;
@@ -218,6 +249,21 @@ export function AddDeadlineModal({
               disabled={formsQuery.isLoading}
               className="w-full px-2.5 py-1.5 rounded border border-slate-200 bg-white disabled:opacity-50"
             >
+              <optgroup label="Most common">
+                {COMMON_FORMS.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="All federal forms">
+                {CATALOG_FORM_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </optgroup>
+              <option value="__custom__">Other / custom…</option>
               {groups.map(([groupLabel, items]) => (
                 <optgroup key={groupLabel} label={groupLabel}>
                   {items.map((opt) => (
