@@ -37,25 +37,28 @@ export function resolveFederalForm(formString: string): FederalForm | null {
 
   // Fuzzy patterns — these handle common decorated forms in legacy data.
   // Order matters: more specific first.
-  const lower = cleaned.toLowerCase();
 
   // Estimated payments — collapse "Q1 estimate", "Q2 estimate" etc to 1040-ES
   // (or 1120-W for corp; we default to individual since most callers are
   // individual contexts; corp-side callers should pass the explicit code).
-  if (/^q[1-4]\s+estimate$/i.test(cleaned)) return federalFormByCode("1040-ES");
-  if (/estimate.*federal/i.test(cleaned)) return federalFormByCode("1040-ES");
+  if (/^q[1-4]\s+estimate$/i.test(cleaned)) {
+    return federalFormByCode("1040-ES") ?? null;
+  }
+  if (/estimate.*federal/i.test(cleaned)) {
+    return federalFormByCode("1040-ES") ?? null;
+  }
 
   // Schedules — Schedule A, B, C, D, E, SE
   const scheduleMatch = cleaned.match(/^Schedule\s+([A-Z]+)$/i);
   if (scheduleMatch) {
     const code = `Schedule-${scheduleMatch[1].toUpperCase()}`;
-    return federalFormByCode(code);
+    return federalFormByCode(code) ?? null;
   }
 
   // K-1 variants
-  if (/k-?1.*1065/i.test(cleaned)) return federalFormByCode("K-1-1065");
-  if (/k-?1.*1120-?s/i.test(cleaned)) return federalFormByCode("K-1-1120-S");
-  if (/k-?1.*1041/i.test(cleaned)) return federalFormByCode("K-1-1041");
+  if (/k-?1.*1065/i.test(cleaned)) return federalFormByCode("K-1-1065") ?? null;
+  if (/k-?1.*1120-?s/i.test(cleaned)) return federalFormByCode("K-1-1120-S") ?? null;
+  if (/k-?1.*1041/i.test(cleaned)) return federalFormByCode("K-1-1041") ?? null;
 
   // Common 4-digit form codes that may appear with other decorations
   // (e.g. "Form 5471", "1040X")
