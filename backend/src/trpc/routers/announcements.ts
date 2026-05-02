@@ -13,6 +13,59 @@ import {
 
 const ESCALATION = ["normal", "dark", "blocking"] as const;
 
+// Roll a list of per-client match confidences up to a single
+// announcement-level chip. "high" wins so the FE shows the strongest
+// signal the matcher had on at least one client. Defaults to "medium"
+// when the firm has no matches yet — same default as the schema.
+function rollupConfidence(confs: string[]): "high" | "medium" | "low" {
+  if (confs.includes("high")) return "high";
+  if (confs.includes("low") && !confs.includes("medium")) return "low";
+  return "medium";
+}
+
+type AnnouncementRow = typeof announcements.$inferSelect;
+type FirmAnnouncementRow = typeof firmAnnouncements.$inferSelect;
+
+function projectAnnouncement(
+  ann: AnnouncementRow,
+  firmAnn: FirmAnnouncementRow | null,
+  affectedClientIds: string[],
+  matchConfidence: "high" | "medium" | "low",
+) {
+  return {
+    id: ann.id,
+    stateCode: ann.stateCode,
+    authority: ann.authority,
+    title: ann.title,
+    summary: ann.summary,
+    type: ann.type,
+    taxType: ann.taxType,
+    retroactive: ann.retroactive,
+    counties: ann.counties,
+    entityTypes: ann.entityTypes,
+    taxTypes: ann.taxTypes,
+    oldDeadline: ann.oldDeadline,
+    newDeadline: ann.newDeadline,
+    sourceUrl: ann.sourceUrl,
+    sourceAuthority: ann.sourceAuthority,
+    parseConfidence: ann.parseConfidence,
+    matchConfidence,
+    detectedAt: ann.detectedAt.toISOString(),
+    issuanceDate: (ann.publishedAt ?? ann.detectedAt).toISOString(),
+    effectiveDate: ann.effectiveDate,
+    affectedClientIds,
+    // No cross-reference data source yet (Phase 1) — return [] so the FE's
+    // "RELATED ALERTS" section collapses cleanly instead of crashing.
+    relatedAnnouncementIds: [] as string[],
+    // Per-firm overlay
+    read: firmAnn?.acknowledgedAt != null,
+    dismissed: firmAnn?.dismissedAt != null,
+    snoozedUntil: firmAnn?.snoozedUntil?.toISOString() ?? null,
+    escalationLevel: firmAnn?.escalationLevel ?? "normal",
+    batchAdjustedAt: firmAnn?.batchAdjustedAt?.toISOString() ?? null,
+  };
+}
+
 export const announcementsRouter = router({
   /**
    * Per-firm view of state announcements: joins the system-wide
@@ -46,19 +99,23 @@ export const announcementsRouter = router({
         )
         .orderBy(desc(announcements.detectedAt));
 
-      // Pull match counts in one query, group in JS.
       const matchRows = await db
         .select({
           announcementId: announcementMatches.announcementId,
           clientId: announcementMatches.clientId,
+          matchConfidence: announcementMatches.matchConfidence,
         })
         .from(announcementMatches)
         .where(eq(announcementMatches.firmId, ctx.firmId));
-      const byAnn = new Map<string, string[]>();
+      const clientsByAnn = new Map<string, string[]>();
+      const confsByAnn = new Map<string, string[]>();
       for (const m of matchRows) {
-        const arr = byAnn.get(m.announcementId) ?? [];
-        arr.push(m.clientId);
-        byAnn.set(m.announcementId, arr);
+        const cs = clientsByAnn.get(m.announcementId) ?? [];
+        cs.push(m.clientId);
+        clientsByAnn.set(m.announcementId, cs);
+        const fs = confsByAnn.get(m.announcementId) ?? [];
+        fs.push(m.matchConfidence);
+        confsByAnn.set(m.announcementId, fs);
       }
 
       return rows.map((r) => ({
@@ -105,7 +162,10 @@ export const announcementsRouter = router({
         ),
       });
       const matches = await db
-        .select()
+        .select({
+          clientId: announcementMatches.clientId,
+          matchConfidence: announcementMatches.matchConfidence,
+        })
         .from(announcementMatches)
         .where(
           and(
@@ -113,7 +173,12 @@ export const announcementsRouter = router({
             eq(announcementMatches.firmId, ctx.firmId),
           ),
         );
-      return { announcement: ann, firmAnnouncement: firmAnn ?? null, matches };
+      return projectAnnouncement(
+        ann,
+        firmAnn ?? null,
+        matches.map((m) => m.clientId),
+        rollupConfidence(matches.map((m) => m.matchConfidence)),
+      );
     }),
 
   /** Mark this announcement as acknowledged (clears the banner + bell badge). */
