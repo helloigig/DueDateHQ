@@ -12,8 +12,12 @@ import {
   SOURCE_AUTHORITY_LABEL,
   SOURCE_AUTHORITY_TOOLTIP,
   TAX_TYPE_LABEL,
-  TOPIC_LABEL,
 } from "../data/announcementLabels";
+import {
+  ALERT_TYPE_CONFIG,
+  type AlertActionKind,
+} from "../data/alertTypeConfig";
+import { AlertActionBar, AlertTypeChip } from "../components/AlertActionBar";
 import { BatchNotifyModal } from "../components/BatchNotifyModal";
 import { DismissWithReasonDialog } from "../components/DismissWithReasonDialog";
 
@@ -152,6 +156,34 @@ export function AnnouncementDetail() {
   const isDisasterShift =
     ann.type === "disaster_extension" && !!ann.oldDeadline && !!ann.newDeadline;
 
+  // Per-alertType config — drives header chip tone, verdict copy, primary
+  // verb, action shape, etc. See data/alertTypeConfig.ts for the table
+  // and docs/specs/alert-detail-variants.md for design rationale.
+  const alertCfg = ALERT_TYPE_CONFIG[ann.type];
+
+  const handleAlertAction = (kind: AlertActionKind) => {
+    switch (kind) {
+      case "open_batch_notify":
+      case "open_batch_notify_no_shift":
+        setNotifyOpen(true);
+        break;
+      case "route_admin_queue":
+        navigate(`/settings/federal-forms?event=${ann.id}`);
+        break;
+      case "route_calendar_schedule":
+        // P2 — calendar integration; for now, open BatchNotifyModal so CPA
+        // can at least draft an outreach email per client.
+        setNotifyOpen(true);
+        break;
+      case "open_recompute_modal":
+      case "open_nexus_check_modal":
+        // P1 — dedicated modals not yet built. Fall back to BatchNotifyModal
+        // (notify-only mode) so the CPA can still draft an outreach email.
+        setNotifyOpen(true);
+        break;
+    }
+  };
+
   const relatedAlerts = ann.relatedAnnouncementIds
     .map((rid) => allAnnouncements.find((a) => a.id === rid))
     .filter((a): a is NonNullable<typeof a> => !!a);
@@ -178,9 +210,7 @@ export function AnnouncementDetail() {
             </div>
 
             <div className="flex flex-wrap gap-1.5 mt-2">
-              <span className="inline-flex items-center text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                {TOPIC_LABEL[ann.type]}
-              </span>
+              <AlertTypeChip type={ann.type} />
               <span className="inline-flex items-center text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
                 {TAX_TYPE_LABEL[ann.taxType]}
               </span>
@@ -237,13 +267,14 @@ export function AnnouncementDetail() {
       {/* VERDICT — who's affected + the action they need. Surfaces first because
           Sarah's mental order is "who do I act on" → "what do I do" → (only if
           uncertain) "let me audit the parse." Evidence sits below in collapsed
-          <details> blocks. */}
+          <details> blocks. Headline + empty-state copy vary by alertType
+          (sourced from alertTypeConfig). */}
       <section className="mt-5 bg-white border border-slate-200 rounded-lg overflow-hidden">
         <div className="flex items-center px-4 py-3 border-b border-slate-100">
           <h2 className="text-sm font-semibold text-slate-700">
-            🎯 AFFECTED CLIENTS ({ann.affectedClientIds.length})
+            🎯 {alertCfg.verdictHeadline(ann.affectedClientIds.length, clients.length)}
           </h2>
-          {ann.affectedClientIds.length > 0 && (
+          {ann.affectedClientIds.length > 0 && !alertCfg.isAdminGated && (
             <button
               onClick={toggleAll}
               className="ml-auto text-xs text-indigo-600 hover:underline"
@@ -255,22 +286,16 @@ export function AnnouncementDetail() {
           )}
         </div>
         {ann.affectedClientIds.length === 0 ? (
-          // Empty state: no one in the firm matches this alert. Common when:
-          //   - The firm has zero clients yet (fresh sign-up)
-          //   - The alert's state/county/entity filters don't intersect the
-          //     current roster (e.g. CA disaster alert, no CA clients)
-          // We still keep the alert page reachable so the CPA can read what
-          // happened and dismiss it explicitly — but the action surface
-          // collapses (no batch buttons, no list).
+          // Empty state — type-specific copy. Page stays reachable so CPA can
+          // read evidence + dismiss with reason.
           <div className="px-4 py-10 text-center">
             <div className="w-10 h-10 rounded-full bg-slate-100 mx-auto flex items-center justify-center text-lg">
               ✓
             </div>
             <p className="text-sm font-medium text-slate-900 mt-3">
-              None of your clients are affected.
+              {alertCfg.emptyStateCopy(ann)}
             </p>
             <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
-              This {ann.stateCode} alert doesn't match anyone in your roster.
               No deadlines need to move, and no notifications are queued.
             </p>
             <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
@@ -316,8 +341,12 @@ export function AnnouncementDetail() {
                 >
                   {c.name}
                 </Link>
-                <span className="text-xs text-slate-500 w-32 truncate">
-                  {c.county ? `${c.county}, ${c.primaryState}` : c.primaryState}
+                <span className="text-xs text-slate-500 w-44 truncate">
+                  {alertCfg.perClientRowChip
+                    ? alertCfg.perClientRowChip(c, ann)
+                    : c.county
+                      ? `${c.county}, ${c.primaryState}`
+                      : c.primaryState}
                 </span>
                 <span className="text-xs text-slate-500 flex-1 truncate">
                   {c.entityType}
@@ -335,28 +364,18 @@ export function AnnouncementDetail() {
         </ul>
       </section>
 
-      {ann.affectedClientIds.length > 0 && (
-      <section className="mt-5 bg-white border border-slate-200 rounded-lg p-4 flex flex-wrap items-center gap-2 sticky bottom-0">
-        <button
-          onClick={() => setNotifyOpen(true)}
-          disabled={selectedCount === 0}
-          className="px-4 py-2 rounded bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Review draft for {selectedCount} client
-          {selectedCount === 1 ? "" : "s"}
-        </button>
-        {isDisasterShift && (
-          <span className="text-xs text-slate-500">
-            Bundles deadline shift to {formatLongDate(ann.newDeadline!)}
-          </span>
-        )}
-        <button
-          onClick={() => setDismissOpen(true)}
-          className="ml-auto px-4 py-2 rounded text-sm text-slate-500 hover:bg-slate-50"
-        >
-          Not applicable — dismiss
-        </button>
-      </section>
+      {(ann.affectedClientIds.length > 0 || alertCfg.isAdminGated) && (
+        <AlertActionBar
+          announcement={ann}
+          selectedCount={selectedCount}
+          onAction={handleAlertAction}
+          onDismiss={() => setDismissOpen(true)}
+          helperText={
+            isDisasterShift && ann.newDeadline
+              ? `Bundles deadline shift to ${formatLongDate(ann.newDeadline)}`
+              : undefined
+          }
+        />
       )}
 
       {/* EVIDENCE — collapsed by default. The reader has already seen the
