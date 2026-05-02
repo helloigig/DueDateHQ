@@ -165,17 +165,6 @@ export function AnnouncementBanner({
     .sort((a, b) => b.primary.detectedAt.localeCompare(a.primary.detectedAt));
 
   const escalatedCount = actionable.filter(clusterIsEscalated).length;
-  // Total distinct anchor URLs across all clusters — counts each member's
-  // sourceUrl plus any relatedSourceUrls the BE folded in. This is the
-  // honest "N sources" signal for the header annotation.
-  const totalVisibleAnnouncements = clusters.reduce((sum, c) => {
-    const urls = new Set<string>();
-    for (const m of c.members) {
-      urls.add(m.sourceUrl);
-      for (const u of m.relatedSourceUrls ?? []) urls.add(u);
-    }
-    return sum + urls.size;
-  }, 0);
   const unreadCount = visible.filter((a) => !a.read).length;
 
   const markAllRead = () => {
