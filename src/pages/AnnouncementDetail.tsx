@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { History, Link2 } from "lucide-react";
 import { actions } from "../data/store";
+import { trpc } from "../lib/api/client";
 import { useAnnouncement, useAnnouncements } from "../hooks/useAnnouncements";
 import { useClients } from "../hooks/useClients";
 import { PageSkeleton } from "../components/skeletons/DashboardSkeleton";
@@ -65,6 +66,24 @@ export function AnnouncementDetail() {
   const _session = useSession();
   const isAdmin = true;
   void _session;
+
+  // ─── tRPC mutations for the 5 variant action surfaces ──────────────────
+  // Each mutation routes to MOCK adapter (mock-link) in dev mode and to
+  // the real BE (alertActions / federalForms routers) in prod. Mocks log
+  // payload to console + return realistic-shape responses; real handlers
+  // mutate Postgres + return the same shape.
+  const tagClients = trpc.alertActions.tagClientsForRelief.useMutation();
+  const schedulePlanningCalls =
+    trpc.alertActions.schedulePlanningCalls.useMutation();
+  const recomputeEstimates = trpc.alertActions.recomputeEstimates.useMutation();
+  const undoRecomputeEstimates =
+    trpc.alertActions.undoRecomputeEstimates.useMutation();
+  const runNexusCheck = trpc.alertActions.runNexusCheck.useMutation();
+  const addNexusFilings = trpc.alertActions.addNexusFilings.useMutation();
+  const applyChangeEvent = trpc.federalForms.applyChangeEvent.useMutation();
+  const rejectChangeEvent = trpc.federalForms.rejectChangeEvent.useMutation();
+  const acknowledgeChangeEvent =
+    trpc.federalForms.acknowledgeChangeEvent.useMutation();
   // Captures the last bundled batch-adjust so the flash banner can offer a
   // one-click undo. Cleared when the banner is dismissed or another action
   // overwrites it. Only set when adjustedCount > 0 — pure email sends are
@@ -330,27 +349,46 @@ export function AnnouncementDetail() {
           // from the BE that the federal-register parser extracts.
           formNumber={ann.title.match(/Form ([\w-]+)/)?.[1] ?? "—"}
           affectedClientCount={ann.affectedClientIds.length}
-          onApply={(overrides) => {
-            console.info("[alerts] applyChangeEvent (mock)", {
-              announcementId: ann.id,
-              overrides,
-            });
-            setFlash(
-              `Catalog updated · ${ann.affectedClientIds.length} clients' form metadata refreshed`,
-            );
+          onApply={async (overrides) => {
+            try {
+              const result = await applyChangeEvent.mutateAsync({
+                // Mock change_event id — production passes the event row's
+                // bigserial id from announcement.changeEventId once the
+                // detailWithAffected query exposes it on the alert.
+                eventId: 1,
+                userOverrides: overrides,
+              });
+              setFlash(
+                `Catalog updated · ${result.fieldsApplied.length} field${result.fieldsApplied.length === 1 ? "" : "s"} applied · ${ann.affectedClientIds.length} client${ann.affectedClientIds.length === 1 ? "" : "s"}' metadata refreshed`,
+              );
+            } catch (err) {
+              setFlash(
+                `Couldn't apply change — ${err instanceof Error ? err.message : "try again"}`,
+              );
+            }
           }}
-          onReject={(reason) => {
-            console.info("[alerts] rejectChangeEvent (mock)", {
-              announcementId: ann.id,
-              reason,
-            });
-            setFlash("Catalog change rejected");
+          onReject={async (reason) => {
+            try {
+              await rejectChangeEvent.mutateAsync({
+                eventId: 1,
+                reason,
+              });
+              setFlash("Catalog change rejected");
+            } catch (err) {
+              setFlash(
+                `Couldn't reject — ${err instanceof Error ? err.message : "try again"}`,
+              );
+            }
           }}
-          onAcknowledge={() => {
-            console.info("[alerts] acknowledgeChangeEvent (mock)", {
-              announcementId: ann.id,
-            });
-            setFlash("Acknowledged · removed from Today");
+          onAcknowledge={async () => {
+            try {
+              await acknowledgeChangeEvent.mutateAsync({ eventId: 1 });
+              setFlash("Acknowledged · removed from Today");
+            } catch (err) {
+              setFlash(
+                `Couldn't acknowledge — ${err instanceof Error ? err.message : "try again"}`,
+              );
+            }
           }}
         />
       )}
@@ -614,16 +652,26 @@ export function AnnouncementDetail() {
         announcement={ann}
         recipients={selectedRecipients}
         onClose={() => setTagOpen(false)}
-        onConfirm={({ clientIds, composeEmail }) => {
-          console.info("[alerts] tagClientsForRelief (mock)", {
-            announcementId: ann.id,
-            clientIds,
-            composeEmail,
-          });
+        onConfirm={async ({ clientIds, composeEmail }) => {
           setTagOpen(false);
-          setFlash(
-            `${clientIds.length} client${clientIds.length === 1 ? "" : "s"} tagged · Untag (24h window)`,
-          );
+          try {
+            const result = await tagClients.mutateAsync({
+              announcementId: ann.id,
+              clientIds,
+              expiresAt: ann.effectiveDate ?? null,
+            });
+            const dupNote =
+              result.duplicateCount > 0
+                ? ` (${result.duplicateCount} already tagged)`
+                : "";
+            setFlash(
+              `${result.taggedCount} client${result.taggedCount === 1 ? "" : "s"} tagged${dupNote} · Untag (24h window)${composeEmail ? " · drafts queued" : ""}`,
+            );
+          } catch (err) {
+            setFlash(
+              `Couldn't tag clients — ${err instanceof Error ? err.message : "try again"}`,
+            );
+          }
         }}
       />
 
@@ -632,17 +680,22 @@ export function AnnouncementDetail() {
         announcement={ann}
         recipients={selectedRecipients}
         onClose={() => setPlanningCallOpen(false)}
-        onConfirm={({ clientIds, suggestedWindow, composeEmail }) => {
-          console.info("[alerts] schedulePlanningCalls (mock)", {
-            announcementId: ann.id,
-            clientIds,
-            suggestedWindow,
-            composeEmail,
-          });
+        onConfirm={async ({ clientIds, suggestedWindow, composeEmail }) => {
           setPlanningCallOpen(false);
-          setFlash(
-            `${clientIds.length} call${clientIds.length === 1 ? "" : "s"} flagged on Today queue · Open queue`,
-          );
+          try {
+            const result = await schedulePlanningCalls.mutateAsync({
+              announcementId: ann.id,
+              clientIds,
+              suggestedWindow,
+            });
+            setFlash(
+              `${result.callsCreated} call${result.callsCreated === 1 ? "" : "s"} flagged on Today queue${composeEmail ? " · drafts queued" : ""}`,
+            );
+          } catch (err) {
+            setFlash(
+              `Couldn't schedule calls — ${err instanceof Error ? err.message : "try again"}`,
+            );
+          }
         }}
       />
 
@@ -651,20 +704,42 @@ export function AnnouncementDetail() {
         announcement={ann}
         recipients={selectedRecipients}
         onClose={() => setRecomputeOpen(false)}
-        onConfirm={({ selections, composeEmail }) => {
-          const totalEstimates = selections.reduce(
-            (acc, s) => acc + s.estimateIds.length,
-            0,
-          );
-          console.info("[alerts] recomputeEstimates (mock)", {
-            announcementId: ann.id,
-            selections,
-            composeEmail,
-          });
+        onConfirm={async ({ selections, composeEmail }) => {
           setRecomputeOpen(false);
-          setFlash(
-            `${totalEstimates} estimate${totalEstimates === 1 ? "" : "s"} recomputed · Undo (5min)`,
+          // Flatten the per-client `estimateIds` into the BE's expected
+          // shape `selections: [{ deadlineId, overrideAmountCents? }]`.
+          const flatSelections = selections.flatMap((s) =>
+            s.estimateIds.map((id) => ({ deadlineId: id })),
           );
+          try {
+            const result = await recomputeEstimates.mutateAsync({
+              announcementId: ann.id,
+              selections: flatSelections,
+              // Default to federal 2026 — for state-scoped alerts the BE
+              // would derive this from the announcement's stateCode/year.
+              ruleJurisdiction: "federal" as const,
+              ruleTaxYear: 2026,
+            });
+            const bankNote =
+              result.bankUpdateTodos > 0
+                ? ` · ${result.bankUpdateTodos} bank-instruction TodoItem${result.bankUpdateTodos === 1 ? "" : "s"} queued`
+                : "";
+            setFlash(
+              `${result.recomputedCount} estimate${result.recomputedCount === 1 ? "" : "s"} recomputed${bankNote}${composeEmail ? " · drafts queued" : ""} · Undo (5min)`,
+            );
+            // Stash undo token so the flash banner can offer a real undo.
+            // For V1 we just log it — wiring undo into the existing flash
+            // banner is a small follow-up.
+            if (result.undoToken) {
+              console.info("[alerts] recompute undoToken", result.undoToken);
+            }
+            // Avoid TS warning when mutation isn't used elsewhere.
+            void undoRecomputeEstimates;
+          } catch (err) {
+            setFlash(
+              `Couldn't recompute — ${err instanceof Error ? err.message : "try again"}`,
+            );
+          }
         }}
       />
 
@@ -673,19 +748,53 @@ export function AnnouncementDetail() {
         announcement={ann}
         recipients={selectedRecipients}
         onClose={() => setNexusOpen(false)}
-        onConfirm={({ clientId, answers, selectedFilings, notifyOnly }) => {
-          console.info("[alerts] runNexusCheck (mock)", {
-            announcementId: ann.id,
-            clientId,
-            answers,
-            selectedFilings,
-            notifyOnly,
-          });
+        onConfirm={async ({
+          clientId,
+          answers,
+          selectedFilings,
+          notifyOnly,
+        }) => {
           if (notifyOnly) {
             setFlash(`Notification queued for client · No filings added`);
-          } else {
+            return;
+          }
+          try {
+            // Step 1: persist nexus check (BE writes nexus_questionnaire_runs
+            // + upserts client_state_nexus.status).
+            const checkResult = await runNexusCheck.mutateAsync({
+              announcementId: ann.id,
+              clientId,
+              state: ann.stateCode,
+              // V1 maps every nexus_change alert to "sales" — real BE will
+              // surface nexusKind via the announcement payload.
+              nexusKind: "sales" as const,
+              answers,
+            });
+            // Step 2: if user picked filings, batch-add them.
+            if (
+              checkResult.status === "established" &&
+              selectedFilings.length > 0
+            ) {
+              const addResult = await addNexusFilings.mutateAsync({
+                announcementId: ann.id,
+                clientId,
+                state: ann.stateCode,
+                filings: selectedFilings.map((formCode) => ({
+                  formCode,
+                  formName: formCode,
+                })),
+              });
+              setFlash(
+                `${addResult.filingsAdded} filing${addResult.filingsAdded === 1 ? "" : "s"} added · Undo (24h)`,
+              );
+            } else {
+              setFlash(
+                `Nexus check saved — ${checkResult.status.replace(/_/g, " ")}`,
+              );
+            }
+          } catch (err) {
             setFlash(
-              `${selectedFilings.length} filing${selectedFilings.length === 1 ? "" : "s"} added · Undo (24h)`,
+              `Couldn't run nexus check — ${err instanceof Error ? err.message : "try again"}`,
             );
           }
         }}

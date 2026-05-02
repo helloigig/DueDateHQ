@@ -1841,6 +1841,33 @@ export const mockAdapter = {
       await delay();
       return { ok: true as const };
     },
+    applyChangeEvent: async (input: {
+      eventId: number;
+      userOverrides?: Record<string, unknown>;
+    }) => {
+      await delay();
+      console.info("[mock] federalForms.applyChangeEvent", input);
+      return {
+        applied: true as const,
+        appliedAt: new Date().toISOString(),
+        fieldsApplied: input.userOverrides
+          ? Object.keys(input.userOverrides)
+          : ["notes"],
+      };
+    },
+    rejectChangeEvent: async (input: { eventId: number; reason: string }) => {
+      await delay();
+      console.info("[mock] federalForms.rejectChangeEvent", input);
+      return {
+        rejected: true as const,
+        rejectedAt: new Date().toISOString(),
+      };
+    },
+    acknowledgeChangeEvent: async (input: { eventId: number }) => {
+      await delay();
+      console.info("[mock] federalForms.acknowledgeChangeEvent", input);
+      return { ok: true as const };
+    },
     pollNow: async () => {
       await delay(200);
       return {
@@ -1950,6 +1977,236 @@ export const mockAdapter = {
         createdTasks: input.stateCodes.length * 2,
         createdChecklistItems: input.stateCodes.length * 6,
         createdPackageId: input.saveAsPackage ? "pkg-mock-multistate" : null,
+      };
+    },
+  },
+
+  /**
+   * alertActions — mocks for the 5 non-disaster alert variant procedures.
+   * V1 mocks log to console + return realistic-shape responses; they do
+   * NOT mutate any persisted store. The flash banner on AnnouncementDetail
+   * shows "X clients tagged" / "X estimates recomputed" etc — sufficient
+   * for design demos. Real DB writes happen in production once migration
+   * 0007 is deployed and the BE handlers replace these mocks.
+   */
+  alertActions: {
+    // ─── penalty_relief ──────────────────────────────────────────────────
+    tagClientsForRelief: async (input: {
+      announcementId: string;
+      clientIds: string[];
+      expiresAt: string | null;
+    }) => {
+      await delay();
+      console.info("[mock] alertActions.tagClientsForRelief", input);
+      return {
+        taggedCount: input.clientIds.length,
+        duplicateCount: 0,
+        failedCount: 0,
+      };
+    },
+    markTagApplied: async (input: { tagId: string; taskId?: string }) => {
+      await delay();
+      console.info("[mock] alertActions.markTagApplied", input);
+      return { ok: true as const, appliedAt: new Date().toISOString() };
+    },
+    untag: async (input: { tagId: string; reason: string }) => {
+      await delay();
+      console.info("[mock] alertActions.untag", input);
+      return { ok: true as const };
+    },
+
+    // ─── pte_change ──────────────────────────────────────────────────────
+    schedulePlanningCalls: async (input: {
+      announcementId: string;
+      clientIds: string[];
+      suggestedWindow: "this_week" | "next_2_weeks" | "before_deadline";
+    }) => {
+      await delay();
+      console.info("[mock] alertActions.schedulePlanningCalls", input);
+      return {
+        callsCreated: input.clientIds.length,
+        // Mocked count of "schedule call with X" TodoItems on Today.
+        // Real BE will fan out via the todoItems router once it exposes
+        // a public `create` mutation.
+        todoItemsAdded: input.clientIds.length,
+      };
+    },
+    markPlanningCallCompleted: async (input: {
+      callId: string;
+      outcome:
+        | "renewed"
+        | "revoked"
+        | "opted_in"
+        | "deferred"
+        | "no_change";
+      notes?: string;
+    }) => {
+      await delay();
+      console.info("[mock] alertActions.markPlanningCallCompleted", input);
+      return { ok: true as const };
+    },
+
+    // ─── rate_change ─────────────────────────────────────────────────────
+    recomputeEstimates: async (input: {
+      announcementId: string;
+      selections: Array<{
+        deadlineId: string;
+        overrideAmountCents?: number;
+      }>;
+      ruleJurisdiction: "federal" | "CA" | "NY";
+      ruleTaxYear: number;
+    }) => {
+      await delay(200);
+      console.info("[mock] alertActions.recomputeEstimates", input);
+      return {
+        recomputedCount: input.selections.length,
+        // Stub: roughly 33% of clients flagged as auto-pay (matches the
+        // mock heuristic in RecomputeEstimatesModal).
+        bankUpdateTodos: Math.ceil(input.selections.length / 3),
+        undoToken: `undo_mock_${Date.now()}`,
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      };
+    },
+    undoRecomputeEstimates: async (input: { undoToken: string }) => {
+      await delay();
+      console.info("[mock] alertActions.undoRecomputeEstimates", input);
+      return { restoredCount: 0 };
+    },
+
+    // ─── nexus_change ────────────────────────────────────────────────────
+    getNexusQuestionnaire: async (input: {
+      state: string;
+      nexusKind: "sales" | "income" | "payroll" | "franchise";
+    }) => {
+      await delay();
+      // Mock returns the PA sales questionnaire regardless of input — the
+      // real BE reads from per-state config in nexus-rules.ts. The FE
+      // NexusCheckModal is built to render whatever shape comes back, so
+      // this stub is enough for demo.
+      console.info("[mock] alertActions.getNexusQuestionnaire", input);
+      return {
+        state: input.state,
+        nexusKind: input.nexusKind,
+        thresholdSummary:
+          "Economic nexus: $100K in PA sales OR 200 separate PA transactions in current or prior calendar year.",
+        ruleEffectiveDate: "2026-07-01",
+        questions: [
+          {
+            id: "pa_sales_1",
+            text: "Did the client deliver tangible goods to PA addresses in 2025?",
+          },
+          {
+            id: "pa_sales_2",
+            text: "Did the client provide services to PA-based customers?",
+          },
+          {
+            id: "pa_sales_3",
+            text: "Did the client use a marketplace facilitator (Amazon, Etsy) for PA sales?",
+          },
+          {
+            id: "pa_sales_4",
+            text: "Does the client already have a PA sales tax license?",
+          },
+        ],
+        suggestedFilings: [
+          {
+            formCode: "PA REV-72",
+            formName: "Sales tax registration",
+            preCheckedOnEstablished: true,
+          },
+          {
+            formCode: "PA-3",
+            formName: "Quarterly sales tax remittance",
+            preCheckedOnEstablished: true,
+          },
+          {
+            formCode: "PA Corp Tax",
+            formName: "Corporate income tax",
+            caveat: "verify income nexus separately",
+            preCheckedOnEstablished: false,
+          },
+        ],
+      };
+    },
+    runNexusCheck: async (input: {
+      announcementId: string;
+      clientId: string;
+      state: string;
+      nexusKind: "sales" | "income" | "payroll" | "franchise";
+      answers: Record<string, boolean>;
+    }) => {
+      await delay();
+      console.info("[mock] alertActions.runNexusCheck", input);
+      // Mirror the BE's default heuristic: ≥2 yes-answers = established.
+      const yesCount = Object.values(input.answers).filter(Boolean).length;
+      const total = Object.keys(input.answers).length;
+      let status:
+        | "established"
+        | "borderline"
+        | "confirmed_no_nexus";
+      let confidence: "high" | "medium" | "low";
+      if (total === 0) {
+        status = "confirmed_no_nexus";
+        confidence = "low";
+      } else if (yesCount >= 2) {
+        status = "established";
+        confidence = "high";
+      } else if (yesCount === 1) {
+        status = "borderline";
+        confidence = "medium";
+      } else {
+        status = "confirmed_no_nexus";
+        confidence = "high";
+      }
+      return {
+        status,
+        confidence,
+        reason: `${yesCount} of ${total} signals positive`,
+        recommendedFilings:
+          status === "established"
+            ? [
+                {
+                  formCode: "PA REV-72",
+                  formName: "Sales tax registration",
+                  preCheckedOnEstablished: true,
+                },
+                {
+                  formCode: "PA-3",
+                  formName: "Quarterly sales tax remittance",
+                  preCheckedOnEstablished: true,
+                },
+              ]
+            : [],
+      };
+    },
+    addNexusFilings: async (input: {
+      announcementId: string;
+      clientId: string;
+      state: string;
+      filings: Array<{
+        formCode: string;
+        formName: string;
+        dueDate?: string;
+      }>;
+    }) => {
+      await delay();
+      console.info("[mock] alertActions.addNexusFilings", input);
+      return {
+        filingsAdded: input.filings.length,
+        clientId: input.clientId,
+      };
+    },
+    markFilingsProtective: async (input: {
+      announcementId: string;
+      deadlineIds: string[];
+      reason: string;
+      protectedThroughYear: number;
+    }) => {
+      await delay();
+      console.info("[mock] alertActions.markFilingsProtective", input);
+      return {
+        markedCount: input.deadlineIds.length,
+        protectedThroughYear: input.protectedThroughYear,
       };
     },
   },
