@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { History, Link2 } from "lucide-react";
 import { actions } from "../data/store";
 import { useAnnouncement, useAnnouncements } from "../hooks/useAnnouncements";
@@ -49,6 +49,23 @@ export function AnnouncementDetail() {
     total: number;
     done: number;
   } | null>(null);
+
+  // Deep-link from the Today banner: `?action=adjust` opens the batch confirm
+  // dialog, `?action=notify` opens the email modal. We strip the param after
+  // consuming it so a refresh doesn't re-open the dialog.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedAction = searchParams.get("action");
+  useEffect(() => {
+    if (!ann || !requestedAction) return;
+    if (requestedAction === "adjust" && ann.newDeadline) {
+      setConfirm("batch");
+    } else if (requestedAction === "notify") {
+      setNotifyOpen(true);
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete("action");
+    setSearchParams(next, { replace: true });
+  }, [ann?.id, requestedAction]);
 
   const clientsById = useMemo(() => {
     const m = new Map<string, (typeof clients)[number]>();
