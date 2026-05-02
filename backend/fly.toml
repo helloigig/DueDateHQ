@@ -20,8 +20,8 @@
 #                fly status      (machine health)
 #                fly ssh console (debug inside the container)
 
-app = "duedatehq-backend"  # CHANGE THIS — must be globally unique on Fly.io
-primary_region = "iad"      # us-east; change to "sjc" / "lhr" / "nrt" if closer to your users
+app = "duedatehq"
+primary_region = "lhr"      # eu-west — close to Supabase eu-west-1
 
 [build]
   # Use the Dockerfile in this directory.
