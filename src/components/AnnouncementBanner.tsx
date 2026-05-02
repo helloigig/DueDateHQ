@@ -495,12 +495,7 @@ function AlertRow({
         </p>
       </div>
 
-      <Link
-        to={`/alerts/${ann.id}`}
-        className="text-xs text-ink-500 hover:text-ink-900 px-2 py-1 rounded hover:bg-sunken inline-flex items-center gap-0.5 shrink-0"
-      >
-        Review <ChevronRight className="w-3 h-3" aria-hidden />
-      </Link>
+      <PrimaryAction ann={ann} />
       <button
         onClick={onDismiss}
         aria-label={
@@ -513,6 +508,52 @@ function AlertRow({
         <X className="w-3 h-3" aria-hidden />
       </button>
     </li>
+  );
+}
+
+// One deterministic CTA per row, picked by alert state. The button deep-links
+// into the detail page with the matching dialog pre-opened (?action=…) so the
+// CPA still gets the parsed-impact ribbon, confidence chips, and "verify the
+// official source" disclaimer before committing — we just save them a click
+// when the next move is unambiguous. We intentionally show ONE action, never
+// a toolbar: the banner is a wedge, not /alerts.
+function PrimaryAction({ ann }: { ann: Announcement }) {
+  const affected = ann.affectedClientIds.length;
+  // Low parse confidence means structured fields (newDeadline, counties) may
+  // be wrong — fall back to plain Review so the CPA reads before acting.
+  const trustsParse = ann.parseConfidence !== "low";
+
+  if (affected > 0 && ann.newDeadline && trustsParse) {
+    return (
+      <Link
+        to={`/alerts/${ann.id}?action=adjust`}
+        className="text-xs font-medium text-ink-900 px-2.5 py-1 rounded border border-line bg-surface hover:bg-sunken inline-flex items-center gap-1 shrink-0"
+      >
+        Adjust {affected} deadline{affected === 1 ? "" : "s"}
+        <ChevronRight className="w-3 h-3" aria-hidden />
+      </Link>
+    );
+  }
+
+  if (affected > 0 && trustsParse) {
+    return (
+      <Link
+        to={`/alerts/${ann.id}?action=notify`}
+        className="text-xs font-medium text-ink-900 px-2.5 py-1 rounded border border-line bg-surface hover:bg-sunken inline-flex items-center gap-1 shrink-0"
+      >
+        Draft email to {affected} client{affected === 1 ? "" : "s"}
+        <ChevronRight className="w-3 h-3" aria-hidden />
+      </Link>
+    );
+  }
+
+  return (
+    <Link
+      to={`/alerts/${ann.id}`}
+      className="text-xs text-ink-500 hover:text-ink-900 px-2 py-1 rounded hover:bg-sunken inline-flex items-center gap-0.5 shrink-0"
+    >
+      Review <ChevronRight className="w-3 h-3" aria-hidden />
+    </Link>
   );
 }
 
