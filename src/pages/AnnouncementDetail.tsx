@@ -58,11 +58,13 @@ export function AnnouncementDetail() {
   const [planningCallOpen, setPlanningCallOpen] = useState(false);
   const [recomputeOpen, setRecomputeOpen] = useState(false);
   const [nexusOpen, setNexusOpen] = useState(false);
-  // Admin gating for the form_change variant. For solo tier (Sarah's
-  // persona — sole-prop CPA) the user is always the owner. Pro/team tiers
-  // will need a real users.role check — added when multi-user comes online.
-  const session = useSession();
-  const isAdmin = session?.tier === "solo" || session?.tier === undefined;
+  // Admin gating for the form_change variant. We don't yet model multi-user
+  // roles — every signed-in user is treated as the firm's catalog admin.
+  // When multi-user lands (pro/team tiers w/ users.role), wire a real
+  // role check here.
+  const _session = useSession();
+  const isAdmin = true;
+  void _session;
   // Captures the last bundled batch-adjust so the flash banner can offer a
   // one-click undo. Cleared when the banner is dismissed or another action
   // overwrites it. Only set when adjustedCount > 0 — pure email sends are
@@ -323,6 +325,10 @@ export function AnnouncementDetail() {
         <CatalogChangeReviewPanel
           announcement={ann}
           isAdmin={isAdmin}
+          // Form number is parsed from the alert title for the design-stage
+          // mock; production passes a structured `affectedFormNumber` field
+          // from the BE that the federal-register parser extracts.
+          formNumber={ann.title.match(/Form ([\w-]+)/)?.[1] ?? "—"}
           affectedClientCount={ann.affectedClientIds.length}
           onApply={(overrides) => {
             console.info("[alerts] applyChangeEvent (mock)", {
@@ -449,7 +455,11 @@ export function AnnouncementDetail() {
         </ul>
       </section>
 
-      {(ann.affectedClientIds.length > 0 || alertCfg.isAdminGated) && (
+      {/* Skip the sticky AlertActionBar for form_change — its action shape
+          (Apply / Modify / Reject for admin, Acknowledge for non-admin)
+          lives inside <CatalogChangeReviewPanel /> rendered above the
+          verdict block. Two action surfaces would compete and confuse. */}
+      {ann.type !== "form_change" && ann.affectedClientIds.length > 0 && (
         <AlertActionBar
           announcement={ann}
           selectedCount={selectedCount}

@@ -54,13 +54,13 @@ export function BatchTagModal({
         : "Retroactive (no expiry)";
     return (client: Client) => {
       const filing =
-        client.entityType === "Individual" ? "1040" :
-        client.entityType === "S-Corp" ? "1120-S" :
-        client.entityType === "C-Corp" ? "1120" :
-        client.entityType === "Partnership" ? "1065" :
-        client.entityType === "Trust" ? "1041" :
-        "next return";
-      return `Penalty relief (${noticeRef}) — apply at next ${filing} filing. ${expiry}.`;
+        client.entityType === "Individual" ? "1040 filing" :
+        client.entityType === "S-Corp" ? "1120-S filing" :
+        client.entityType === "C-Corp" ? "1120 filing" :
+        client.entityType === "Partnership" ? "1065 filing" :
+        client.entityType === "Trust" ? "1041 filing" :
+        "applicable filing"; // covers LLC + other entity types
+      return `Penalty relief (${noticeRef}) — apply at next ${filing}. ${expiry}.`;
     };
   }, [announcement]);
 
