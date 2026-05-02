@@ -118,14 +118,34 @@ export const announcementsRouter = router({
         confsByAnn.set(m.announcementId, fs);
       }
 
-      return rows.map((r) =>
-        projectAnnouncement(
-          r.ann,
-          r.firmAnn ?? null,
-          clientsByAnn.get(r.ann.id) ?? [],
-          rollupConfidence(confsByAnn.get(r.ann.id) ?? []),
-        ),
-      );
+      return rows.map((r) => ({
+        id: r.ann.id,
+        stateCode: r.ann.stateCode,
+        authority: r.ann.authority,
+        title: r.ann.title,
+        summary: r.ann.summary,
+        type: r.ann.type,
+        taxType: r.ann.taxType,
+        retroactive: r.ann.retroactive,
+        counties: r.ann.counties,
+        entityTypes: r.ann.entityTypes,
+        taxTypes: r.ann.taxTypes,
+        oldDeadline: r.ann.oldDeadline,
+        newDeadline: r.ann.newDeadline,
+        sourceUrl: r.ann.sourceUrl,
+        relatedSourceUrls: r.ann.relatedSourceUrls,
+        sourceAuthority: r.ann.sourceAuthority,
+        parseConfidence: r.ann.parseConfidence,
+        detectedAt: r.ann.detectedAt.toISOString(),
+        effectiveDate: r.ann.effectiveDate,
+        affectedClientIds: byAnn.get(r.ann.id) ?? [],
+        // Per-firm overlay
+        read: r.firmAnn?.acknowledgedAt != null,
+        dismissed: r.firmAnn?.dismissedAt != null,
+        snoozedUntil: r.firmAnn?.snoozedUntil?.toISOString() ?? null,
+        escalationLevel: r.firmAnn?.escalationLevel ?? "normal",
+        batchAdjustedAt: r.firmAnn?.batchAdjustedAt?.toISOString() ?? null,
+      }));
     }),
 
   get: firmProcedure

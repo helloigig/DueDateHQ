@@ -149,6 +149,11 @@ export interface Announcement {
   newDeadline?: string;
 
   sourceUrl: string;
+  /** Additional anchor URLs the scraper saw for this same fingerprint
+   *  (state + type + normalized title). Populated by the BE scraper's
+   *  dedup path; the FE banner uses this to show the full source set in
+   *  the cluster tooltip rather than guessing from cluster size alone. */
+  relatedSourceUrls?: string[];
   sourceAuthority: SourceAuthority;
   relatedAnnouncementIds: string[];
 

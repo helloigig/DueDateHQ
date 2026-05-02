@@ -17,7 +17,10 @@ import {
   escalationTier,
   type EscalationTier,
 } from "../data/dateHelpers";
-import { actions } from "../data/store";
+import {
+  useDismissAnnouncement,
+  useMarkAnnouncementRead,
+} from "../hooks/useAnnouncements";
 
 type Tone = "danger" | "warn" | "info";
 
@@ -61,6 +64,13 @@ function iconFor(type: Announcement["type"]): LucideIcon {
  *     • Doesn't affect any client + not escalated — pure news.
  *       Surfaced as "N news items — none affect your clients" expander.
  *
+ * Same-event clustering: when the scraper picks up multiple anchors from
+ * the same news page (common with HTML-scraped state newsrooms — e.g. an
+ * IRS Hurricane Ian disaster page with 5 link variations), we collapse
+ * announcements that share (state, type, effectiveDate, affectedClientSet)
+ * into a single row. Picks the most authoritative member as the headline
+ * and shows a "+N sources" chip. Dismissing the row dismisses every member.
+ *
  * Within full rows, sorted by: escalated → has new deadline shifting my
  * client → most clients affected → most recent.
  *
@@ -73,60 +83,93 @@ export function AnnouncementBanner({
 }: {
   announcements: Announcement[];
 }) {
-  // Show ONLY the most-urgent unread alert as a banner. The rest live in the
-  // bell dropdown + /alerts page. Multi-alert in a banner is noise —
-  // research suggests CPAs want one anchor, not a stack.
   if (announcements.length === 0) return null;
 
   // ── State for the calm-dashboard refactor (was orphaned during merge) ─
   const [showNews, setShowNews] = useState(false);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const dismissMutation = useDismissAnnouncement();
+  const markReadMutation = useMarkAnnouncementRead();
+
   const visible = announcements.filter((a) => !dismissedIds.has(a.id));
+
+  // ── Cluster same-event announcements ────────────────────────────────
+  const clusters = clusterByEvent(visible);
 
   // ── Principled cut: relevance, not recency ───────────────────────────
   //
-  // An alert earns a full row if EITHER:
-  //   (a) it's escalated (>72h unactioned — past soft SLA), or
+  // A cluster earns a full row if EITHER:
+  //   (a) any member is escalated (>72h unactioned — past soft SLA), or
   //   (b) it affects at least one of this firm's clients.
   //
   // Everything else is "news" and collapses behind a chip.
-  const isEscalated = (a: Announcement) =>
+  const isEscalatedAnn = (a: Announcement) =>
     escalationTier(hoursSince(a.detectedAt)) === "escalated";
-  const affectsFirm = (a: Announcement) => a.affectedClientIds.length > 0;
+  const affectsFirm = (c: Cluster) => c.primary.affectedClientIds.length > 0;
+  const clusterIsEscalated = (c: Cluster) => c.members.some(isEscalatedAnn);
 
-  const actionable = visible
-    .filter((a) => isEscalated(a) || affectsFirm(a))
+  const actionable = clusters
+    .filter((c) => clusterIsEscalated(c) || affectsFirm(c))
     .sort((a, b) => {
       // 1. Escalated first
-      if (isEscalated(a) !== isEscalated(b)) return isEscalated(a) ? -1 : 1;
+      const ae = clusterIsEscalated(a);
+      const be = clusterIsEscalated(b);
+      if (ae !== be) return ae ? -1 : 1;
       // 2. Has newDeadline (a deadline shifted on my clients)
-      const aShift = !!a.newDeadline && affectsFirm(a) ? 1 : 0;
-      const bShift = !!b.newDeadline && affectsFirm(b) ? 1 : 0;
+      const aShift = !!a.primary.newDeadline && affectsFirm(a) ? 1 : 0;
+      const bShift = !!b.primary.newDeadline && affectsFirm(b) ? 1 : 0;
       if (aShift !== bShift) return bShift - aShift;
       // 3. More clients affected = more impact
-      if (a.affectedClientIds.length !== b.affectedClientIds.length) {
-        return b.affectedClientIds.length - a.affectedClientIds.length;
+      if (
+        a.primary.affectedClientIds.length !==
+        b.primary.affectedClientIds.length
+      ) {
+        return (
+          b.primary.affectedClientIds.length -
+          a.primary.affectedClientIds.length
+        );
       }
       // 4. Most recent
-      return b.detectedAt.localeCompare(a.detectedAt);
+      return b.primary.detectedAt.localeCompare(a.primary.detectedAt);
     });
 
-  const news = visible
-    .filter((a) => !isEscalated(a) && !affectsFirm(a))
-    .sort((a, b) => b.detectedAt.localeCompare(a.detectedAt));
+  const news = clusters
+    .filter((c) => !clusterIsEscalated(c) && !affectsFirm(c))
+    .sort((a, b) => b.primary.detectedAt.localeCompare(a.primary.detectedAt));
 
-  const escalatedCount = actionable.filter(isEscalated).length;
+  const escalatedCount = actionable.filter(clusterIsEscalated).length;
+  // Total distinct anchor URLs across all clusters — counts each member's
+  // sourceUrl plus any relatedSourceUrls the BE folded in. This is the
+  // honest "N sources" signal for the header annotation.
+  const totalVisibleAnnouncements = clusters.reduce((sum, c) => {
+    const urls = new Set<string>();
+    for (const m of c.members) {
+      urls.add(m.sourceUrl);
+      for (const u of m.relatedSourceUrls ?? []) urls.add(u);
+    }
+    return sum + urls.size;
+  }, 0);
   const unreadCount = visible.filter((a) => !a.read).length;
 
   const markAllRead = () => {
     for (const a of visible) {
-      if (!a.read) actions.markAnnouncementRead(a.id);
+      if (!a.read) markReadMutation.mutate({ id: a.id });
     }
   };
 
-  const dismiss = (id: string) => {
-    setDismissedIds((prev) => new Set(prev).add(id));
-    setTimeout(() => actions.dismissAnnouncement(id), 200);
+  // Dismissing a cluster dismisses every member announcement on the
+  // backend (firm_announcements.dismissed_at). Local optimism via
+  // dismissedIds gives instant UI feedback; the tRPC invalidation
+  // re-hydrates the list once the writes land.
+  const dismissCluster = (cluster: Cluster) => {
+    setDismissedIds((prev) => {
+      const next = new Set(prev);
+      for (const m of cluster.members) next.add(m.id);
+      return next;
+    });
+    for (const m of cluster.members) {
+      dismissMutation.mutate({ id: m.id });
+    }
   };
 
   // ── Edge case: nothing actionable, only news ─────────────────────────
@@ -134,7 +177,7 @@ export function AnnouncementBanner({
   // top. User clicks to peek.
   if (actionable.length === 0) {
     if (!showNews) {
-      const lead = news[0];
+      const lead = news[0].primary;
       return (
         <section
           className="bg-surface border border-line rounded-md"
@@ -184,7 +227,13 @@ export function AnnouncementBanner({
           State alerts
         </h2>
         <span className="text-2xs text-ink-500">
-          {visible.length}
+          {clusters.length}
+          {clusters.length !== totalVisibleAnnouncements && (
+            <span className="text-ink-400">
+              {" "}
+              ({totalVisibleAnnouncements} sources)
+            </span>
+          )}
           {escalatedCount > 0 && (
             <>
               <span className="text-ink-300"> · </span>
@@ -221,8 +270,12 @@ export function AnnouncementBanner({
         </span>
       </header>
       <ul className="divide-y divide-line">
-        {actionable.map((a) => (
-          <AlertRow key={a.id} ann={a} onDismiss={() => dismiss(a.id)} />
+        {actionable.map((c) => (
+          <AlertRow
+            key={c.primary.id}
+            cluster={c}
+            onDismiss={() => dismissCluster(c)}
+          />
         ))}
 
         {/* Collapsed news chip — pure news that doesn't touch your clients */}
@@ -245,8 +298,12 @@ export function AnnouncementBanner({
 
         {/* Expanded news rows */}
         {showNews &&
-          news.map((a) => (
-            <AlertRow key={a.id} ann={a} onDismiss={() => dismiss(a.id)} />
+          news.map((c) => (
+            <AlertRow
+              key={c.primary.id}
+              cluster={c}
+              onDismiss={() => dismissCluster(c)}
+            />
           ))}
 
         {showNews && news.length > 0 && (
@@ -265,18 +322,106 @@ export function AnnouncementBanner({
   );
 }
 
+// ── Cluster types + helpers ─────────────────────────────────────────────
+
+type Cluster = {
+  /** Most authoritative announcement in the cluster — drives the row UI. */
+  primary: Announcement;
+  /** All announcements in the cluster (includes primary). */
+  members: Announcement[];
+};
+
+/**
+ * Group announcements that point at the same underlying event. The cluster
+ * key is (state, type, effectiveDate-or-detection-day, sorted affected
+ * client ids) — two rows with the same impact set on the same kind of
+ * change are almost certainly the same event surfaced from multiple
+ * sources (e.g. an IRS Hurricane Ian webpage + an FDLE press release +
+ * an FL DOR notice all pointing at the same disaster).
+ *
+ * The primary is picked by source authority → parse confidence → earliest
+ * detection. That keeps the headline stable across refetches.
+ */
+function clusterByEvent(items: Announcement[]): Cluster[] {
+  const byKey = new Map<string, Announcement[]>();
+  for (const a of items) {
+    const key = clusterKey(a);
+    const arr = byKey.get(key) ?? [];
+    arr.push(a);
+    byKey.set(key, arr);
+  }
+  return Array.from(byKey.values()).map((members) => ({
+    primary: pickPrimary(members),
+    members,
+  }));
+}
+
+function clusterKey(a: Announcement): string {
+  const clients = [...a.affectedClientIds].sort().join(",");
+  // Use effectiveDate when available; fall back to the detection day so
+  // two rows scraped on the same day still cluster even when neither has
+  // structured an effectiveDate yet.
+  const day = a.effectiveDate ?? a.detectedAt.slice(0, 10);
+  return `${a.stateCode}|${a.type}|${day}|${clients}`;
+}
+
+function pickPrimary(members: Announcement[]): Announcement {
+  const score = (a: Announcement) => {
+    let s = 0;
+    if (a.sourceAuthority === "primary") s += 100;
+    else if (a.sourceAuthority === "editorial") s += 50;
+    if (a.parseConfidence === "high") s += 10;
+    else if (a.parseConfidence === "medium") s += 5;
+    if (a.newDeadline) s += 3;
+    return s;
+  };
+  return [...members].sort((a, b) => {
+    const sa = score(a);
+    const sb = score(b);
+    if (sa !== sb) return sb - sa;
+    return a.detectedAt.localeCompare(b.detectedAt);
+  })[0];
+}
+
 function AlertRow({
-  ann,
+  cluster,
   onDismiss,
 }: {
-  ann: Announcement;
+  cluster: Cluster;
   onDismiss: () => void;
 }) {
+  const ann = cluster.primary;
   const hours = hoursSince(ann.detectedAt);
-  const tier = escalationTier(hours);
+  // For escalation, take the worst tier across the cluster — if any source
+  // has been unactioned >72h, the row is escalated.
+  const tier = cluster.members
+    .map((m) => escalationTier(hoursSince(m.detectedAt)))
+    .reduce<EscalationTier>(
+      (worst, t) => (TIER_RANK[t] > TIER_RANK[worst] ? t : worst),
+      "fresh",
+    );
   const tone = toneFor(ann.type, tier);
   const Icon = iconFor(ann.type);
   const matchReason = matchReasonFor(ann);
+  // Distinct anchor URLs the BE has filed under this event: each cluster
+  // member contributes its canonical sourceUrl + any relatedSourceUrls
+  // the scraper folded in via title-fingerprint dedup. Distinct URLs is
+  // the honest "how many places have we seen this" — distinct articles
+  // (cluster.members.length) under-counts when BE dedup ran.
+  const sourceUrls = new Set<string>();
+  for (const m of cluster.members) {
+    sourceUrls.add(m.sourceUrl);
+    for (const u of m.relatedSourceUrls ?? []) sourceUrls.add(u);
+  }
+  const sourceCount = sourceUrls.size;
+  const tooltipLines: string[] = [];
+  for (const m of cluster.members) {
+    tooltipLines.push(`${m.authority}: ${m.title}`);
+    for (const u of m.relatedSourceUrls ?? []) {
+      tooltipLines.push(`  also seen at ${u}`);
+    }
+  }
+  const anyUnread = cluster.members.some((m) => !m.read);
 
   return (
     <li
@@ -305,7 +450,7 @@ function AlertRow({
               escalated
             </span>
           )}
-          {!ann.read && tier !== "escalated" && (
+          {anyUnread && tier !== "escalated" && (
             <span className="w-1.5 h-1.5 rounded-full bg-info-solid" title="Unread" />
           )}
         </Link>
@@ -325,6 +470,17 @@ function AlertRow({
             <>
               <span className="text-ink-300">·</span>
               <span>new {formatLongDate(ann.newDeadline)}</span>
+            </>
+          )}
+          {sourceCount > 1 && (
+            <>
+              <span className="text-ink-300">·</span>
+              <span
+                className="inline-flex items-center px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line"
+                title={tooltipLines.join("\n")}
+              >
+                {sourceCount} sources
+              </span>
             </>
           )}
           {tier !== "fresh" && (
@@ -347,7 +503,11 @@ function AlertRow({
       </Link>
       <button
         onClick={onDismiss}
-        aria-label="Dismiss alert"
+        aria-label={
+          sourceCount > 1
+            ? `Dismiss ${sourceCount} sources for this event`
+            : "Dismiss alert"
+        }
         className="p-1 rounded text-ink-400 hover:text-ink-700 hover:bg-sunken shrink-0"
       >
         <X className="w-3 h-3" aria-hidden />
@@ -355,6 +515,13 @@ function AlertRow({
     </li>
   );
 }
+
+const TIER_RANK: Record<EscalationTier, number> = {
+  fresh: 0,
+  reminder: 1,
+  escalated: 2,
+  blocking: 3,
+};
 
 /** Build a short "why these clients" explanation. Sources the announcement's
  *  parsed-impact (county / entity / tax filters). */

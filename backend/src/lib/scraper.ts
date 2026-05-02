@@ -126,14 +126,30 @@ export interface ScrapedNotice {
  *
  * Idempotent: existing announcements (matched by source_url) are
  * skipped — the scraper can run as often as you like.
+ *
+ * Two layers of dedup before insert:
+ *   (1) sourceUrl exact match — anywhere, any time. Standard repeat-fetch case.
+ *   (2) Title fingerprint — same (stateCode, type, normalized-title) within
+ *       the last 30 days. Catches the common HTML-scrape pathology where one
+ *       newsroom page has the same article linked from multiple anchor
+ *       positions (different hrefs, identical link text). Without (2), a
+ *       single FL DOR fetch produced 5 rows like "FL: declaration from the
+ *       Internal Revenue Service" that all matched the same client set and
+ *       cluttered the dashboard. With (2), only the first lands in the DB.
  */
 export async function runScraperCycle(
   sources: ScraperSource[] = DEFAULT_SOURCES,
-): Promise<{ fetched: number; new: number; lowConfidence: number }> {
+): Promise<{
+  fetched: number;
+  new: number;
+  lowConfidence: number;
+  duplicatesSkipped: number;
+}> {
   return span("scraper.cycle", async () => {
     let fetched = 0;
     let inserted = 0;
     let lowConfidence = 0;
+    let duplicatesSkipped = 0;
 
     for (const src of sources) {
       const cycleStart = new Date();
@@ -141,12 +157,72 @@ export async function runScraperCycle(
       try {
         const notices = await fetchSource(src);
         fetched += notices.length;
+
+        // Pre-fetch the dedup window once per state. One query beats one
+        // per notice. The 30-day window is generous — disaster-related
+        // articles often re-trend weeks later when an IRS extension is
+        // announced.
+        const recentSame = await db
+          .select({
+            id: announcements.id,
+            title: announcements.title,
+            type: announcements.type,
+            sourceUrl: announcements.sourceUrl,
+            relatedSourceUrls: announcements.relatedSourceUrls,
+          })
+          .from(announcements)
+          .where(
+            and(
+              eq(announcements.stateCode, src.stateCode),
+              sql`${announcements.detectedAt} > now() - interval '30 days'`,
+            ),
+          );
+        type RecentRow = (typeof recentSame)[number];
+        const byUrl = new Map<string, RecentRow>();
+        const byFingerprint = new Map<string, RecentRow>();
+        for (const r of recentSame) {
+          byUrl.set(r.sourceUrl, r);
+          for (const u of r.relatedSourceUrls) byUrl.set(u, r);
+          byFingerprint.set(fingerprintKey(r.type, r.title), r);
+        }
+
         for (const n of notices) {
-          // Skip if we've already seen this source URL
-          const existing = await db.query.announcements.findFirst({
-            where: eq(announcements.sourceUrl, n.sourceUrl),
-          });
-          if (existing) continue;
+          // (1) URL dedup — same exact URL we've already filed (either
+          // as canonical sourceUrl or as a previously-tracked related
+          // URL). Within-window check is the fast path; we fall through
+          // to a broader DB lookup for older rows.
+          const urlMatch =
+            byUrl.get(n.sourceUrl) ??
+            (await db.query.announcements.findFirst({
+              where: eq(announcements.sourceUrl, n.sourceUrl),
+            }));
+          if (urlMatch) {
+            duplicatesSkipped++;
+            continue;
+          }
+
+          // (2) Title-fingerprint dedup. Same state + same type +
+          // normalized title. When this fires, the new URL almost
+          // certainly points at the same article surfaced from a
+          // different anchor — record it on the canonical row so the
+          // frontend banner can honestly say "N sources confirm this."
+          const fpKey = fingerprintKey(n.type, n.title);
+          const fpMatch = byFingerprint.get(fpKey);
+          if (fpMatch) {
+            const merged = Array.from(
+              new Set([...fpMatch.relatedSourceUrls, n.sourceUrl]),
+            );
+            if (merged.length !== fpMatch.relatedSourceUrls.length) {
+              await db
+                .update(announcements)
+                .set({ relatedSourceUrls: merged })
+                .where(eq(announcements.id, fpMatch.id));
+              fpMatch.relatedSourceUrls = merged;
+              byUrl.set(n.sourceUrl, fpMatch);
+            }
+            duplicatesSkipped++;
+            continue;
+          }
 
           // Bucket numeric confidence into the existing schema enum.
           // Low-confidence items still write but the reviewer dashboard
@@ -158,18 +234,33 @@ export async function runScraperCycle(
               : n.parseConfidence >= 0.7
                 ? "medium"
                 : "low";
-          await db.insert(announcements).values({
-            stateCode: n.stateCode,
-            authority: n.authority,
-            title: n.title,
-            summary: n.summary,
-            type: n.type,
-            sourceUrl: n.sourceUrl,
-            sourceAuthority: n.authority,
-            parseConfidence: bucket,
-            publishedAt: n.publishedAt,
-            detectedAt: new Date(),
-          });
+          const [insertedRow] = await db
+            .insert(announcements)
+            .values({
+              stateCode: n.stateCode,
+              authority: n.authority,
+              title: n.title,
+              summary: n.summary,
+              type: n.type,
+              sourceUrl: n.sourceUrl,
+              sourceAuthority: n.authority,
+              parseConfidence: bucket,
+              publishedAt: n.publishedAt,
+              detectedAt: new Date(),
+            })
+            .returning({
+              id: announcements.id,
+              title: announcements.title,
+              type: announcements.type,
+              sourceUrl: announcements.sourceUrl,
+              relatedSourceUrls: announcements.relatedSourceUrls,
+            });
+          // Track within this cycle so subsequent notices in the same
+          // batch dedup against the row we just inserted.
+          if (insertedRow) {
+            byUrl.set(n.sourceUrl, insertedRow);
+            byFingerprint.set(fpKey, insertedRow);
+          }
           inserted++;
           if (bucket === "low") lowConfidence++;
         }
@@ -189,11 +280,41 @@ export async function runScraperCycle(
       fetched,
       inserted,
       lowConfidence,
+      duplicatesSkipped,
       sourceCount: sources.length,
     });
 
-    return { fetched, new: inserted, lowConfidence };
+    return { fetched, new: inserted, lowConfidence, duplicatesSkipped };
   });
+}
+
+// ---------- Dedup helpers ----------
+
+/**
+ * Normalize an announcement title to a fingerprint suitable for equality
+ * comparison. Lowercases, strips punctuation, collapses whitespace.
+ *
+ *   "FL: declaration from the Internal Revenue Service (IRS)"
+ *   "FL: declaration from the Internal Revenue Service"
+ *
+ * become different fingerprints (the trailing "(IRS)" is signal — those
+ * are arguably different articles). But:
+ *
+ *   "declaration from the Internal Revenue Service"
+ *   "Declaration   from the Internal-Revenue Service."
+ *
+ * collapse to the same fingerprint, which is the clutter we're chasing.
+ */
+export function titleFingerprint(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function fingerprintKey(type: string, title: string): string {
+  return `${type}|${titleFingerprint(title)}`;
 }
 
 /**

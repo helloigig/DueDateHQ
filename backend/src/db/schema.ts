@@ -495,6 +495,14 @@ export const announcements = pgTable("announcements", {
   oldDeadline: date("old_deadline"),
   newDeadline: date("new_deadline"),
   sourceUrl: text("source_url").notNull(),
+  /** Additional anchor URLs the scraper saw for this same canonical
+   *  fingerprint — see migration 0005 + scraper.ts dedup notes. The
+   *  primary `sourceUrl` is the first-seen URL; everything else lands
+   *  here when fingerprint dedup fires. */
+  relatedSourceUrls: text("related_source_urls")
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
   sourceAuthority: text("source_authority").notNull().default("primary"),
   parseConfidence: text("parse_confidence").notNull().default("medium"),
   rawPayload: jsonb("raw_payload"),
