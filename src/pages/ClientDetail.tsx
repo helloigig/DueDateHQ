@@ -16,7 +16,7 @@ import {
 } from "../hooks/useAiInsights";
 import { PageSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
-import { bucketOf, formatLongDate, parseDate, TODAY } from "../data/dateHelpers";
+import { bucketOf, daysBetween, formatLongDate, parseDate, TODAY } from "../data/dateHelpers";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import {
   AddDeadlineModal,
@@ -1088,8 +1088,15 @@ function ToDoTab({
         </section>
       )}
 
-      {/* Open deadlines summary — anchors the per-task entry points so the
-          CPA can navigate to any task's full detail without leaving To Do. */}
+      {/* Open deadlines — full per-task entry points so the CPA can pivot
+          from a deadline directly into its task detail. Each row carries:
+            • form + jurisdiction badge (federal vs state-specific)
+            • status pill (overdue / due-soon / on-track / waiting)
+            • the official due date AND the internal target date — both shift
+              together when a state alert moves the deadline, so the CPA sees
+              the buffer they have, not just the wall date
+            • countdown ("in 12 days", "8 days overdue") for at-a-glance triage
+          Rows are clickable when a Task exists for the deadline (1:1 at MVP). */}
       <section className="bg-surface border border-line rounded-md p-4">
         <header className="flex items-baseline gap-2 mb-2">
           <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
@@ -1108,19 +1115,73 @@ function ToDoTab({
               (d) => d.status !== "completed" && d.status !== "filed_extension",
             )
             .slice(0, 8)
-            .map((d) => (
-              <li key={d.id} className="py-2 first:pt-0 last:pb-0">
-                <div className="text-sm text-ink-900 flex items-baseline gap-3">
-                  <span className="flex-1 truncate">
-                    {d.form} · {d.jurisdiction}
+            .map((d) => {
+              const task = tasksByIdMap.get(`t-${d.id}`) ??
+                Array.from(tasksByIdMap.values()).find((t) => t.deadlineId === d.id);
+              const days = daysBetween(TODAY, parseDate(d.officialDueDate));
+              const isOverdue = days < 0;
+              const isDueSoon = days >= 0 && days <= 7;
+              const countdown = isOverdue
+                ? `${Math.abs(days)}d overdue`
+                : days === 0
+                  ? "due today"
+                  : `in ${days}d`;
+              const pillClass = isOverdue
+                ? "bg-danger-bg text-danger-ink border border-danger-border"
+                : isDueSoon
+                  ? "bg-warn-bg text-warn-ink border border-warn-border"
+                  : "bg-sunken text-ink-700 border border-line";
+              const row = (
+                <div className="text-sm text-ink-900 flex items-baseline gap-3 py-1.5">
+                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-sunken text-ink-700 border border-line shrink-0 uppercase">
+                    {d.jurisdiction}
                   </span>
-                  <span className="text-xs text-ink-500 tabular-nums">
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate">{d.form}</p>
+                    {task && (
+                      <p className="text-2xs text-ink-500 tabular-nums">
+                        Internal target {formatLongDate(task.internalTargetDate)}
+                      </p>
+                    )}
+                  </div>
+                  <span
+                    className={`text-2xs px-1.5 py-0.5 rounded tabular-nums shrink-0 ${pillClass}`}
+                  >
+                    {countdown}
+                  </span>
+                  <span className="text-xs text-ink-500 tabular-nums shrink-0 w-28 text-right">
                     {formatLongDate(d.officialDueDate)}
                   </span>
                 </div>
-              </li>
-            ))}
+              );
+              return (
+                <li key={d.id} className="first:pt-0 last:pb-0">
+                  {task ? (
+                    <Link
+                      to={`/clients/${client.id}/tasks/${task.id}`}
+                      className="block hover:bg-sunken/40 -mx-1 px-1 rounded"
+                      title="Open task detail"
+                    >
+                      {row}
+                    </Link>
+                  ) : (
+                    row
+                  )}
+                </li>
+              );
+            })}
         </ul>
+        {allDeadlines.filter(
+          (d) => d.status !== "completed" && d.status !== "filed_extension",
+        ).length > 8 && (
+          <p className="text-2xs text-ink-500 mt-2">
+            +
+            {allDeadlines.filter(
+              (d) => d.status !== "completed" && d.status !== "filed_extension",
+            ).length - 8}{" "}
+            more open
+          </p>
+        )}
       </section>
 
       <p className="text-2xs text-ink-400">

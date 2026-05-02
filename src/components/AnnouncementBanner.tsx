@@ -511,37 +511,31 @@ function AlertRow({
   );
 }
 
-// One deterministic CTA per row, picked by alert state. The button deep-links
-// into the detail page with the matching dialog pre-opened (?action=…) so the
-// CPA still gets the parsed-impact ribbon, confidence chips, and "verify the
-// official source" disclaimer before committing — we just save them a click
-// when the next move is unambiguous. We intentionally show ONE action, never
-// a toolbar: the banner is a wedge, not /alerts.
+// One deterministic CTA per row. Whatever the alert type, the CPA's job is
+// the same: review the AI-drafted client note, optionally include the
+// bundled deadline shift (disaster_extension only), and send. We surface
+// that as a single verb — "Review draft for N clients" — and deep-link
+// `?action=review` to the detail page where the unified modal pops open.
+// When there are no affected clients, we drop to a quiet "Review" link so
+// the row stays scannable but doesn't promise an action that doesn't exist.
 function PrimaryAction({ ann }: { ann: Announcement }) {
   const affected = ann.affectedClientIds.length;
   // Low parse confidence means structured fields (newDeadline, counties) may
   // be wrong — fall back to plain Review so the CPA reads before acting.
   const trustsParse = ann.parseConfidence !== "low";
 
-  if (affected > 0 && ann.newDeadline && trustsParse) {
-    return (
-      <Link
-        to={`/alerts/${ann.id}?action=adjust`}
-        className="text-xs font-medium text-ink-900 px-2.5 py-1 rounded border border-line bg-surface hover:bg-sunken inline-flex items-center gap-1 shrink-0"
-      >
-        Adjust {affected} deadline{affected === 1 ? "" : "s"}
-        <ChevronRight className="w-3 h-3" aria-hidden />
-      </Link>
-    );
-  }
-
   if (affected > 0 && trustsParse) {
     return (
       <Link
-        to={`/alerts/${ann.id}?action=notify`}
+        to={`/alerts/${ann.id}?action=review`}
         className="text-xs font-medium text-ink-900 px-2.5 py-1 rounded border border-line bg-surface hover:bg-sunken inline-flex items-center gap-1 shrink-0"
+        title={
+          ann.type === "disaster_extension" && ann.newDeadline
+            ? "Review the AI-drafted note. Bundled deadline shift is included by default."
+            : "Review the AI-drafted note before sending."
+        }
       >
-        Draft email to {affected} client{affected === 1 ? "" : "s"}
+        Review draft for {affected} client{affected === 1 ? "" : "s"}
         <ChevronRight className="w-3 h-3" aria-hidden />
       </Link>
     );

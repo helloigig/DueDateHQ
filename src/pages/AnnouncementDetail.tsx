@@ -14,10 +14,8 @@ import {
   TAX_TYPE_LABEL,
   TOPIC_LABEL,
 } from "../data/announcementLabels";
-import { ConfirmDialog } from "../components/ConfirmDialog";
 import { BatchNotifyModal } from "../components/BatchNotifyModal";
 import { DismissWithReasonDialog } from "../components/DismissWithReasonDialog";
-import { BatchApplyProgress } from "../components/BatchApplyProgress";
 
 const CONFIDENCE_TONE = {
   high: "bg-emerald-50 text-emerald-700",
@@ -42,24 +40,47 @@ export function AnnouncementDetail() {
   }, [ann?.id, (ann?.affectedClientIds ?? []).join(",")]);
 
   const [flash, setFlash] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<"batch" | null>(null);
   const [dismissOpen, setDismissOpen] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
-  const [progress, setProgress] = useState<{
-    total: number;
-    done: number;
+  // Captures the last bundled batch-adjust so the flash banner can offer a
+  // one-click undo. Cleared when the banner is dismissed or another action
+  // overwrites it. Only set when adjustedCount > 0 — pure email sends are
+  // not "undoable" in the same sense (the email already left the queue).
+  const [lastBatch, setLastBatch] = useState<{
+    clientIds: string[];
+    oldIso: string;
+    newIso: string;
+    title: string;
   } | null>(null);
 
-  // Deep-link from the Today banner: `?action=adjust` opens the batch confirm
-  // dialog, `?action=notify` opens the email modal. We strip the param after
+  const undoLastBatch = () => {
+    if (!lastBatch) return;
+    actions.batchAdjustDeadlines(
+      lastBatch.clientIds,
+      lastBatch.newIso,
+      lastBatch.oldIso,
+      `Undo: ${lastBatch.title}`
+    );
+    setFlash(
+      `Reverted: ${lastBatch.clientIds.length} deadline${lastBatch.clientIds.length === 1 ? "" : "s"} restored to ${formatLongDate(lastBatch.oldIso)}.`
+    );
+    setLastBatch(null);
+  };
+
+  // Deep-link from the Today banner: any of `?action=review|adjust|notify`
+  // opens the unified review modal. The modal itself bundles the deadline
+  // shift for disaster_extension alerts via an in-modal toggle, so callers
+  // no longer need to pick a verb up-front. We strip the param after
   // consuming it so a refresh doesn't re-open the dialog.
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedAction = searchParams.get("action");
   useEffect(() => {
     if (!ann || !requestedAction) return;
-    if (requestedAction === "adjust" && ann.newDeadline) {
-      setConfirm("batch");
-    } else if (requestedAction === "notify") {
+    if (
+      requestedAction === "review" ||
+      requestedAction === "adjust" ||
+      requestedAction === "notify"
+    ) {
       setNotifyOpen(true);
     }
     const next = new URLSearchParams(searchParams);
@@ -122,42 +143,14 @@ export function AnnouncementDetail() {
 
   const selectedCount = selected.size;
 
-  const doBatchAdjust = () => {
-    if (!ann.oldDeadline || !ann.newDeadline) return;
-    const ids = Array.from(selected);
-    const total = ids.length;
-    setConfirm(null);
-    setProgress({ total, done: 0 });
-
-    let i = 0;
-    const tick = () => {
-      i += 1;
-      if (i <= total) {
-        setProgress({ total, done: i });
-        setTimeout(tick, Math.max(60, 240 - total * 8));
-      } else {
-        actions.batchAdjustDeadlines(
-          ids,
-          ann.oldDeadline!,
-          ann.newDeadline!,
-          ann.title
-        );
-        setProgress(null);
-        setFlash(
-          `${total} deadline${total === 1 ? "" : "s"} adjusted to ${formatLongDate(
-            ann.newDeadline!
-          )}.`
-        );
-      }
-    };
-    setTimeout(tick, 200);
-  };
-
   const doDismissWithReason = (reason: string) => {
     actions.dismissAnnouncement(ann.id, reason);
     setDismissOpen(false);
     navigate("/alerts");
   };
+
+  const isDisasterShift =
+    ann.type === "disaster_extension" && !!ann.oldDeadline && !!ann.newDeadline;
 
   const relatedAlerts = ann.relatedAnnouncementIds
     .map((rid) => allAnnouncements.find((a) => a.id === rid))
@@ -228,107 +221,23 @@ export function AnnouncementDetail() {
       </div>
 
       {flash && (
-        <div className="mt-4 rounded border border-emerald-200 bg-emerald-50 text-emerald-800 text-sm px-4 py-3">
-          ✓ {flash}
+        <div className="mt-4 rounded border border-emerald-200 bg-emerald-50 text-emerald-800 text-sm px-4 py-3 flex items-center gap-3">
+          <span className="flex-1">✓ {flash}</span>
+          {lastBatch && (
+            <button
+              onClick={undoLastBatch}
+              className="text-xs px-2.5 py-1 rounded border border-emerald-300 text-emerald-800 hover:bg-emerald-100 shrink-0"
+            >
+              Undo
+            </button>
+          )}
         </div>
       )}
 
-      <section className="mt-5 bg-white border border-slate-200 rounded-lg">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100">
-          <h2 className="text-sm font-semibold text-slate-700">
-            📋 PARSED IMPACT
-          </h2>
-          <span
-            className={`ml-auto text-xs px-2 py-0.5 rounded ${
-              CONFIDENCE_TONE[ann.parseConfidence]
-            }`}
-          >
-            AI parse: {CONFIDENCE_LABEL[ann.parseConfidence]}
-          </span>
-          <span
-            className={`text-xs px-2 py-0.5 rounded ${
-              CONFIDENCE_TONE[ann.matchConfidence]
-            }`}
-          >
-            AI match: {CONFIDENCE_LABEL[ann.matchConfidence]}
-          </span>
-        </div>
-        <dl className="divide-y divide-slate-100 text-sm">
-          <Row label="Summary">{ann.summary}</Row>
-          {(ann.counties ?? []).length > 0 && (
-            <Row label="Counties">{(ann.counties ?? []).join(", ")}</Row>
-          )}
-          {(ann.entityTypes ?? []).length > 0 && (
-            <Row label="Entities">{(ann.entityTypes ?? []).join(" · ")}</Row>
-          )}
-          {(ann.taxTypes ?? []).length > 0 && (
-            <Row label="Taxes">{(ann.taxTypes ?? []).join(" · ")}</Row>
-          )}
-          {ann.oldDeadline && (
-            <Row label="Old deadline">{formatLongDate(ann.oldDeadline)}</Row>
-          )}
-          {ann.newDeadline && (
-            <Row label="New deadline">
-              <span className="font-medium text-slate-900">
-                {formatLongDate(ann.newDeadline)}
-              </span>
-            </Row>
-          )}
-        </dl>
-        <div className="px-4 py-3 bg-amber-50 border-t border-amber-100 text-xs text-amber-900">
-          ⚠ Always verify against the official source before acting.{" "}
-          <button className="underline">Report parsing issue</button>
-        </div>
-      </section>
-
-      {(relatedAlerts.length > 0 || ann.relatedAnnouncementIds.length > 0) && (
-        <section className="mt-5 bg-white border border-slate-200 rounded-lg">
-          <div className="flex items-center px-4 py-3 border-b border-slate-100">
-            <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-              <Link2 className="w-3.5 h-3.5" aria-hidden />
-              RELATED ALERTS
-            </h2>
-            <span className="ml-2 text-xs text-slate-500">
-              {ann.relatedAnnouncementIds.length} cross-reference
-              {ann.relatedAnnouncementIds.length === 1 ? "" : "s"}
-            </span>
-          </div>
-          <ul className="divide-y divide-slate-100">
-            {relatedAlerts.map((rel) => (
-              <li key={rel.id} className="px-4 py-2.5">
-                <Link
-                  to={`/alerts/${rel.id}`}
-                  className="flex items-start gap-2 hover:underline"
-                >
-                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-slate-100 text-slate-900 border border-slate-200 shrink-0 mt-0.5">
-                    {rel.stateCode}
-                  </span>
-                  <span className="text-sm text-slate-900">
-                    {rel.title}
-                    <span className="text-xs text-slate-500 ml-2">
-                      · {rel.authority}
-                    </span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-            {ann.relatedAnnouncementIds
-              .filter((rid) => !allAnnouncements.some((a) => a.id === rid))
-              .map((rid) => (
-                <li key={rid} className="px-4 py-2.5 text-xs text-slate-500">
-                  <span className="font-mono">{rid}</span> — referenced but not
-                  yet in your feed
-                </li>
-              ))}
-          </ul>
-          <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 text-xs text-slate-500">
-            Disaster declarations are often dual-source (IRS §7508A + state
-            DOR). Cross-references help you reconcile overlapping postponement
-            dates.
-          </div>
-        </section>
-      )}
-
+      {/* VERDICT — who's affected + the action they need. Surfaces first because
+          Sarah's mental order is "who do I act on" → "what do I do" → (only if
+          uncertain) "let me audit the parse." Evidence sits below in collapsed
+          <details> blocks. */}
       <section className="mt-5 bg-white border border-slate-200 rounded-lg overflow-hidden">
         <div className="flex items-center px-4 py-3 border-b border-slate-100">
           <h2 className="text-sm font-semibold text-slate-700">
@@ -427,35 +336,20 @@ export function AnnouncementDetail() {
       </section>
 
       {ann.affectedClientIds.length > 0 && (
-      <section className="mt-5 bg-white border border-slate-200 rounded-lg p-4 flex flex-wrap gap-2 sticky bottom-0">
-        <button
-          onClick={() => setConfirm("batch")}
-          disabled={selectedCount === 0 || !ann.newDeadline}
-          className="px-4 py-2 rounded bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {ann.newDeadline ? (
-            <>
-              Adjust {selectedCount} deadline
-              {selectedCount === 1 ? "" : "s"} to{" "}
-              {formatLongDate(ann.newDeadline)}
-            </>
-          ) : (
-            <>
-              Review {selectedCount} deadline
-              {selectedCount === 1 ? "" : "s"}
-            </>
-          )}
-        </button>
+      <section className="mt-5 bg-white border border-slate-200 rounded-lg p-4 flex flex-wrap items-center gap-2 sticky bottom-0">
         <button
           onClick={() => setNotifyOpen(true)}
           disabled={selectedCount === 0}
-          className="px-4 py-2 rounded border border-slate-200 text-sm hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="px-4 py-2 rounded bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          Notify {selectedCount} client{selectedCount === 1 ? "" : "s"} by email
+          Review draft for {selectedCount} client
+          {selectedCount === 1 ? "" : "s"}
         </button>
-        <button className="px-4 py-2 rounded border border-slate-200 text-sm hover:bg-slate-50">
-          Review one-by-one
-        </button>
+        {isDisasterShift && (
+          <span className="text-xs text-slate-500">
+            Bundles deadline shift to {formatLongDate(ann.newDeadline!)}
+          </span>
+        )}
         <button
           onClick={() => setDismissOpen(true)}
           className="ml-auto px-4 py-2 rounded text-sm text-slate-500 hover:bg-slate-50"
@@ -465,49 +359,104 @@ export function AnnouncementDetail() {
       </section>
       )}
 
-      <BatchApplyProgress
-        open={!!progress}
-        total={progress?.total ?? 0}
-        done={progress?.done ?? 0}
-        title={`Adjusting ${progress?.total ?? 0} deadline${
-          (progress?.total ?? 0) === 1 ? "" : "s"
-        }`}
-        subtitle={
-          ann.newDeadline
-            ? `New deadline: ${formatLongDate(ann.newDeadline)}`
-            : ""
-        }
-      />
+      {/* EVIDENCE — collapsed by default. The reader has already seen the
+          verdict (affected clients) and acted; these blocks are here for
+          audit, not gating. We expand parsed-impact automatically when
+          confidence is low so a sketchy parse can't hide. */}
+      <details
+        className="mt-5 bg-white border border-slate-200 rounded-lg group"
+        open={ann.parseConfidence === "low" || ann.matchConfidence === "low"}
+      >
+        <summary className="cursor-pointer list-none flex items-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 rounded-t-lg group-open:border-b group-open:border-slate-100">
+          <span className="text-xs text-slate-400 group-open:rotate-90 transition-transform">▶</span>
+          📄 What the alert says
+          <span
+            className={`ml-auto text-xs px-2 py-0.5 rounded ${CONFIDENCE_TONE[ann.parseConfidence]}`}
+          >
+            AI parse: {CONFIDENCE_LABEL[ann.parseConfidence]}
+          </span>
+          <span
+            className={`text-xs px-2 py-0.5 rounded ${CONFIDENCE_TONE[ann.matchConfidence]}`}
+          >
+            AI match: {CONFIDENCE_LABEL[ann.matchConfidence]}
+          </span>
+        </summary>
+        <dl className="divide-y divide-slate-100 text-sm">
+          <Row label="Summary">{ann.summary}</Row>
+          {(ann.counties ?? []).length > 0 && (
+            <Row label="Counties">{(ann.counties ?? []).join(", ")}</Row>
+          )}
+          {(ann.entityTypes ?? []).length > 0 && (
+            <Row label="Entities">{(ann.entityTypes ?? []).join(" · ")}</Row>
+          )}
+          {(ann.taxTypes ?? []).length > 0 && (
+            <Row label="Taxes">{(ann.taxTypes ?? []).join(" · ")}</Row>
+          )}
+          {ann.oldDeadline && (
+            <Row label="Old deadline">{formatLongDate(ann.oldDeadline)}</Row>
+          )}
+          {ann.newDeadline && (
+            <Row label="New deadline">
+              <span className="font-medium text-slate-900">
+                {formatLongDate(ann.newDeadline)}
+              </span>
+            </Row>
+          )}
+        </dl>
+        {(ann.parseConfidence === "low" || ann.matchConfidence === "low") && (
+          <div className="px-4 py-3 bg-amber-50 border-t border-amber-100 text-xs text-amber-900">
+            ⚠ Low confidence — verify against the official source before acting.{" "}
+            <button className="underline">Report parsing issue</button>
+          </div>
+        )}
+      </details>
 
-      <ConfirmDialog
-        open={confirm === "batch"}
-        title={`Move ${selectedCount} deadline${
-          selectedCount === 1 ? "" : "s"
-        }?`}
-        body={
-          <>
-            <p>
-              Changing the official due date from{" "}
-              <strong>
-                {ann.oldDeadline ? formatLongDate(ann.oldDeadline) : "—"}
-              </strong>{" "}
-              to{" "}
-              <strong>
-                {ann.newDeadline ? formatLongDate(ann.newDeadline) : "—"}
-              </strong>{" "}
-              on {selectedCount} client deadline
-              {selectedCount === 1 ? "" : "s"}.
-            </p>
-            <p className="mt-2 text-xs text-slate-500">
-              Each change is recorded in the client activity log and can be
-              reverted individually.
-            </p>
-          </>
-        }
-        confirmLabel="Apply changes"
-        onConfirm={doBatchAdjust}
-        onCancel={() => setConfirm(null)}
-      />
+      {(relatedAlerts.length > 0 || ann.relatedAnnouncementIds.length > 0) && (
+        <details className="mt-3 bg-white border border-slate-200 rounded-lg group">
+          <summary className="cursor-pointer list-none flex items-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 rounded-t-lg group-open:border-b group-open:border-slate-100">
+            <span className="text-xs text-slate-400 group-open:rotate-90 transition-transform">▶</span>
+            <Link2 className="w-3.5 h-3.5" aria-hidden />
+            Related alerts
+            <span className="ml-2 text-xs text-slate-500 font-normal">
+              {ann.relatedAnnouncementIds.length} cross-reference
+              {ann.relatedAnnouncementIds.length === 1 ? "" : "s"}
+            </span>
+          </summary>
+          <ul className="divide-y divide-slate-100">
+            {relatedAlerts.map((rel) => (
+              <li key={rel.id} className="px-4 py-2.5">
+                <Link
+                  to={`/alerts/${rel.id}`}
+                  className="flex items-start gap-2 hover:underline"
+                >
+                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-slate-100 text-slate-900 border border-slate-200 shrink-0 mt-0.5">
+                    {rel.stateCode}
+                  </span>
+                  <span className="text-sm text-slate-900">
+                    {rel.title}
+                    <span className="text-xs text-slate-500 ml-2">
+                      · {rel.authority}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+            {ann.relatedAnnouncementIds
+              .filter((rid) => !allAnnouncements.some((a) => a.id === rid))
+              .map((rid) => (
+                <li key={rid} className="px-4 py-2.5 text-xs text-slate-500">
+                  <span className="font-mono">{rid}</span> — referenced but not
+                  yet in your feed
+                </li>
+              ))}
+          </ul>
+          <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 text-xs text-slate-500">
+            Disaster declarations are often dual-source (IRS §7508A + state
+            DOR). Cross-references help you reconcile overlapping postponement
+            dates.
+          </div>
+        </details>
+      )}
 
       <BatchNotifyModal
         open={notifyOpen}
@@ -516,11 +465,23 @@ export function AnnouncementDetail() {
           .map((cid) => clientsById.get(cid))
           .filter((c): c is NonNullable<typeof c> => !!c)}
         onClose={() => setNotifyOpen(false)}
-        onSent={(count) =>
+        onSent={(count, adjustedCount) => {
           setFlash(
-            `Notification queued for ${count} recipient${count === 1 ? "" : "s"}.`
-          )
-        }
+            adjustedCount > 0
+              ? `Drafts queued for ${count} client${count === 1 ? "" : "s"} · ${adjustedCount} deadline${adjustedCount === 1 ? "" : "s"} moved to ${formatLongDate(ann.newDeadline!)}.`
+              : `Drafts queued for ${count} client${count === 1 ? "" : "s"}.`
+          );
+          if (adjustedCount > 0 && ann.oldDeadline && ann.newDeadline) {
+            setLastBatch({
+              clientIds: Array.from(selected),
+              oldIso: ann.oldDeadline,
+              newIso: ann.newDeadline,
+              title: ann.title,
+            });
+          } else {
+            setLastBatch(null);
+          }
+        }}
       />
 
       <DismissWithReasonDialog

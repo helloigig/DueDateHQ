@@ -181,6 +181,20 @@ function makeId(prefix: string): string {
     .slice(2, 6)}`;
 }
 
+// ISO yyyy-mm-dd date math. Local-noon parsing avoids the DST/UTC drift that
+// would corrupt date-only fields when the device crosses midnight UTC.
+function isoDeltaDays(fromIso: string, toIso: string): number {
+  const a = new Date(fromIso + "T12:00:00").getTime();
+  const b = new Date(toIso + "T12:00:00").getTime();
+  return Math.round((b - a) / 86400000);
+}
+
+function shiftIso(iso: string, deltaDays: number): string {
+  const d = new Date(iso + "T12:00:00");
+  d.setDate(d.getDate() + deltaDays);
+  return d.toISOString().slice(0, 10);
+}
+
 function statusLabel(s: DeadlineStatus): string {
   return (
     {
@@ -555,28 +569,52 @@ export const actions = {
     newIso: string,
     announcementTitle?: string
   ) {
-    // Walk per-client so we can log an activity entry on each.
+    // Shift the official due date AND the derived Task fields
+    // (officialDueDate / internalTargetDate / clientPrepDate) by the same
+    // delta so every downstream view rebounds in lockstep:
+    //   • Deadlines power the ClientDetail timeline
+    //   • Tasks power the Today / Dashboard "due now" buckets and TaskDetail
+    // Without the cascade, ClientDetail would show the new official date
+    // while Today still fires on the old internal target.
+    const deltaDays = isoDeltaDays(oldIso, newIso);
+
     for (const cid of clientIds) {
-      const touched = state.deadlines.filter(
+      const touchedDeadlines = state.deadlines.filter(
         (d) => d.clientId === cid && d.officialDueDate === oldIso
       );
-      if (touched.length === 0) continue;
+      if (touchedDeadlines.length === 0) continue;
+
+      const touchedDeadlineIds = new Set(touchedDeadlines.map((d) => d.id));
+
       state = {
         ...state,
         deadlines: state.deadlines.map((d) =>
-          d.clientId === cid && d.officialDueDate === oldIso
+          touchedDeadlineIds.has(d.id)
             ? { ...d, officialDueDate: newIso }
             : d
         ),
+        tasks: state.tasks.map((t) =>
+          touchedDeadlineIds.has(t.deadlineId)
+            ? {
+                ...t,
+                officialDueDate: newIso,
+                internalTargetDate: shiftIso(t.internalTargetDate, deltaDays),
+                clientPrepDate: t.clientPrepDate
+                  ? shiftIso(t.clientPrepDate, deltaDays)
+                  : t.clientPrepDate,
+              }
+            : t
+        ),
       };
+
       const note = announcementTitle
         ? ` (from ${announcementTitle})`
         : "";
       appendActivity(
         cid,
         "batch_adjust",
-        `Moved ${touched.length} deadline${
-          touched.length === 1 ? "" : "s"
+        `Moved ${touchedDeadlines.length} deadline${
+          touchedDeadlines.length === 1 ? "" : "s"
         } from ${oldIso} → ${newIso}${note}`
       );
     }
