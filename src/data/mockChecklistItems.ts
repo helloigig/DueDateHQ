@@ -1,5 +1,6 @@
 import type { ChecklistItem, DocumentState, AiConfidence } from "../types";
 import { tasks as seedTasks } from "./mockTasks";
+import { resolveFederalForm } from "./canonicalForm";
 
 /**
  * Per-form checklist templates. Each Task gets 4-8 items spread across the
@@ -56,6 +57,20 @@ const TEMPLATES: Record<string, TemplateItem[]> = {
 };
 
 function templateFor(form: string): TemplateItem[] {
+  // Prefer the federalForms.ts catalog when the deadline string maps to
+  // a known form code. Catalog has sourced + per-form-tailored checklists
+  // (1041 trust gets trust-specific items, 990 nonprofit gets nonprofit
+  // items, etc.) — much richer than the 5 hardcoded templates below.
+  // Falls back to the legacy templates for unmatched forms (state-only
+  // filings, generic items) so existing test fixtures keep working.
+  const canonical = resolveFederalForm(form);
+  if (canonical && canonical.requiredItems.length > 0) {
+    return canonical.requiredItems.map((item) => ({
+      label: item.label,
+      itemType: item.itemType,
+    }));
+  }
+
   if (form.includes("1040")) return TEMPLATES["1040"];
   if (form.includes("1065")) return TEMPLATES["1065"];
   if (form.includes("1120-S")) return TEMPLATES["1120-S"];

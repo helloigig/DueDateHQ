@@ -28,6 +28,7 @@ import { ExportClientsButton } from "../components/ExportClientsButton";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { STATE_NAMES, type StateCode } from "../types";
 import { bundleByName, type FilingBundle } from "../data/bundles";
+import { resolveFederalForm } from "../data/canonicalForm";
 import type {
   ActivityEntry,
   ActivityType,
@@ -499,6 +500,12 @@ function PackageDetailsPopover({
       <ul className="divide-y divide-line max-h-80 overflow-y-auto">
         {bundle.templates.map((t, i) => {
           const slot = resolveSlot(t.jurisdiction);
+          // Try to resolve the bundle's free-text form name to a federal
+          // catalog entry. If matched, surface a "↗ IRS" link so the CPA
+          // can verify against the official PDF without leaving this view.
+          // State-only / firm-custom rows (no catalog match) just render
+          // the legacy text — no broken links.
+          const canonical = resolveFederalForm(t.form);
           return (
             <li
               key={`${t.form}-${i}`}
@@ -510,7 +517,21 @@ function PackageDetailsPopover({
               >
                 {slot.label}
               </span>
-              <span className="flex-1 text-ink-900 truncate">{t.form}</span>
+              <span className="flex-1 text-ink-900 truncate" title={canonical?.name ?? t.form}>
+                {t.form}
+              </span>
+              {canonical && canonical.sources[0] && (
+                <a
+                  href={canonical.sources[0]}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-2xs text-accent hover:underline shrink-0"
+                  title={`IRS source for Form ${canonical.code}`}
+                >
+                  ↗ IRS
+                </a>
+              )}
               <span className="text-2xs text-ink-500 tabular-nums shrink-0">
                 {formatTemplateDate(t.month, t.day)}
               </span>
