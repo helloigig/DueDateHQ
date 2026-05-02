@@ -27,6 +27,7 @@ import { taskMilestonesRouter } from "./routers/taskMilestones.js";
 import { inboundRepliesRouter } from "./routers/inboundReplies.js";
 import { deliveryEventsRouter } from "./routers/deliveryEvents.js";
 import { uploadsRouter } from "./routers/uploads.js";
+import { federalFormsRouter } from "./routers/federalForms.js";
 
 export const appRouter = router({
   auth: authRouter,
@@ -61,6 +62,10 @@ export const appRouter = router({
   taskMilestones: taskMilestonesRouter,
   inboundReplies: inboundRepliesRouter,
   deliveryEvents: deliveryEventsRouter,
+  // Federal forms catalog + Federal Register change-detection.
+  // Replaces the hardcoded COMMON_FORMS list in AddDeadlineModal and
+  // backs FilingsTab + AI applicability per the BE federal_forms table.
+  federalForms: federalFormsRouter,
 });
 
 export type AppRouter = typeof appRouter;

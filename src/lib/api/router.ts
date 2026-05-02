@@ -114,6 +114,37 @@ export type DeliveryEventIssueRow = {
   };
 };
 
+// Federal forms catalog DTOs — mirror the BE shape from
+// backend/src/trpc/routers/federalForms.ts. Kept narrow (only what FE
+// consumes) so refactors don't ripple.
+export type FederalFormDTO = {
+  id: string;
+  formNumber: string;
+  formName: string;
+  category: string;
+  entityTypes: string[];
+  frequency: string;
+  /** JSON shape — see backend `lib/due-date-rules.ts:DueDateRule`.
+   *  Optional because the inferred tRPC return type marks `unknown`
+   *  fields as optional even when always present. */
+  dueDateRule?: unknown;
+  notes: string | null;
+  irsUrl: string | null;
+  extractionMethod: "curated" | "llm" | "federal_register";
+  confidenceScore: number;
+  status: "active" | "pending_review" | "deprecated";
+  lastVerifiedAt: string | null;
+  lastChangeCheckAt: string | null;
+};
+
+export type FederalFormChangeKind =
+  | "due_date_change"
+  | "form_revision"
+  | "new_form"
+  | "deprecation"
+  | "instructions_update"
+  | "other";
+
 export const appRouter = t.router({
   auth: t.router({
     session: t.procedure.query(
@@ -1120,6 +1151,96 @@ export const appRouter = t.router({
     listForClient: t.procedure
       .input(z.object({ clientId: z.string() }))
       .query(async (): Promise<AiInsight[]> => NOT_IMPL()),
+  }),
+
+  // Federal forms catalog — backs AddDeadlineModal's form picker,
+  // FilingsTab, and AI applicability. Replaces the hardcoded
+  // COMMON_FORMS list.
+  federalForms: t.router({
+    list: t.procedure
+      .input(
+        z
+          .object({
+            search: z.string().optional(),
+            entityType: z.string().optional(),
+            category: z.string().optional(),
+            frequency: z.string().optional(),
+            status: z.array(z.string()).optional(),
+            includePendingReview: z.boolean().optional(),
+          })
+          .optional(),
+      )
+      .query(async (): Promise<FederalFormDTO[]> => NOT_IMPL()),
+    getByFormNumber: t.procedure
+      .input(z.object({ formNumber: z.string() }))
+      .query(async (): Promise<FederalFormDTO | null> => NOT_IMPL()),
+    applicabilityForClient: t.procedure
+      .input(z.object({ clientId: z.string() }))
+      .query(
+        async (): Promise<{
+          clientId: string;
+          entityType: string;
+          primaryState: string;
+          forms: Array<{
+            form: FederalFormDTO;
+            confidence: "high" | "medium";
+            reason: string;
+          }>;
+        }> => NOT_IMPL(),
+      ),
+    extractFromLlm: t.procedure
+      .input(z.object({ formNumber: z.string(), hint: z.string().optional() }))
+      .mutation(
+        async (): Promise<{
+          form: FederalFormDTO;
+          created: boolean;
+          llmCalled: boolean;
+          confidence: number;
+          needsReview: boolean;
+        }> => NOT_IMPL(),
+      ),
+    recentChanges: t.procedure
+      .input(
+        z
+          .object({
+            limit: z.number().int().min(1).max(200).optional(),
+            includeReviewed: z.boolean().optional(),
+          })
+          .optional(),
+      )
+      .query(
+        async (): Promise<
+          Array<{
+            eventId: number;
+            changeKind: FederalFormChangeKind;
+            summary: string;
+            createdAt: string;
+            reviewedAt: string | null;
+            appliedAt: string | null;
+            form: { id: string; formNumber: string; formName: string };
+            notice: {
+              id: string;
+              documentNumber: string;
+              title: string;
+              publicationDate: string;
+              htmlUrl: string;
+              parseConfidence: string;
+            };
+          }>
+        > => NOT_IMPL(),
+      ),
+    markChangeReviewed: t.procedure
+      .input(z.object({ eventId: z.number().int(), applied: z.boolean() }))
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    pollNow: t.procedure.mutation(
+      async (): Promise<{
+        fetched: number;
+        inserted: number;
+        changeEvents: number;
+        lowConfidence: number;
+        duplicatesSkipped: number;
+      }> => NOT_IMPL(),
+    ),
   }),
 
   multistate: t.router({

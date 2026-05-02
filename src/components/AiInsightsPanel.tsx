@@ -1,4 +1,4 @@
-import { Sparkles, Snowflake, Calendar, Bell, X, AlertTriangle } from "lucide-react";
+import { Sparkles, Snowflake, Calendar, Bell, X, AlertTriangle, FileText } from "lucide-react";
 import type {
   AiInsight,
   ChecklistItem,
@@ -44,6 +44,18 @@ export function AiInsightsPanel({
   });
   const consistencyFlags = consistencyQuery.data?.flags ?? [];
 
+  // Federal-form applicability — drives the "what filings should this
+  // client be on?" surface. Catalog rows ranked by entity match.
+  // Replaces the old hand-coded `arrivalTiming` per-form heuristics for
+  // the federal surface; state forms still flow through service-packages.
+  const applicabilityQuery = trpc.federalForms.applicabilityForClient.useQuery({
+    clientId: client.id,
+  });
+  // Cap to the top 5 — full list lives on FilingsTab. The panel is the
+  // peek; the tab is the depth.
+  const topApplicableForms =
+    applicabilityQuery.data?.forms.slice(0, 5) ?? [];
+
   const taskItemTypes = task
     ? Array.from(
         new Set(checklistItems.filter((c) => c.taskId === task.id).map((c) => c.itemType))
@@ -71,6 +83,64 @@ export function AiInsightsPanel({
           Mode B · C · E
         </span>
       </header>
+
+      {/* Federal forms applicability — backed by `federal_forms` table.
+          Ranked by category × entity_type match. Top 5 here; full
+          catalog in FilingsTab. */}
+      {topApplicableForms.length > 0 && (
+        <div className="border-b border-line">
+          <SectionTitle>
+            Applicable filings (federal_forms catalog)
+          </SectionTitle>
+          <ul className="divide-y divide-line">
+            {topApplicableForms.map(({ form, confidence, reason }) => {
+              const isLlm = form.extractionMethod !== "curated";
+              return (
+                <li
+                  key={form.id}
+                  className="px-4 py-2 flex items-baseline gap-2"
+                >
+                  <FileText
+                    className="w-3.5 h-3.5 shrink-0 text-ink-500 mt-0.5"
+                    aria-hidden
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-1.5 flex-wrap">
+                      <span className="text-xs font-mono font-medium text-ink-900">
+                        {form.formNumber}
+                      </span>
+                      <span className="text-xs text-ink-700 truncate">
+                        {form.formName}
+                      </span>
+                      {isLlm && (
+                        <span
+                          className="text-2xs px-1 py-0 rounded border border-line bg-sunken/40 text-ink-500"
+                          title={reason}
+                        >
+                          AI · {(form.confidenceScore * 100).toFixed(0)}%
+                        </span>
+                      )}
+                      {confidence === "high" && (
+                        <span
+                          className="text-2xs text-ok-ink"
+                          title={reason}
+                        >
+                          ★
+                        </span>
+                      )}
+                    </div>
+                    {form.notes && (
+                      <p className="text-2xs text-ink-500 mt-0.5 line-clamp-1">
+                        {form.notes}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
 
       {/* Cross-fact consistency — Mode C flags */}
       {consistencyFlags.length > 0 && (
@@ -235,11 +305,14 @@ export function AiInsightsPanel({
         </div>
       )}
 
-      {openInsights.length === 0 && timingPreds.length === 0 && crossYear.length === 0 && (
-        <div className="px-4 py-5 text-xs text-ink-500">
-          No insights to surface yet for this {task ? "task" : "client"}.
-        </div>
-      )}
+      {openInsights.length === 0 &&
+        timingPreds.length === 0 &&
+        crossYear.length === 0 &&
+        topApplicableForms.length === 0 && (
+          <div className="px-4 py-5 text-xs text-ink-500">
+            No insights to surface yet for this {task ? "task" : "client"}.
+          </div>
+        )}
 
       <footer className="px-4 py-2 text-2xs text-ink-400 bg-sunken/40 flex items-center gap-1">
         <X className="w-2.5 h-2.5" aria-hidden /> AI never decides — it
