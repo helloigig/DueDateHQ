@@ -7,14 +7,15 @@ import {
   CheckCircle2,
   Megaphone,
   MessageSquare,
-  Inbox,
-  Sparkles,
   Users,
 } from "lucide-react";
 import { trpc } from "../lib/api/client";
 import { MOCK_TODO_ITEMS } from "../data/mockTodoItems";
 import type { MockTodoItem, TodoVerb } from "../data/mockTodoItems";
 import { env } from "../config";
+import { DateLabel } from "./ui/DateLabel";
+import { SectionHeader } from "./ui/SectionHeader";
+import { cn } from "../lib/utils";
 import {
   buildQueueRows,
   pickPrimaryItem,
@@ -25,21 +26,9 @@ import {
   type QueueTodoItem,
 } from "../lib/queueGrouping";
 
-// ActionQueue — per IA v0.7 amendment §3.1 (Today restructure).
-//
-// One row per (client × email-thread). State alerts (Mode F, fan-out to many
-// clients) and bulk-batch drafts (Mode D "8 routine W-2 follow-ups") render
-// as their own row variants. Per-client rows expand inline to show the
-// individual TodoItems behind the count.
-//
-// Sort: state alerts pinned to top, then client groups + bulk rows by
-// max urgency_score desc (PRD §4.8 v0.8 amendment formula).
-//
-// Why grouped: a CPA chasing one client sends one email covering everything
-// outstanding — not 6 separate "Send" emails for 6 separate forms. The
-// queue surface has to mirror that workflow or the row count becomes
-// theatrical (49 clients × 6 forms = 294 rows for Sarah; 600 × 6 = 3600
-// for Yan Jing). See §5.3 invariant + `feedback_state_notif_plus_actions`.
+// ActionQueue — Today's chase queue. One row per (client × email-thread).
+// State alerts pin to top; bulk-batch drafts render their own variant.
+// Click a row to act; chevron expands to show individual TodoItems.
 
 const VERB_ICON: Record<TodoVerb, typeof Mail> = {
   Send: Mail,
@@ -48,17 +37,34 @@ const VERB_ICON: Record<TodoVerb, typeof Mail> = {
   Discuss: MessageSquare,
 };
 
-const URGENCY_BORDER: Record<MockTodoItem["urgency"], string> = {
-  high: "border-l-4 border-danger-solid",
-  medium: "border-l-4 border-warning-solid",
-  normal: "border-l-4 border-success-solid",
+// Urgency dots — small SVG circles, matching the DESIGN.md dot
+// vocabulary used elsewhere (Timeline mini-timeline, Today triage
+// queue rail). Colored as pills, never as row paint (T4 — "status
+// colors are pills, never paint").
+const URGENCY_DOT_CLASS: Record<MockTodoItem["urgency"], string> = {
+  high: "bg-danger-solid",
+  medium: "bg-warn-solid",
+  normal: "bg-ok-solid",
 };
 
-const URGENCY_DOT: Record<MockTodoItem["urgency"], string> = {
-  high: "🔴",
-  medium: "🟡",
-  normal: "🟢",
+const URGENCY_LABEL: Record<MockTodoItem["urgency"], string> = {
+  high: "High urgency",
+  medium: "Medium urgency",
+  normal: "Routine",
 };
+
+function UrgencyDot({ urgency }: { urgency: MockTodoItem["urgency"] }) {
+  return (
+    <span
+      className={cn(
+        "w-2 h-2 rounded-pill shrink-0 mt-1.5",
+        URGENCY_DOT_CLASS[urgency],
+      )}
+      aria-label={URGENCY_LABEL[urgency]}
+      role="img"
+    />
+  );
+}
 
 export function ActionQueue() {
   const [expanded, setExpanded] = useState(false);
@@ -75,59 +81,35 @@ export function ActionQueue() {
   const visible = rows.slice(0, visibleCount);
   const hidden = rows.length - visibleCount;
 
-  const sourceLabel = todoQuery.isLoading
-    ? "loading TodoItem feed (PRD §4.8)"
-    : live.length > 0
-      ? `live TodoItem feed (PRD §4.8) · ${live.length} items from backend`
-      : "fallback static mock (no live TodoItems yet)";
-
   return (
-    <section
-      aria-labelledby="action-queue-heading"
-      className="rounded-md border-2 border-warning-border bg-warning-bg/30 overflow-hidden"
-    >
-      <header className="flex items-center px-4 py-3 border-b border-warning-border gap-3">
-        <Inbox className="w-4 h-4 text-warning-solid" aria-hidden />
-        <h2
-          id="action-queue-heading"
-          className="text-sm font-semibold text-ink-900 flex items-center gap-2"
-        >
-          Action queue
-          <span
-            className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
-            title="AI ranks by urgency + waiting-on-client time + history. You can override the order."
+    <section className="mb-section" aria-labelledby="action-queue-heading">
+      <SectionHeader
+        title={<span id="action-queue-heading">Action queue</span>}
+        meta={
+          rows.length === 1
+            ? `${rows.length} client · ${items.length} ${items.length === 1 ? "item" : "items"}`
+            : `${rows.length} clients · ${items.length} items`
+        }
+      />
+      <div className="bg-surface border border-line rounded-md overflow-hidden">
+        <ul className="divide-y divide-line" role="list">
+          {visible.map((row) => {
+            if (row.kind === "state_alert")
+              return <StateAlertRowView key={row.key} row={row} />;
+            if (row.kind === "bulk_batch")
+              return <BulkBatchRowView key={row.key} row={row} />;
+            return <ClientGroupRowView key={row.key} row={row} />;
+          })}
+        </ul>
+        {hidden > 0 && (
+          <button
+            onClick={() => setExpanded(true)}
+            className="w-full px-region py-2.5 text-xs text-ink-500 hover:text-ink-900 hover:bg-sunken/40 border-t border-line"
           >
-            <Sparkles className="w-3 h-3" aria-hidden />
-            AI prioritized
-          </span>
-        </h2>
-        <span className="text-2xs text-ink-500 tabular-nums">
-          {rows.length} {rows.length === 1 ? "row" : "rows"} · {items.length}{" "}
-          {items.length === 1 ? "item" : "items"}
-        </span>
-        <span className="ml-auto text-2xs text-ink-400 italic">
-          {sourceLabel}
-        </span>
-      </header>
-
-      <ul className="divide-y divide-line">
-        {visible.map((row) => {
-          if (row.kind === "state_alert")
-            return <StateAlertRowView key={row.key} row={row} />;
-          if (row.kind === "bulk_batch")
-            return <BulkBatchRowView key={row.key} row={row} />;
-          return <ClientGroupRowView key={row.key} row={row} />;
-        })}
-      </ul>
-
-      {hidden > 0 && (
-        <button
-          onClick={() => setExpanded(true)}
-          className="w-full px-4 py-2.5 text-xs text-ink-500 hover:text-ink-900 hover:bg-sunken/40 border-t border-line"
-        >
-          Show {hidden} more {hidden === 1 ? "row" : "rows"}
-        </button>
-      )}
+            Show {hidden} more {hidden === 1 ? "client" : "clients"}
+          </button>
+        )}
+      </div>
     </section>
   );
 }
@@ -189,36 +171,34 @@ function ClientGroupRowView({ row }: { row: ClientGroupRow }) {
   };
 
   return (
-    <li
-      className={`group bg-surface ${URGENCY_BORDER[row.maxUrgency]}`}
-      data-deadline-row
-    >
+    <li className="group bg-surface" data-deadline-row>
       <div className="w-full flex items-stretch">
         <button
           type="button"
           onClick={onRowClick}
-          className="flex-1 text-left px-4 py-3 flex items-start gap-3 hover:bg-sunken/40 transition-colors"
+          className="flex-1 text-left px-region py-3 flex items-start gap-3 hover:bg-sunken/40 transition-colors"
         >
-          <span aria-hidden className="text-base shrink-0 leading-tight pt-0.5">
-            {URGENCY_DOT[row.maxUrgency]}
-          </span>
+          <UrgencyDot urgency={row.maxUrgency} />
           <div className="flex-1 min-w-0">
             {/* Identity line */}
-            <div className="flex items-center gap-2 text-2xs text-ink-500 mb-0.5 flex-wrap">
+            <div className="flex items-center gap-2 text-xs text-ink-500 mb-0.5 flex-wrap">
               <span className="font-medium text-ink-900">{row.clientName}</span>
-              <span className="text-ink-300">·</span>
+              <span className="text-ink-300" aria-hidden>·</span>
               <span>
                 {row.items.length} {row.items.length === 1 ? "item" : "items"}
               </span>
               {row.earliestDueDate && (
                 <>
-                  <span className="text-ink-300">·</span>
-                  <span>earliest due {row.earliestDueDate}</span>
+                  <span className="text-ink-300" aria-hidden>·</span>
+                  <span className="inline-flex items-center gap-1">
+                    earliest due{" "}
+                    <DateLabel value={row.earliestDueDate} format="auto" />
+                  </span>
                 </>
               )}
-              <span className="ml-auto inline-flex items-center gap-1 text-2xs">
+              <span className="ml-auto inline-flex items-center gap-1 text-xs text-ink-700">
                 <PrimaryIcon className="w-3 h-3" aria-hidden />
-                <span className="font-medium text-ink-700">{primaryVerb}</span>
+                <span className="font-medium">{primaryVerb}</span>
               </span>
             </div>
 
@@ -226,7 +206,7 @@ function ClientGroupRowView({ row }: { row: ClientGroupRow }) {
             <div className="text-sm text-ink-900 font-medium">{summary}</div>
 
             {/* Context — first item's context as flavor */}
-            <div className="text-2xs text-ink-500 mt-0.5 line-clamp-1">
+            <div className="text-xs text-ink-500 mt-0.5 line-clamp-1">
               {row.items[0].context}
             </div>
           </div>
@@ -239,7 +219,7 @@ function ClientGroupRowView({ row }: { row: ClientGroupRow }) {
           onClick={() => setOpen((v) => !v)}
           aria-label={open ? "Collapse items" : "Expand items"}
           aria-expanded={open}
-          className="px-3 flex items-center text-ink-300 hover:text-ink-700 hover:bg-sunken/40 border-l border-line"
+          className="px-3 flex items-center text-ink-400 hover:text-ink-700 hover:bg-sunken/40 border-l border-line"
         >
           {open ? (
             <ChevronDown className="w-4 h-4" aria-hidden />
@@ -270,31 +250,31 @@ function SubItemRow({ item }: { item: QueueTodoItem }) {
       <button
         type="button"
         onClick={() => navigateForItem(item, navigate)}
-        className="w-full text-left px-4 py-2 pl-10 flex items-start gap-3 hover:bg-surface transition-colors"
+        className="w-full text-left px-region py-2 pl-10 flex items-start gap-3 hover:bg-surface transition-colors"
       >
-        <span aria-hidden className="text-xs shrink-0 leading-tight pt-1">
-          {URGENCY_DOT[item.urgency]}
-        </span>
+        <UrgencyDot urgency={item.urgency} />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 text-2xs text-ink-500 mb-0.5 flex-wrap">
+          <div className="flex items-center gap-2 text-xs text-ink-500 mb-0.5 flex-wrap">
             {item.task && (
               <span className="text-ink-700 font-medium">{item.task}</span>
             )}
             {item.dueDate && (
               <>
-                {item.task && <span className="text-ink-300">·</span>}
-                <span>due {item.dueDate}</span>
+                {item.task && <span className="text-ink-300" aria-hidden>·</span>}
+                <span className="inline-flex items-center gap-1">
+                  due <DateLabel value={item.dueDate} format="auto" />
+                </span>
               </>
             )}
             {item.stageLabel && (
               <>
-                <span className="text-ink-300">·</span>
+                <span className="text-ink-300" aria-hidden>·</span>
                 <span
                   className={
                     item.daysBehind && item.daysBehind > 7
-                      ? "text-danger-solid font-semibold"
+                      ? "text-danger-ink font-medium"
                       : item.daysBehind && item.daysBehind > 0
-                        ? "text-warning-solid"
+                        ? "text-warn-ink"
                         : "text-ink-500"
                   }
                 >
@@ -305,16 +285,16 @@ function SubItemRow({ item }: { item: QueueTodoItem }) {
                 </span>
               </>
             )}
-            <span className="ml-auto inline-flex items-center gap-1 text-2xs">
+            <span className="ml-auto inline-flex items-center gap-1 text-xs text-ink-700">
               <Icon className="w-3 h-3" aria-hidden />
-              <span className="font-medium text-ink-700">{item.verb}</span>
+              <span className="font-medium">{item.verb}</span>
             </span>
           </div>
           <div className="text-sm text-ink-900">{item.action}</div>
-          <div className="text-2xs text-ink-500 mt-0.5">{item.context}</div>
+          <div className="text-xs text-ink-500 mt-0.5">{item.context}</div>
         </div>
         <ChevronRight
-          className="w-3.5 h-3.5 text-ink-300 shrink-0 mt-1"
+          className="w-3.5 h-3.5 text-ink-400 shrink-0 mt-1"
           aria-hidden
         />
       </button>
@@ -331,35 +311,30 @@ function StateAlertRowView({ row }: { row: StateAlertRow }) {
   const item = row.item;
   const navigate = useNavigate();
   return (
-    <li
-      className={`group bg-info-bg/40 hover:bg-info-bg/60 transition-colors ${URGENCY_BORDER[item.urgency]}`}
-      data-deadline-row
-    >
+    <li className="group bg-surface" data-deadline-row>
       <button
         type="button"
         onClick={() => navigateForItem(item, navigate)}
-        className="w-full text-left px-4 py-3 flex items-start gap-3"
+        className="w-full text-left px-region py-3 flex items-start gap-3 hover:bg-sunken/40 transition-colors"
       >
-        <span aria-hidden className="text-base shrink-0 leading-tight pt-0.5">
-          🔔
-        </span>
+        <UrgencyDot urgency={item.urgency} />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 text-2xs text-info-ink mb-0.5">
-            <span className="uppercase tracking-wide font-semibold">
+          <div className="flex items-center gap-2 text-xs text-ink-500 mb-0.5 flex-wrap">
+            <span className="text-2xs uppercase tracking-wider font-semibold text-ink-500">
               State alert
             </span>
-            <span className="text-ink-300">·</span>
-            <span className="text-ink-700 font-medium">{item.client}</span>
-            <span className="ml-auto inline-flex items-center gap-1 text-2xs">
+            <span className="text-ink-300" aria-hidden>·</span>
+            <span className="text-ink-900 font-medium">{item.client}</span>
+            <span className="ml-auto inline-flex items-center gap-1 text-xs text-ink-700">
               <Megaphone className="w-3 h-3" aria-hidden />
-              <span className="font-medium text-ink-700">Notify all</span>
+              <span className="font-medium">Notify all</span>
             </span>
           </div>
           <div className="text-sm text-ink-900 font-medium">{item.action}</div>
-          <div className="text-2xs text-ink-500 mt-0.5">{item.context}</div>
+          <div className="text-xs text-ink-500 mt-0.5">{item.context}</div>
         </div>
         <ChevronRight
-          className="w-4 h-4 text-ink-300 group-hover:text-ink-700 shrink-0 mt-1"
+          className="w-4 h-4 text-ink-400 group-hover:text-ink-700 shrink-0 mt-1"
           aria-hidden
         />
       </button>
@@ -375,32 +350,27 @@ function BulkBatchRowView({ row }: { row: BulkBatchRow }) {
   const Icon = VERB_ICON[item.verb];
   const navigate = useNavigate();
   return (
-    <li
-      className={`group bg-surface hover:bg-sunken/40 transition-colors ${URGENCY_BORDER[item.urgency]}`}
-      data-deadline-row
-    >
+    <li className="group bg-surface" data-deadline-row>
       <button
         type="button"
         onClick={() => navigateForItem(item, navigate)}
-        className="w-full text-left px-4 py-3 flex items-start gap-3"
+        className="w-full text-left px-region py-3 flex items-start gap-3 hover:bg-sunken/40 transition-colors"
       >
-        <span aria-hidden className="text-base shrink-0 leading-tight pt-0.5">
-          {URGENCY_DOT[item.urgency]}
-        </span>
+        <UrgencyDot urgency={item.urgency} />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 text-2xs text-ink-500 mb-0.5">
+          <div className="flex items-center gap-2 text-xs text-ink-500 mb-0.5">
             <Users className="w-3 h-3" aria-hidden />
-            <span className="font-medium text-ink-700">{item.client}</span>
-            <span className="ml-auto inline-flex items-center gap-1 text-2xs">
+            <span className="font-medium text-ink-900">{item.client}</span>
+            <span className="ml-auto inline-flex items-center gap-1 text-xs text-ink-700">
               <Icon className="w-3 h-3" aria-hidden />
-              <span className="font-medium text-ink-700">{item.verb}</span>
+              <span className="font-medium">{item.verb}</span>
             </span>
           </div>
           <div className="text-sm text-ink-900 font-medium">{item.action}</div>
-          <div className="text-2xs text-ink-500 mt-0.5">{item.context}</div>
+          <div className="text-xs text-ink-500 mt-0.5">{item.context}</div>
         </div>
         <ChevronRight
-          className="w-4 h-4 text-ink-300 group-hover:text-ink-700 shrink-0 mt-1"
+          className="w-4 h-4 text-ink-400 group-hover:text-ink-700 shrink-0 mt-1"
           aria-hidden
         />
       </button>
