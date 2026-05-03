@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { AddClientModal } from "../components/AddClientModal";
 import { ExportClientsButton } from "../components/ExportClientsButton";
 import { PageHeader } from "../components/ui/PageHeader";
+import { MetricTile } from "../components/ui/MetricTile";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { MultiSelectChip } from "../components/MultiSelectChip";
 import { SpotlightStrip, type SpotlightCard } from "../components/SpotlightStrip";
@@ -398,13 +399,17 @@ export function Clients() {
   }
 
   const activeCount = clients.filter((c) => c.status === "active").length;
-  const openTaskCount = deadlines.filter(
-    (d) => d.status !== "completed" && d.status !== "filed_extension"
-  ).length;
   const dueSoonCount = deadlines.filter((d) => {
     const diff = daysBetween(TODAY, parseDate(d.officialDueDate));
     return diff >= 0 && diff <= 7 && d.status !== "completed" && d.status !== "filed_extension";
   }).length;
+  // Roster-level signals — surface what needs attention vs. what's volume.
+  let waitingFleetCount = 0;
+  let stuckFleetCount = 0;
+  for (const fc of fleetCounts.values()) {
+    if (fc.waiting > 0) waitingFleetCount++;
+    if ((fc.oldestReminderDays ?? 0) >= STUCK_THRESHOLD_DAYS) stuckFleetCount++;
+  }
 
   return (
     <div className="max-w-[840px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8 space-y-card">
@@ -412,18 +417,26 @@ export function Clients() {
         title="Clients"
         meta={`${activeCount} active`}
       />
-      <header>
-        <p className="text-sm text-ink-500 max-w-2xl">
-          Each client carries entity, jurisdictions, service packages, and a
-          per-task forwarding address. Click a row to open the client view; the
-          open-task count tells you what's still moving.
-        </p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <StatCard label="Active clients" value={activeCount} helper="Excludes archived and inactive" />
-          <StatCard label="Open tasks" value={openTaskCount} helper="Across the entire roster" />
-          <StatCard label="Due in 7 days" value={dueSoonCount} helper="Urgency window" />
-        </div>
-      </header>
+      {/* Roster-level signals — Mercury-style MetricTiles consistent with
+          Today + Timeline. Order: volume → urgency (left → right). */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-card">
+        <MetricTile label="Active clients" value={activeCount} />
+        <MetricTile
+          label="Has waiting"
+          value={waitingFleetCount}
+          tone={waitingFleetCount > 0 ? "warn" : "neutral"}
+        />
+        <MetricTile
+          label="Stuck"
+          value={stuckFleetCount}
+          tone={stuckFleetCount > 0 ? "danger" : "neutral"}
+        />
+        <MetricTile
+          label="Due in 7 days"
+          value={dueSoonCount}
+          tone={dueSoonCount > 0 ? "warn" : "neutral"}
+        />
+      </div>
 
       <div className="flex items-center gap-3 flex-wrap">
         <input
@@ -488,9 +501,8 @@ export function Clients() {
             })
           }
           tooltip="Clients with at least one item the client hasn't sent yet"
-          accent="warning"
         >
-          🚨 Has waiting
+          Has waiting
         </SmartFilterChip>
         <SmartFilterChip
           active={smartFilters.has("stuck")}
@@ -531,7 +543,7 @@ export function Clients() {
           }
           tooltip="AI surfaced a churn or pricing opportunity (Mode E)"
         >
-          💎 Has opportunity
+          Has opportunity
         </SmartFilterChip>
       </div>
 
@@ -769,30 +781,6 @@ const TIER_LABEL: Record<ClientTier, string> = {
   standard: "Standard",
   custom: "Custom",
 };
-
-function StatCard({
-  label,
-  value,
-  helper,
-}: {
-  label: string;
-  value: number;
-  helper?: string;
-}) {
-  return (
-    <div className="border border-line rounded-md p-3 bg-surface">
-      <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
-        {label}
-      </p>
-      <p className="text-xl font-semibold text-ink-900 mt-1 tabular-nums">
-        {value}
-      </p>
-      {helper && (
-        <p className="text-2xs text-ink-500 mt-0.5">{helper}</p>
-      )}
-    </div>
-  );
-}
 
 function SortableTh({
   col,
