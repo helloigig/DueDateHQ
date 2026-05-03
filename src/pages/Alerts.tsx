@@ -20,8 +20,6 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { StateBadge } from "@/components/ui/StateBadge";
 import { ClientChip } from "@/components/ui/ClientChip";
 import { FilterChip } from "@/components/ui/FilterChip";
-import { OpenInTabButton } from "@/components/TabBar";
-import { useTabs, makeTab } from "@/lib/tabs/TabContext";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -157,18 +155,6 @@ function FeedCard({
   const affected = affectedClientsFor(a);
   const visibleChips = affected.slice(0, 5);
   const overflow = Math.max(0, affected.length - visibleChips.length);
-  const { openInTab } = useTabs();
-  const handleOpenInTab = () => {
-    openInTab(
-      makeTab("alert", {
-        id: a.id,
-        label: `${a.stateCode} · ${a.title}`,
-        href: `/alerts/${a.id}`,
-        status: tone === "danger" ? "danger" : tone === "warn" ? "warn" : undefined,
-      }),
-    );
-    toast.success("Pinned to workspace tab");
-  };
 
   // Two zones, separated by a hairline divider — per DESIGN.md
   // §Information hierarchy:
@@ -357,11 +343,6 @@ function FeedCard({
             <MoonStar className="w-3 h-3" aria-hidden />
             Snooze
           </button>
-          <OpenInTabButton
-            label={`${a.stateCode} · ${a.title}`}
-            onClick={handleOpenInTab}
-            className="ml-1"
-          />
         </div>
       )}
     </div>
