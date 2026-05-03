@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   CalendarClock,
-  Check,
   ChevronLeft,
   ChevronRight,
   Forward,
@@ -16,17 +15,13 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { StatusPill } from "@/components/ui/StatusPill";
 import { StateBadge } from "@/components/ui/StateBadge";
-import { ClientChip } from "@/components/ui/ClientChip";
 import { FilterChip } from "@/components/ui/FilterChip";
+import { StateAlertCard } from "@/components/StateAlertCard";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/button";
-import {
-  formatLongDate,
-  hoursSince,
-} from "@/data/dateHelpers";
+import { formatLongDate } from "@/data/dateHelpers";
 import {
   useAnnouncements,
   useDismissAnnouncement,
@@ -50,32 +45,10 @@ import { cn } from "@/lib/utils";
  *                      Today's StateAlertCard click target)
  */
 
-type Tone = "danger" | "warn" | "info";
-
-const TYPE_LABEL: Record<Announcement["type"], string> = {
-  disaster_extension: "Disaster ext.",
-  penalty_relief: "Penalty relief",
-  pte_change: "PTE change",
-  form_change: "Form change",
-  rate_change: "Rate change",
-  nexus_change: "Nexus change",
-};
-
-const TYPE_TONE: Record<Announcement["type"], Tone> = {
-  disaster_extension: "warn",
-  penalty_relief: "info",
-  pte_change: "info",
-  form_change: "info",
-  rate_change: "info",
-  nexus_change: "warn",
-};
-
-function timeAgoShort(iso: string): string {
-  const h = hoursSince(iso);
-  if (h < 1) return "just now";
-  if (h < 24) return `${Math.round(h)}h ago`;
-  return `${Math.round(h / 24)}d ago`;
-}
+// TYPE_LABEL / TYPE_TONE / timeAgoShort moved to <StateAlertCard>
+// (single source of truth for the alert presentation). The CopilotPane
+// header is now title-only (collapsed earlier per #12) so it doesn't
+// need the type-pill metadata anymore.
 
 function firstNameFromEmail(email: string | undefined): string | null {
   if (!email) return null;
@@ -136,171 +109,10 @@ I'll let you know if it changes anything on your end. Source: ${a.sourceUrl}
 Sarah`;
 }
 
-// ── Feed card ─────────────────────────────────────────────────────────────
-
-function FeedCard({
-  a,
-  selected,
-  handled,
-  onSelect,
-  onComplete,
-}: {
-  a: Announcement;
-  selected: boolean;
-  handled: boolean;
-  onSelect: () => void;
-  onComplete: (id: string) => void;
-}) {
-  const tone = TYPE_TONE[a.type];
-  const affected = affectedClientsFor(a);
-  const visibleChips = affected.slice(0, 5);
-  const overflow = Math.max(0, affected.length - visibleChips.length);
-
-  // Two zones, separated by a hairline divider — per DESIGN.md
-  // §Information hierarchy:
-  //   Zone 1 ("what")   — title (T1 hero, alone on its row), then a
-  //                       single quiet meta line carrying authority +
-  //                       type pill + time, then a 2-line summary.
-  //                       Type pill rides at xs size on the meta line
-  //                       so it stays scannable but doesn't compete
-  //                       with the title.
-  //   Zone 2 ("who/when") — AFFECTS eyebrow + chips, then the
-  //                         deadline shift on its own row beneath
-  //                         (different concept = different geometry).
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onSelect}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
-      className={cn(
-        // `group` enables hover-revealed action chips in Zone 3.
-        // shrink-0 keeps cards at intrinsic height inside the
-        // parent's `flex flex-col` scroll container.
-        "group block w-full shrink-0 text-left bg-surface border border-line rounded-md transition-all cursor-pointer overflow-hidden",
-        "hover:border-line-strong",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-900",
-        selected && !handled && "border-indigo ring-2 ring-indigo-soft",
-        handled && "opacity-60 hover:opacity-95",
-      )}
-      aria-pressed={selected}
-    >
-      {/* ── Zone 1 — what just happened ───────────────────────── */}
-      <div className="p-region flex items-start gap-3">
-        <StateBadge code={a.stateCode} />
-        <div className="flex-1 min-w-0">
-          {/* Title on its own row — hero, one size up from the
-              meta line so the eye lands here first. */}
-          <h3 className="text-lg font-semibold text-ink-900 leading-snug">
-            {a.title}
-          </h3>
-
-          {/* Single quiet meta line: authority truncates, type pill +
-              time pinned right at the same weight (both T2 metadata). */}
-          <div className="mt-1 flex items-center gap-2 text-xs text-ink-500">
-            <span className="truncate flex-1 min-w-0">{a.authority}</span>
-            <StatusPill variant={tone} size="xs" className="shrink-0">
-              {TYPE_LABEL[a.type]}
-            </StatusPill>
-            <span className="tabular-nums shrink-0 text-ink-400">
-              {timeAgoShort(a.detectedAt)}
-            </span>
-          </div>
-
-          <p className="mt-2 text-sm text-ink-700 leading-snug line-clamp-2">
-            {a.summary}
-          </p>
-
-          {handled && (
-            <div className="mt-2 inline-flex items-center gap-1 text-2xs font-medium text-ok-ink bg-ok-bg border border-ok-border rounded px-1.5 py-0.5">
-              <Check className="w-3 h-3" aria-hidden />
-              Handled this session
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Zone 2 — who/when affected ────────────────────────── */}
-      {(visibleChips.length > 0 || a.newDeadline) && (
-        <div className="border-t border-line bg-sunken/40 px-region py-3">
-          {/* AFFECTS eyebrow + chip row — one concept */}
-          {visibleChips.length > 0 && (
-            <>
-              <div className="text-2xs uppercase tracking-wider text-ink-500 font-semibold mb-2">
-                Affects{" "}
-                <span className="tabular-nums text-ink-900">
-                  {a.affectedClientIds.length}
-                </span>{" "}
-                {a.affectedClientIds.length === 1 ? "client" : "clients"}
-              </div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {visibleChips.map((c) => (
-                  <ClientChip key={c.id} name={c.name} />
-                ))}
-                {overflow > 0 && (
-                  <span className="text-xs text-ink-500 px-1.5 tabular-nums">
-                    +{overflow} more
-                  </span>
-                )}
-              </div>
-            </>
-          )}
-
-          {/* Deadline shift — own row, calendar icon, separated from
-              the AFFECTS group by an inner divider. Different concept
-              = different geometry. */}
-          {a.newDeadline && (
-            <div
-              className={cn(
-                "flex items-center gap-1.5 text-xs text-ink-700",
-                visibleChips.length > 0 && "mt-2.5 pt-2.5 border-t border-line/60",
-              )}
-            >
-              <CalendarClock className="w-3.5 h-3.5 text-ink-500 shrink-0" aria-hidden />
-              <span>
-                Deadline shifts to{" "}
-                <span className="font-medium text-ink-900">
-                  {formatLongDate(a.newDeadline)}
-                </span>
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Zone 3 — single dominant action (hover-revealed) ──
-          Cut from earlier rev: Apply / Forward / Snooze were
-          duplicating the right-pane actions and making cards heavy
-          with 4 inline buttons. Kept only the indigo `Send N` chip —
-          the dominant common-case action — visible on selection /
-          hover. Everything else lives in the pane. */}
-      {!handled && (
-        <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity border-t border-line px-region py-2 flex items-center justify-end bg-surface">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              toast.success(
-                `Sent draft to ${a.affectedClientIds.length} ${a.affectedClientIds.length === 1 ? "client" : "clients"}`,
-              );
-              onComplete(a.id);
-            }}
-            className="inline-flex items-center gap-1 text-xs font-medium text-white bg-indigo hover:bg-indigo-hover transition-colors px-2.5 py-1 rounded"
-            title="Send personalized email draft to each affected client"
-          >
-            <Send className="w-3 h-3" aria-hidden />
-            Send {a.affectedClientIds.length}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
+// FeedCard extracted to <StateAlertCard variant="feed"> in
+// src/components/StateAlertCard.tsx so the Dashboard preview surface
+// can share the same presentation. See that file for the canonical
+// implementation.
 
 // ── Co-pilot pane ─────────────────────────────────────────────────────────
 
@@ -831,9 +643,10 @@ export function Alerts() {
             </div>
           ) : (
             filtered.map((a) => (
-              <FeedCard
+              <StateAlertCard
                 key={a.id}
                 a={a}
+                variant="feed"
                 selected={a.id === selectedId}
                 handled={handledIds.has(a.id)}
                 onSelect={() => handleSelect(a.id)}
