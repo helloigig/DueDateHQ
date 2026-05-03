@@ -383,25 +383,29 @@ export function Dashboard() {
   );
 }
 
-// StateAlertsPreview — Dashboard's compact alert surface. Renders the
-// top 3 most-urgent alerts as <StateAlertCard variant="preview"> +
-// "View all N affecting →" link. Single source of truth for alert
-// presentation: same card on /alerts and Dashboard, no two layouts of
-// the same data.
+// StateAlertsPreview — Dashboard's compact alert surface.
 //
-// Sort: escalated (>72h unactioned) → has new deadline → most clients
-// affected → most recent. Only alerts that actually affect the firm's
-// clients show; pure news (no client match) collapses behind a chip.
+// Hard rule: Dashboard shows ONLY escalated alerts (>72h unactioned —
+// past soft SLA, demand action TODAY). Routine alerts collapse to an
+// ambient count line — they're one sidebar click away on /alerts.
+//
+// This earns the section's real estate. Routine alerts on Today
+// duplicated the /alerts page for no UX gain; the CPA is going to
+// /alerts to act on them anyway. Reserving Today for the truly
+// urgent makes the morning glance honest.
+//
+// Three states:
+//   • 0 alerts            → calm "all clear" line
+//   • 0 escalated, N affecting → ambient line ("N affecting · all under SLA")
+//   • M escalated, N total      → M cards inline + "{N-M} more routine →" link
 function StateAlertsPreview({
   announcements,
 }: {
   announcements: Announcement[];
 }) {
   const navigate = useNavigate();
-  const PREVIEW_LIMIT = 3;
 
-  // Calm "all clear" — keeps the section visible so a fresh firm sees
-  // the surface working, not a silent gap.
+  // Empty: monitoring assurance, calm.
   if (announcements.length === 0) {
     return (
       <section
@@ -430,18 +434,48 @@ function StateAlertsPreview({
     );
   }
 
-  // Affecting-firm subset (gap > fill — pure news is hidden behind the
-  // /alerts page; Dashboard only previews what touches the roster).
+  // Affecting-firm subset.
   const affecting = announcements.filter(
     (a) => !a.dismissed && a.affectedClientIds.length > 0,
   );
 
-  // Urgency sort: escalated first, then deadline-shifting, then by
-  // most clients affected, then by detection time.
-  const sorted = [...affecting].sort((a, b) => {
-    const aEsc = escTier(hoursSince(a.detectedAt)) === "escalated" ? 1 : 0;
-    const bEsc = escTier(hoursSince(b.detectedAt)) === "escalated" ? 1 : 0;
-    if (aEsc !== bEsc) return bEsc - aEsc;
+  // Escalated subset — the only thing that earns Today's real estate.
+  const escalated = affecting.filter(
+    (a) => escTier(hoursSince(a.detectedAt)) === "escalated",
+  );
+  const routineCount = affecting.length - escalated.length;
+
+  // No escalated — single ambient line. Same shape as the empty state
+  // (calm), different copy (you have stuff, but not on fire).
+  if (escalated.length === 0) {
+    return (
+      <Link
+        to="/alerts"
+        className="block bg-surface border border-line rounded-md px-4 py-2.5 flex items-center gap-3 mb-section hover:border-line-strong transition-colors"
+        aria-label="State alerts"
+      >
+        <span
+          className="w-2 h-2 rounded-full shrink-0 bg-info-solid"
+          aria-hidden
+        />
+        <Megaphone className="w-3.5 h-3.5 shrink-0 text-ink-500" aria-hidden />
+        <span className="flex-1 text-sm text-ink-700">
+          <span className="font-medium text-ink-900 tabular-nums">
+            {affecting.length}
+          </span>{" "}
+          {affecting.length === 1 ? "alert" : "alerts"} affecting your clients
+          <span className="text-ink-500"> · all under SLA</span>
+        </span>
+        <span className="text-2xs text-ink-500 inline-flex items-center gap-0.5 shrink-0">
+          Open <ChevronRight className="w-3 h-3" aria-hidden />
+        </span>
+      </Link>
+    );
+  }
+
+  // Escalated present — sort escalated by impact (deadline-shifting,
+  // then most clients) so the most urgent card is first.
+  const sortedEscalated = [...escalated].sort((a, b) => {
     const aShift = a.newDeadline ? 1 : 0;
     const bShift = b.newDeadline ? 1 : 0;
     if (aShift !== bShift) return bShift - aShift;
@@ -451,20 +485,14 @@ function StateAlertsPreview({
     return b.detectedAt.localeCompare(a.detectedAt);
   });
 
-  const preview = sorted.slice(0, PREVIEW_LIMIT);
-  const remaining = Math.max(0, sorted.length - preview.length);
-  const escalatedCount = sorted.filter(
-    (a) => escTier(hoursSince(a.detectedAt)) === "escalated",
-  ).length;
-
   return (
     <section className="mb-section">
       <SectionHeader
-        title="State alerts"
+        title="Escalated alerts"
         meta={
-          escalatedCount > 0
-            ? `${sorted.length} affecting · ${escalatedCount} escalated`
-            : `${sorted.length} affecting your clients`
+          escalated.length === 1
+            ? "1 past 72h SLA — act today"
+            : `${escalated.length} past 72h SLA — act today`
         }
         action={
           <Link
@@ -476,7 +504,7 @@ function StateAlertsPreview({
         }
       />
       <div className="flex flex-col gap-card">
-        {preview.map((a) => (
+        {sortedEscalated.map((a) => (
           <StateAlertCard
             key={a.id}
             a={a}
@@ -485,13 +513,14 @@ function StateAlertsPreview({
           />
         ))}
       </div>
-      {remaining > 0 && (
+      {routineCount > 0 && (
         <div className="mt-3 flex justify-center">
           <Link
             to="/alerts"
-            className="inline-flex items-center gap-1 text-xs font-medium text-ink-700 hover:text-ink-900 hover:underline underline-offset-[3px] decoration-[1.5px]"
+            className="inline-flex items-center gap-1 text-xs text-ink-500 hover:text-ink-900 hover:underline underline-offset-[3px] decoration-[1.5px]"
           >
-            View {remaining} more affecting your clients on /alerts
+            {routineCount} more routine{" "}
+            {routineCount === 1 ? "alert" : "alerts"} on /alerts
             <ChevronRight className="w-3.5 h-3.5" aria-hidden />
           </Link>
         </div>
