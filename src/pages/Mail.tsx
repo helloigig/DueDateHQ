@@ -366,9 +366,9 @@ function IntentBadge({ intent }: { intent: string }) {
     string,
     { label: string; tone: string }
   > = {
-    timeline_pushback: { label: "pushback", tone: "bg-warning-bg text-warning-ink" },
+    timeline_pushback: { label: "pushback", tone: "bg-warn-bg text-warn-ink" },
     question_asked: { label: "question", tone: "bg-info-bg text-info-ink" },
-    document_provided: { label: "document", tone: "bg-success-bg text-success-ink" },
+    document_provided: { label: "document", tone: "bg-ok-bg text-ok-ink" },
     off_topic: { label: "off-topic", tone: "bg-sunken text-ink-500" },
     mismatched_attachment: { label: "mismatched", tone: "bg-danger-bg text-danger-ink" },
     acknowledgment: { label: "ack", tone: "bg-sunken text-ink-500" },

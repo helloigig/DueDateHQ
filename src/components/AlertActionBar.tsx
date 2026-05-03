@@ -50,7 +50,7 @@ export function AlertActionBar({
       <button
         onClick={() => onAction(cfg.primaryAction)}
         disabled={primaryDisabled}
-        className="px-4 py-2 rounded bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+        className="px-4 py-2 rounded bg-ink-900 text-white text-sm font-medium hover:bg-ink-900 disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {primaryLabel}
       </button>
@@ -59,19 +59,19 @@ export function AlertActionBar({
         <button
           onClick={() => onAction(cfg.secondaryAction!)}
           disabled={primaryDisabled}
-          className="px-3 py-2 rounded border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="px-3 py-2 rounded border border-line text-ink-700 text-sm font-medium hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {secondaryLabel}
         </button>
       )}
 
       {helperText && (
-        <span className="text-xs text-slate-500">{helperText}</span>
+        <span className="text-xs text-ink-500">{helperText}</span>
       )}
 
       <button
         onClick={onDismiss}
-        className="ml-auto px-3 py-2 rounded text-sm text-slate-500 hover:bg-slate-50"
+        className="ml-auto px-3 py-2 rounded text-sm text-ink-500 hover:bg-canvas"
       >
         Not applicable — dismiss
       </button>

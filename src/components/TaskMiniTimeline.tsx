@@ -243,9 +243,9 @@ function Waypoint({
   const dotClasses = (() => {
     switch (wp.status) {
       case "done":
-        return "bg-success-solid";
+        return "bg-ok-solid";
       case "in_progress":
-        return "bg-warning-solid ring-2 ring-warning-border ring-offset-2 ring-offset-surface";
+        return "bg-warn-solid ring-2 ring-warn-border ring-offset-2 ring-offset-surface";
       case "overdue":
         return "bg-danger-solid";
       case "blocked":
@@ -276,7 +276,7 @@ function Waypoint({
       {/* Missing-count badge above the dot at the in-progress stage */}
       <div className="h-3 mb-0.5 flex items-end justify-center">
         {wp.missingBadge && wp.missingBadge > 0 && (
-          <span className="text-2xs text-warning-solid font-semibold tabular-nums leading-none">
+          <span className="text-2xs text-warn-solid font-semibold tabular-nums leading-none">
             ({wp.missingBadge})
           </span>
         )}

@@ -63,7 +63,7 @@ export function MigrationPreviewModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 backdrop-blur-sm"
       onClick={onCancel}
     >
       <div
@@ -73,16 +73,16 @@ export function MigrationPreviewModal({
         aria-modal="true"
         aria-labelledby="migration-title"
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-lg shadow-xl border border-slate-200 w-full max-w-lg mx-4 outline-none"
+        className="bg-white rounded-lg shadow-xl border border-line w-full max-w-lg mx-4 outline-none"
       >
-        <div className="px-5 py-4 border-b border-slate-100">
+        <div className="px-5 py-4 border-b border-line">
           <h2
             id="migration-title"
-            className="text-base font-semibold text-slate-900"
+            className="text-base font-semibold text-ink-900"
           >
             Preview deadline changes
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">{summary}</p>
+          <p className="text-xs text-ink-500 mt-0.5">{summary}</p>
         </div>
 
         <div className="px-5 py-4 space-y-3 text-sm">
@@ -115,23 +115,23 @@ export function MigrationPreviewModal({
             }`}
             detail="Federal + unchanged-state deadlines are preserved."
           />
-          <p className="text-xs text-slate-500 pt-1">
+          <p className="text-xs text-ink-500 pt-1">
             A single activity entry is logged summarizing all three counts. Removed
             deadlines stay recoverable via the activity log for 24h.
           </p>
         </div>
 
-        <div className="px-5 py-3 bg-slate-50 rounded-b-lg flex items-center justify-end gap-2">
+        <div className="px-5 py-3 bg-canvas rounded-b-lg flex items-center justify-end gap-2">
           <button
             onClick={onCancel}
-            className="text-sm px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50"
+            className="text-sm px-3 py-1.5 rounded border border-line bg-white hover:bg-canvas"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
             data-autofocus
-            className="text-sm px-3 py-1.5 rounded bg-slate-900 text-white font-medium hover:bg-slate-800"
+            className="text-sm px-3 py-1.5 rounded bg-ink-900 text-white font-medium hover:bg-ink-900"
           >
             Apply changes
           </button>
@@ -205,7 +205,7 @@ function MigrationRow({
       ? "bg-red-50 text-red-700 border-red-200"
       : tone === "ok"
       ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-      : "bg-slate-50 text-slate-600 border-slate-200";
+      : "bg-canvas text-ink-700 border-line";
   return (
     <div className={`border rounded px-3 py-2 ${toneClass}`}>
       <div className="flex items-center gap-2 font-medium">

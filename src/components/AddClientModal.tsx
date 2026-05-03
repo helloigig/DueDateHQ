@@ -174,7 +174,7 @@ export function AddClientModal({
   // ─── Render ──────────────────────────────────────────────────────────
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -183,20 +183,20 @@ export function AddClientModal({
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-lg shadow-xl border border-slate-200 w-full max-w-lg mx-4 outline-none"
+        className="bg-white rounded-lg shadow-xl border border-line w-full max-w-lg mx-4 outline-none"
       >
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center">
-          <h2 className="text-base font-semibold text-slate-900">
+        <div className="px-5 py-4 border-b border-line flex items-center">
+          <h2 className="text-base font-semibold text-ink-900">
             {step === "form" ? "New client" : "Review and confirm"}
           </h2>
-          <span className="ml-3 text-xs text-slate-400">
+          <span className="ml-3 text-xs text-ink-400">
             {step === "form"
               ? "Step 1 of 2 · ~2 min"
               : "Step 2 of 2 · last chance to edit"}
           </span>
           <button
             onClick={onClose}
-            className="ml-auto text-slate-400 hover:text-slate-600"
+            className="ml-auto text-ink-400 hover:text-ink-700"
             aria-label="Close"
           >
             ✕
@@ -244,18 +244,18 @@ export function AddClientModal({
           </div>
         )}
 
-        <div className="px-5 py-3 bg-slate-50 rounded-b-lg flex items-center justify-end gap-2">
+        <div className="px-5 py-3 bg-canvas rounded-b-lg flex items-center justify-end gap-2">
           {step === "form" ? (
             <>
               <button
                 onClick={onClose}
-                className="text-sm px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50"
+                className="text-sm px-3 py-1.5 rounded border border-line bg-white hover:bg-canvas"
               >
                 Cancel
               </button>
               <button
                 onClick={onContinue}
-                className="text-sm px-3 py-1.5 rounded font-medium text-white bg-slate-900 hover:bg-slate-800"
+                className="text-sm px-3 py-1.5 rounded font-medium text-white bg-ink-900 hover:bg-ink-900"
               >
                 Continue → review
               </button>
@@ -265,14 +265,14 @@ export function AddClientModal({
               <button
                 onClick={() => setStep("form")}
                 disabled={submitting}
-                className="text-sm px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40"
+                className="text-sm px-3 py-1.5 rounded border border-line bg-white hover:bg-canvas disabled:opacity-40"
               >
                 ← Back to edit
               </button>
               <button
                 onClick={() => void onConfirm()}
                 disabled={submitting}
-                className="text-sm px-3 py-1.5 rounded font-medium text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-40"
+                className="text-sm px-3 py-1.5 rounded font-medium text-white bg-ink-900 hover:bg-ink-900 disabled:opacity-40"
               >
                 {submitting ? "Saving…" : "Confirm and create"}
               </button>
@@ -330,7 +330,7 @@ function FormStep(props: {
           className={`w-full px-2.5 py-1.5 rounded border focus:outline-none focus:ring-2 ${
             errors.name
               ? "border-red-300 focus:ring-red-500"
-              : "border-slate-200 focus:ring-slate-900"
+              : "border-line focus:ring-ink-900"
           }`}
           data-autofocus
         />
@@ -341,7 +341,7 @@ function FormStep(props: {
           <select
             value={entity}
             onChange={(e) => setEntity(e.target.value as EntityType)}
-            className="w-full px-2.5 py-1.5 rounded border border-slate-200 bg-white"
+            className="w-full px-2.5 py-1.5 rounded border border-line bg-white"
           >
             {ENTITY_OPTIONS.map((e) => (
               <option key={e} value={e}>
@@ -354,7 +354,7 @@ function FormStep(props: {
           <select
             value={state}
             onChange={(e) => setState(e.target.value as StateCode)}
-            className="w-full px-2.5 py-1.5 rounded border border-slate-200 bg-white"
+            className="w-full px-2.5 py-1.5 rounded border border-line bg-white"
           >
             {STATE_OPTIONS.map((s) => (
               <option key={s} value={s}>
@@ -380,8 +380,8 @@ function FormStep(props: {
                 }
                 className={`text-xs px-2 py-1 rounded border ${
                   on
-                    ? "bg-slate-900 text-white border-slate-900"
-                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                    ? "bg-ink-900 text-white border-ink-900"
+                    : "bg-white text-ink-700 border-line hover:bg-canvas"
                 }`}
               >
                 {s}
@@ -400,7 +400,7 @@ function FormStep(props: {
           className={`w-full px-2.5 py-1.5 rounded border focus:outline-none focus:ring-2 ${
             errors.email
               ? "border-red-300 focus:ring-red-500"
-              : "border-slate-200 focus:ring-slate-900"
+              : "border-line focus:ring-ink-900"
           }`}
         />
       </Field>
@@ -410,24 +410,24 @@ function FormStep(props: {
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           placeholder="(555) 555-0100"
-          className="w-full px-2.5 py-1.5 rounded border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
+          className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-ink-900"
         />
       </Field>
 
-      <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded px-3 py-2">
+      <div className="text-xs text-ink-700 bg-canvas border border-line rounded px-3 py-2">
         Suggested service package:{" "}
         {suggestionLoading ? (
-          <span className="text-slate-400">finding the right one…</span>
+          <span className="text-ink-400">finding the right one…</span>
         ) : suggestedPackageName ? (
-          <span className="font-medium text-slate-900">
+          <span className="font-medium text-ink-900">
             {suggestedPackageName}
           </span>
         ) : (
-          <span className="text-slate-500">
+          <span className="text-ink-500">
             no exact match — you can pick one on the next screen
           </span>
         )}
-        <div className="text-slate-500 mt-0.5">
+        <div className="text-ink-500 mt-0.5">
           We&apos;ll create deadlines from this package after you confirm. You
           can change it anytime on the client page.
         </div>
@@ -452,7 +452,7 @@ function ReviewStep(props: {
   return (
     <div className="px-5 py-4 space-y-4 text-sm">
       <div>
-        <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">
+        <p className="text-xs uppercase tracking-wider text-ink-500 mb-2">
           About to create
         </p>
         <dl className="space-y-1.5 text-sm">
@@ -470,16 +470,16 @@ function ReviewStep(props: {
         </dl>
       </div>
 
-      <div className="border-t border-slate-100 pt-4">
-        <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">
+      <div className="border-t border-line pt-4">
+        <p className="text-xs uppercase tracking-wider text-ink-500 mb-2">
           What happens on confirm
         </p>
-        <ul className="space-y-1.5 text-sm text-slate-700 list-disc pl-5">
+        <ul className="space-y-1.5 text-sm text-ink-700 list-disc pl-5">
           <li>The client record is created in your firm.</li>
           {hasPackage && suggestedPackageName ? (
             <li>
               Service package{" "}
-              <span className="font-medium text-slate-900">
+              <span className="font-medium text-ink-900">
                 {suggestedPackageName}
               </span>{" "}
               is assigned, which generates this year&apos;s deadlines and a
@@ -504,8 +504,8 @@ function ReviewStep(props: {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex gap-3">
-      <dt className="text-slate-500 w-32 shrink-0">{label}</dt>
-      <dd className="text-slate-900 font-medium">{value}</dd>
+      <dt className="text-ink-500 w-32 shrink-0">{label}</dt>
+      <dd className="text-ink-900 font-medium">{value}</dd>
     </div>
   );
 }
@@ -523,7 +523,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-xs font-medium text-slate-600 mb-1 block">
+      <span className="text-xs font-medium text-ink-700 mb-1 block">
         {label} {required && <span className="text-red-500">*</span>}
       </span>
       {children}

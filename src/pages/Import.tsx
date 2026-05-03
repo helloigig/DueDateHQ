@@ -66,10 +66,10 @@ export function Import() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 md:px-6 py-6">
-      <Link to="/clients" className="text-sm text-slate-500 hover:underline">
+      <Link to="/clients" className="text-sm text-ink-500 hover:underline">
         ‹ Clients
       </Link>
-      <h1 className="mt-3 text-xl font-semibold text-slate-900">
+      <h1 className="mt-3 text-xl font-semibold text-ink-900">
         Import clients from CSV
       </h1>
 
@@ -86,20 +86,20 @@ export function Import() {
                     done
                       ? "bg-emerald-500 text-white"
                       : current
-                      ? "bg-slate-900 text-white"
-                      : "bg-slate-200 text-slate-500"
+                      ? "bg-ink-900 text-white"
+                      : "bg-line text-ink-500"
                   }`}
                 >
                   {done ? "✓" : i + 1}
                 </span>
                 <span
                   className={
-                    current ? "text-slate-900 font-medium" : "text-slate-500"
+                    current ? "text-ink-900 font-medium" : "text-ink-500"
                   }
                 >
                   {STEP_LABELS[s]}
                 </span>
-                {i < 2 && <span className="text-slate-300 mx-1">→</span>}
+                {i < 2 && <span className="text-ink-300 mx-1">→</span>}
               </li>
             );
           }
@@ -230,7 +230,7 @@ function UploadStep({
   const hasFile = status.kind === "ok";
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-8">
+    <div className="bg-white border border-line rounded-lg p-8">
       <button
         type="button"
         onClick={onPick}
@@ -244,19 +244,19 @@ function UploadStep({
           hasFile
             ? "border-emerald-400 bg-emerald-50"
             : isDragging
-            ? "border-slate-500 bg-slate-50"
-            : "border-slate-300 hover:border-slate-400 hover:bg-slate-50"
+            ? "border-line-strong bg-canvas"
+            : "border-line-strong hover:border-line-strong hover:bg-canvas"
         }`}
       >
         <span className="text-4xl">{hasFile ? "✓" : "↑"}</span>
-        <div className="text-sm font-medium text-slate-700">
+        <div className="text-sm font-medium text-ink-700">
           {hasFile
             ? `${status.name} · ${status.count} row${
                 status.count === 1 ? "" : "s"
               } detected`
             : "Drop CSV here or click to browse"}
         </div>
-        <div className="text-xs text-slate-500">
+        <div className="text-xs text-ink-500">
           Max 5 MB · First row should be column headers
         </div>
       </button>
@@ -278,8 +278,8 @@ function UploadStep({
         </div>
       )}
 
-      <div className="mt-5 text-xs text-slate-500">
-        <div className="font-medium text-slate-700 mb-1">Supported sources</div>
+      <div className="mt-5 text-xs text-ink-500">
+        <div className="font-medium text-ink-700 mb-1">Supported sources</div>
         <div className="flex flex-wrap gap-1.5">
           {[
             "File In Time",
@@ -291,7 +291,7 @@ function UploadStep({
           ].map((s) => (
             <span
               key={s}
-              className="px-2 py-0.5 rounded bg-slate-100 text-slate-600"
+              className="px-2 py-0.5 rounded bg-sunken text-ink-700"
             >
               {s}
             </span>
@@ -306,14 +306,14 @@ function UploadStep({
       <div className="mt-6 flex items-center justify-between">
         <button
           onClick={onDemo}
-          className="text-sm px-3 py-1.5 rounded border border-slate-200 hover:bg-slate-50 text-slate-600"
+          className="text-sm px-3 py-1.5 rounded border border-line hover:bg-canvas text-ink-700"
         >
           Try with demo data
         </button>
         <button
           disabled={!hasFile}
           onClick={onNext}
-          className="text-sm px-4 py-2 rounded font-medium text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-40"
+          className="text-sm px-4 py-2 rounded font-medium text-white bg-ink-900 hover:bg-ink-900 disabled:opacity-40"
         >
           Continue →
         </button>
@@ -336,10 +336,10 @@ function MapStep({
   const confidence: "high" | "low" =
     mapping.filter((m) => m.confidence === "high").length >= 3 ? "high" : "low";
   return (
-    <div className="bg-white border border-slate-200 rounded-lg">
-      <div className="px-5 py-4 border-b border-slate-100">
+    <div className="bg-white border border-line rounded-lg">
+      <div className="px-5 py-4 border-b border-line">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-slate-700">
+          <span className="text-sm font-semibold text-ink-700">
             Map fields
           </span>
           <span
@@ -352,14 +352,14 @@ function MapStep({
             AI · {confidence} confidence
           </span>
         </div>
-        <p className="text-xs text-slate-500 mt-1">
+        <p className="text-xs text-ink-500 mt-1">
           Detected: <strong>{detectedSource}</strong>. Review the column
           mapping; re-map anything that looks off.
         </p>
       </div>
 
       <table className="w-full text-sm">
-        <thead className="text-xs uppercase tracking-wide text-slate-500 bg-slate-50">
+        <thead className="text-xs uppercase tracking-wide text-ink-500 bg-canvas">
           <tr>
             <th className="text-left px-4 py-2 font-medium">Your column</th>
             <th className="text-left px-4 py-2 font-medium">→</th>
@@ -367,12 +367,12 @@ function MapStep({
             <th className="text-left px-4 py-2 font-medium">Status</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-line">
           {mapping.map((m) => (
             <tr key={m.sourceColumn}>
-              <td className="px-4 py-2.5 text-slate-700">{m.sourceColumn}</td>
-              <td className="px-4 py-2.5 text-slate-400">→</td>
-              <td className="px-4 py-2.5 text-slate-900">
+              <td className="px-4 py-2.5 text-ink-700">{m.sourceColumn}</td>
+              <td className="px-4 py-2.5 text-ink-400">→</td>
+              <td className="px-4 py-2.5 text-ink-900">
                 {humanTargetField(m.targetField)}
               </td>
               <td className="px-4 py-2.5">
@@ -385,7 +385,7 @@ function MapStep({
                   </span>
                 )}
                 {m.confidence === "ignore" && (
-                  <span className="text-slate-500 text-xs">Ignored</span>
+                  <span className="text-ink-500 text-xs">Ignored</span>
                 )}
               </td>
             </tr>
@@ -393,16 +393,16 @@ function MapStep({
         </tbody>
       </table>
 
-      <div className="px-5 py-3 bg-slate-50 rounded-b-lg flex items-center justify-between">
+      <div className="px-5 py-3 bg-canvas rounded-b-lg flex items-center justify-between">
         <button
           onClick={onBack}
-          className="text-sm px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50"
+          className="text-sm px-3 py-1.5 rounded border border-line bg-white hover:bg-canvas"
         >
           ← Back
         </button>
         <button
           onClick={onNext}
-          className="text-sm px-4 py-2 rounded font-medium text-white bg-slate-900 hover:bg-slate-800"
+          className="text-sm px-4 py-2 rounded font-medium text-white bg-ink-900 hover:bg-ink-900"
         >
           Continue →
         </button>
@@ -453,9 +453,9 @@ function PreviewStep({
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg">
-      <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
-        <h2 className="text-sm font-semibold text-slate-700">
+    <div className="bg-white border border-line rounded-lg">
+      <div className="px-5 py-4 border-b border-line flex items-center gap-3">
+        <h2 className="text-sm font-semibold text-ink-700">
           Preview ({rows.length} rows)
         </h2>
         <div className="ml-auto flex items-center gap-2 text-xs">
@@ -471,7 +471,7 @@ function PreviewStep({
       </div>
 
       <table className="w-full text-sm">
-        <thead className="text-xs uppercase tracking-wide text-slate-500 bg-slate-50">
+        <thead className="text-xs uppercase tracking-wide text-ink-500 bg-canvas">
           <tr>
             <th className="text-left px-4 py-2 font-medium">Name</th>
             <th className="text-left px-4 py-2 font-medium">Entity</th>
@@ -481,39 +481,39 @@ function PreviewStep({
             <th className="text-right px-4 py-2 font-medium"></th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-line">
           {rows.map((r, i) => {
             const issue = r.issues.length > 0;
             return (
               <Fragment key={i}>
                 <tr
-                  className={issue ? "bg-amber-50/50" : "hover:bg-slate-50"}
+                  className={issue ? "bg-amber-50/50" : "hover:bg-canvas"}
                 >
-                  <td className="px-4 py-2.5 text-slate-900">
+                  <td className="px-4 py-2.5 text-ink-900">
                     {issue && <span className="text-amber-600 mr-1">⚠</span>}
                     {r.name}
                   </td>
-                  <td className="px-4 py-2.5 text-slate-600">
+                  <td className="px-4 py-2.5 text-ink-700">
                     {r.entityType ?? (
                       <span className="text-amber-700">?</span>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 text-slate-600">
+                  <td className="px-4 py-2.5 text-ink-700">
                     {r.primaryState ?? (
                       <span className="text-amber-700">?</span>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 text-slate-600 truncate max-w-[180px]">
+                  <td className="px-4 py-2.5 text-ink-700 truncate max-w-[180px]">
                     {r.email || <span className="text-amber-700">—</span>}
                   </td>
-                  <td className="px-4 py-2.5 text-slate-600">
-                    {r.bundle ?? <span className="text-slate-400">—</span>}
+                  <td className="px-4 py-2.5 text-ink-700">
+                    {r.bundle ?? <span className="text-ink-400">—</span>}
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     {issue && (
                       <button
                         onClick={() => setEditing(editing === i ? null : i)}
-                        className="text-xs px-2 py-1 rounded bg-slate-900 text-white hover:bg-slate-800"
+                        className="text-xs px-2 py-1 rounded bg-ink-900 text-white hover:bg-ink-900"
                       >
                         {editing === i ? "Cancel" : "Fix inline"}
                       </button>
@@ -544,16 +544,16 @@ function PreviewStep({
         </tbody>
       </table>
 
-      <div className="px-5 py-3 bg-slate-50 rounded-b-lg flex items-center justify-between">
+      <div className="px-5 py-3 bg-canvas rounded-b-lg flex items-center justify-between">
         <button
           onClick={onBack}
-          className="text-sm px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50"
+          className="text-sm px-3 py-1.5 rounded border border-line bg-white hover:bg-canvas"
         >
           ← Back
         </button>
         <div className="flex items-center gap-2">
           {flaggedCount > 0 && (
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-ink-500">
               {flaggedCount} problematic row{flaggedCount === 1 ? "" : "s"}{" "}
               will be skipped
             </span>
@@ -561,7 +561,7 @@ function PreviewStep({
           <button
             onClick={() => setConfirmOpen(true)}
             disabled={readyCount === 0}
-            className="text-sm px-4 py-2 rounded font-medium text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-40"
+            className="text-sm px-4 py-2 rounded font-medium text-white bg-ink-900 hover:bg-ink-900 disabled:opacity-40"
           >
             Commit {readyCount} client{readyCount === 1 ? "" : "s"} →
           </button>
@@ -584,7 +584,7 @@ function PreviewStep({
                 them later from Settings › Imports.
               </p>
             )}
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-ink-500">
               You can undo this import from Settings › Imports for the next 7
               days.
             </p>
@@ -624,12 +624,12 @@ function FixInline({
     <div className="flex flex-wrap items-end gap-3">
       {row.issues.includes("entity_missing") ||
       row.issues.includes("entity_ambiguous") ? (
-        <label className="text-xs text-slate-600">
+        <label className="text-xs text-ink-700">
           <span className="block mb-1">Entity type</span>
           <select
             value={entity}
             onChange={(e) => setEntity(e.target.value as EntityType)}
-            className="px-2 py-1 rounded border border-slate-200 bg-white text-sm"
+            className="px-2 py-1 rounded border border-line bg-white text-sm"
           >
             <option value="">— pick —</option>
             {ENTITY_OPTIONS.map((e) => (
@@ -642,12 +642,12 @@ function FixInline({
       ) : null}
 
       {row.issues.includes("state_unknown") && (
-        <label className="text-xs text-slate-600">
+        <label className="text-xs text-ink-700">
           <span className="block mb-1">Primary state</span>
           <select
             value={state}
             onChange={(e) => setState(e.target.value as StateCode)}
-            className="px-2 py-1 rounded border border-slate-200 bg-white text-sm"
+            className="px-2 py-1 rounded border border-line bg-white text-sm"
           >
             <option value="">— pick —</option>
             {STATE_OPTIONS.map((s) => (
@@ -660,21 +660,21 @@ function FixInline({
       )}
 
       {row.issues.includes("email_missing") && (
-        <label className="text-xs text-slate-600">
+        <label className="text-xs text-ink-700">
           <span className="block mb-1">Contact email</span>
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             type="email"
             placeholder="contact@example.com"
-            className="px-2 py-1 rounded border border-slate-200 bg-white text-sm"
+            className="px-2 py-1 rounded border border-line bg-white text-sm"
           />
         </label>
       )}
 
       <button
         onClick={save}
-        className="text-xs px-3 py-1.5 rounded bg-slate-900 text-white hover:bg-slate-800"
+        className="text-xs px-3 py-1.5 rounded bg-ink-900 text-white hover:bg-ink-900"
       >
         Save row
       </button>
@@ -791,15 +791,15 @@ function CommittingStep({
   ];
 
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-8">
-      <h2 className="text-sm font-semibold text-slate-700">Importing…</h2>
-      <div className="mt-4 h-2 rounded-full bg-slate-100 overflow-hidden">
+    <div className="bg-white border border-line rounded-lg p-8">
+      <h2 className="text-sm font-semibold text-ink-700">Importing…</h2>
+      <div className="mt-4 h-2 rounded-full bg-sunken overflow-hidden">
         <div
-          className="h-full bg-slate-900 transition-[width] duration-200"
+          className="h-full bg-ink-900 transition-[width] duration-200"
           style={{ width: `${progress}%` }}
         />
       </div>
-      <p className="mt-3 text-sm text-slate-600 tabular-nums">
+      <p className="mt-3 text-sm text-ink-700 tabular-nums">
         {Math.floor(progress)}% — {doneRows} of {rows.length} clients
       </p>
 
@@ -814,8 +814,8 @@ function CommittingStep({
                   done
                     ? "bg-emerald-500 text-white"
                     : active
-                    ? "bg-slate-900 text-white"
-                    : "bg-slate-200 text-slate-500"
+                    ? "bg-ink-900 text-white"
+                    : "bg-line text-ink-500"
                 }`}
                 aria-hidden
               >
@@ -823,12 +823,12 @@ function CommittingStep({
               </span>
               <span
                 className={`text-sm ${
-                  done || active ? "text-slate-900" : "text-slate-400"
+                  done || active ? "text-ink-900" : "text-ink-400"
                 }`}
               >
                 {p.label}
               </span>
-              <span className="ml-auto text-xs text-slate-500 tabular-nums">
+              <span className="ml-auto text-xs text-ink-500 tabular-nums">
                 {done || active ? p.detail : "queued"}
               </span>
             </li>
@@ -859,27 +859,27 @@ function DoneStep({
   // fake deadline count: ~12 per client
   const generatedDeadlines = importedCount * 12;
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-8 text-center">
+    <div className="bg-white border border-line rounded-lg p-8 text-center">
       <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto text-2xl">
         ✓
       </div>
-      <h2 className="mt-4 text-lg font-semibold text-slate-900">
+      <h2 className="mt-4 text-lg font-semibold text-ink-900">
         Import complete
       </h2>
       <dl className="mt-4 inline-block text-sm text-left space-y-1">
         <div className="flex gap-8">
-          <dt className="w-48 text-slate-500">Clients imported</dt>
-          <dd className="font-medium text-slate-900">{importedCount}</dd>
+          <dt className="w-48 text-ink-500">Clients imported</dt>
+          <dd className="font-medium text-ink-900">{importedCount}</dd>
         </div>
         {skippedCount > 0 && (
           <div className="flex gap-8">
-            <dt className="w-48 text-slate-500">Skipped (needs attention)</dt>
+            <dt className="w-48 text-ink-500">Skipped (needs attention)</dt>
             <dd className="font-medium text-amber-700">{skippedCount}</dd>
           </div>
         )}
         <div className="flex gap-8">
-          <dt className="w-48 text-slate-500">Deadlines generated</dt>
-          <dd className="font-medium text-slate-900">
+          <dt className="w-48 text-ink-500">Deadlines generated</dt>
+          <dd className="font-medium text-ink-900">
             {generatedDeadlines.toLocaleString()}
           </dd>
         </div>
@@ -888,19 +888,19 @@ function DoneStep({
       <div className="mt-6 flex items-center justify-center gap-3">
         <button
           onClick={onDashboard}
-          className="text-sm px-4 py-2 rounded font-medium text-white bg-slate-900 hover:bg-slate-800"
+          className="text-sm px-4 py-2 rounded font-medium text-white bg-ink-900 hover:bg-ink-900"
         >
           Go to dashboard →
         </button>
         <button
           onClick={onClients}
-          className="text-sm px-4 py-2 rounded border border-slate-200 hover:bg-slate-50"
+          className="text-sm px-4 py-2 rounded border border-line hover:bg-canvas"
         >
           See all clients
         </button>
       </div>
 
-      <p className="mt-5 text-xs text-slate-500">
+      <p className="mt-5 text-xs text-ink-500">
         You can undo this import from Settings › Imports for the next 7 days.
       </p>
     </div>

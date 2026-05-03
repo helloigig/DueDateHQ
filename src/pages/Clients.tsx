@@ -552,12 +552,12 @@ export function Clients() {
                 fc.oldestReminderDays != null && fc.oldestReminderDays > 14
                   ? "text-danger-solid font-semibold"
                   : fc.oldestReminderDays != null && fc.oldestReminderDays > 7
-                    ? "text-warning-solid font-semibold"
+                    ? "text-warn-solid font-semibold"
                     : fc.waiting > 0
                       ? "text-ink-900 font-medium"
                       : "text-ink-400";
               const rowTint = hasAlert
-                ? "bg-warning-bg/30 hover:bg-warning-bg/50"
+                ? "bg-warn-bg/30 hover:bg-warn-bg/50"
                 : "hover:bg-sunken";
               // Phase 2 mock — Mode E opportunity badge (real wiring Phase 5).
               // Surface a tag on premium clients with overdue items as a stand-in

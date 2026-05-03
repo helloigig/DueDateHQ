@@ -601,7 +601,7 @@ function NotesTab({ client }: { client: Client }) {
           onChange={(e) => setDraft(e.target.value)}
           rows={3}
           placeholder="e.g. Called client; waiting on W-2 copies by Friday."
-          className="w-full px-3 py-2 rounded border border-line focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm resize-none"
+          className="w-full px-3 py-2 rounded border border-line focus:outline-none focus:ring-2 focus:ring-ink-900 text-sm resize-none"
         />
         <div className="flex items-center justify-between mt-2">
           <span className="text-xs text-ink-400">
@@ -740,7 +740,7 @@ function ActivityTab({ client }: { client: Client }) {
     );
   }
   return (
-    <ul className="bg-surface border border-line rounded-lg divide-y divide-slate-100">
+    <ul className="bg-surface border border-line rounded-lg divide-y divide-line">
       {activity.map((a) => (
         <ActivityItem key={a.id} entry={a} />
       ))}
@@ -1768,7 +1768,7 @@ function DocumentsTab({ client }: { client: Client }) {
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-line">
             {types.map(([itemType, label]) => (
               <tr key={itemType}>
                 <td className="px-4 py-2 text-ink-900 capitalize">{label}</td>

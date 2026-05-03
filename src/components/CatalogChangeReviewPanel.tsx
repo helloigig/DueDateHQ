@@ -122,7 +122,7 @@ export function CatalogChangeReviewPanel({
                     d.confidence === "high"
                       ? "bg-ok-bg text-ok-ink"
                       : d.confidence === "medium"
-                        ? "bg-slate-100 text-ink-700"
+                        ? "bg-sunken text-ink-700"
                         : "bg-warn-bg text-warn-ink"
                   }`}
                 >

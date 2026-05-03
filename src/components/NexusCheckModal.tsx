@@ -172,7 +172,7 @@ export function NexusCheckModal({
                         onClick={() => setAnswer(q.id, false)}
                         className={`px-2.5 py-1 text-xs rounded border ${
                           ans === false
-                            ? "bg-slate-200 text-ink-900 border-slate-300 ring-2 ring-slate-400/30"
+                            ? "bg-line text-ink-900 border-line-strong ring-2 ring-line-strong/30"
                             : "border-line hover:bg-sunken/30"
                         }`}
                       >
@@ -198,7 +198,7 @@ export function NexusCheckModal({
                     ? "bg-info-bg text-info-ink"
                     : result.status === "no_nexus"
                       ? "bg-ok-bg text-ok-ink"
-                      : "bg-slate-100 text-ink-500"
+                      : "bg-sunken text-ink-500"
               }`}
             >
               {result.status === "not_started" && "Answer questions to determine"}

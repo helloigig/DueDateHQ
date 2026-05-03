@@ -154,7 +154,7 @@ export function AiInsightsPanel({
                   flag.severity === "high"
                     ? "px-4 py-3 bg-danger-bg/30"
                     : flag.severity === "medium"
-                      ? "px-4 py-3 bg-warning-bg/30"
+                      ? "px-4 py-3 bg-warn-bg/30"
                       : "px-4 py-3"
                 }
               >
@@ -163,7 +163,7 @@ export function AiInsightsPanel({
                     className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${
                       flag.severity === "high"
                         ? "text-danger-solid"
-                        : "text-warning-solid"
+                        : "text-warn-solid"
                     }`}
                     aria-hidden
                   />

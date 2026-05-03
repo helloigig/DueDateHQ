@@ -203,7 +203,7 @@ export function RecomputeEstimatesModal({
                         {isPaid ? (
                           <>
                             <span className="text-ink-700">{fmtCents(e.oldAmountCents)}</span>
-                            <span className="text-2xs px-1.5 py-0.5 rounded bg-slate-100 text-ink-500">
+                            <span className="text-2xs px-1.5 py-0.5 rounded bg-sunken text-ink-500">
                               paid
                             </span>
                           </>
@@ -220,7 +220,7 @@ export function RecomputeEstimatesModal({
                               ({delta >= 0 ? "+" : "−"}{fmtCents(Math.abs(delta))})
                             </span>
                             {belowThreshold && (
-                              <span className="text-2xs px-1.5 py-0.5 rounded bg-slate-100 text-ink-500">
+                              <span className="text-2xs px-1.5 py-0.5 rounded bg-sunken text-ink-500">
                                 below threshold
                               </span>
                             )}

@@ -86,9 +86,9 @@ export function ChecklistList({ taskId, items, onOpenEmailDraft }: Props) {
       {groups.waiting.length > 0 && (
         <section
           aria-labelledby="still-waiting-heading"
-          className="bg-surface border-2 border-warning-border rounded-md overflow-hidden"
+          className="bg-surface border-2 border-warn-border rounded-md overflow-hidden"
         >
-          <header className="flex items-center px-4 py-2.5 bg-warning-bg/50 border-b border-warning-border gap-3">
+          <header className="flex items-center px-4 py-2.5 bg-warn-bg/50 border-b border-warn-border gap-3">
             <span aria-hidden className="text-base leading-none">
               🚨
             </span>
@@ -108,7 +108,7 @@ export function ChecklistList({ taskId, items, onOpenEmailDraft }: Props) {
                       oldestWaitingDays > 7
                         ? "text-danger-solid font-semibold"
                         : oldestWaitingDays > 3
-                          ? "text-warning-solid font-semibold"
+                          ? "text-warn-solid font-semibold"
                           : ""
                     }
                   >
@@ -138,7 +138,7 @@ export function ChecklistList({ taskId, items, onOpenEmailDraft }: Props) {
         >
           <header className="flex items-center px-4 py-2.5 border-b border-line gap-3">
             <AlertTriangle
-              className="w-3.5 h-3.5 text-warning-solid"
+              className="w-3.5 h-3.5 text-warn-solid"
               aria-hidden
             />
             <h2
@@ -184,7 +184,7 @@ export function ChecklistList({ taskId, items, onOpenEmailDraft }: Props) {
               id="complete-heading"
               className="text-xs font-medium text-ink-500 tracking-wide flex items-center gap-2"
             >
-              <span className="text-success-solid">✓</span>
+              <span className="text-ok-solid">✓</span>
               <span className="tabular-nums">{groups.complete.length}</span>{" "}
               {groups.complete.length === 1 ? "item" : "items"} complete
               <span className="text-ink-400">·</span>

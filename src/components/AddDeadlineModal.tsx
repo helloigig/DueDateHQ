@@ -212,7 +212,7 @@ export function AddDeadlineModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -221,13 +221,13 @@ export function AddDeadlineModal({
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-lg shadow-xl border border-slate-200 w-full max-w-md mx-4 outline-none"
+        className="bg-white rounded-lg shadow-xl border border-line w-full max-w-md mx-4 outline-none"
       >
-        <div className="px-5 py-3 border-b border-slate-100">
-          <h2 className="text-sm font-semibold text-slate-900">
+        <div className="px-5 py-3 border-b border-line">
+          <h2 className="text-sm font-semibold text-ink-900">
             Add a deadline to {client.name}
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-ink-500 mt-0.5">
             {prefill?.sourceNote ??
               "Use for one-offs not covered by a service package."}
           </p>
@@ -235,10 +235,10 @@ export function AddDeadlineModal({
 
         <div className="px-5 py-4 space-y-3 text-sm">
           <label className="block">
-            <span className="text-xs font-medium text-slate-600 mb-1 block">
+            <span className="text-xs font-medium text-ink-700 mb-1 block">
               Form / service
               {formsQuery.isLoading && (
-                <span className="ml-2 text-2xs text-slate-400 font-normal">
+                <span className="ml-2 text-2xs text-ink-400 font-normal">
                   loading catalog…
                 </span>
               )}
@@ -247,7 +247,7 @@ export function AddDeadlineModal({
               value={form}
               onChange={(e) => setForm(e.target.value)}
               disabled={formsQuery.isLoading}
-              className="w-full px-2.5 py-1.5 rounded border border-slate-200 bg-white disabled:opacity-50"
+              className="w-full px-2.5 py-1.5 rounded border border-line bg-white disabled:opacity-50"
             >
               <optgroup label="Most common">
                 {COMMON_FORMS.map((f) => (
@@ -291,17 +291,17 @@ export function AddDeadlineModal({
 
           {form === SYNTHETIC_OPTIONS.custom && (
             <label className="block">
-              <span className="text-xs font-medium text-slate-600 mb-1 block">
+              <span className="text-xs font-medium text-ink-700 mb-1 block">
                 Custom form name
               </span>
               <input
                 value={customForm}
                 onChange={(e) => setCustomForm(e.target.value)}
                 placeholder="e.g. NYC UBT, 5471, 8606…"
-                className="w-full px-2.5 py-1.5 rounded border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-ink-900"
                 autoFocus
               />
-              <p className="mt-1 text-2xs text-slate-500">
+              <p className="mt-1 text-2xs text-ink-500">
                 Federal form numbers we don't have curated will be auto-extracted by AI on save.
               </p>
             </label>
@@ -309,7 +309,7 @@ export function AddDeadlineModal({
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="text-xs font-medium text-slate-600 mb-1 block">
+              <span className="text-xs font-medium text-ink-700 mb-1 block">
                 Jurisdiction
               </span>
               <select
@@ -317,7 +317,7 @@ export function AddDeadlineModal({
                 onChange={(e) =>
                   setJurisdiction(e.target.value as typeof jurisdiction)
                 }
-                className="w-full px-2.5 py-1.5 rounded border border-slate-200 bg-white"
+                className="w-full px-2.5 py-1.5 rounded border border-line bg-white"
               >
                 {jurisdictionOptions.map((j) => (
                   <option key={j} value={j}>
@@ -327,30 +327,30 @@ export function AddDeadlineModal({
               </select>
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-slate-600 mb-1 block">
+              <span className="text-xs font-medium text-ink-700 mb-1 block">
                 Official due date
               </span>
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full px-2.5 py-1.5 rounded border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-ink-900"
               />
             </label>
           </div>
         </div>
 
-        <div className="px-5 py-3 bg-slate-50 rounded-b-lg flex items-center justify-end gap-2">
+        <div className="px-5 py-3 bg-canvas rounded-b-lg flex items-center justify-end gap-2">
           <button
             onClick={onClose}
-            className="text-sm px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50"
+            className="text-sm px-3 py-1.5 rounded border border-line bg-white hover:bg-canvas"
           >
             Cancel
           </button>
           <button
             onClick={onSave}
             disabled={!canSave}
-            className="text-sm px-3 py-1.5 rounded font-medium text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-40"
+            className="text-sm px-3 py-1.5 rounded font-medium text-white bg-ink-900 hover:bg-ink-900 disabled:opacity-40"
           >
             Add deadline
           </button>
