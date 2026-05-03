@@ -339,6 +339,8 @@ Used inside expanded alert cards (one client per row) and inside expanded client
 - **Don't use a 5th spacing value.** If you need one, you're wrong about the grouping or the rhythm.
 - **Don't ship Mode F Health as its own card on Today.** It's an inline pill on the State alerts header. The detail page lives at `/system-status`.
 - **Don't put decorative dots before status text** (e.g. `● Overdue`). Tinted pill bg + colored ink already carry the signal; a leading filled circle is visual noise. `<StatusPill>` defaults to no dot — opt in only for screen-reader-supplemental urgency cases.
+- **Don't use emojis anywhere in product UI.** Not in nav labels, not as table-column glyphs (`🚨 Waiting`), not as opportunity flags (`💎`), not on filter chips. Emojis read as marketing-tone playful and break Mercury/Sana/Oku's calm register. Use a Lucide icon when an icon is needed; use a `<StatusPill>` when status urgency is needed. (The product-voice rule "no `🎉`" was already implicit in T8 + §Forbidden words; this makes it explicit for visual elements too.)
+- **Don't introduce horizontal scroll on data tables.** If a table doesn't fit, drop or compact columns at the breakpoint — never set `min-w-[Npx]` + `overflow-x-auto` to push content sideways. CPAs scan column-wise; a horizontally-scrolled table loses its first-column anchor.
 - **Don't separate metric values with middle dots (`·`) when a clean row works.** `33 active clients · 8 due this week` reads like a comma-spliced sentence. Use horizontal whitespace (`gap-section`) and let weight+color carry hierarchy. Middle dots stay valid as **separators inside a single string of metadata** (`Tax 2025 · Federal · LLC`), but not as the structure of a metric row.
 - **Don't write a custom `<h1>` per page.** Use `<PageHeader title=... meta=... />` from `src/components/ui/PageHeader.tsx`. Same for section titles — use `<SectionHeader>`. Custom one-offs cause typography drift across pages.
 
@@ -604,9 +606,15 @@ These live in `src/components/ui/` and are the **only** correct source for these
 | `<Banner>` | `src/components/ui/Banner.tsx` | The "I noticed something" alert surface (one of the four — see §The four alert surfaces). 4px status left rule + tinted bg + inline link action (NEVER a primary button). |
 | `<EmptyState>` | `src/components/ui/EmptyState.tsx` | Centered icon (decorative, `ink-300` — never accent) + factual title + max-32ch body + single primary action. Voice rule: "Nothing to do today." not "All caught up!" |
 | `<DateLabel>` | `src/components/ui/DateLabel.tsx` | Every deadline/date render. Auto-renders Today/Tomorrow/Yesterday for ±1 day, "MMM D" otherwise. **Tabular-nums by default.** Per locked policy: never times. |
-| `<MetricTile>` | `src/components/ui/MetricTile.tsx` | Mercury-style headline KPI tile (eyebrow label / big value / optional delta with up/down icon). Use on dashboards / page-tops where one big number carries the page. |
+| `<MetricTile>` | `src/components/ui/MetricTile.tsx` | Mercury-style headline KPI tile (eyebrow label / big value / optional delta with up/down icon). Use on dashboards / page-tops where one big number carries the page. **`helper` prop** for one-line metric explainer (e.g. "No reply in 14+ days"). **`active` + `onClick` props** make a tile a filter trigger — see §KPI tile = filter trigger. |
 | `<DotStack>` | `src/components/ui/DotStack.tsx` | Horizontal dot-grid visualizing a count by status color (e.g. day-of-deadline rows). Caps at 17 visible + "+ N" overflow. |
 | `<Card>` / `<CardZone>` / `<CardDivider>` | `src/components/ui/Card.tsx` | Card container (`border 1px line` + `surface bg` + `rounded-md` + `p-region`). For multi-zone cards, use `<CardZone>` + `<CardDivider>` instead of nested borders. |
+| `<Avatar>` | `src/components/ui/Avatar.tsx` | Initials block. Sizes `xs`/`sm`/`md`/`lg`. Variants `round` (people, default) / `square` (firms). Tones `neutral`/`primary`. Initials derived from `name` or passed via `initials`. |
+| `<StateBadge>` | `src/components/ui/StateBadge.tsx` | The 2-letter jurisdiction badge (LA, CA, NY, FED…). Sizes `sm`/`md`/`lg`. Sunken bg + ink-900 text — NOT per-state colored (single-accent rule). Used wherever an announcement / deadline / filing has a jurisdiction. |
+| `<ClientChip>` | `src/components/ui/ClientChip.tsx` | Pill with avatar + truncated client name (max-w-[140px]). Used in announcement cards, batch action lists — anywhere a client is referenced inline as a tag (not a row). |
+| `<CountBadge>` | `src/components/ui/CountBadge.tsx` | The "10" / "9+" badge that sits on a sidebar item, tab, icon button, etc. Tones `neutral`/`danger`/`warn`/`info`. Cap-at-9 rule lives here so it's uniform. |
+| `<FilterChip>` | `src/components/ui/FilterChip.tsx` | The "show me X" toggle. Two variants: `chip` (rounded-pill, default — used in Timeline filter row) and `tab` (underline-active — used in Alerts page tabs). Optional `count` shows a tabular-nums suffix that inherits active/inactive tone. |
+| `<IconButton>` | `src/components/ui/IconButton.tsx` | Composes shadcn `<Button variant="ghost" size="icon">` with a required `label` (drives both `aria-label` and `title`) and an optional `badge` slot using `<CountBadge>`. Sizes `sm`/`md`. The single source for top-bar / page-header / sheet-header icon affordances (Search, Notifications, More, Close). Variants `ghost` (default) / `outline`. |
 
 **Migration discipline.** When you find an inline status pill / banner / empty state / `<h1>` in the codebase, replace it with the primitive. Don't roll your own — the only way the system stays coherent at scale is if there is one source per concept.
 
@@ -633,6 +641,7 @@ DESIGN.md tokens in code, mapped to Tailwind classes:
 | Spacing card | `gap-card` / `mb-card` | Card → card (24px) |
 | Spacing section | `gap-section` / `mb-section` / `py-section` | Section → section (48px) |
 | Page max-width | `max-w-[840px]` | Single-column content cap |
+| Pane width | `w-pane` | Co-pilot / detail pane width (440px). Used by `/alerts` workshop and any other surface with a fixed right pane. |
 | Page padding | `px-4 md:px-6 lg:px-8` | Responsive horizontal padding |
 | Page vertical | `py-6 md:py-8` | Responsive vertical padding |
 | Display type | `text-display` (or `text-2xl font-semibold`) | Page titles only |
@@ -644,6 +653,94 @@ DESIGN.md tokens in code, mapped to Tailwind classes:
 
 **Rule:** wherever a Tailwind class would do but a named token reads more clearly, use the named token. `text-display` reads better than `text-2xl font-semibold` on a page header. `mb-section` reads better than `mb-12`.
 
+## The /alerts workshop surface
+
+`/alerts` is the v0.7 differentiator's true home — the one-screen workspace
+where state announcements get triaged. It's the **`/alerts` page** of the
+four-alert-surfaces model, but rendered as a 2-column workshop, not a list.
+
+**Layout** (inside AppShell — same Sidebar + TopBar + MOCK banner as every
+other route):
+
+```
+┌─────────────────────────────────────┬────────────────┐
+│   Center feed (flex-1)              │  Co-pilot pane │
+│   ─ Page title + tabs               │   (w-pane)     │
+│   ─ Announcement card list          │  ─ Context     │
+│   (each card = StateBadge +         │  ─ AI actions  │
+│    type pill + source + title +     │  ─ Email cycle │
+│    summary + ClientChips +          │  ─ Composer    │
+│    source link + actions row)       │                │
+│                                     │                │
+└─────────────────────────────────────┴────────────────┘
+```
+
+- Left feed scrolls; right pane is fixed `w-pane` (440px). On mobile the
+  pane drops below the feed — no horizontal scroll.
+- Tabs are `<FilterChip variant="tab">` ("Affecting you · N" / "All
+  announcements · N" / "Resolved · N"). DON'T put a duplicate "N affecting
+  you" pill above the tabs — the tab carries the count.
+- The pane shows context for the **selected announcement only** (URL is
+  `/alerts/:id`, deep-linkable). Empty pane = "Pick an alert to see
+  suggested actions" empty state, not blank.
+- The pane's primary action carries the **indigo accent** (T2 — one
+  next-action). Secondary actions are slate ghost buttons.
+
+## KPI tile = filter trigger
+
+Some KPI tiles double as filter affordances on their page (Timeline tiles
+filter the task list; Clients tiles filter the roster). When a tile is
+clickable:
+
+- Pass `onClick` + `active` props to `<MetricTile>`. `active` paints a
+  ring + ink-900 border; non-active is the standard line border.
+- The tile's **label IS the filter name** — don't duplicate the label as
+  a separate filter chip below. ONE entrance, ONE name.
+- A second row of `<FilterChip>` chips below KPI tiles is allowed only
+  when the chips represent **a different filter dimension** (e.g. tiles
+  surface gap-loud signals, chips slice by attribute like entity/state).
+  See `/clients` for the canonical implementation: tiles answer "what
+  needs attention", dropdowns answer "what slice of the roster".
+
+## Single drilldown destination per concept
+
+When two surfaces present the same concept, the click target on the
+secondary surface NAVIGATES to the primary surface — it does NOT open a
+duplicate Sheet/modal showing the same content.
+
+- **State alerts**: `/alerts/:id` is the single drilldown.
+  - Today's `<StateAlertCard>` click → `navigate('/alerts/:id')` (NOT
+    open a Sheet)
+  - Bell dropdown unread item click → `navigate('/alerts/:id')`
+  - `/changes` public landing page deep-link → `navigate('/alerts/:id')`
+    (after auth)
+
+This rule prevents the "Sheet that duplicates the page" failure mode and
+keeps deep-links to a single canonical URL per record.
+
+## Outstanding gap: alertType-specific verbs
+
+`docs/specs/alert-detail-variants.md` defines a per-alertType primary verb
+mapping. The current `/alerts` co-pilot pane uses generic verbs ("Send
+all" / "Apply new deadline" / "Forward bulletin") regardless of type.
+The canonical mapping is:
+
+| `alertType` | Primary verb | Secondary verbs |
+|:------------|:-------------|:----------------|
+| `disaster_extension` | Move {N} deadlines | Send notice / Tag clients |
+| `penalty_relief` | Tag {N} clients for review | Send notice |
+| `pte_change` | Schedule planning call | Send talking points |
+| `rate_change` | Recompute estimates | Notify {N} clients |
+| `form_change` | Acknowledge (non-admin) / Apply firm-wide (admin) | Notify clients |
+| `nexus_change` | Add filings for {N} clients | Run nexus check |
+
+This taxonomy + per-alertType client-row expansion UI lives in the
+variants spec. **TODO**: derive the primary verb from `alertType` in
+`<CopilotPane>`, route each verb to the appropriate confirm modal
+(`BatchNotifyModal`, `RecomputeEstimatesModal`, `NexusCheckModal`,
+`SchedulePlanningCallModal`). Until this lands, the pane is generic
+across all 6 variants.
+
 ## Devx note: tailwind config + token additions
 
 Tailwind picks up new tokens from `tailwind.config.js` only on **dev server cold start**. If you add a token (`text-newSize`, `bg-newColor`, `mb-newSpacing`, etc.) and it doesn't render, restart the Vite dev server. HMR re-runs file watchers but does not rebuild the Tailwind config layer.
@@ -652,3 +749,4 @@ Tailwind picks up new tokens from `tailwind.config.js` only on **dev server cold
 
 - **2026-05-03** — Augmentation pass. Added §Brand Vocabulary, §The four alert surfaces, §Component anatomy rules, §Responsive behavior, §Voice & Microcopy, §Accessibility, §Motion, §Invisible correctness, §Shared primitives reference, §Implementation reference, §Devx note. Added Mercury-style indigo accent (`bg-indigo`) + pill radius (`rounded-pill`) as opt-in tokens for the next-action CTA. Added `text-display` / `text-title` / `text-body` / `text-label` / `text-caption` / `text-micro` semantic typography aliases. Created shared primitives: `<PageHeader>`, `<SectionHeader>`, `<Card>`, `<MetricTile>`, refreshed `<StatusPill>` to default `dot=false` (no decorative leading dot). Applied to Today (`/design/today`), Dashboard (`/`), Clients (`/clients`), Alerts (`/alerts`), Mail (`/mail`). Existing surfaces preserved — no functionality stripped, no routes changed.
 - **2026-05-03 (later)** — Mercury inheritance restored. Added §Reference inheritance (Mercury / Sana AI / Oku) + §Taste principles (T1–T8) so the doc tells the next builder *what Mercury looks like*, not just what to avoid. Switched canvas warm cream `#FAFAF7` → cool neutral `#F8F9FB` (Mercury / Sana / Oku align). Promoted AnnouncementBanner primary CTA from outline-slate to indigo pill so the Dashboard at `/` visibly carries the Mercury accent.
+- **2026-05-03 (v0u rollout)** — Reverse-merged from the v0u four-page rollout (Today / Alerts / Timeline / Clients). Added 6 shared primitives to §Shared primitives reference: `<Avatar>`, `<StateBadge>`, `<ClientChip>`, `<CountBadge>`, `<FilterChip>` (with `chip` + `tab` variants), `<IconButton>` (composes shadcn `Button variant=ghost size=icon`). Enhanced `<MetricTile>` with `helper` text + `active`/`onClick` filter-trigger props. New `width.pane = "440px"` token in tailwind.config for the co-pilot pane. Added §The /alerts workshop surface (2-column feed + co-pilot pane inside AppShell — replaces the old AnnouncementList → AnnouncementDetail two-page flow). Added §KPI tile = filter trigger + §Single drilldown destination per concept. Made "no emojis in product UI" + "no horizontal scroll on data tables" explicit Don'ts. Flagged outstanding gap: per-alertType verb taxonomy from `docs/specs/alert-detail-variants.md` not yet wired into the co-pilot pane (currently uses generic verbs across all 6 alertTypes).
