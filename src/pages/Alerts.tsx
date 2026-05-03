@@ -17,6 +17,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { StateBadge } from "@/components/ui/StateBadge";
+import { ClientChip } from "@/components/ui/ClientChip";
+import { FilterChip } from "@/components/ui/FilterChip";
 import {
   formatLongDate,
   hoursSince,
@@ -69,15 +72,6 @@ function timeAgoShort(iso: string): string {
   if (h < 1) return "just now";
   if (h < 24) return `${Math.round(h)}h ago`;
   return `${Math.round(h / 24)}d ago`;
-}
-
-function clientInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
 }
 
 function firstNameFromEmail(email: string | undefined): string | null {
@@ -175,12 +169,7 @@ function FeedCard({
       aria-pressed={selected}
     >
       <div className="p-region flex items-start gap-3">
-        <span
-          aria-hidden
-          className="shrink-0 w-9 h-9 rounded-md bg-sunken text-ink-900 inline-flex items-center justify-center text-xs font-bold tracking-wide"
-        >
-          {a.stateCode}
-        </span>
+        <StateBadge code={a.stateCode} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap text-xs text-ink-500 mb-1">
             <StatusPill variant={tone} size="xs">
@@ -218,19 +207,7 @@ function FeedCard({
           {visibleChips.length > 0 && (
             <div className="flex items-center gap-1.5 flex-wrap mt-2">
               {visibleChips.map((c) => (
-                <span
-                  key={c.id}
-                  className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-0.5 rounded-pill bg-sunken text-ink-700 text-xs"
-                  title={c.name}
-                >
-                  <span
-                    aria-hidden
-                    className="w-4 h-4 rounded-pill bg-ink-700 text-surface text-[9px] font-bold inline-flex items-center justify-center"
-                  >
-                    {clientInitials(c.name)}
-                  </span>
-                  <span className="truncate max-w-[120px]">{c.name}</span>
-                </span>
+                <ClientChip key={c.id} name={c.name} />
               ))}
               {overflow > 0 && (
                 <span className="text-xs text-ink-500 px-1.5 tabular-nums">
@@ -347,12 +324,7 @@ function CopilotPane({
       {/* Header — context strip */}
       <div className="px-region py-3 bg-surface border-b border-line">
         <div className="flex items-start gap-3">
-          <span
-            aria-hidden
-            className="shrink-0 w-9 h-9 rounded-md bg-sunken text-ink-900 inline-flex items-center justify-center text-xs font-bold"
-          >
-            {a.stateCode}
-          </span>
+          <StateBadge code={a.stateCode} />
           <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold text-ink-900 leading-snug">
               {a.title}
@@ -648,16 +620,9 @@ export function Alerts() {
       {/* ── Center feed ──────────────────────────────────────────────── */}
       <section className="flex-1 min-w-0 flex flex-col bg-canvas overflow-hidden">
         <header className="bg-surface border-b border-line px-6 pt-4 pb-3 sticky top-0 z-10">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold tracking-tight text-ink-900 leading-tight">
-              State alerts
-            </h1>
-            {totals.affecting > 0 && (
-              <span className="bg-danger-solid text-white text-2xs font-bold px-2 py-0.5 rounded-pill leading-none">
-                {totals.affecting} affecting you
-              </span>
-            )}
-          </div>
+          <h1 className="text-display font-semibold tracking-[-0.01em] text-ink-900">
+            State alerts
+          </h1>
           <div className="mt-1 flex items-center gap-2 text-xs text-ink-500">
             <span
               aria-hidden
@@ -665,28 +630,31 @@ export function Alerts() {
             />
             50 / 50 states monitored · last scrape 14m ago
           </div>
-          <div className="mt-3 flex items-center gap-1 -mb-px">
-            <TabButton
+          <div className="mt-3 flex items-center gap-1 border-b border-line">
+            <FilterChip
+              variant="tab"
               active={tab === "affecting"}
               onClick={() => setTab("affecting")}
               count={totals.affecting}
             >
               Affecting you
-            </TabButton>
-            <TabButton
+            </FilterChip>
+            <FilterChip
+              variant="tab"
               active={tab === "all"}
               onClick={() => setTab("all")}
               count={totals.all}
             >
               All announcements
-            </TabButton>
-            <TabButton
+            </FilterChip>
+            <FilterChip
+              variant="tab"
               active={tab === "resolved"}
               onClick={() => setTab("resolved")}
               count={totals.resolved}
             >
               Resolved
-            </TabButton>
+            </FilterChip>
           </div>
         </header>
 
@@ -733,39 +701,3 @@ export function Alerts() {
   );
 }
 
-function TabButton({
-  active,
-  onClick,
-  count,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  count?: number;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "px-3 py-2 -mb-px border-b-2 text-sm font-medium transition-colors inline-flex items-center gap-1.5",
-        active
-          ? "border-ink-900 text-ink-900 font-semibold"
-          : "border-transparent text-ink-500 hover:text-ink-900",
-      )}
-    >
-      {children}
-      {count !== undefined && (
-        <span
-          className={cn(
-            "text-2xs font-semibold px-1.5 rounded tabular-nums",
-            active ? "bg-ink-900 text-surface" : "bg-sunken text-ink-500",
-          )}
-        >
-          {count}
-        </span>
-      )}
-    </button>
-  );
-}

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronRight, Sparkles } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../lib/api/client";
 import { env } from "../config";
@@ -7,6 +7,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { MetricTile } from "../components/ui/MetricTile";
 import { StatusPill } from "../components/ui/StatusPill";
+import { FilterChip } from "../components/ui/FilterChip";
 import { cn } from "../lib/utils";
 
 /**
@@ -183,16 +184,6 @@ export function Timeline() {
         ? MOCK_TIMELINES
         : [];
 
-  const sourceLabel = fleetQuery.isLoading
-    ? "loading milestones…"
-    : fleetQuery.error
-      ? `backend error: ${fleetQuery.error.message.slice(0, 60)}`
-      : liveTimelines.length > 0
-        ? `${liveTimelines.length} live ${liveTimelines.length === 1 ? "task" : "tasks"}`
-        : env.useMockData
-          ? "showing example data (mock mode)"
-          : "no live tasks yet";
-
   // KPIs across the full source (filter doesn't change them)
   const kpis = useMemo(() => {
     const active = source.length;
@@ -227,55 +218,60 @@ export function Timeline() {
 
   return (
     <div className="mx-auto max-w-[1080px] px-4 md:px-6 lg:px-8 py-6 md:py-8">
-      <PageHeader
-        title={
-          <span className="inline-flex items-center gap-2">
-            Timeline
-            <span
-              className="inline-flex items-center gap-1 text-2xs font-medium px-2 py-0.5 rounded-pill border border-info-border bg-info-bg text-info-ink"
-              title="Mode B (per-task pacing) — AI estimates target dates for each milestone from your firm's history. You can override any of them."
-            >
-              <Sparkles className="w-3 h-3" aria-hidden />
-              AI paced
-            </span>
-          </span>
-        }
-        meta={sourceLabel}
-      />
+      <PageHeader title="Timeline" meta={`${kpis.active} active`} />
 
-      {/* KPI tiles — Mercury-style headline numbers */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-card mb-section">
-        <MetricTile label="Active tasks" value={kpis.active} />
+      {/* KPI tiles — Mercury-style headline numbers, double as filter triggers */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-card mb-card">
         <MetricTile
           label="Behind"
           value={kpis.behind}
           tone={kpis.behind > 0 ? "warn" : "neutral"}
+          helper="Past internal target"
+          active={filter === "behind"}
+          onClick={() =>
+            setFilter((f) => (f === "behind" ? "all" : "behind"))
+          }
         />
         <MetricTile
           label="Awaiting docs"
           value={kpis.waiting}
           tone={kpis.waiting > 0 ? "warn" : "neutral"}
+          helper="Client hasn't sent something"
+          active={filter === "waiting"}
+          onClick={() =>
+            setFilter((f) => (f === "waiting" ? "all" : "waiting"))
+          }
         />
         <MetricTile
           label="Ready to file"
           value={kpis.ready}
           tone={kpis.ready > 0 ? "ok" : "neutral"}
+          helper="On track, no blockers"
         />
       </div>
 
-      {/* Filter chips — segmented pill */}
+      {/* Filter chips — single source of truth via shared FilterChip */}
       <div className="flex items-center gap-1 mb-card">
-        <FilterChip active={filter === "waiting"} onClick={() => setFilter("waiting")}>
-          Waiting on docs
-          <span className="ml-1.5 tabular-nums opacity-80">{kpis.waiting}</span>
-        </FilterChip>
-        <FilterChip active={filter === "behind"} onClick={() => setFilter("behind")}>
-          Behind
-          <span className="ml-1.5 tabular-nums opacity-80">{kpis.behind}</span>
-        </FilterChip>
-        <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>
+        <FilterChip
+          active={filter === "all"}
+          count={kpis.active}
+          onClick={() => setFilter("all")}
+        >
           All tasks
-          <span className="ml-1.5 tabular-nums opacity-80">{kpis.active}</span>
+        </FilterChip>
+        <FilterChip
+          active={filter === "waiting"}
+          count={kpis.waiting}
+          onClick={() => setFilter("waiting")}
+        >
+          Awaiting docs
+        </FilterChip>
+        <FilterChip
+          active={filter === "behind"}
+          count={kpis.behind}
+          onClick={() => setFilter("behind")}
+        >
+          Behind
         </FilterChip>
       </div>
 
@@ -314,31 +310,6 @@ export function Timeline() {
         </>
       )}
     </div>
-  );
-}
-
-function FilterChip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex items-center px-3 h-7 rounded-pill text-xs font-medium transition-colors",
-        active
-          ? "bg-ink-900 text-surface"
-          : "bg-surface border border-line text-ink-700 hover:bg-sunken hover:border-line-strong",
-      )}
-    >
-      {children}
-    </button>
   );
 }
 

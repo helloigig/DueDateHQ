@@ -21,6 +21,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { StateBadge } from "@/components/ui/StateBadge";
 import { formatLongDate } from "@/data/dateHelpers";
 import type { Announcement } from "@/types";
 import type { AffectedClient } from "./StateAlertCard";
@@ -154,12 +155,7 @@ export function SuggestedActionsSheet({
       >
         {/* Header — state + title */}
         <SheetHeader className="flex items-start gap-3 px-region py-3 border-b border-line">
-          <span
-            className="shrink-0 w-9 h-9 rounded-md bg-sunken text-ink-900 inline-flex items-center justify-center text-xs font-bold tracking-wide"
-            aria-hidden
-          >
-            {a.stateCode}
-          </span>
+          <StateBadge code={a.stateCode} />
           <div className="flex-1 min-w-0 pr-8">
             <SheetTitle className="text-sm font-semibold text-ink-900 leading-snug">
               {a.title}

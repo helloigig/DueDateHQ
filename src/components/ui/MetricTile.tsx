@@ -22,10 +22,17 @@ export interface MetricTileProps extends React.HTMLAttributes<HTMLDivElement> {
   label: string;
   value: React.ReactNode; // can be a Money/Date component
   delta?: { tone: DeltaTone; label: string };
+  /** Optional one-line helper below the value — explains the metric.
+   *  Use for KPI rows where a label alone is ambiguous ("Stuck" vs.
+   *  "Stuck · no reply in 14+ days"). Mutually-exclusive-ish with delta;
+   *  when both passed, helper renders below delta. */
+  helper?: string;
   /** Color of the headline value (default neutral ink-900). */
   tone?: ValueTone;
   /** Drop the surrounding card chrome (use when nested inside a Card). */
   flush?: boolean;
+  /** Visual selected state — for tiles that double as filter triggers. */
+  active?: boolean;
   /** Make the tile clickable. */
   onClick?: () => void;
 }
@@ -50,7 +57,7 @@ const deltaColor: Record<DeltaTone, string> = {
 };
 
 export const MetricTile = React.forwardRef<HTMLDivElement, MetricTileProps>(
-  ({ className, label, value, delta, tone, flush, onClick, ...props }, ref) => {
+  ({ className, label, value, delta, helper, tone, flush, active, onClick, ...props }, ref) => {
     const Icon = delta ? deltaIcon[delta.tone] : null;
     const interactive = !!onClick;
     const valueClass = valueColor[tone ?? "neutral"];
@@ -59,6 +66,7 @@ export const MetricTile = React.forwardRef<HTMLDivElement, MetricTileProps>(
         ref={ref}
         role={interactive ? "button" : undefined}
         tabIndex={interactive ? 0 : undefined}
+        aria-pressed={interactive ? !!active : undefined}
         onClick={onClick}
         onKeyDown={
           interactive
@@ -74,6 +82,7 @@ export const MetricTile = React.forwardRef<HTMLDivElement, MetricTileProps>(
           !flush && "bg-surface border border-line rounded-md p-region",
           interactive &&
             "cursor-pointer transition-colors hover:bg-sunken/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-line-strong",
+          active && "border-ink-900 ring-1 ring-ink-900",
           className,
         )}
         {...props}
@@ -88,6 +97,11 @@ export const MetricTile = React.forwardRef<HTMLDivElement, MetricTileProps>(
           <div className={cn("mt-1 flex items-center gap-1 text-caption", deltaColor[delta.tone])}>
             {Icon && <Icon className="w-3 h-3" aria-hidden="true" />}
             <span className="tabular-nums">{delta.label}</span>
+          </div>
+        )}
+        {helper && (
+          <div className="mt-1 text-caption text-ink-500 leading-tight">
+            {helper}
           </div>
         )}
       </div>

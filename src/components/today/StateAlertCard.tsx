@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import type { Announcement } from "@/types";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { StateBadge } from "@/components/ui/StateBadge";
+import { ClientChip } from "@/components/ui/ClientChip";
 import { hoursSince, formatLongDate } from "@/data/dateHelpers";
 import { cn } from "@/lib/utils";
 
@@ -56,15 +58,6 @@ function timeAgoShort(iso: string): string {
   if (h < 24) return `${Math.round(h)}h ago`;
   const d = Math.round(h / 24);
   return `${d}d ago`;
-}
-
-function clientInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
 }
 
 export interface AffectedClient {
@@ -123,12 +116,7 @@ export function StateAlertCard({
 
         {/* Title row: state badge + title block */}
         <div className="flex items-start gap-3">
-          <span
-            className="shrink-0 w-9 h-9 rounded-md bg-sunken text-ink-900 inline-flex items-center justify-center text-xs font-bold tracking-wide"
-            aria-hidden
-          >
-            {a.stateCode}
-          </span>
+          <StateBadge code={a.stateCode} />
           <div className="flex-1 min-w-0">
             <h3
               id={`ann-${a.id}-title`}
@@ -168,19 +156,7 @@ export function StateAlertCard({
         {visibleChips.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap mt-1 ml-12">
             {visibleChips.map((c) => (
-              <span
-                key={c.id}
-                className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-0.5 rounded-pill bg-sunken text-ink-700 text-xs"
-                title={c.name}
-              >
-                <span
-                  className="w-4 h-4 rounded-pill bg-ink-700 text-surface text-[9px] font-bold inline-flex items-center justify-center"
-                  aria-hidden
-                >
-                  {clientInitials(c.name)}
-                </span>
-                <span className="truncate max-w-[120px]">{c.name}</span>
-              </span>
+              <ClientChip key={c.id} name={c.name} />
             ))}
             {overflow > 0 && (
               <span className="text-xs text-ink-500 px-1.5 tabular-nums">
