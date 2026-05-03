@@ -1,25 +1,32 @@
 import { useMemo, useState } from "react";
-import { GanttChartSquare, Sparkles } from "lucide-react";
+import { ChevronRight, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../lib/api/client";
 import { env } from "../config";
+import { PageHeader } from "../components/ui/PageHeader";
+import { SectionHeader } from "../components/ui/SectionHeader";
+import { MetricTile } from "../components/ui/MetricTile";
+import { StatusPill } from "../components/ui/StatusPill";
+import { cn } from "../lib/utils";
 
-// Timeline destination — per IA v0.7 amendment §3.9a.
-//
-// Cross-client forward-planning surface. Each row is one Task; each renders
-// its TaskMilestone collection (PRD §9.4.1) as a horizontal mini-timeline
-// from today → due_date with waypoints.
-//
-// Default filter "Has waiting items" enabled per `feedback_gap_over_fill`.
-// Sort: missing_items × 10 + days_behind × 5 + deadline_proximity (per spec).
-//
-// Wired to live BE: trpc.taskMilestones.fleetStack returns flat per-task
-// milestone rows; we group by taskId and render. Falls back to MOCK_TIMELINES
-// when BE returns empty (no Mode B-proposed milestones yet on a fresh firm).
+/**
+ * Timeline — IA v0.7 §3.9a forward-planning surface.
+ *
+ * One row per task; each renders its TaskMilestone collection (initial_meeting
+ * → collect → prepare → review → file) as a horizontal mini-timeline.
+ * Rows group by client.
+ *
+ * Live BE: trpc.taskMilestones.fleetStack returns flat per-task milestone
+ * rows; we group + sort. Falls back to MOCK_TIMELINES in mock mode only —
+ * real mode shows an honest empty state when the BE returns nothing.
+ *
+ * v0u-aligned re-skin (PR3 of 4): KPI tiles header, gap-loud sections
+ * (Behind / On-track), StatusPill (no row paint), indigo on the next-action.
+ */
 
 type Stage = "initial_meeting" | "collect" | "prepare" | "review" | "file";
 
-type MockTaskTimeline = {
+type TaskRow = {
   client: string;
   task: string;
   dueDate: string;
@@ -27,13 +34,19 @@ type MockTaskTimeline = {
   daysBehind: number;
   missingCount: number;
   milestoneStatus: ("done" | "in_progress" | "not_started")[];
-  /** Routing: when present, the row links to the real Task detail page.
-   *  Mock rows leave these undefined and the row is read-only. */
   taskId?: string;
   clientId?: string;
 };
 
-const MOCK_TIMELINES: MockTaskTimeline[] = [
+const STAGE_LABELS: Record<Stage, string> = {
+  initial_meeting: "Initial mtg",
+  collect: "Collect",
+  prepare: "Prepare",
+  review: "Review",
+  file: "File",
+};
+
+const MOCK_TIMELINES: TaskRow[] = [
   {
     client: "Apex Fund",
     task: "1065 Partner Forms",
@@ -81,19 +94,6 @@ const MOCK_TIMELINES: MockTaskTimeline[] = [
   },
 ];
 
-const STAGE_LABELS: Record<Stage, string> = {
-  initial_meeting: "Initial mtg",
-  collect: "Collect",
-  prepare: "Prepare",
-  review: "Review",
-  file: "File",
-};
-
-// BE fleetStack now joins through tasks → deadlines → clients and returns
-// real names alongside each milestone row. Earlier shape only carried
-// taskId, forcing the FE to fall back to a local-store lookup that was
-// always empty in real mode (the FE store is mock-only) — Timeline rows
-// rendered as "Task b3bee883" instead of "Apex Fund · 1040".
 type LiveMilestone = {
   taskId: string;
   milestoneType: string;
@@ -106,16 +106,16 @@ type LiveMilestone = {
   officialDueDate: string | null;
 };
 
-function groupLiveMilestones(rows: LiveMilestone[]): MockTaskTimeline[] {
+function groupLiveMilestones(rows: LiveMilestone[]): TaskRow[] {
   const byTask = new Map<string, LiveMilestone[]>();
   for (const r of rows) {
     const arr = byTask.get(r.taskId) ?? [];
     arr.push(r);
     byTask.set(r.taskId, arr);
   }
-  const out: MockTaskTimeline[] = [];
+  const out: TaskRow[] = [];
+  const stages: Stage[] = ["initial_meeting", "collect", "prepare", "review", "file"];
   for (const [taskId, ms] of byTask) {
-    const stages: Stage[] = ["initial_meeting", "collect", "prepare", "review", "file"];
     const milestoneStatus = stages.map((s) => {
       const m = ms.find((x) =>
         x.milestoneType === s ||
@@ -159,13 +159,14 @@ function groupLiveMilestones(rows: LiveMilestone[]): MockTaskTimeline[] {
   return out;
 }
 
+type FilterMode = "all" | "waiting" | "behind";
+
 export function Timeline() {
-  const [filterWaiting, setFilterWaiting] = useState(true);
+  const [filter, setFilter] = useState<FilterMode>("waiting");
   const fleetQuery = trpc.taskMilestones.fleetStack.useQuery({});
   const liveTimelines = useMemo(
-    // Cast through unknown — the FE-side router types are stale until the
-    // BE redeploys with the joined fleetStack shape. Runtime contract is
-    // safe; the BE always returns at least the LiveMilestone fields.
+    // Cast through unknown — FE-side router types are stale until BE
+    // redeploys with the joined fleetStack shape; runtime contract is safe.
     () =>
       groupLiveMilestones(
         (fleetQuery.data ?? []) as unknown as LiveMilestone[],
@@ -173,15 +174,15 @@ export function Timeline() {
     [fleetQuery.data],
   );
 
-  // In real mode, never substitute MOCK_TIMELINES — an empty BE should
-  // render an empty state, not fake "Apex Fund" rows that the user can't
-  // act on. Mock fallback is only a design-review aid for mock mode.
+  // In real mode, never substitute MOCK_TIMELINES — empty BE shows empty
+  // state, not fake "Apex Fund" rows the user can't act on.
   const source =
     liveTimelines.length > 0
       ? liveTimelines
       : env.useMockData
         ? MOCK_TIMELINES
         : [];
+
   const sourceLabel = fleetQuery.isLoading
     ? "loading milestones…"
     : fleetQuery.error
@@ -192,258 +193,292 @@ export function Timeline() {
           ? "showing example data (mock mode)"
           : "no live tasks yet";
 
-  // Apply filter
-  const filtered = filterWaiting
-    ? source.filter((t) => t.missingCount > 0)
-    : source;
+  // KPIs across the full source (filter doesn't change them)
+  const kpis = useMemo(() => {
+    const active = source.length;
+    const behind = source.filter((t) => t.daysBehind > 0).length;
+    const waiting = source.filter((t) => t.missingCount > 0).length;
+    const ready = source.filter(
+      (t) => t.daysBehind === 0 && t.missingCount === 0,
+    ).length;
+    return { active, behind, waiting, ready };
+  }, [source]);
 
-  // Sort: missing_items × 10 + days_behind × 5
-  const sorted = [...filtered].sort((a, b) => {
-    const sa = a.missingCount * 10 + a.daysBehind * 5;
-    const sb = b.missingCount * 10 + b.daysBehind * 5;
-    return sb - sa;
-  });
+  const filtered = useMemo(() => {
+    if (filter === "waiting") return source.filter((t) => t.missingCount > 0);
+    if (filter === "behind") return source.filter((t) => t.daysBehind > 0);
+    return source;
+  }, [source, filter]);
+
+  // Sort: missing × 10 + behind × 5 = "needs attention" score (per spec).
+  const sorted = useMemo(
+    () =>
+      [...filtered].sort(
+        (a, b) =>
+          b.missingCount * 10 + b.daysBehind * 5 -
+          (a.missingCount * 10 + a.daysBehind * 5),
+      ),
+    [filtered],
+  );
+
+  // Split sorted into Behind + On-track sections (gap > fill)
+  const behindList = sorted.filter((t) => t.daysBehind > 0);
+  const onTrackList = sorted.filter((t) => t.daysBehind === 0);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 md:px-6 py-4">
-      <header className="mb-4">
-        <h1 className="text-xl font-semibold text-ink-900 flex items-center gap-2">
-          <GanttChartSquare className="w-5 h-5" aria-hidden />
-          Timeline
-          <span
-            className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
-            title="Mode B (per-task pacing) — AI estimates target dates for each milestone from your firm's history. You can override any of them."
-          >
-            <Sparkles className="w-3 h-3" aria-hidden />
-            AI paced
+    <div className="mx-auto max-w-[1080px] px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      <PageHeader
+        title={
+          <span className="inline-flex items-center gap-2">
+            Timeline
+            <span
+              className="inline-flex items-center gap-1 text-2xs font-medium px-2 py-0.5 rounded-pill border border-info-border bg-info-bg text-info-ink"
+              title="Mode B (per-task pacing) — AI estimates target dates for each milestone from your firm's history. You can override any of them."
+            >
+              <Sparkles className="w-3 h-3" aria-hidden />
+              AI paced
+            </span>
           </span>
-        </h1>
-        <p className="text-sm text-ink-500 mt-0.5">
-          Forward-planning across all active tasks. Each row shows where this task
-          stands on its mini-deadlines.
-        </p>
-      </header>
+        }
+        meta={sourceLabel}
+      />
 
-      {/* Filters */}
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <button
-          onClick={() => setFilterWaiting(!filterWaiting)}
-          className={`px-3 py-1.5 text-xs rounded-full border ${
-            filterWaiting
-              ? "bg-warning-bg border-warning-border text-warning-ink font-medium"
-              : "bg-surface border-line text-ink-500 hover:bg-sunken"
-          }`}
-        >
-          🚨 Has waiting items
-        </button>
-        <button className="px-3 py-1.5 text-xs rounded-full border border-line text-ink-500 hover:bg-sunken">
-          By stage
-        </button>
-        <button className="px-3 py-1.5 text-xs rounded-full border border-line text-ink-500 hover:bg-sunken">
-          Behind schedule
-        </button>
-        <span className="ml-auto text-2xs text-ink-400">
-          Sort: <strong>Needs attention</strong> (missing_items × 10 + days_behind × 5)
-          <span className="text-ink-300 ml-2">· {sourceLabel}</span>
-        </span>
+      {/* KPI tiles — Mercury-style headline numbers */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-card mb-section">
+        <MetricTile label="Active tasks" value={kpis.active} />
+        <MetricTile
+          label="Behind"
+          value={kpis.behind}
+          tone={kpis.behind > 0 ? "warn" : "neutral"}
+        />
+        <MetricTile
+          label="Awaiting docs"
+          value={kpis.waiting}
+          tone={kpis.waiting > 0 ? "warn" : "neutral"}
+        />
+        <MetricTile
+          label="Ready to file"
+          value={kpis.ready}
+          tone={kpis.ready > 0 ? "ok" : "neutral"}
+        />
       </div>
 
-      {/* Timeline stack — grouped by client. One row per task under each
-          client header so an 8-task client renders as 8 mini-timelines
-          nested under their name (not 8 separate top-level rows that
-          repeat the client). Order of clients = first appearance in the
-          urgency-sorted task list, so the most-needs-attention client
-          floats to the top. */}
-      <div className="space-y-3">
-        {sorted.length === 0 ? (
-          <div className="text-center py-12 bg-surface border border-line rounded-md">
-            <p className="text-sm text-ink-700 font-medium">
-              {filterWaiting
-                ? "Nothing waiting on a client right now."
-                : "No active tasks yet."}
-            </p>
-            <p className="text-xs text-ink-500 mt-1">
-              {filterWaiting
-                ? "Toggle the filter off to see all tasks, or come back when a deadline gets closer."
-                : "Add a client and a service package — deadlines and milestones populate automatically."}
-            </p>
-          </div>
-        ) : (
-          groupByClient(sorted).map((group) => (
-            <ClientTimelineGroup key={group.key} group={group} />
-          ))
-        )}
+      {/* Filter chips — segmented pill */}
+      <div className="flex items-center gap-1 mb-card">
+        <FilterChip active={filter === "waiting"} onClick={() => setFilter("waiting")}>
+          Waiting on docs
+          <span className="ml-1.5 tabular-nums opacity-80">{kpis.waiting}</span>
+        </FilterChip>
+        <FilterChip active={filter === "behind"} onClick={() => setFilter("behind")}>
+          Behind
+          <span className="ml-1.5 tabular-nums opacity-80">{kpis.behind}</span>
+        </FilterChip>
+        <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>
+          All tasks
+          <span className="ml-1.5 tabular-nums opacity-80">{kpis.active}</span>
+        </FilterChip>
       </div>
+
+      {/* Sections */}
+      {sorted.length === 0 ? (
+        <EmptyTimeline filter={filter} />
+      ) : (
+        <>
+          {filter !== "behind" && behindList.length > 0 && (
+            <section className="mb-section">
+              <SectionHeader
+                title="Behind schedule"
+                meta={`${behindList.length} ${behindList.length === 1 ? "task" : "tasks"}`}
+              />
+              <TaskTable rows={behindList} />
+            </section>
+          )}
+          {filter !== "behind" && onTrackList.length > 0 && (
+            <section className="mb-section">
+              <SectionHeader
+                title="On track"
+                meta={`${onTrackList.length} ${onTrackList.length === 1 ? "task" : "tasks"}`}
+              />
+              <TaskTable rows={onTrackList} />
+            </section>
+          )}
+          {filter === "behind" && (
+            <section className="mb-section">
+              <SectionHeader
+                title="Behind schedule"
+                meta={`${behindList.length} ${behindList.length === 1 ? "task" : "tasks"}`}
+              />
+              <TaskTable rows={behindList} />
+            </section>
+          )}
+        </>
+      )}
     </div>
   );
 }
 
-type ClientGroup = {
-  key: string;
-  clientName: string;
-  clientId?: string;
-  tasks: MockTaskTimeline[];
-  totalMissing: number;
-  worstDaysBehind: number;
-};
-
-function groupByClient(rows: MockTaskTimeline[]): ClientGroup[] {
-  const groups = new Map<string, ClientGroup>();
-  for (const t of rows) {
-    const key = t.clientId ?? t.client;
-    const existing = groups.get(key);
-    if (existing) {
-      existing.tasks.push(t);
-      existing.totalMissing += t.missingCount;
-      existing.worstDaysBehind = Math.max(existing.worstDaysBehind, t.daysBehind);
-    } else {
-      groups.set(key, {
-        key,
-        clientName: t.client,
-        clientId: t.clientId,
-        tasks: [t],
-        totalMissing: t.missingCount,
-        worstDaysBehind: t.daysBehind,
-      });
-    }
-  }
-  return Array.from(groups.values());
-}
-
-function ClientTimelineGroup({ group }: { group: ClientGroup }) {
-  const navigate = useNavigate();
-  const navigable = !!group.clientId;
-  const tinted =
-    group.worstDaysBehind > 7
-      ? "bg-danger-bg/20"
-      : group.worstDaysBehind > 0
-        ? "bg-warning-bg/20"
-        : "";
+function FilterChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <section
-      className={`rounded-md border border-line overflow-hidden ${tinted}`}
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center px-3 h-7 rounded-pill text-xs font-medium transition-colors",
+        active
+          ? "bg-ink-900 text-surface"
+          : "bg-surface border border-line text-ink-700 hover:bg-sunken hover:border-line-strong",
+      )}
     >
-      <header
-        className={`flex items-center gap-3 px-3 py-2 border-b border-line bg-surface/60 ${
-          navigable ? "cursor-pointer hover:bg-sunken/40" : ""
-        }`}
-        onClick={() => {
-          if (navigable) navigate(`/clients/${group.clientId}`);
-        }}
-        role={navigable ? "button" : undefined}
-        title={
-          navigable
-            ? `Open ${group.clientName}`
-            : "Example client — sign in and add real ones to see live timelines"
-        }
-      >
-        <div className="font-semibold text-sm text-ink-900 truncate flex-1 min-w-0">
-          {group.clientName}
-        </div>
-        <span className="text-2xs text-ink-500 tabular-nums whitespace-nowrap">
-          {group.tasks.length} {group.tasks.length === 1 ? "task" : "tasks"}
-        </span>
-        {group.totalMissing > 0 && (
-          <span className="text-2xs font-medium text-warning-solid tabular-nums whitespace-nowrap">
-            · {group.totalMissing} waiting
-          </span>
-        )}
-        {group.worstDaysBehind > 0 && (
-          <span className="text-2xs font-medium text-warning-solid tabular-nums whitespace-nowrap">
-            · {group.worstDaysBehind}d behind
-          </span>
-        )}
-      </header>
-      <ul className="divide-y divide-line/60">
-        {group.tasks.map((t) => (
-          <TimelineRow key={t.taskId ?? `${group.key}-${t.task}`} t={t} />
-        ))}
-      </ul>
-    </section>
+      {children}
+    </button>
   );
 }
 
-function TimelineRow({ t }: { t: MockTaskTimeline }) {
+function EmptyTimeline({ filter }: { filter: FilterMode }) {
+  return (
+    <div className="text-center py-12 bg-surface border border-line rounded-md">
+      <p className="text-sm text-ink-700 font-medium">
+        {filter === "waiting" && "Nothing waiting on a client right now."}
+        {filter === "behind" && "All tasks on schedule."}
+        {filter === "all" && "No active tasks yet."}
+      </p>
+      <p className="text-xs text-ink-500 mt-1">
+        {filter === "waiting" &&
+          "Toggle to All tasks to see everything in flight."}
+        {filter === "behind" &&
+          "Toggle to All tasks for the full forward-plan."}
+        {filter === "all" &&
+          "Add a client and a service package — milestones populate automatically."}
+      </p>
+    </div>
+  );
+}
+
+function TaskTable({ rows }: { rows: TaskRow[] }) {
+  return (
+    <div className="bg-surface border border-line rounded-md overflow-hidden">
+      <ul className="divide-y divide-line" role="list">
+        {rows.map((t) => (
+          <TaskTimelineRow key={t.taskId ?? `${t.client}-${t.task}`} t={t} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function TaskTimelineRow({ t }: { t: TaskRow }) {
   const navigate = useNavigate();
-  const stages: Stage[] = ["initial_meeting", "collect", "prepare", "review", "file"];
-  const tinted =
-    t.daysBehind > 7 ? "bg-danger-bg/30" : t.daysBehind > 0 ? "bg-warning-bg/30" : "";
-  const navigable = t.taskId && t.clientId;
+  const stages: Stage[] = [
+    "initial_meeting",
+    "collect",
+    "prepare",
+    "review",
+    "file",
+  ];
+  const navigable = !!(t.taskId && t.clientId);
 
   return (
     <li className="list-none">
       <button
-        className={`group w-full text-left flex items-center gap-3 px-3 py-2 transition-colors ${tinted} ${
-          navigable ? "hover:bg-sunken/60" : "cursor-default"
-        }`}
+        type="button"
         onClick={() => {
           if (navigable) navigate(`/clients/${t.clientId}/tasks/${t.taskId}`);
         }}
+        disabled={!navigable}
+        className={cn(
+          "group w-full text-left flex items-center gap-4 px-region py-3 transition-colors",
+          navigable ? "hover:bg-sunken cursor-pointer" : "cursor-default",
+          "focus-visible:outline-none focus-visible:bg-sunken",
+        )}
         title={
           navigable
             ? "Open task detail"
             : "Example row — sign in and add a client to see your real tasks here"
         }
       >
-        {/* Identity — task only; client name is in the group header above */}
-        <div className="w-48 shrink-0 min-w-0">
-          <div className="font-medium text-sm text-ink-900 truncate">{t.task}</div>
-          <div className="text-2xs text-ink-500 truncate">due {t.dueDate}</div>
-        </div>
-
-      {/* Mini-timeline */}
-      <div className="flex-1 flex items-center gap-1.5 min-w-0">
-        {stages.map((s, idx) => {
-          const status = t.milestoneStatus[idx] ?? "not_started";
-          const isCurrent = s === t.currentStage;
-          const dot =
-            status === "done"
-              ? "bg-success-solid"
-              : status === "in_progress"
-                ? "bg-warning-solid ring-2 ring-warning-border ring-offset-1 ring-offset-canvas"
-                : "bg-line";
-          return (
-            <div key={s} className="flex items-center gap-1.5 flex-1 min-w-0">
-              <span
-                className={`relative w-2.5 h-2.5 rounded-full shrink-0 ${dot}`}
-                title={`${STAGE_LABELS[s]} — ${status.replace("_", " ")}`}
-              >
-                {isCurrent && t.missingCount > 0 && (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xs text-warning-solid font-semibold tabular-nums">
-                    ({t.missingCount})
-                  </span>
-                )}
-              </span>
-              {idx < stages.length - 1 && (
-                <span className="flex-1 h-0.5 bg-line shrink min-w-3" aria-hidden />
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Stage label + status */}
-      <div className="w-44 shrink-0 text-right">
-        <div className="text-xs text-ink-700 font-medium">
-          {STAGE_LABELS[t.currentStage]}
-          {t.daysBehind > 0 && (
-            <span className="text-warning-solid ml-1.5 tabular-nums">
-              · {t.daysBehind}d behind
-            </span>
-          )}
-          {t.daysBehind === 0 && t.missingCount === 0 && (
-            <span className="text-success-solid ml-1.5">· ready</span>
-          )}
-          {t.daysBehind === 0 && t.missingCount > 0 && (
-            <span className="text-ink-500 ml-1.5">· on track</span>
-          )}
-        </div>
-        {t.missingCount > 0 && (
-          <div className="text-2xs text-ink-500 tabular-nums">
-            {t.missingCount} waiting on client
+        {/* Identity */}
+        <div className="w-56 shrink-0 min-w-0">
+          <div className="text-sm font-semibold text-ink-900 truncate">
+            {t.client}
           </div>
-        )}
-      </div>
+          <div className="text-xs text-ink-500 truncate">
+            {t.task} <span className="text-ink-400">· due {t.dueDate}</span>
+          </div>
+        </div>
+
+        {/* Mini-timeline */}
+        <div className="flex-1 flex items-center gap-1.5 min-w-0">
+          {stages.map((s, idx) => {
+            const status = t.milestoneStatus[idx] ?? "not_started";
+            const isCurrent = s === t.currentStage;
+            const dotClass =
+              status === "done"
+                ? "bg-ok-solid"
+                : status === "in_progress"
+                  ? isCurrent
+                    ? "bg-warn-solid ring-2 ring-warn-border ring-offset-1 ring-offset-surface"
+                    : "bg-warn-solid"
+                  : "bg-line-strong";
+            return (
+              <div
+                key={s}
+                className="flex items-center gap-1.5 flex-1 min-w-0"
+              >
+                <span
+                  className={cn(
+                    "w-2.5 h-2.5 rounded-pill shrink-0",
+                    dotClass,
+                  )}
+                  title={`${STAGE_LABELS[s]} — ${status.replace("_", " ")}`}
+                />
+                {idx < stages.length - 1 && (
+                  <span
+                    className="flex-1 h-px bg-line shrink min-w-3"
+                    aria-hidden
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Status pill — gap-loud (T4: as pill, never paint) */}
+        <div className="w-44 shrink-0 flex items-center justify-end gap-2">
+          {t.daysBehind > 0 ? (
+            <StatusPill variant="danger" size="xs">
+              {t.daysBehind}d behind
+            </StatusPill>
+          ) : t.missingCount > 0 ? (
+            <StatusPill variant="warn" size="xs">
+              {t.missingCount} waiting
+            </StatusPill>
+          ) : (
+            <StatusPill variant="ok" size="xs">
+              Ready
+            </StatusPill>
+          )}
+          <span className="text-xs text-ink-500 tabular-nums hidden md:inline">
+            {STAGE_LABELS[t.currentStage]}
+          </span>
+        </div>
+
+        <ChevronRight
+          className={cn(
+            "w-4 h-4 shrink-0 transition-colors",
+            navigable
+              ? "text-ink-400 group-hover:text-ink-700"
+              : "text-ink-300",
+          )}
+          aria-hidden
+        />
       </button>
     </li>
   );
