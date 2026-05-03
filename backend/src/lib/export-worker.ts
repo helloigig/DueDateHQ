@@ -36,12 +36,28 @@ import {
 } from "../db/schema.js";
 import { log, span, captureException } from "./observability.js";
 import { mkdir, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
-const ARTIFACT_DIR = process.env.EXPORT_ARTIFACT_DIR ?? "./.artifacts";
+// No leading `./` — index.ts prepends it when registering serveStatic, so
+// keeping the bare name avoids producing the `././.artifacts` path that
+// Hono complained about on every boot ("root path '././.artifacts' is not
+// found, are you sure it's correct?").
+const ARTIFACT_DIR = process.env.EXPORT_ARTIFACT_DIR ?? ".artifacts";
 
-// Set up the artifact directory once on startup
+// Create the artifact dir at module-load time. Hono's serveStatic
+// (registered in index.ts) stat's the root path immediately on app.use,
+// which fires before startExportWorker's first tick. Without this, every
+// boot logs a noisy "root path not found" warning even though the worker
+// would have created the directory on its first cycle 5 seconds later.
+// mkdirSync is fine here — module init is already synchronous and the
+// path is local-FS so the call is cheap.
+if (!existsSync(ARTIFACT_DIR)) {
+  mkdirSync(ARTIFACT_DIR, { recursive: true });
+}
+
+// Worker-tick safety net: a horizontally-scaled deploy that bind-mounts
+// the artifact dir from a volume could see it disappear between ticks.
 async function ensureDir() {
   if (!existsSync(ARTIFACT_DIR)) {
     await mkdir(ARTIFACT_DIR, { recursive: true });

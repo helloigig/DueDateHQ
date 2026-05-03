@@ -249,6 +249,8 @@ If a step fails, stop and diagnose before moving on. Skipping ahead just confuse
 
 ## Troubleshooting
 
+> **Prod is down? Start here:** [`docs/runbooks/fly-deploy.md`](../docs/runbooks/fly-deploy.md) has a step-by-step triage flow (port mismatch → migrations → secrets shadowing → frontend wiring → CORS) plus the integration callback registry and the 2026-05-02 incident reference. The table below covers the lower-stakes dev/local issues.
+
 | Symptom | Cause | Fix |
 |---|---|---|
 | `auth.session` returns null after bootstrap | Email-confirmation pending in Supabase | Disable email confirmation in dev (Auth → Providers → Email → Confirm email = off) |
@@ -257,13 +259,8 @@ If a step fails, stop and diagnose before moving on. Skipping ahead just confuse
 | CORS error in browser | `CORS_ORIGIN` doesn't match your FE URL | `fly secrets set CORS_ORIGIN=https://your-frontend.vercel.app` then `fly deploy` |
 | `prepared statement "..." already exists` on queries | Connecting to PgBouncer with `prepare: true` | Already handled — `postgres()` is initialized with `prepare: false` in `src/db/client.ts` |
 | Backend dev server crashes on save | Stale `.vite` pre-bundle | `rm -rf node_modules/.vite` and restart |
-| Backend crash-loops on Fly with `ZodError: DATABASE_URL: Invalid URL` | Fly's secret was never set or got rotated | `fly secrets import -a duedatehq < backend/.env.local` (resyncs all keys atomically) |
-| `fly logs ... \| grep` blocks forever, no output | Machines auto-stopped (`min_machines_running = 0`) → no process producing logs | Either `curl https://duedatehq.fly.dev/health` to wake one, or set `min_machines_running = 1` in `fly.toml` and `fly deploy` |
-| Docker build fails with `Cannot find name 'foo'` after merging a PR | Two PRs renamed the same variable in different branches; the merge resolved textually but not semantically | Run `npm run backend:lint` locally before merging anything that touches files in active PRs. Worth wiring as a CI check. |
-| `fly deploy` finished but new code isn't running | The image updated but Fly machine config changes (auto_stop, vm size, etc.) only apply on a fresh `fly deploy`, not `fly secrets import` | Confirm via `fly status` that VERSION incremented after the relevant deploy |
-| Backend boots locally fine but missing keys on Fly | `backend/.env.local` was updated, `fly secrets` wasn't | `fly secrets list -a duedatehq` to compare; `fly secrets import` to sync |
-| `Cannot find package 'X' imported from /app/backend/...` on Fly build or `npm run backend:dev` | A new dep was added to `backend/package.json` in another worktree but `npm install` wasn't run in the parent | `npm run backend:install` from repo root |
-| Same scraped article appears as 3-5 separate alert rows | HTML newsroom anchor regex picks up the same article from multiple link positions | Title-fingerprint dedup at insert (since 2026-05-02) folds these. Tooltip shows all source URLs via `related_source_urls`. |
+| Health check critical / `/health` times out | Port mismatch or shadow secret overriding `[env]` | See [fly-deploy runbook §1-5](../docs/runbooks/fly-deploy.md#when-prod-is-unreachable-triage-flow) |
+| `relation "..." does not exist` after deploy | Drizzle skipped a migration (journal/timestamp issue) | See [fly-deploy runbook §4](../docs/runbooks/fly-deploy.md#4-are-migrations-actually-running) — SQL is idempotent so re-running by hand via Supabase SQL editor is safe |
 
 ---
 
