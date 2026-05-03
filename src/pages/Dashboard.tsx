@@ -28,6 +28,8 @@ import { ModeFHealth } from "../components/ModeFHealth";
 import { ActionQueue } from "../components/ActionQueue";
 import { JustHappenedStrip } from "../components/JustHappenedStrip";
 import { AiUsageInfo } from "../components/AiUsageInfo";
+import { PageHeader } from "../components/ui/PageHeader";
+import { DateLabel } from "../components/ui/DateLabel";
 import { useLocation } from "react-router-dom";
 import type { Announcement } from "../types";
 
@@ -54,7 +56,7 @@ const DONE_STATUSES = new Set(["completed", "filed_extension"]);
  *     surfaced via per-row actions in the queue).
  */
 export function Dashboard() {
-  const session = useSession();
+  useSession();
   const clientsQuery = useClients();
   const triageQuery = useTriageDeadlines();
   const announcementsQuery = useRealtimeAnnouncements();
@@ -162,15 +164,7 @@ export function Dashboard() {
     };
   }, [tasks, clients]);
 
-  const todayLabel = useMemo(
-    () =>
-      TODAY.toLocaleDateString("en-US", {
-        weekday: "long",
-        month: "long",
-        day: "numeric",
-      }),
-    [],
-  );
+  const todayIso = useMemo(() => toIso(TODAY), []);
 
   const hasNoClients = clients.length === 0;
 
@@ -198,10 +192,17 @@ export function Dashboard() {
 
   if (hasNoClients) {
     return (
-      <div className="max-w-5xl mx-auto px-6 py-12 space-y-6">
-        <div className="flex justify-end">
-          <AiUsageInfo />
-        </div>
+      <div className="max-w-[840px] mx-auto px-4 md:px-6 lg:px-8 py-section">
+        <PageHeader
+          title={
+            <>
+              Today
+              <span className="ml-2 font-medium text-ink-500">
+                <DateLabel value={todayIso} format="short" />
+              </span>
+            </>
+          }
+        />
         <EmptyState
           title="Let's get your clients in."
           actions={
@@ -220,72 +221,52 @@ export function Dashboard() {
     );
   }
 
-  const firmName = session?.firmName ?? "";
-
   return (
-    <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-4">
-      {/* Thin top strip — date + firm name + AI affordance. No big greeting. */}
-      <header className="flex items-baseline gap-2 text-xs flex-wrap">
-        <span className="text-ink-500">{todayLabel}</span>
-        {firmName && (
+    <div className="max-w-[840px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      {/* Page header — DESIGN.md §Typography display. Date inline, no
+          greeting, no firm name (sidebar already shows the firm), no AI
+          chip in the header (DESIGN.md "Don't add greetings, firm names,
+          or AI usage chips to the header"). AI usage moved to the bottom
+          shortcuts strip below. */}
+      <PageHeader
+        title={
           <>
-            <span className="text-ink-300">·</span>
-            <span className="text-ink-700 font-medium">{firmName}</span>
+            Today
+            <span className="ml-2 font-medium text-ink-500">
+              <DateLabel value={todayIso} format="short" />
+            </span>
           </>
-        )}
-        <span className="ml-auto self-center">
-          <AiUsageInfo />
-        </span>
-      </header>
+        }
+      />
 
-      {/* One-line operational summary. Two-tier urgency: warn for past
-          internal target (common), danger for past official (rare). Both
-          conditional — no zero-counts shouted at the CPA. */}
-      <p
-        className="text-sm text-ink-700 flex items-center flex-wrap gap-x-3 gap-y-1 tabular-nums"
+      {/* Operational summary — Mercury-style metric strip. No middle-dot
+          separators (rule: "avoid dots in labels"). Air + tabular-nums +
+          two-level ink hierarchy do the work. Conditional warn/danger
+          metrics fold in only when nonzero. */}
+      <div
+        className="mb-card flex flex-wrap items-baseline gap-x-section gap-y-2 tabular-nums"
         aria-label="Firm summary"
       >
-        <span>
-          <span className="text-ink-900 font-semibold">
-            {summary.activeClients}
-          </span>{" "}
-          <span className="text-ink-500">active clients</span>
-        </span>
-        <span className="text-ink-300">·</span>
-        <span>
-          <span className="text-ink-900 font-semibold">
-            {summary.dueThisWeek}
-          </span>{" "}
-          <span className="text-ink-500">due this week</span>
-        </span>
+        <SummaryMetric value={summary.activeClients} label="active clients" />
+        <SummaryMetric value={summary.dueThisWeek} label="due this week" />
         {summary.dueToday > 0 && (
-          <>
-            <span className="text-ink-300">·</span>
-            <span className="text-warn-ink">
-              <span className="font-semibold">{summary.dueToday}</span> filing
-              today
-            </span>
-          </>
+          <SummaryMetric value={summary.dueToday} label="filing today" tone="warn" />
         )}
         {summary.pastInternalTarget > 0 && (
-          <>
-            <span className="text-ink-300">·</span>
-            <span className="text-warn-ink">
-              <span className="font-semibold">{summary.pastInternalTarget}</span>{" "}
-              past internal target
-            </span>
-          </>
+          <SummaryMetric
+            value={summary.pastInternalTarget}
+            label="past internal target"
+            tone="warn"
+          />
         )}
         {summary.pastOfficial > 0 && (
-          <>
-            <span className="text-ink-300">·</span>
-            <span className="text-danger-ink">
-              <span className="font-semibold">{summary.pastOfficial}</span>{" "}
-              past official — file extension
-            </span>
-          </>
+          <SummaryMetric
+            value={summary.pastOfficial}
+            label="past official — file extension"
+            tone="danger"
+          />
         )}
-      </p>
+      </div>
 
       {/* First-run welcome — inline banner, click to expand. */}
       <WelcomeTour />
@@ -377,7 +358,8 @@ export function Dashboard() {
         ]}
       />
 
-      <div className="pt-2 pb-6 text-2xs text-ink-400 flex items-center justify-end">
+      <div className="pt-2 pb-6 text-2xs text-ink-400 flex items-center justify-between gap-4">
+        <AiUsageInfo />
         <button
           onClick={() => setShortcutsOpen(true)}
           className="hover:text-ink-700 flex items-center gap-1"
@@ -388,6 +370,37 @@ export function Dashboard() {
           for shortcuts
         </button>
       </div>
+    </div>
+  );
+}
+
+// SummaryMetric — Mercury-style inline KPI used in the Dashboard
+// operational summary. No dots; whitespace + size + color carry hierarchy.
+function SummaryMetric({
+  value,
+  label,
+  tone,
+}: {
+  value: number;
+  label: string;
+  tone?: "warn" | "danger";
+}) {
+  const labelTone =
+    tone === "danger"
+      ? "text-danger-ink"
+      : tone === "warn"
+      ? "text-warn-ink"
+      : "text-ink-500";
+  const valueTone =
+    tone === "danger"
+      ? "text-danger-ink"
+      : tone === "warn"
+      ? "text-warn-ink"
+      : "text-ink-900";
+  return (
+    <div className="flex items-baseline gap-2">
+      <span className={`text-xl font-semibold ${valueTone}`}>{value}</span>
+      <span className={`text-sm ${labelTone}`}>{label}</span>
     </div>
   );
 }

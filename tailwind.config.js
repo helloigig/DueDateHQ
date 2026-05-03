@@ -64,6 +64,19 @@ export default {
         lg:   ["16px", { lineHeight: "24px" }],
         xl:   ["18px", { lineHeight: "26px" }],
         "2xl":["22px", { lineHeight: "28px", letterSpacing: "-0.01em" }],
+
+        // DESIGN.md named typography tokens (preferred over numeric scale
+        // when the role is semantic — `text-display` reads more clearly
+        // in JSX than `text-2xl font-semibold`).
+        display:      ["22px", { lineHeight: "28px", letterSpacing: "-0.01em" }],
+        title:        ["18px", { lineHeight: "26px" }],
+        "body-lg":    ["14px", { lineHeight: "20px", fontWeight: "500" }],
+        body:         ["14px", { lineHeight: "20px" }],
+        label:        ["13px", { lineHeight: "20px", fontWeight: "500" }],
+        caption:      ["12px", { lineHeight: "16px" }],
+        micro:        ["11px", { lineHeight: "16px", fontWeight: "600", letterSpacing: "0.05em" }],
+        // Mercury-style headline numeric (page-level KPIs only).
+        "numeric-lg": ["26px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600" }],
       },
 
       borderRadius: {

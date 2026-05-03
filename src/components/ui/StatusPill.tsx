@@ -2,9 +2,14 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-// StatusPill — design-system §4.2.
+// StatusPill — DESIGN.md §Components > Pills.
 // State as pill, never as paint. Tinted bg + saturated ink + 1px border.
-// Optional 6px filled dot for urgency-bearing variants (overdue, due-today).
+//
+// Mercury-style refinement (2026-05-03): the leading filled dot is OFF by
+// default. Status communicates via tinted bg + colored text alone — leading
+// dots clutter the label and aren't load-bearing. Caller can opt in via
+// `dot={true}` for the rare cases where extra urgency-flag is needed
+// (e.g. screen-reader-supplemental indicator on a danger state).
 
 const pillVariants = cva(
   "inline-flex items-center gap-1.5 rounded-pill border whitespace-nowrap font-medium",

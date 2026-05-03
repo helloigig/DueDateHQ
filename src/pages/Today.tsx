@@ -5,6 +5,8 @@ import { Banner } from "@/components/ui/Banner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { DateLabel } from "@/components/ui/DateLabel";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { SectionHeader } from "@/components/ui/SectionHeader";
 import { ActionQueueRow, type RowUrgency, type RowAction } from "@/components/today/ActionQueueRow";
 import { TimelineDayRow } from "@/components/today/TimelineDayRow";
 import { type DotStackUrgency } from "@/components/ui/DotStack";
@@ -161,23 +163,6 @@ function buildConfirmedToday(): ConfirmedItem[] {
   ];
 }
 
-function SectionHeader({
-  title,
-  meta,
-}: {
-  title: string;
-  meta?: React.ReactNode;
-}) {
-  // Per PR #63 DESIGN.md: title typography (18px / 600 / line-height 26px).
-  // No -0.005em letterspacing — body has no tracking adjustment.
-  return (
-    <div className="flex items-baseline justify-between mb-4">
-      <h2 className="text-lg font-semibold text-ink-900 leading-[26px]">{title}</h2>
-      {meta && <div className="text-xs text-ink-500 tabular-nums">{meta}</div>}
-    </div>
-  );
-}
-
 export function Today() {
   const queue = useMemo(buildQueue, []);
   const timeline = useMemo(buildTimeline, []);
@@ -186,20 +171,26 @@ export function Today() {
   const [confirmedExpanded, setConfirmedExpanded] = useState(false);
 
   return (
-    <div className="mx-auto max-w-[840px] px-8 py-8">
-      {/* Page header — Mercury extraction: "Today, MMM D" understated, the
-          conversational "Today" carries primary ink, the date trails in
-          --ink-700. T8 (desk, not stage) + voice (factual, not greeting). */}
-      <h1 className="text-[22px] font-semibold text-ink-900 tracking-[-0.01em] leading-7 mb-8">
-        Today, <span className="text-ink-700 font-medium">
-          <DateLabel value={toIso(TODAY)} format="short" />
-        </span>
-      </h1>
+    <div className="mx-auto max-w-[840px] px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      {/* Page header — DESIGN.md §Typography display (22px / 600). Date inline
+          (T8: desk, not stage). PageHeader primitive enforces consistency
+          across all pages — see src/components/ui/PageHeader.tsx. */}
+      <PageHeader
+        title={
+          <>
+            Today
+            <span className="ml-2 font-medium text-ink-500">
+              <DateLabel value={toIso(TODAY)} format="short" />
+            </span>
+          </>
+        }
+      />
 
       {/* State notification banner — info banner with inline action link
-          (DESIGN.md §Banner — banners use inline link, never primary button). */}
+          (DESIGN.md §The four alert surfaces — banners use inline link, never
+          primary button; one banner max per viewport). */}
       {!bannerDismissed && (
-        <div className="mb-6">
+        <div className="mb-card">
           <Banner
             variant="info"
             onDismiss={() => setBannerDismissed(true)}
@@ -209,19 +200,19 @@ export function Today() {
                 toast.info("Would open /alerts filtered to Form 941 impacts"),
             }}
           >
-            <strong className="font-semibold">IRS revised Form 941.</strong>{" "}
+            <strong className="font-semibold">IRS revised Form 941</strong>{" "}
             <span className="text-info-ink/90">
-              72 of your clients are affected.
+              — 72 of your clients are affected
             </span>
           </Banner>
         </div>
       )}
 
       {/* Action Queue — gap-first dominant section */}
-      <section className="mb-12">
+      <section className="mb-section">
         <SectionHeader
           title="Action Queue"
-          meta={<>{queue.length} {queue.length === 1 ? "item" : "items"}</>}
+          meta={`${queue.length} ${queue.length === 1 ? "item" : "items"}`}
         />
         {queue.length === 0 ? (
           <EmptyState
@@ -265,8 +256,8 @@ export function Today() {
       </section>
 
       {/* Timeline — glance-view of next 14 days */}
-      <section className="mb-12">
-        <SectionHeader title="Timeline" meta={<>Next 14 days</>} />
+      <section className="mb-section">
+        <SectionHeader title="Timeline" meta="Next 14 days" />
         {timeline.length === 0 ? (
           <div className="text-sm text-ink-500 py-6 text-center border-t border-line">
             No deadlines in the next 14 days.

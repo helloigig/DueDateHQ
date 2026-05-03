@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { AddClientModal } from "../components/AddClientModal";
 import { ExportClientsButton } from "../components/ExportClientsButton";
+import { PageHeader } from "../components/ui/PageHeader";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { MultiSelectChip } from "../components/MultiSelectChip";
 import { SpotlightStrip, type SpotlightCard } from "../components/SpotlightStrip";
@@ -362,16 +363,11 @@ export function Clients() {
 
   if (allClients.length === 0) {
     return (
-      <div className="max-w-5xl mx-auto px-6 py-12">
+      <div className="max-w-[840px] mx-auto px-4 md:px-6 lg:px-8 py-section">
         {/* Single-purpose direct empty state. The user came to /clients
             deliberately to manage clients — give them one strong action,
             not a re-onboarding menu. */}
-        <header className="mb-6">
-          <h1 className="text-xl font-semibold text-ink-900">Clients</h1>
-          <p className="text-sm text-ink-500 mt-1">
-            Your roster is empty.
-          </p>
-        </header>
+        <PageHeader title="Clients" meta="Roster is empty" />
         <div className="bg-surface border border-line rounded-md px-6 py-12 text-center">
           <h2 className="text-base font-semibold text-ink-900">
             Add your first client
@@ -411,15 +407,13 @@ export function Clients() {
   }).length;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-6">
+    <div className="max-w-[840px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8 space-y-card">
+      <PageHeader
+        title="Clients"
+        meta={`${activeCount} active`}
+      />
       <header>
-        <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
-          Clients
-        </p>
-        <h1 className="text-2xl font-semibold text-ink-900 mt-1">
-          Firm roster and work surface
-        </h1>
-        <p className="text-sm text-ink-500 mt-2 max-w-2xl">
+        <p className="text-sm text-ink-500 max-w-2xl">
           Each client carries entity, jurisdictions, service packages, and a
           per-task forwarding address. Click a row to open the client view; the
           open-task count tells you what's still moving.

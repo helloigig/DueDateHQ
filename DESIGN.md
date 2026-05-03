@@ -311,6 +311,9 @@ Used inside expanded alert cards (one client per row) and inside expanded client
 - **Don't show form-type counts ("affecting ~15 form types").** Show actual form codes (1040, 1020-S) and client counts. Specificity always.
 - **Don't use a 5th spacing value.** If you need one, you're wrong about the grouping or the rhythm.
 - **Don't ship Mode F Health as its own card on Today.** It's an inline pill on the State alerts header. The detail page lives at `/system-status`.
+- **Don't put decorative dots before status text** (e.g. `● Overdue`). Tinted pill bg + colored ink already carry the signal; a leading filled circle is visual noise. `<StatusPill>` defaults to no dot — opt in only for screen-reader-supplemental urgency cases.
+- **Don't separate metric values with middle dots (`·`) when a clean row works.** `33 active clients · 8 due this week` reads like a comma-spliced sentence. Use horizontal whitespace (`gap-section`) and let weight+color carry hierarchy. Middle dots stay valid as **separators inside a single string of metadata** (`Tax 2025 · Federal · LLC`), but not as the structure of a metric row.
+- **Don't write a custom `<h1>` per page.** Use `<PageHeader title=... meta=... />` from `src/components/ui/PageHeader.tsx`. Same for section titles — use `<SectionHeader>`. Custom one-offs cause typography drift across pages.
 
 ## Brand Vocabulary
 
@@ -561,3 +564,63 @@ The barely-audible voices that compound. These are easy to forget and easy to sp
 | Number inputs | `appearance: none` on currency inputs (kill browser spinners) |
 | Empty cell rendering | render `—` (em dash) in `ink-400`, never blank |
 | Print stylesheet | links unfurl URLs; `@page` margin 0.5in; brand fonts swap to system |
+
+## Shared primitives reference
+
+These live in `src/components/ui/` and are the **only** correct source for these elements. Custom rolls of any of these break the design system.
+
+| Primitive | Path | When to use |
+|:----------|:-----|:------------|
+| `<PageHeader>` | `src/components/ui/PageHeader.tsx` | Every page's `<h1>`. Composes display typography (22px / 600), optional muted `meta` (e.g. count/date), optional right-aligned `actions`. |
+| `<SectionHeader>` | `src/components/ui/SectionHeader.tsx` | Every section's `<h2>` inside a page (`Action Queue`, `Timeline`, etc.). Title typography (18px / 600) + right-aligned `meta` and `action`. |
+| `<StatusPill>` | `src/components/ui/StatusPill.tsx` | All status indicators (`Overdue 3d`, `Due today`, `Pending`, `Active`). Variants: `ok` / `warn` / `danger` / `info` / `neutral` / `accent`. **No leading dot by default.** |
+| `<Banner>` | `src/components/ui/Banner.tsx` | The "I noticed something" alert surface (one of the four — see §The four alert surfaces). 4px status left rule + tinted bg + inline link action (NEVER a primary button). |
+| `<EmptyState>` | `src/components/ui/EmptyState.tsx` | Centered icon (decorative, `ink-300` — never accent) + factual title + max-32ch body + single primary action. Voice rule: "Nothing to do today." not "All caught up!" |
+| `<DateLabel>` | `src/components/ui/DateLabel.tsx` | Every deadline/date render. Auto-renders Today/Tomorrow/Yesterday for ±1 day, "MMM D" otherwise. **Tabular-nums by default.** Per locked policy: never times. |
+| `<MetricTile>` | `src/components/ui/MetricTile.tsx` | Mercury-style headline KPI tile (eyebrow label / big value / optional delta with up/down icon). Use on dashboards / page-tops where one big number carries the page. |
+| `<DotStack>` | `src/components/ui/DotStack.tsx` | Horizontal dot-grid visualizing a count by status color (e.g. day-of-deadline rows). Caps at 17 visible + "+ N" overflow. |
+| `<Card>` / `<CardZone>` / `<CardDivider>` | `src/components/ui/Card.tsx` | Card container (`border 1px line` + `surface bg` + `rounded-md` + `p-region`). For multi-zone cards, use `<CardZone>` + `<CardDivider>` instead of nested borders. |
+
+**Migration discipline.** When you find an inline status pill / banner / empty state / `<h1>` in the codebase, replace it with the primitive. Don't roll your own — the only way the system stays coherent at scale is if there is one source per concept.
+
+## Implementation reference (token usage)
+
+DESIGN.md tokens in code, mapped to Tailwind classes:
+
+| Token | Tailwind class | Used for |
+|:------|:---------------|:---------|
+| Surface bg | `bg-surface` | Card, modal, popover bodies |
+| Canvas bg | `bg-canvas` | Page bg (already on body) |
+| Sunken bg | `bg-sunken` | Sidebar, table head, hover row |
+| Ink primary | `text-ink-900` | Headings, body, primary labels |
+| Ink secondary | `text-ink-700` | Strong secondary, button text |
+| Ink tertiary | `text-ink-500` | Metadata, descriptions |
+| Ink quaternary | `text-ink-400` | Helper, timestamps, disabled |
+| Line | `border-line` | Default 1px border |
+| Line strong | `border-line-strong` | Emphasized 1px border |
+| Indigo (next action) | `bg-indigo` / `text-indigo` / `bg-indigo-soft` / `text-indigo-ink` | Primary CTAs only — per T2 |
+| Pill radius | `rounded-pill` | Buttons + status pills + search bar |
+| Card radius | `rounded-md` | Cards, modal body, popover |
+| Spacing inline | `gap-inline` / `p-inline` | Within a row (8px) |
+| Spacing region | `gap-region` / `p-region` | Inside a card (16px) |
+| Spacing card | `gap-card` / `mb-card` | Card → card (24px) |
+| Spacing section | `gap-section` / `mb-section` / `py-section` | Section → section (48px) |
+| Page max-width | `max-w-[840px]` | Single-column content cap |
+| Page padding | `px-4 md:px-6 lg:px-8` | Responsive horizontal padding |
+| Page vertical | `py-6 md:py-8` | Responsive vertical padding |
+| Display type | `text-display` (or `text-2xl font-semibold`) | Page titles only |
+| Title type | `text-title` (or `text-xl font-semibold`) | Section titles only |
+| Body type | `text-body` (or `text-base`) | Default body, table cells |
+| Label type | `text-label` (or `text-sm font-medium`) | Form labels, button labels |
+| Caption type | `text-caption` (or `text-xs`) | Metadata, helper text |
+| Micro type | `text-micro` (or `text-2xs uppercase tracking-wider font-semibold`) | Sidebar group eyebrows, table column headers |
+
+**Rule:** wherever a Tailwind class would do but a named token reads more clearly, use the named token. `text-display` reads better than `text-2xl font-semibold` on a page header. `mb-section` reads better than `mb-12`.
+
+## Devx note: tailwind config + token additions
+
+Tailwind picks up new tokens from `tailwind.config.js` only on **dev server cold start**. If you add a token (`text-newSize`, `bg-newColor`, `mb-newSpacing`, etc.) and it doesn't render, restart the Vite dev server. HMR re-runs file watchers but does not rebuild the Tailwind config layer.
+
+## Changelog
+
+- **2026-05-03** — Augmentation pass. Added §Brand Vocabulary, §The four alert surfaces, §Component anatomy rules, §Responsive behavior, §Voice & Microcopy, §Accessibility, §Motion, §Invisible correctness, §Shared primitives reference, §Implementation reference, §Devx note. Added Mercury-style indigo accent (`bg-indigo`) + pill radius (`rounded-pill`) as opt-in tokens for the next-action CTA. Added `text-display` / `text-title` / `text-body` / `text-label` / `text-caption` / `text-micro` semantic typography aliases. Created shared primitives: `<PageHeader>`, `<SectionHeader>`, `<Card>`, `<MetricTile>`, refreshed `<StatusPill>` to default `dot=false` (no decorative leading dot). Applied to Today (`/design/today`), Dashboard (`/`), Clients (`/clients`), Alerts (`/alerts`), Mail (`/mail`). Existing surfaces preserved — no functionality stripped, no routes changed.

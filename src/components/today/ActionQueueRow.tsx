@@ -10,13 +10,15 @@ import { cn } from "@/lib/utils";
 
 export type RowUrgency = "overdue" | "due_today" | "due_soon" | "awaiting_review" | "awaiting_client" | "ai_suggested";
 
-const urgencyToPill: Record<RowUrgency, { variant: "danger" | "warn" | "info" | "neutral" | "accent"; label: (n?: number) => string; dot: boolean }> = {
-  overdue:        { variant: "danger",  label: (n) => `Overdue${n ? ` ${n}d` : ""}`, dot: true },
-  due_today:      { variant: "warn",    label: () => `Due today`,                    dot: true },
-  due_soon:       { variant: "warn",    label: (n) => `Due in ${n ?? 0}d`,           dot: false },
-  awaiting_review:{ variant: "info",    label: () => `Action required`,              dot: false },
-  awaiting_client:{ variant: "neutral", label: () => `Awaiting client`,              dot: false },
-  ai_suggested:   { variant: "accent",  label: () => `AI-suggested`,                 dot: false },
+// No leading dots in status labels (Mercury rule — text + tint carry the
+// signal; decorative dots compete with the meaningful content).
+const urgencyToPill: Record<RowUrgency, { variant: "danger" | "warn" | "info" | "neutral" | "accent"; label: (n?: number) => string }> = {
+  overdue:        { variant: "danger",  label: (n) => `Overdue${n ? ` ${n}d` : ""} ` },
+  due_today:      { variant: "warn",    label: () => `Due today` },
+  due_soon:       { variant: "warn",    label: (n) => `Due in ${n ?? 0}d` },
+  awaiting_review:{ variant: "info",    label: () => `Action required` },
+  awaiting_client:{ variant: "neutral", label: () => `Awaiting client` },
+  ai_suggested:   { variant: "accent",  label: () => `AI-suggested` },
 };
 
 // DESIGN.md §Buttons + "Don't repeat verbs": button label = verb + object
@@ -84,8 +86,8 @@ export function ActionQueueRow({
           {meta}
         </div>
         <div className="mt-2">
-          <StatusPill variant={pill.variant} dot={pill.dot}>
-            {pill.label(urgencyDays)}
+          <StatusPill variant={pill.variant}>
+            {pill.label(urgencyDays).trim()}
           </StatusPill>
         </div>
       </div>
