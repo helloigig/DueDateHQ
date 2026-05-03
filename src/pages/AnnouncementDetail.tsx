@@ -95,6 +95,32 @@ export function AnnouncementDetail() {
     title: string;
   } | null>(null);
 
+  // Recompute undo state. Set when recomputeEstimates returns an undoToken
+  // (5-min window per BE). Cleared when undo is clicked, the window expires,
+  // or another action overwrites the flash banner. Distinct from lastBatch
+  // because the underlying undo procedure is different (deadline date shift
+  // vs estimate amount shift) and the BE manages this token's lifetime.
+  const [lastRecompute, setLastRecompute] = useState<{
+    undoToken: string;
+    expiresAt: number; // ms epoch
+    count: number;
+  } | null>(null);
+
+  // Auto-clear lastRecompute when its window expires so the Undo button
+  // disappears from the flash banner instead of letting the user click a
+  // dead token. We re-render every 30s while a token is active; not exact
+  // but cheap and good enough for the 5-min window.
+  useEffect(() => {
+    if (!lastRecompute) return;
+    const ms = lastRecompute.expiresAt - Date.now();
+    if (ms <= 0) {
+      setLastRecompute(null);
+      return;
+    }
+    const timer = setTimeout(() => setLastRecompute(null), ms);
+    return () => clearTimeout(timer);
+  }, [lastRecompute]);
+
   const undoLastBatch = () => {
     if (!lastBatch) return;
     actions.batchAdjustDeadlines(
@@ -330,6 +356,28 @@ export function AnnouncementDetail() {
               className="text-xs px-2.5 py-1 rounded border border-emerald-300 text-emerald-800 hover:bg-emerald-100 shrink-0"
             >
               Undo
+            </button>
+          )}
+          {lastRecompute && (
+            <button
+              onClick={async () => {
+                try {
+                  const result = await undoRecomputeEstimates.mutateAsync({
+                    undoToken: lastRecompute.undoToken,
+                  });
+                  setFlash(
+                    `Reverted: ${result.restoredCount} estimate${result.restoredCount === 1 ? "" : "s"} restored.`,
+                  );
+                } catch (err) {
+                  setFlash(
+                    `Couldn't undo — ${err instanceof Error ? err.message : "window expired"}`,
+                  );
+                }
+                setLastRecompute(null);
+              }}
+              className="text-xs px-2.5 py-1 rounded border border-emerald-300 text-emerald-800 hover:bg-emerald-100 shrink-0"
+            >
+              Undo recompute
             </button>
           )}
         </div>
@@ -727,14 +775,17 @@ export function AnnouncementDetail() {
             setFlash(
               `${result.recomputedCount} estimate${result.recomputedCount === 1 ? "" : "s"} recomputed${bankNote}${composeEmail ? " · drafts queued" : ""} · Undo (5min)`,
             );
-            // Stash undo token so the flash banner can offer a real undo.
-            // For V1 we just log it — wiring undo into the existing flash
-            // banner is a small follow-up.
+            // Stash undo token so the flash banner offers Undo for 5 min.
+            // Clears the older lastBatch (deadline-shift undo) since they
+            // share the same flash banner slot.
             if (result.undoToken) {
-              console.info("[alerts] recompute undoToken", result.undoToken);
+              setLastBatch(null);
+              setLastRecompute({
+                undoToken: result.undoToken,
+                expiresAt: new Date(result.expiresAt).getTime(),
+                count: result.recomputedCount,
+              });
             }
-            // Avoid TS warning when mutation isn't used elsewhere.
-            void undoRecomputeEstimates;
           } catch (err) {
             setFlash(
               `Couldn't recompute — ${err instanceof Error ? err.message : "try again"}`,

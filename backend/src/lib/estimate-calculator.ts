@@ -60,7 +60,17 @@ export interface EstimateRecomputeResult {
 }
 
 export interface RateSchedule {
-  jurisdiction: "federal" | "CA" | "NY" | "TX" | "FL" | "LA";
+  jurisdiction:
+    | "federal"
+    | "CA"
+    | "NY"
+    | "TX"
+    | "FL"
+    | "LA"
+    | "NJ"
+    | "MA"
+    | "IL"
+    | "AZ";
   taxKind: "income" | "sales" | "payroll" | "franchise";
   /** Marginal brackets, ordered ascending. cents-from threshold + percent. */
   brackets: Array<{ thresholdCents: number; ratePct: number }>;
@@ -243,13 +253,137 @@ export const NY_2026_INCOME_SINGLE: RateSchedule = {
   standardDeductionCents: 800000,
 };
 
+/** 2025 NY personal income (single filer). 2026 raised top bracket
+ *  10.9 → tracking; 2025 baseline kept for diffing. */
+export const NY_2025_INCOME_SINGLE: RateSchedule = {
+  jurisdiction: "NY",
+  taxKind: "income",
+  brackets: [
+    { thresholdCents: 0, ratePct: 4 },
+    { thresholdCents: 850000, ratePct: 4.5 },
+    { thresholdCents: 1170000, ratePct: 5.25 },
+    { thresholdCents: 1380000, ratePct: 5.5 },
+    { thresholdCents: 8050000, ratePct: 6 },
+    { thresholdCents: 21560000, ratePct: 6.85 },
+    { thresholdCents: 109630000, ratePct: 9.65 },
+    { thresholdCents: 502330000, ratePct: 10.3 },
+    { thresholdCents: 2510830000, ratePct: 10.9 },
+  ],
+  standardDeductionCents: 800000,
+};
+
+/** 2026 NJ personal income (single filer). NJ has 8 brackets, top
+ *  10.75% on income > $1M. */
+export const NJ_2026_INCOME_SINGLE: RateSchedule = {
+  jurisdiction: "NJ",
+  taxKind: "income",
+  brackets: [
+    { thresholdCents: 0, ratePct: 1.4 },
+    { thresholdCents: 2000000, ratePct: 1.75 },
+    { thresholdCents: 3500000, ratePct: 3.5 },
+    { thresholdCents: 4000000, ratePct: 5.525 },
+    { thresholdCents: 7500000, ratePct: 6.37 },
+    { thresholdCents: 50000000, ratePct: 8.97 },
+    { thresholdCents: 100000000, ratePct: 10.75 },
+  ],
+  // NJ doesn't have a personal-exemption-style standard deduction;
+  // exemptions are per-dependent, applied separately. Use 0 for V1.
+  standardDeductionCents: 0,
+};
+
+/** 2025 NJ personal income (single filer) — same brackets as 2026 (no
+ *  legislative change announced); kept as a separate constant for
+ *  symmetry with the rate-change diff API. */
+export const NJ_2025_INCOME_SINGLE: RateSchedule = {
+  jurisdiction: "NJ",
+  taxKind: "income",
+  brackets: [
+    { thresholdCents: 0, ratePct: 1.4 },
+    { thresholdCents: 2000000, ratePct: 1.75 },
+    { thresholdCents: 3500000, ratePct: 3.5 },
+    { thresholdCents: 4000000, ratePct: 5.525 },
+    { thresholdCents: 7500000, ratePct: 6.37 },
+    { thresholdCents: 50000000, ratePct: 8.97 },
+    { thresholdCents: 100000000, ratePct: 10.75 },
+  ],
+  standardDeductionCents: 0,
+};
+
+/** 2026 MA personal income (single filer). Flat 5% + 4% surtax on
+ *  income > $1,083,150 ("millionaire tax", indexed). The surtax tier
+ *  is encoded as the second bracket. */
+export const MA_2026_INCOME_SINGLE: RateSchedule = {
+  jurisdiction: "MA",
+  taxKind: "income",
+  brackets: [
+    { thresholdCents: 0, ratePct: 5 },
+    { thresholdCents: 108315000, ratePct: 9 }, // $1,083,150 — 5% + 4% surtax
+  ],
+  // MA has a small per-filer personal exemption (~$4,400 single 2026).
+  // Modeled here as the standard deduction for V1 simplicity.
+  standardDeductionCents: 440000,
+};
+
+/** 2025 MA personal income (single filer). Same flat-rate structure;
+ *  surtax threshold was $1,053,750 before the 2026 inflation adjustment. */
+export const MA_2025_INCOME_SINGLE: RateSchedule = {
+  jurisdiction: "MA",
+  taxKind: "income",
+  brackets: [
+    { thresholdCents: 0, ratePct: 5 },
+    { thresholdCents: 105375000, ratePct: 9 },
+  ],
+  standardDeductionCents: 440000,
+};
+
+/** 2026 IL personal income (single filer). IL is flat 4.95% — the
+ *  rate hasn't moved since 2017 but the schedule shape is preserved
+ *  for symmetry with the calc's interface. */
+export const IL_2026_INCOME_SINGLE: RateSchedule = {
+  jurisdiction: "IL",
+  taxKind: "income",
+  brackets: [{ thresholdCents: 0, ratePct: 4.95 }],
+  // IL personal exemption ~$2,775 single 2026.
+  standardDeductionCents: 277500,
+};
+
+export const IL_2025_INCOME_SINGLE: RateSchedule = {
+  jurisdiction: "IL",
+  taxKind: "income",
+  brackets: [{ thresholdCents: 0, ratePct: 4.95 }],
+  standardDeductionCents: 277500,
+};
+
+/** 2026 AZ personal income (single filer). AZ moved to a flat 2.5%
+ *  effective 2023 (was graduated up to 4.5%). Useful for rate-change
+ *  alerts that announce the next phase of AZ tax reform. */
+export const AZ_2026_INCOME_SINGLE: RateSchedule = {
+  jurisdiction: "AZ",
+  taxKind: "income",
+  brackets: [{ thresholdCents: 0, ratePct: 2.5 }],
+  // AZ standard deduction ~$14,600 single 2026 (matches federal).
+  standardDeductionCents: 1460000,
+};
+
+export const AZ_2025_INCOME_SINGLE: RateSchedule = {
+  jurisdiction: "AZ",
+  taxKind: "income",
+  brackets: [{ thresholdCents: 0, ratePct: 2.5 }],
+  standardDeductionCents: 1460000,
+};
+
 /**
  * Helper: pick the right schedule by jurisdiction + year. Used by tRPC
  * recomputeEstimates to translate an alert's metadata into RateSchedule
  * instances for the calc.
+ *
+ * Coverage as of V1.1: federal + 6 states (CA, NY, NJ, MA, IL, AZ),
+ * single-filer only, 2025/2026 brackets. Returns null for any jurisdiction
+ * + year combo not in the table — caller should fall back to "manual"
+ * methodology and surface a warning to the CPA.
  */
 export function getRateSchedule(
-  jurisdiction: "federal" | "CA" | "NY",
+  jurisdiction: RateSchedule["jurisdiction"],
   taxYear: number,
 ): RateSchedule | null {
   const key = `${jurisdiction}_${taxYear}`;
@@ -264,7 +398,52 @@ export function getRateSchedule(
       return CA_2025_INCOME_SINGLE;
     case "NY_2026":
       return NY_2026_INCOME_SINGLE;
+    case "NY_2025":
+      return NY_2025_INCOME_SINGLE;
+    case "NJ_2026":
+      return NJ_2026_INCOME_SINGLE;
+    case "NJ_2025":
+      return NJ_2025_INCOME_SINGLE;
+    case "MA_2026":
+      return MA_2026_INCOME_SINGLE;
+    case "MA_2025":
+      return MA_2025_INCOME_SINGLE;
+    case "IL_2026":
+      return IL_2026_INCOME_SINGLE;
+    case "IL_2025":
+      return IL_2025_INCOME_SINGLE;
+    case "AZ_2026":
+      return AZ_2026_INCOME_SINGLE;
+    case "AZ_2025":
+      return AZ_2025_INCOME_SINGLE;
     default:
       return null;
   }
+}
+
+/**
+ * List of (jurisdiction, year) pairs we have rate schedules for. Useful
+ * for an admin UI showing coverage. The recomputeEstimates tRPC
+ * procedure validates incoming jurisdiction against this list.
+ */
+export function getSupportedRateSchedules(): Array<{
+  jurisdiction: RateSchedule["jurisdiction"];
+  taxYear: number;
+}> {
+  return [
+    { jurisdiction: "federal", taxYear: 2026 },
+    { jurisdiction: "federal", taxYear: 2025 },
+    { jurisdiction: "CA", taxYear: 2026 },
+    { jurisdiction: "CA", taxYear: 2025 },
+    { jurisdiction: "NY", taxYear: 2026 },
+    { jurisdiction: "NY", taxYear: 2025 },
+    { jurisdiction: "NJ", taxYear: 2026 },
+    { jurisdiction: "NJ", taxYear: 2025 },
+    { jurisdiction: "MA", taxYear: 2026 },
+    { jurisdiction: "MA", taxYear: 2025 },
+    { jurisdiction: "IL", taxYear: 2026 },
+    { jurisdiction: "IL", taxYear: 2025 },
+    { jurisdiction: "AZ", taxYear: 2026 },
+    { jurisdiction: "AZ", taxYear: 2025 },
+  ];
 }
