@@ -16,6 +16,8 @@ import { useAnnouncements } from "../hooks/useAnnouncements";
 import { useSession } from "../data/session";
 import { useStore } from "../data/store";
 import { useFeatureFlags } from "../hooks/useFeatureFlags";
+import { CountBadge } from "./ui/CountBadge";
+import { Avatar } from "./ui/Avatar";
 
 // 7-item sidebar per IA v0.7 amendment §2:
 //   Today / Timeline / Clients / Mail / Alerts / Opportunities / Settings
@@ -127,22 +129,14 @@ export function Sidebar() {
                 )}
                 <Icon className="w-4 h-4 shrink-0" aria-hidden />
                 {!collapsed && <span className="flex-1">{label}</span>}
-                {!collapsed &&
-                  to === "/alerts" &&
-                  unread > 0 && (
-                    <span className="ml-auto bg-danger-solid text-white text-2xs rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center tabular-nums">
-                      {unread}
-                    </span>
-                  )}
-                {collapsed &&
-                  to === "/alerts" &&
-                  unread > 0 && (
-                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-danger-solid" />
-                  )}
+                {!collapsed && to === "/alerts" && unread > 0 && (
+                  <CountBadge count={unread} tone="danger" className="ml-auto" />
+                )}
+                {collapsed && to === "/alerts" && unread > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-danger-solid" />
+                )}
                 {!collapsed && to === "/mail" && inboxCount > 0 && (
-                  <span className="ml-auto bg-sunken text-ink-700 text-2xs rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center tabular-nums border border-line">
-                    {inboxCount}
-                  </span>
+                  <CountBadge count={inboxCount} tone="neutral" className="ml-auto" />
                 )}
                 {collapsed && to === "/mail" && inboxCount > 0 && (
                   <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-info-solid" />
@@ -278,12 +272,13 @@ function WorkspaceHeader({
   if (collapsed) {
     return (
       <div className="h-14 flex items-center justify-center border-b border-line px-3">
-        <span
-          className="w-7 h-7 rounded-md bg-accent text-canvas flex items-center justify-center text-2xs font-semibold"
+        <Avatar
+          variant="square"
+          size="md"
+          tone="primary"
+          name={firmName}
           title={firmName}
-        >
-          {firmName.slice(0, 2).toUpperCase()}
-        </span>
+        />
       </div>
     );
   }
@@ -295,9 +290,7 @@ function WorkspaceHeader({
         className="flex items-center gap-2 w-full hover:bg-sunken rounded px-2 py-1.5 -mx-1 group"
         aria-expanded={open}
       >
-        <span className="w-7 h-7 rounded-md bg-accent text-canvas flex items-center justify-center text-2xs font-semibold shrink-0">
-          {firmName.slice(0, 2).toUpperCase()}
-        </span>
+        <Avatar variant="square" size="md" tone="primary" name={firmName} />
         <div className="flex flex-col justify-center min-w-0 flex-1 text-left">
           <span className="font-semibold text-ink-900 text-sm leading-tight truncate">
             {firmName}
@@ -322,9 +315,7 @@ function WorkspaceHeader({
               Current workspace
             </p>
             <div className="px-3 py-2 flex items-center gap-2 bg-sunken/40 mx-1 rounded">
-              <span className="w-5 h-5 rounded bg-accent text-canvas flex items-center justify-center text-2xs font-semibold">
-                {firmName.slice(0, 2).toUpperCase()}
-              </span>
+              <Avatar variant="square" size="sm" tone="primary" name={firmName} />
               <span className="text-sm font-medium text-ink-900 truncate flex-1">
                 {firmName}
               </span>

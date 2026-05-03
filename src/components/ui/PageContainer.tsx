@@ -6,12 +6,18 @@ import { cn } from "@/lib/utils";
 // four-page rollout (Today, Timeline, Clients, Alerts) shares one source
 // of truth.
 //
-// Variants:
-//   - "default"  — DESIGN.md single-column cap (max-w-840). Today, Clients.
-//   - "wide"     — Wider cap (max-w-1080) for table/grid pages. Timeline.
-//   - "workshop" — Full viewport width, no cap, no horizontal padding.
-//                  For 2-column workshops with their own internal layout.
-//                  Alerts (feed + co-pilot pane).
+// Variants — pick by the page's primary content type:
+//   - "default"  — Calm digest pages (Today). max-w-840 single-column cap.
+//                  Use when the page reads top-to-bottom like a briefing.
+//   - "wide"     — Data table / grid pages (Timeline, Clients). max-w-1080.
+//                  Use when the page's main content is a wide tabular row.
+//   - "workshop" — 2-column workshops (Alerts feed + co-pilot pane).
+//                  Full viewport, no cap, no padding — the child owns
+//                  all chrome decisions.
+//
+// The rule: same content type → same width. Don't mix (Today + Clients
+// both being 840 even though Clients has a table was the bug that
+// surfaced this rule).
 //
 // Padding + spacing are uniform across "default" and "wide" — only the
 // max-width changes. "workshop" hands all chrome decisions to its child

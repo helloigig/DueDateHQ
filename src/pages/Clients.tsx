@@ -339,7 +339,7 @@ export function Clients() {
   };
 
   return (
-    <PageContainer className="space-y-section">
+    <PageContainer variant="wide" className="space-y-section">
       {/* Header — title meta carries the active-count, actions live inline so
           "Add client" + "Import CSV" sit on the same row as the page name. */}
       <PageHeader

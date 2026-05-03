@@ -12,6 +12,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { Button } from "./ui/button";
+import { Avatar } from "./ui/Avatar";
 
 export function TopBar() {
   const [modal, setModal] = useState<"client" | null>(null);
@@ -53,9 +55,7 @@ export function TopBar() {
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="text-sm px-3 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover whitespace-nowrap shrink-0">
-            + New
-          </button>
+          <Button className="shrink-0">+ New</Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuItem onSelect={() => setModal("client")}>
@@ -92,9 +92,12 @@ export function TopBar() {
               className="flex items-center gap-2 px-1 py-1 rounded hover:bg-sunken"
               aria-label="Open user menu"
             >
-              <div className="w-8 h-8 rounded-full bg-ink-900 text-canvas flex items-center justify-center text-xs font-medium">
-                {session?.userInitials || "SC"}
-              </div>
+              <Avatar
+                size="md"
+                tone="primary"
+                initials={session?.userInitials || "SC"}
+                name={session?.userName || "Sarah Chen"}
+              />
               <span className="hidden lg:inline text-sm text-ink-700 whitespace-nowrap">
                 {session?.userName || "Sarah Chen"}
               </span>
