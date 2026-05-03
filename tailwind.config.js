@@ -6,10 +6,14 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Surfaces
-        canvas: "#FAFAF7",
+        // Surfaces — Mercury-aligned cool neutral palette (2026-05-03 refresh).
+        // The previous warm cream (#FAFAF7) gave the product a paper feeling
+        // but read as "Notion-ish" not "operational". Cool neutral pairs with
+        // the indigo accent cleanly and matches the Mercury / Sana / Oku
+        // reference family.
+        canvas: "#F8F9FB",
         surface: "#FFFFFF",
-        sunken: "#F5F4EF",
+        sunken: "#F2F3F5",
 
         // Text
         ink: {

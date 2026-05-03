@@ -164,6 +164,33 @@ DueDateHQ is a work surface for solo and small-team CPAs juggling 50–600 clien
 
 The aesthetic is **calm professional density**. Closer in spirit to Linear, Stripe Dashboard, or a well-built financial terminal than to consumer SaaS. No greetings, no decorative gradients, no celebrations. The user is a senior pro doing batch work; the UI respects her time.
 
+### Reference inheritance — Mercury · Sana AI · Oku
+
+DueDateHQ inherits the visual register of three operational SaaS products. Each contributes specific moves; together they define the "look".
+
+| Reference | What we inherit |
+|:----------|:----------------|
+| **[Mercury](https://mercury.com)** (banking dashboard) | Number typography (tabular-nums everywhere; cents-superscript on display values where applicable) · pill-shaped primary CTAs · soft-tint status pills · sidebar grouped by domain · the "professional density" feeling · ⌘K search affordance · single indigo accent on the next action |
+| **[Sana AI](https://sanalabs.com)** (AI workspace) | Cool neutral canvas (not warm cream) · borderless surfaces with hairline (1px) divisions · neutral category dots · warm but quiet tone · clean meta lines |
+| **[Oku](https://oku.so)** (knowledge tool) | Content-first hierarchy (almost no chrome) · thin sidebar with no decoration · understated page titles · restraint as the dominant taste — what's *removed* matters more than what's added |
+
+The three converge: **a productivity tool earns trust by getting out of the way**. Mercury proves it for finance, Sana proves it for AI workspace, Oku proves it for knowledge. DueDateHQ inherits the lineage for CPA practice operations.
+
+### Taste principles (T1–T8 — apply to every new screen)
+
+| # | Principle | How to apply |
+|:--|:----------|:-------------|
+| **T1** | **Numbers are typographic objects.** | Every dollar / count / date uses `tabular-nums`. Page-level KPIs use `<MetricTile>` with display weight. Generic body-render of a number is a fail. |
+| **T2** | **One accent, one viewport, one action.** | The indigo accent (`bg-indigo`) appears on the **next action** only — primary CTA, currently-selected sidebar item, important "do this now" surface. Before painting indigo, ask: "is this the ONE next action?" If no, demote to a slate ghost / link. |
+| **T3** | **Pills for actions, soft rectangles for objects.** | Buttons + status chips are `rounded-pill` (999px). Cards / inputs / modals are soft rectangles (`rounded-md` 8px). Shape codes role faster than label. |
+| **T4** | **Status colors are pills, never paint.** | Green / orange / red appear as small `<StatusPill>` (tinted bg + saturated text). They never become surface fills, never become row left-borders, never become full-card backgrounds. Use `<StatusPill>` — period. |
+| **T5** | **Sidebar groups, surface unfolds.** | Left nav is grouped by domain (`Workflows / Personal / Team`). Main canvas opens flush — no nested chrome bars, no breadcrumbs on most pages. The sidebar IS the wayfinding. |
+| **T6** | **Density via vertical air, not chrome.** | Tables/lists use ≥44px row height with consistent vertical padding. Cramped density is anxiety; comfortable density is the product's value. The 8/16/24/48 rhythm does the structural work — drop the dividing borders/shadows. |
+| **T7** | **Modal vs toast vs banner discipline.** | Modals interrupt for input only. Toasts confirm "did the thing." Banners notify "I noticed." Bell holds the inbox. Pick the right surface — picking IS the message (see §The four alert surfaces). |
+| **T8** | **The dashboard is a desk, not a stage.** | Page titles use `<PageHeader>` (display 22px / 600), no display face anywhere. No "Welcome, Sarah." No firm-name in header. No celebratory toasts. The product looks like a calm tool, not a marketing site — because the CPA opens it 30× a day. |
+
+When a screen makes a decision the doc doesn't address, derive from these principles. The principles outlast any single token.
+
 **Implementation foundation.** The product is built on [shadcn/ui](https://ui.shadcn.com) primitives with `cssVariables: false` (see [components.json](components.json)) — meaning shadcn primitives consume Tailwind classes directly from [tailwind.config.js](tailwind.config.js), and the tokens defined here flow to those classes via `npx @google/design.md export --format tailwind DESIGN.md`. New components are composed from shadcn primitives (`<Button>`, `<Dialog>`, `<Dropdown>`, `<Checkbox>`, etc.); we do not write component primitives from scratch. Icons come from [Lucide](https://lucide.dev).
 
 The differentiator pattern, in two unit variants:
@@ -177,7 +204,7 @@ Same pattern, two axes. Both must look like siblings.
 
 A single accent (deep ink) plus four status families. No tertiary brand color, no gradient, no glassmorphism, no dark glow. Color carries semantics — never decoration.
 
-- **Surfaces** (`canvas` / `surface` / `sunken`): warm off-white as page bg, pure white for cards, slightly darker tint for hover and divided regions inside cards.
+- **Surfaces** (`canvas` / `surface` / `sunken`): cool neutral as page bg (`#F8F9FB` — Mercury-aligned, refreshed 2026-05-03 from the original warm cream), pure white for cards, slightly darker cool tint for hover and divided regions inside cards.
 - **Ink** (`ink-900` → `ink-300`): a five-step grayscale ladder. `900` for primary text, `500` for metadata, `300` for separator dots and disabled states.
 - **Primary** (`primary` / `primary-hover`): deep ink, used only on primary commit buttons. Never as a fill on cards, banners, or icons.
 - **Status families** (`danger` / `warn` / `ok` / `info`): each has `bg`, `border`, `ink` triples. `bg` is a low-saturation tint for pill backgrounds; `ink` is a high-contrast text color. Never use status `solid` colors for backgrounds — they're for icons and borders only.
@@ -624,3 +651,4 @@ Tailwind picks up new tokens from `tailwind.config.js` only on **dev server cold
 ## Changelog
 
 - **2026-05-03** — Augmentation pass. Added §Brand Vocabulary, §The four alert surfaces, §Component anatomy rules, §Responsive behavior, §Voice & Microcopy, §Accessibility, §Motion, §Invisible correctness, §Shared primitives reference, §Implementation reference, §Devx note. Added Mercury-style indigo accent (`bg-indigo`) + pill radius (`rounded-pill`) as opt-in tokens for the next-action CTA. Added `text-display` / `text-title` / `text-body` / `text-label` / `text-caption` / `text-micro` semantic typography aliases. Created shared primitives: `<PageHeader>`, `<SectionHeader>`, `<Card>`, `<MetricTile>`, refreshed `<StatusPill>` to default `dot=false` (no decorative leading dot). Applied to Today (`/design/today`), Dashboard (`/`), Clients (`/clients`), Alerts (`/alerts`), Mail (`/mail`). Existing surfaces preserved — no functionality stripped, no routes changed.
+- **2026-05-03 (later)** — Mercury inheritance restored. Added §Reference inheritance (Mercury / Sana AI / Oku) + §Taste principles (T1–T8) so the doc tells the next builder *what Mercury looks like*, not just what to avoid. Switched canvas warm cream `#FAFAF7` → cool neutral `#F8F9FB` (Mercury / Sana / Oku align). Promoted AnnouncementBanner primary CTA from outline-slate to indigo pill so the Dashboard at `/` visibly carries the Mercury accent.
