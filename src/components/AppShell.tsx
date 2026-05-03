@@ -1,6 +1,7 @@
 import { Link, Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { TabBar } from "./TabBar";
 import { BottomTabBar } from "./BottomTabBar";
 import { OfflineBanner } from "./OfflineBanner";
 import { InstallPrompt } from "./InstallPrompt";
@@ -9,6 +10,7 @@ import { StatusBanner } from "./StatusBanner";
 import { useSession } from "../data/session";
 import { useStore } from "../data/store";
 import { trpc } from "../lib/api/client";
+import { TabsProvider } from "../lib/tabs/TabContext";
 
 export function AppShell() {
   const session = useSession();
@@ -30,42 +32,47 @@ export function AppShell() {
     !!session && session.onboardingComplete !== true && !hasClients;
 
   return (
-    <div className="h-screen flex bg-canvas">
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-accent focus:text-canvas focus:px-3 focus:py-1.5 focus:rounded-md focus:text-sm"
-      >
-        Skip to main content
-      </a>
-      <OfflineBanner />
-      <div className="hidden md:flex">
-        <Sidebar />
-      </div>
-      <div className="flex-1 min-w-0 flex flex-col">
-        <TopBar />
-        <StatusBanner />
-        {showSetupBanner && (
-          <div className="bg-info-bg border-b border-info-border px-4 py-2 text-xs text-info-ink flex items-center gap-2">
-            <span>Complete setup to lock in your firm settings.</span>
-            <Link
-              to="/onboarding/firm"
-              className="ml-auto underline hover:no-underline"
-            >
-              Resume setup
-            </Link>
-          </div>
-        )}
-        <main
-          id="main-content"
-          tabIndex={-1}
-          className="flex-1 overflow-y-auto pb-14 md:pb-0 outline-none"
+    <TabsProvider>
+      <div className="h-screen flex bg-canvas">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-accent focus:text-canvas focus:px-3 focus:py-1.5 focus:rounded-md focus:text-sm"
         >
-          <Outlet />
-        </main>
+          Skip to main content
+        </a>
+        <OfflineBanner />
+        <div className="hidden md:flex">
+          <Sidebar />
+        </div>
+        <div className="flex-1 min-w-0 flex flex-col">
+          <TopBar />
+          <StatusBanner />
+          {showSetupBanner && (
+            <div className="bg-info-bg border-b border-info-border px-4 py-2 text-xs text-info-ink flex items-center gap-2">
+              <span>Complete setup to lock in your firm settings.</span>
+              <Link
+                to="/onboarding/firm"
+                className="ml-auto underline hover:no-underline"
+              >
+                Resume setup
+              </Link>
+            </div>
+          )}
+          {/* Workspace tabs — sticky strip below TopBar.
+              Renders nothing when no tabs are open (saves canvas). */}
+          <TabBar />
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className="flex-1 overflow-y-auto pb-14 md:pb-0 outline-none"
+          >
+            <Outlet />
+          </main>
+        </div>
+        <BottomTabBar />
+        <InstallPrompt />
+        <Toaster />
       </div>
-      <BottomTabBar />
-      <InstallPrompt />
-      <Toaster />
-    </div>
+    </TabsProvider>
   );
 }

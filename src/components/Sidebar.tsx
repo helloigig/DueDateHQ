@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
   Home,
   Users,
@@ -11,29 +11,34 @@ import {
   PanelLeftOpen,
   GanttChartSquare,
   UserPlus,
+  LogOut,
 } from "lucide-react";
 import { useAnnouncements } from "../hooks/useAnnouncements";
-import { useSession } from "../data/session";
+import { useSession, signOut } from "../data/session";
 import { useStore } from "../data/store";
 import { useFeatureFlags } from "../hooks/useFeatureFlags";
 import { CountBadge } from "./ui/CountBadge";
 import { Avatar } from "./ui/Avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 // 7-item sidebar per IA v0.7 amendment §2:
-//   Today / Timeline / Clients / Mail / Alerts / Opportunities / Settings
+//   Today / Alerts / Timeline / Clients / Mail / Opportunities / Settings
 //
-// "Today" is reactive — the action queue (per `feedback_gap_over_fill`).
-// "Timeline" is forward-planning — cross-client mini-timeline stack.
-// "Mail" is cross-client communication (per `feedback_unified_ai_surface`,
-//   ships Day 1 even though Method B OAuth volume is initially low).
-// "Opportunities" surfaces Mode E + Layer B/C signals (advisory / churn /
-//   pricing / capacity).
+// Alerts sits second so the state-notification + suggested-action surface
+// (the product's differentiator) is one keystroke from "Today" — the
+// signal lives next to the inbox of work it generates.
 const primary = [
   { to: "/", label: "Today", Icon: Home, end: true },
+  { to: "/alerts", label: "Alerts", Icon: Bell, end: false },
   { to: "/timeline", label: "Timeline", Icon: GanttChartSquare, end: false },
   { to: "/clients", label: "Clients", Icon: Users, end: false },
   { to: "/mail", label: "Mail", Icon: Mail, end: false },
-  { to: "/alerts", label: "Alerts", Icon: Bell, end: false },
   { to: "/opportunities", label: "Opportunities", Icon: Lightbulb, end: false },
 ];
 
@@ -93,8 +98,18 @@ export function Sidebar() {
   return (
     <aside
       className={[
-        "shrink-0 bg-surface border-r border-line flex flex-col transition-[width] duration-150",
-        collapsed ? "w-14" : "w-56",
+        // Sidebar shell — two visual modes.
+        //   Expanded (`w-56`): floating card — Mac OS / Mercury
+        //     aesthetic. `my-3 ml-3` offset + `rounded-lg shadow-pop`,
+        //     no right border. Reads as a tool, not a rail.
+        //   Collapsed (`w-14`): flush rail. Drop the margin + shadow,
+        //     restore the right hairline border. A 56px floating card
+        //     is decoration; flush gives the user maximum canvas back
+        //     when they've actively chosen to tuck the menu away.
+        "shrink-0 bg-surface flex flex-col transition-[width] duration-150",
+        collapsed
+          ? "w-14 border-r border-line"
+          : "w-56 my-3 ml-3 rounded-lg shadow-pop",
       ].join(" ")}
     >
       <WorkspaceHeader
@@ -123,7 +138,9 @@ export function Sidebar() {
               <>
                 {isActive && (
                   <span
-                    className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-accent"
+                    className={`absolute top-1 bottom-1 rounded-r bg-accent ${
+                      collapsed ? "-left-2 w-[3px]" : "left-0 w-0.5"
+                    }`}
                     aria-hidden
                   />
                 )}
@@ -202,7 +219,96 @@ export function Sidebar() {
           )}
         </button>
       </div>
+
+      {/* User account — bottom-left, Linear/Notion convention.
+          Replaces the user dropdown that used to live in the TopBar so
+          there's a single account entrance. */}
+      <UserAccountTrigger collapsed={collapsed} />
     </aside>
+  );
+}
+
+/**
+ * Bottom-of-sidebar account trigger — avatar + name + chevron, opens a
+ * dropdown with Settings and Sign out. Mirrors Linear's pattern (account
+ * entrance pinned bottom-left, separated by a hairline) so it's always
+ * one click away regardless of which page the user is on.
+ *
+ * Collapsed mode: just the avatar; same dropdown.
+ */
+function UserAccountTrigger({ collapsed }: { collapsed: boolean }) {
+  const session = useSession();
+  const navigate = useNavigate();
+
+  const initials = session?.userInitials || "SC";
+  const name = session?.userName || "Sarah Chen";
+  const email = session?.userEmail;
+
+  return (
+    <div className="border-t border-line px-2 py-2">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className={`w-full flex items-center rounded-md text-sm text-ink-700 hover:bg-sunken transition-colors ${
+              collapsed ? "justify-center py-2" : "gap-2 px-2 py-1.5"
+            }`}
+            aria-label="Open account menu"
+            title={collapsed ? name : undefined}
+          >
+            <Avatar
+              size="md"
+              tone="primary"
+              initials={initials}
+              name={name}
+            />
+            {!collapsed && (
+              <>
+                <div className="flex-1 min-w-0 text-left">
+                  <div className="text-sm font-medium text-ink-900 truncate leading-tight">
+                    {name}
+                  </div>
+                  {email && (
+                    <div className="text-2xs text-ink-500 truncate leading-tight">
+                      {email}
+                    </div>
+                  )}
+                </div>
+                <span className="text-ink-400 text-xs shrink-0" aria-hidden>
+                  ⌄
+                </span>
+              </>
+            )}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" side="top" className="w-56">
+          <div className="px-3 py-2 border-b border-line">
+            <div className="text-sm font-medium text-ink-900 truncate">
+              {name}
+            </div>
+            {email && (
+              <div className="text-2xs text-ink-500 truncate">{email}</div>
+            )}
+          </div>
+          <DropdownMenuItem onSelect={() => navigate("/settings")}>
+            <Settings className="w-3.5 h-3.5 text-ink-500" aria-hidden />
+            Settings
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={() => {
+              // signOut() handles Supabase clear + hard reload to /login.
+              // Don't navigate() here — that would render /login mid-flight
+              // with stale state and crash before the reload fires.
+              void signOut();
+            }}
+          >
+            <LogOut className="w-3.5 h-3.5 text-ink-500" aria-hidden />
+            Sign out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }
 

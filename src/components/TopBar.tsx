@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, UserPlus, Upload, LogOut, FilePlus } from "lucide-react";
+import { Search, UserPlus, Upload, FilePlus } from "lucide-react";
 import { AddClientModal } from "./AddClientModal";
 import { BellDropdown } from "./BellDropdown";
 import { CommandPaletteStub } from "./CommandPaletteStub";
-import { signOut, useSession } from "../data/session";
+import { useSession } from "../data/session";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,13 +13,11 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Button } from "./ui/button";
-import { Avatar } from "./ui/Avatar";
 
 export function TopBar() {
   const [modal, setModal] = useState<"client" | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const navigate = useNavigate();
-  const session = useSession();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -34,20 +32,40 @@ export function TopBar() {
 
   return (
     <header className="h-14 shrink-0 bg-surface border-b border-line flex items-center gap-3 px-5">
+      {/* Search affordance — visually a real input (bg-surface +
+          hairline border) so it reads as fillable, not as a flat
+          area. Click opens the command palette; ⌘K hint pinned right.
+          Hover deepens the border; focus shows the indigo ring. */}
       <div className="flex-1 max-w-md">
         <button
           onClick={() => setPaletteOpen(true)}
           title="Search (⌘K)"
-          className="w-full flex items-center gap-2 px-3 py-1.5 rounded-md bg-sunken text-ink-500 text-sm hover:bg-sunken/70 hover:text-ink-700 transition-colors"
+          aria-label="Search (Cmd+K)"
+          className="
+            group w-full h-9 flex items-center gap-2.5 px-3
+            rounded-md bg-surface
+            border border-line hover:border-line-strong
+            transition-colors
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-soft focus-visible:border-indigo
+          "
         >
-          <Search className="w-4 h-4 shrink-0" aria-hidden />
-          <span className="flex-1 text-left truncate">
+          <Search
+            className="w-4 h-4 shrink-0 text-ink-400 group-hover:text-ink-500 transition-colors"
+            aria-hidden
+          />
+          <span className="flex-1 text-left text-sm text-ink-500 truncate">
             <span className="hidden sm:inline">
-              Search clients, deadlines, alerts
+              Search clients, deadlines, alerts…
             </span>
             <span className="sm:hidden">Search</span>
           </span>
-          <kbd className="ml-auto hidden sm:inline text-2xs text-ink-400 font-mono border border-line rounded px-1 py-0.5">
+          <kbd
+            className="
+              hidden sm:inline-flex items-center gap-0.5 shrink-0
+              text-2xs font-medium text-ink-500 font-mono
+              bg-sunken border border-line rounded px-1.5 py-0.5
+            "
+          >
             ⌘K
           </kbd>
         </button>
@@ -85,52 +103,9 @@ export function TopBar() {
       <TrialBadge />
       <BellDropdown />
 
-      <div className="flex items-center gap-2 pl-2 border-l border-line">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              className="flex items-center gap-2 px-1 py-1 rounded hover:bg-sunken"
-              aria-label="Open user menu"
-            >
-              <Avatar
-                size="md"
-                tone="primary"
-                initials={session?.userInitials || "SC"}
-                name={session?.userName || "Sarah Chen"}
-              />
-              <span className="hidden lg:inline text-sm text-ink-700 whitespace-nowrap">
-                {session?.userName || "Sarah Chen"}
-              </span>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <div className="px-3 py-2 border-b border-line">
-              <div className="text-sm font-medium text-ink-900 truncate">
-                {session?.userName}
-              </div>
-              <div className="text-2xs text-ink-500 truncate">
-                {session?.userEmail}
-              </div>
-            </div>
-            <DropdownMenuItem onSelect={() => navigate("/settings")}>
-              Settings
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={() => {
-                // signOut() handles everything: clear Supabase, clear
-                // local session, hard-reload to /login. We do NOT call
-                // navigate() here — that would render /login mid-flight
-                // (with stale React state) and crash before the reload
-                // fires, which the user experiences as a frozen page.
-                void signOut();
-              }}
-            >
-              <LogOut className="w-3.5 h-3.5 text-ink-500" aria-hidden />
-              Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      {/* Account entrance lives in the Sidebar bottom-left (Linear/Notion
+          convention). Avatar + dropdown removed from here so there's a
+          single account surface; if you need it back, see <Sidebar>. */}
 
       <AddClientModal open={modal === "client"} onClose={() => setModal(null)} />
       <CommandPaletteStub open={paletteOpen} onClose={() => setPaletteOpen(false)} />

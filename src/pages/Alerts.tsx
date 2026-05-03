@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   CalendarClock,
+  Check,
   ChevronLeft,
   ChevronRight,
   Forward,
@@ -12,12 +13,15 @@ import {
   RefreshCw,
   Send,
   Sparkles,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { StateBadge } from "@/components/ui/StateBadge";
 import { ClientChip } from "@/components/ui/ClientChip";
 import { FilterChip } from "@/components/ui/FilterChip";
+import { OpenInTabButton } from "@/components/TabBar";
+import { useTabs, makeTab } from "@/lib/tabs/TabContext";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -139,17 +143,44 @@ Sarah`;
 function FeedCard({
   a,
   selected,
+  handled,
   onSelect,
+  onComplete,
 }: {
   a: Announcement;
   selected: boolean;
+  handled: boolean;
   onSelect: () => void;
+  onComplete: (id: string) => void;
 }) {
   const tone = TYPE_TONE[a.type];
   const affected = affectedClientsFor(a);
   const visibleChips = affected.slice(0, 5);
   const overflow = Math.max(0, affected.length - visibleChips.length);
+  const { openInTab } = useTabs();
+  const handleOpenInTab = () => {
+    openInTab(
+      makeTab("alert", {
+        id: a.id,
+        label: `${a.stateCode} · ${a.title}`,
+        href: `/alerts/${a.id}`,
+        status: tone === "danger" ? "danger" : tone === "warn" ? "warn" : undefined,
+      }),
+    );
+    toast.success("Pinned to workspace tab");
+  };
 
+  // Two zones, separated by a hairline divider — per DESIGN.md
+  // §Information hierarchy:
+  //   Zone 1 ("what")   — title (T1 hero, alone on its row), then a
+  //                       single quiet meta line carrying authority +
+  //                       type pill + time, then a 2-line summary.
+  //                       Type pill rides at xs size on the meta line
+  //                       so it stays scannable but doesn't compete
+  //                       with the title.
+  //   Zone 2 ("who/when") — AFFECTS eyebrow + chips, then the
+  //                         deadline shift on its own row beneath
+  //                         (different concept = different geometry).
   return (
     <div
       role="button"
@@ -162,63 +193,177 @@ function FeedCard({
         }
       }}
       className={cn(
-        "block w-full text-left bg-surface border border-line rounded-md transition-colors cursor-pointer",
+        // `group` enables hover-revealed action chips in Zone 3.
+        // shrink-0 keeps cards at intrinsic height inside the
+        // parent's `flex flex-col` scroll container.
+        "group block w-full shrink-0 text-left bg-surface border border-line rounded-md transition-all cursor-pointer overflow-hidden",
         "hover:border-line-strong",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-900",
-        selected && "border-indigo ring-2 ring-indigo-soft",
+        selected && !handled && "border-indigo ring-2 ring-indigo-soft",
+        handled && "opacity-60 hover:opacity-95",
       )}
       aria-pressed={selected}
     >
+      {/* ── Zone 1 — what just happened ───────────────────────── */}
       <div className="p-region flex items-start gap-3">
         <StateBadge code={a.stateCode} />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap text-xs text-ink-500 mb-1">
-            <StatusPill variant={tone} size="xs">
-              {TYPE_LABEL[a.type]}
-            </StatusPill>
-            <span className="font-medium text-ink-700 truncate">
-              {a.authority}
-            </span>
-            <span className="text-ink-300">·</span>
-            <span className="tabular-nums">{timeAgoShort(a.detectedAt)}</span>
-          </div>
+          {/* Title on its own row — hero, no competition */}
           <h3 className="text-base font-semibold text-ink-900 leading-snug">
             {a.title}
           </h3>
-          <p className="mt-1 text-sm text-ink-700 leading-snug line-clamp-2">
+
+          {/* Single quiet meta line: authority truncates, type pill +
+              time pinned right at the same weight (both T2 metadata). */}
+          <div className="mt-1 flex items-center gap-2 text-xs text-ink-500">
+            <span className="truncate flex-1 min-w-0">{a.authority}</span>
+            <StatusPill variant={tone} size="xs" className="shrink-0">
+              {TYPE_LABEL[a.type]}
+            </StatusPill>
+            <span className="tabular-nums shrink-0 text-ink-400">
+              {timeAgoShort(a.detectedAt)}
+            </span>
+          </div>
+
+          <p className="mt-2 text-sm text-ink-700 leading-snug line-clamp-2">
             {a.summary}
           </p>
-          <div className="flex items-center gap-2 mt-2 text-xs text-ink-700">
-            <span className="font-semibold text-ink-900 tabular-nums">
-              {a.affectedClientIds.length}{" "}
-              {a.affectedClientIds.length === 1 ? "client" : "clients"}
-            </span>
-            <span className="text-ink-400">·</span>
-            {a.newDeadline ? (
-              <span>
-                deadline shifts to{" "}
-                <span className="font-medium text-ink-900">
-                  {formatLongDate(a.newDeadline)}
-                </span>
-              </span>
-            ) : (
-              <span>{a.taxTypes[0] ?? "filing rule change"}</span>
-            )}
-          </div>
-          {visibleChips.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap mt-2">
-              {visibleChips.map((c) => (
-                <ClientChip key={c.id} name={c.name} />
-              ))}
-              {overflow > 0 && (
-                <span className="text-xs text-ink-500 px-1.5 tabular-nums">
-                  +{overflow} more
-                </span>
-              )}
+
+          {handled && (
+            <div className="mt-2 inline-flex items-center gap-1 text-2xs font-medium text-ok-ink bg-ok-bg border border-ok-border rounded px-1.5 py-0.5">
+              <Check className="w-3 h-3" aria-hidden />
+              Handled this session
             </div>
           )}
         </div>
       </div>
+
+      {/* ── Zone 2 — who/when affected ────────────────────────── */}
+      {(visibleChips.length > 0 || a.newDeadline) && (
+        <div className="border-t border-line bg-sunken/40 px-region py-3">
+          {/* AFFECTS eyebrow + chip row — one concept */}
+          {visibleChips.length > 0 && (
+            <>
+              <div className="text-2xs uppercase tracking-wider text-ink-500 font-semibold mb-2">
+                Affects{" "}
+                <span className="tabular-nums text-ink-900">
+                  {a.affectedClientIds.length}
+                </span>{" "}
+                {a.affectedClientIds.length === 1 ? "client" : "clients"}
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {visibleChips.map((c) => (
+                  <ClientChip key={c.id} name={c.name} />
+                ))}
+                {overflow > 0 && (
+                  <span className="text-xs text-ink-500 px-1.5 tabular-nums">
+                    +{overflow} more
+                  </span>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Deadline shift — own row, calendar icon, separated from
+              the AFFECTS group by an inner divider. Different concept
+              = different geometry. */}
+          {a.newDeadline && (
+            <div
+              className={cn(
+                "flex items-center gap-1.5 text-xs text-ink-700",
+                visibleChips.length > 0 && "mt-2.5 pt-2.5 border-t border-line/60",
+              )}
+            >
+              <CalendarClock className="w-3.5 h-3.5 text-ink-500 shrink-0" aria-hidden />
+              <span>
+                Deadline shifts to{" "}
+                <span className="font-medium text-ink-900">
+                  {formatLongDate(a.newDeadline)}
+                </span>
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Zone 3 — inline action chips (hover-revealed) ──────
+          v0u shows action chips inline on every card so the CPA can
+          act without selecting + opening the right pane. We do the
+          same but reveal on hover/focus only — keeps the rest state
+          scannable per the density discipline.
+
+          Each button calls e.stopPropagation() so the card's onSelect
+          doesn't fire alongside. They DO call onComplete(a.id) which
+          marks the alert handled + auto-advances to the next.
+
+          Hidden when handled — re-doing the action would be confusing. */}
+      {!handled && (
+        <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity border-t border-line px-region py-2 flex items-center gap-1.5 flex-wrap bg-surface">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              toast.success(
+                `Sent draft to ${a.affectedClientIds.length} ${a.affectedClientIds.length === 1 ? "client" : "clients"}`,
+              );
+              onComplete(a.id);
+            }}
+            className="inline-flex items-center gap-1 text-xs font-medium text-white bg-indigo hover:bg-indigo-hover transition-colors px-2 py-1 rounded"
+            title="Send personalized email draft to each affected client"
+          >
+            <Send className="w-3 h-3" aria-hidden />
+            Send {a.affectedClientIds.length}
+          </button>
+          {a.newDeadline && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                toast.success(
+                  `${a.affectedClientIds.length} deadlines moved to ${formatLongDate(a.newDeadline!)}`,
+                );
+                onComplete(a.id);
+              }}
+              className="inline-flex items-center gap-1 text-xs font-medium text-ink-700 hover:text-ink-900 hover:bg-sunken transition-colors px-2 py-1 rounded border border-line"
+              title={`Move ${a.affectedClientIds.length} affected filings to ${formatLongDate(a.newDeadline)}`}
+            >
+              <CalendarClock className="w-3 h-3" aria-hidden />
+              Apply deadline
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              toast.info(`Bulletin forwarded to ${a.affectedClientIds.length} clients`);
+              onComplete(a.id);
+            }}
+            className="inline-flex items-center gap-1 text-xs font-medium text-ink-700 hover:text-ink-900 hover:bg-sunken transition-colors px-2 py-1 rounded border border-line"
+            title="Forward the official bulletin with a short cover note"
+          >
+            <Forward className="w-3 h-3" aria-hidden />
+            Forward
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              toast.success("Snoozed until tomorrow");
+              onComplete(a.id);
+            }}
+            className="inline-flex items-center gap-1 text-xs text-ink-500 hover:text-ink-900 hover:bg-sunken transition-colors px-2 py-1 rounded ml-auto"
+            title="Hide until tomorrow; re-appears if unresolved"
+          >
+            <MoonStar className="w-3 h-3" aria-hidden />
+            Snooze
+          </button>
+          <OpenInTabButton
+            label={`${a.stateCode} · ${a.title}`}
+            onClick={handleOpenInTab}
+            className="ml-1"
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -263,9 +408,15 @@ function ActionRow({
 
 function CopilotPane({
   announcement,
+  excludedClientIds,
+  onToggleExclusion,
+  onComplete,
   onClose,
 }: {
   announcement: Announcement | null;
+  excludedClientIds: Set<string>;
+  onToggleExclusion: (clientId: string) => void;
+  onComplete: (id: string) => void;
   onClose: () => void;
 }) {
   const [draftIndex, setDraftIndex] = useState(0);
@@ -292,68 +443,77 @@ function CopilotPane({
   }
 
   const a = announcement;
-  const affected = affectedClientsFor(a);
-  const clientCount = affected.length;
-  const currentClient = affected[draftIndex];
+  const allAffected = affectedClientsFor(a);
+  const includedClients = allAffected.filter((c) => !excludedClientIds.has(c.id));
+  const includedCount = includedClients.length;
+  const excludedCount = allAffected.length - includedCount;
+  const safeIdx = Math.min(draftIndex, Math.max(0, includedCount - 1));
+  const currentClient = includedClients[safeIdx];
   const subject = currentClient ? draftSubject(a, currentClient) : "";
   const body = currentClient ? draftBody(a, currentClient) : "";
 
   return (
     <aside className="w-pane shrink-0 bg-canvas border-l border-line flex flex-col overflow-hidden">
-      {/* Header — context strip */}
-      <div className="px-region py-3 bg-surface border-b border-line">
-        <div className="flex items-start gap-3">
+      {/* ── Header zone: Context ─────────────────────────────────
+          Two grouped sub-zones — "what is this" + a quiet meta strip
+          for at-a-glance scanning. Meta uses gap-3 spacing instead of
+          middle dots between metric values (DESIGN.md §Don't on
+          dot-spliced rows). Calendar icon makes the deadline shift
+          read as a temporal indicator, not just text. */}
+      <div className="bg-surface border-b border-line">
+        <div className="px-region pt-3 pb-3 flex items-start gap-3">
           <StateBadge code={a.stateCode} />
           <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold text-ink-900 leading-snug">
               {a.title}
             </div>
-            <div className="text-xs text-ink-500 mt-0.5">{a.authority}</div>
+            <div className="text-xs text-ink-500 mt-0.5 truncate">
+              {a.authority}
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="shrink-0 w-7 h-7 inline-flex items-center justify-center rounded text-ink-500 hover:bg-sunken hover:text-ink-900 transition-colors"
-            aria-label="Clear selection"
+            aria-label="Close detail pane"
           >
-            <ChevronRight className="w-4 h-4" aria-hidden />
+            <X className="w-4 h-4" aria-hidden />
           </button>
         </div>
-        <div className="flex items-center gap-2 mt-2 flex-wrap">
+        <div className="px-region pb-3 flex items-center gap-3 flex-wrap border-t border-line pt-2.5">
           <StatusPill variant={TYPE_TONE[a.type]} size="xs">
             {TYPE_LABEL[a.type]}
           </StatusPill>
-          <span className="text-xs text-ink-700 font-medium tabular-nums">
-            {clientCount} {clientCount === 1 ? "client" : "clients"} affected
+          <span className="text-xs text-ink-700 tabular-nums">
+            <span className="font-semibold text-ink-900">{allAffected.length}</span>{" "}
+            {allAffected.length === 1 ? "client" : "clients"}
           </span>
           {a.newDeadline && (
-            <>
-              <span className="text-ink-300 text-xs">·</span>
-              <span className="text-xs text-ink-700">
-                new deadline{" "}
-                <span className="font-semibold text-ink-900">
-                  {formatLongDate(a.newDeadline)}
-                </span>
+            <span className="inline-flex items-center gap-1 text-xs text-ink-700">
+              <CalendarClock className="w-3 h-3 text-ink-500" aria-hidden />
+              <span className="font-medium text-ink-900">
+                {formatLongDate(a.newDeadline)}
               </span>
-            </>
+            </span>
           )}
         </div>
       </div>
 
-      {/* Body — actions + email preview */}
+      {/* ── Body zone: Suggested actions ─────────────────────── */}
       <div className="flex-1 overflow-y-auto">
-        <div className="px-region py-3 flex items-center gap-2">
-          <span className="text-2xs uppercase tracking-wider font-semibold text-indigo-ink inline-flex items-center gap-1">
-            <Sparkles className="w-3 h-3" aria-hidden />
-            AI suggested actions
-          </span>
-          <span className="text-xs text-ink-500 ml-auto">
-            {a.newDeadline ? "4" : "3"} ready
+        <div className="px-region pt-3 pb-2">
+          <span className="text-2xs uppercase tracking-wider font-semibold text-ink-500">
+            Suggested actions
           </span>
         </div>
 
         <div className="px-region pb-region flex flex-col gap-2">
-          {/* Action 1 — primary, expanded with email preview */}
+          {/* Action 1 — primary. Three sub-zones in ONE card,
+              separated by hairline dividers (no nested cards per
+              DESIGN.md §Cards):
+                (a) header — icon + title + Send CTA with live count
+                (b) recipient list — chip list with X-to-exclude
+                (c) email preview — subject + body + nav controls */}
           <article className="bg-surface border border-indigo-soft rounded-md overflow-hidden">
             <div className="flex items-start gap-3 p-region">
               <span
@@ -364,8 +524,8 @@ function CopilotPane({
               </span>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold text-ink-900 leading-snug">
-                  Draft {clientCount} client{" "}
-                  {clientCount === 1 ? "email" : "emails"}
+                  Draft {includedCount} client{" "}
+                  {includedCount === 1 ? "email" : "emails"}
                 </div>
                 <div className="text-xs text-ink-700 mt-1 leading-snug">
                   Personalized for each affected client · references the{" "}
@@ -375,26 +535,82 @@ function CopilotPane({
                 </div>
               </div>
               <Button
-                onClick={() =>
+                onClick={() => {
                   toast.success(
-                    `Sent draft to ${clientCount} ${clientCount === 1 ? "client" : "clients"}`,
-                  )
-                }
-                className="shrink-0 bg-indigo hover:bg-indigo-hover text-surface"
+                    `Sent draft to ${includedCount} ${includedCount === 1 ? "client" : "clients"}`,
+                  );
+                  onComplete(a.id);
+                }}
+                disabled={includedCount === 0}
+                className="shrink-0 bg-indigo hover:bg-indigo-hover text-surface disabled:opacity-40"
               >
                 <Send aria-hidden />
-                Send all
+                Send {includedCount}
               </Button>
             </div>
 
-            {currentClient && (
-              <div className="mx-region mb-region bg-sunken/50 border border-line rounded-md p-3">
-                <div className="flex items-center gap-2 mb-2 text-2xs uppercase tracking-wider font-semibold text-ink-500">
-                  <span className="bg-indigo-soft text-indigo-ink px-1.5 py-0.5 rounded text-[10px] font-bold">
-                    Preview {draftIndex + 1} of {clientCount}
+            {/* Recipient list — partial-selection control. Click a
+                chip to exclude / include. The Send CTA above shows
+                the live count. */}
+            <div className="border-t border-line px-region py-2.5 bg-sunken/30">
+              <div className="flex items-center justify-between mb-2 text-2xs uppercase tracking-wider text-ink-500 font-semibold">
+                <span>
+                  Sending to{" "}
+                  <span className="tabular-nums text-ink-900">{includedCount}</span>
+                </span>
+                {excludedCount > 0 && (
+                  <span className="text-ink-400 normal-case tracking-normal text-xs font-normal">
+                    {excludedCount} excluded
                   </span>
-                  <span className="text-ink-500 normal-case tracking-normal text-xs font-normal truncate">
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {allAffected.map((c) => {
+                  const isExcluded = excludedClientIds.has(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => onToggleExclusion(c.id)}
+                      className={cn(
+                        "group inline-flex items-center gap-1 rounded-pill border text-xs px-2 py-0.5 transition-colors",
+                        isExcluded
+                          ? "border-line bg-transparent text-ink-400 line-through hover:border-line-strong hover:text-ink-700 hover:no-underline"
+                          : "border-line bg-surface text-ink-700 hover:border-danger-border hover:text-danger-ink",
+                      )}
+                      title={
+                        isExcluded
+                          ? `Click to include ${c.name}`
+                          : `Click to exclude ${c.name} from this send`
+                      }
+                    >
+                      <span className="truncate max-w-[110px]">{c.name}</span>
+                      <X
+                        className={cn(
+                          "w-2.5 h-2.5 transition-opacity",
+                          isExcluded
+                            ? "rotate-45 text-ink-400"
+                            : "text-ink-400 opacity-0 group-hover:opacity-100",
+                        )}
+                        aria-hidden
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Email preview — divider-separated sub-zone, NOT a
+                nested card (DESIGN.md §Cards). Same surface, just a
+                hairline border-t + sunken bg shift to read as a zone. */}
+            {currentClient && includedCount > 0 && (
+              <div className="border-t border-line bg-sunken/40 px-region py-3">
+                <div className="flex items-center gap-2 mb-2 text-xs">
+                  <span className="text-ink-700 truncate flex-1">
                     To: {currentClient.email ?? currentClient.name}
+                  </span>
+                  <span className="text-ink-500 tabular-nums shrink-0">
+                    Draft {safeIdx + 1} of {includedCount}
                   </span>
                 </div>
                 <div className="text-xs font-semibold text-ink-900 mb-1 leading-snug">
@@ -403,7 +619,7 @@ function CopilotPane({
                 <div className="text-xs text-ink-700 leading-snug whitespace-pre-line line-clamp-6">
                   {body}
                 </div>
-                <div className="flex items-center gap-1 mt-2 pt-2 border-t border-line">
+                <div className="flex items-center gap-1 mt-2 pt-2 border-t border-line/60">
                   <button
                     type="button"
                     onClick={() =>
@@ -426,21 +642,21 @@ function CopilotPane({
                     <button
                       type="button"
                       onClick={() => setDraftIndex((i) => Math.max(0, i - 1))}
-                      disabled={draftIndex === 0}
+                      disabled={safeIdx === 0}
                       className="w-6 h-6 inline-flex items-center justify-center rounded text-ink-700 hover:bg-surface disabled:opacity-40 disabled:hover:bg-transparent"
                       aria-label="Previous draft"
                     >
                       <ChevronLeft className="w-3.5 h-3.5" aria-hidden />
                     </button>
                     <span className="text-xs text-ink-500 tabular-nums px-1.5 min-w-[44px] text-center">
-                      {draftIndex + 1} / {clientCount}
+                      {safeIdx + 1} / {includedCount}
                     </span>
                     <button
                       type="button"
                       onClick={() =>
-                        setDraftIndex((i) => Math.min(clientCount - 1, i + 1))
+                        setDraftIndex((i) => Math.min(includedCount - 1, i + 1))
                       }
-                      disabled={draftIndex === clientCount - 1}
+                      disabled={safeIdx >= includedCount - 1}
                       className="w-6 h-6 inline-flex items-center justify-center rounded text-ink-700 hover:bg-surface disabled:opacity-40 disabled:hover:bg-transparent"
                       aria-label="Next draft"
                     >
@@ -456,34 +672,61 @@ function CopilotPane({
             <ActionRow
               icon={<CalendarClock className="w-3.5 h-3.5" aria-hidden />}
               title={`Apply new ${formatLongDate(a.newDeadline)} deadline`}
-              description={`Move ${clientCount} affected ${clientCount === 1 ? "filing" : "filings"} · audit-trailed with the announcement source`}
+              description={`Move ${includedCount} affected ${includedCount === 1 ? "filing" : "filings"} · audit-trailed with the announcement source`}
               cta="Preview"
-              onClick={() =>
+              onClick={() => {
                 toast.success(
-                  `${clientCount} deadlines moved to ${formatLongDate(a.newDeadline!)}`,
-                )
-              }
+                  `${includedCount} deadlines moved to ${formatLongDate(a.newDeadline!)}`,
+                );
+                onComplete(a.id);
+              }}
             />
           )}
           <ActionRow
             icon={<Forward className="w-3.5 h-3.5" aria-hidden />}
             title={`Forward ${a.authority} bulletin`}
-            description={`Attaches the official URL · short cover note · ${clientCount} recipients`}
+            description={`Attaches the official URL · short cover note · ${includedCount} recipients`}
             cta="Preview"
-            onClick={() =>
-              toast.info(`Bulletin forward staged for ${clientCount} clients`)
-            }
-          />
-          <ActionRow
-            icon={<MoonStar className="w-3.5 h-3.5" aria-hidden />}
-            title="Snooze until tomorrow"
-            description="Reminders pause; alert reappears on next page load if unresolved"
-            cta="Snooze"
             onClick={() => {
-              toast.success("Snoozed until tomorrow");
-              onClose();
+              toast.info(`Bulletin forward staged for ${includedCount} clients`);
+              onComplete(a.id);
             }}
           />
+        </div>
+      </div>
+
+      {/* ── Disposition zone — sticky footer ─────────────────────
+          Pinned above the composer (outside the scroll container) so
+          escape hatches stay reachable regardless of how long the
+          action list grows. Per DESIGN.md §Do's: "Keep escape
+          hatches visible." */}
+      <div className="border-t border-line bg-canvas px-region py-2">
+        <div className="text-2xs uppercase tracking-wider font-semibold text-ink-400 mb-1.5">
+          Disposition
+        </div>
+        <div className="flex items-center gap-1 flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              toast.success("Snoozed until tomorrow");
+              onComplete(a.id);
+            }}
+            className="inline-flex items-center gap-1.5 text-xs text-ink-700 hover:text-ink-900 hover:bg-sunken transition-colors px-2 py-1 rounded"
+          >
+            <MoonStar className="w-3.5 h-3.5 text-ink-500" aria-hidden />
+            Snooze until tomorrow
+          </button>
+          <span className="text-ink-300 mx-1" aria-hidden>·</span>
+          <button
+            type="button"
+            onClick={() => {
+              toast.info("Marked not applicable to your clients");
+              onComplete(a.id);
+            }}
+            className="inline-flex items-center gap-1.5 text-xs text-ink-700 hover:text-ink-900 hover:bg-sunken transition-colors px-2 py-1 rounded"
+          >
+            Mark not applicable
+          </button>
         </div>
       </div>
 
@@ -551,6 +794,17 @@ export function Alerts() {
   const announcements = announcementsQuery.data ?? [];
   const dismissMutation = useDismissAnnouncement();
 
+  // Session-scoped state.
+  // - handledIds: alerts the CPA has acted on this session (Send all,
+  //   Apply deadline, Forward bulletin, Snooze, Mark not applicable).
+  //   Used to fade the card and auto-advance to the next un-handled.
+  // - excludedByAlert: per-alert set of client IDs the CPA has chosen
+  //   NOT to include in batch actions (partial selection in pane).
+  const [handledIds, setHandledIds] = useState<Set<string>>(new Set());
+  const [excludedByAlert, setExcludedByAlert] = useState<
+    Map<string, Set<string>>
+  >(new Map());
+
   const filtered = useMemo(() => {
     if (tab === "all") return announcements.filter((a) => !a.dismissed);
     if (tab === "resolved") return announcements.filter((a) => a.dismissed);
@@ -588,17 +842,82 @@ export function Alerts() {
   const handleSelect = (id: string) => {
     navigate(`/alerts/${id}`, { replace: true });
   };
+
+  // Action complete (Send / Apply / Forward / Snooze / Mark NA):
+  //   1) mark this alert handled so the feed card fades to opacity-60
+  //      with a "Handled this session" chip — gap-loud is preserved
+  //      (the CPA can re-open) but visually demoted on next scan.
+  //   2) auto-advance to the next un-handled alert in the active tab
+  //      so triage feels queue-like (forward, then loop back to before
+  //      the current cursor if all "after" are done).
+  const handleComplete = useCallback(
+    (id: string) => {
+      setHandledIds((prev) => {
+        const next = new Set(prev);
+        next.add(id);
+        return next;
+      });
+      const idx = filtered.findIndex((a) => a.id === id);
+      if (idx < 0) return;
+      const after = filtered
+        .slice(idx + 1)
+        .find((a) => !handledIds.has(a.id) && a.id !== id);
+      const before = filtered
+        .slice(0, idx)
+        .reverse()
+        .find((a) => !handledIds.has(a.id) && a.id !== id);
+      const nextAlert = after ?? before;
+      if (nextAlert) {
+        navigate(`/alerts/${nextAlert.id}`, { replace: true });
+      } else {
+        navigate(`/alerts`, { replace: true });
+      }
+    },
+    [filtered, handledIds, navigate],
+  );
+
   const handleClearSelection = () => {
     navigate(`/alerts`, { replace: true });
-    dismissMutation.mutate({ id: selectedId! });
   };
+
+  const toggleClientExclusion = useCallback(
+    (alertId: string, clientId: string) => {
+      setExcludedByAlert((prev) => {
+        const next = new Map(prev);
+        const set = new Set(next.get(alertId) ?? []);
+        if (set.has(clientId)) set.delete(clientId);
+        else set.add(clientId);
+        next.set(alertId, set);
+        return next;
+      });
+    },
+    [],
+  );
+
+  // Keep dismissMutation referenced — wired to be available when the
+  // disposition's Mark-not-applicable graduates from session-only to
+  // a real backend dismissal.
+  void dismissMutation;
 
   return (
     <PageContainer variant="workshop">
       {/* ── Center feed ──────────────────────────────────────────────── */}
       <section className="flex-1 min-w-0 flex flex-col bg-canvas overflow-hidden">
         <div className="px-4 md:px-6 lg:px-8 pt-6 md:pt-8 pb-region bg-surface border-b border-line sticky top-0 z-10">
-          <PageHeader title="Alerts" meta={`${totals.all} active`} className="mb-region" />
+          <PageHeader title="Alerts" meta={`${totals.all} active`} className="mb-2" />
+          {/* Ambient monitoring line — v0u inheritance. Pulsing dot
+              signals "we're watching" without nagging; the timestamp
+              earns trust by being specific. Static "14m ago" until
+              the scrape backend reports its own clock. */}
+          <div className="mb-region flex items-center gap-2 text-xs text-ink-500">
+            <span
+              className="inline-block w-1.5 h-1.5 rounded-full bg-ok-solid animate-pulse"
+              aria-hidden
+            />
+            <span>50 / 50 states monitored</span>
+            <span className="text-ink-300" aria-hidden>·</span>
+            <span className="tabular-nums">last scrape 14m ago</span>
+          </div>
           <div className="flex items-center gap-1 border-b border-line -mb-region">
             <FilterChip
               variant="tab"
@@ -654,7 +973,9 @@ export function Alerts() {
                 key={a.id}
                 a={a}
                 selected={a.id === selectedId}
+                handled={handledIds.has(a.id)}
                 onSelect={() => handleSelect(a.id)}
+                onComplete={handleComplete}
               />
             ))
           )}
@@ -664,6 +985,13 @@ export function Alerts() {
       {/* ── Co-pilot pane ────────────────────────────────────────────── */}
       <CopilotPane
         announcement={selected}
+        excludedClientIds={
+          selected ? excludedByAlert.get(selected.id) ?? new Set() : new Set()
+        }
+        onToggleExclusion={(clientId) =>
+          selected && toggleClientExclusion(selected.id, clientId)
+        }
+        onComplete={handleComplete}
         onClose={handleClearSelection}
       />
     </PageContainer>

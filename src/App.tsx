@@ -61,6 +61,9 @@ const Calendar = lazy(() =>
 const TodayDesign = lazy(() =>
   import("./pages/Today").then((m) => ({ default: m.Today })),
 );
+const TodayTriage = lazy(() =>
+  import("./pages/TodayTriage").then((m) => ({ default: m.TodayTriage })),
+);
 const OnboardingFirm = lazy(() =>
   import("./pages/onboarding/OnboardingFirm").then((m) => ({
     default: m.OnboardingFirm,
@@ -209,6 +212,11 @@ export default function App() {
               Non-destructive — old Dashboard still serves "/" until this is
               approved as the Today replacement. */}
           <Route path="design/today" element={<TodayDesign />} />
+          {/* v0m focused triage mode — single-card, keyboard-driven.
+              Inherits the Action Queue from Today; mounted inside AppShell
+              so the floating sidebar + topbar stay consistent. Reach via
+              the "Triage mode →" link on Today, or directly /today/triage. */}
+          <Route path="today/triage" element={<TodayTriage />} />
           <Route path="opportunities" element={<Insights />} />
           {/* Legacy /insights route — redirect to canonical /opportunities */}
           <Route path="insights" element={<Navigate to="/opportunities" replace />} />

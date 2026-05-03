@@ -182,7 +182,7 @@ The three converge: **a productivity tool earns trust by getting out of the way*
 |:--|:----------|:-------------|
 | **T1** | **Numbers are typographic objects.** | Every dollar / count / date uses `tabular-nums`. Page-level KPIs use `<MetricTile>` with display weight. Generic body-render of a number is a fail. |
 | **T2** | **One accent, one viewport, one action.** | The indigo accent (`bg-indigo`) appears on the **next action** only — primary CTA, currently-selected sidebar item, important "do this now" surface. Before painting indigo, ask: "is this the ONE next action?" If no, demote to a slate ghost / link. |
-| **T3** | **Pills for actions, soft rectangles for objects.** | Buttons + status chips are `rounded-pill` (999px). Cards / inputs / modals are soft rectangles (`rounded-md` 8px). Shape codes role faster than label. |
+| **T3** | **Pills for indicators, soft rectangles for actions.** | Status pills (`<StatusPill>`), filter chips (`<FilterChip>`), count badges (`<CountBadge>`), jurisdiction tags (`<StateBadge>`) and other read-only or toggle labels use `rounded-full`. Buttons, inputs, cards, modals, dropdowns — anything you commit through — use `rounded-md` (8px). Shape distinguishes *"this labels something"* from *"this acts on something."* (Deliberate departure from Mercury, which pills its primary buttons; the dense terminal register reads better with squared action surfaces.) |
 | **T4** | **Status colors are pills, never paint.** | Green / orange / red appear as small `<StatusPill>` (tinted bg + saturated text). They never become surface fills, never become row left-borders, never become full-card backgrounds. Use `<StatusPill>` — period. |
 | **T5** | **Sidebar groups, surface unfolds.** | Left nav is grouped by domain (`Workflows / Personal / Team`). Main canvas opens flush — no nested chrome bars, no breadcrumbs on most pages. The sidebar IS the wayfinding. |
 | **T6** | **Density via vertical air, not chrome.** | Tables/lists use ≥44px row height with consistent vertical padding. Cramped density is anxiety; comfortable density is the product's value. The 8/16/24/48 rhythm does the structural work — drop the dividing borders/shadows. |
@@ -206,7 +206,7 @@ A single accent (deep ink) plus four status families. No tertiary brand color, n
 
 - **Surfaces** (`canvas` / `surface` / `sunken`): cool neutral as page bg (`#F8F9FB` — Mercury-aligned, refreshed 2026-05-03 from the original warm cream), pure white for cards, slightly darker cool tint for hover and divided regions inside cards.
 - **Ink** (`ink-900` → `ink-300`): a five-step grayscale ladder. `900` for primary text, `500` for metadata, `300` for separator dots and disabled states.
-- **Primary** (`primary` / `primary-hover`): deep ink, used only on primary commit buttons. Never as a fill on cards, banners, or icons.
+- **Primary** (`primary` / `primary-hover`): deep ink — used as the dark surface of the user-avatar circle and a few rare slate-buttoned places (user-menu trigger). The **next-action CTA color is indigo** (`bg-indigo`, per T2 + Mercury inheritance), **not slate**. Never use either as a fill on cards, banners, or icons.
 - **Status families** (`danger` / `warn` / `ok` / `info`): each has `bg`, `border`, `ink` triples. `bg` is a low-saturation tint for pill backgrounds; `ink` is a high-contrast text color. Never use status `solid` colors for backgrounds — they're for icons and borders only.
 
 ## Typography
@@ -224,7 +224,13 @@ Bold for emphasis only — never to fix weak hierarchy that should be solved wit
 
 ## Layout & Spacing
 
-Single column, content-led width. Bounded `max-width: 840px`, centered with `page-x: 32px` horizontal padding. The CPA reads top-to-bottom; we never go full-width-1200px (that's marketing-page sprawl).
+Content width is bounded by `<PageContainer>` (`src/components/ui/PageContainer.tsx`), which has three variants — pick by content type, not page:
+
+- **`default` (max-w-840px)** — calm digest pages (Today). Single-column briefing.
+- **`wide` (max-w-1080px)** — data tables (Timeline, Clients). Mercury-aligned table width.
+- **`workshop` (full viewport)** — 2-column workspaces (Alerts feed + co-pilot pane). Child owns chrome.
+
+Page padding is uniform across `default` and `wide`: `px-4 md:px-6 lg:px-8` horizontal, `py-6 md:py-8` vertical. Tables and workshops use the same vertical rhythm as digest pages — only the canvas widens to match the data they hold. We never go to marketing-page sprawl (1280+) on body content.
 
 The page has **one rhythm rule**: spacing doubles between scopes.
 
@@ -304,16 +310,111 @@ State alert cards and client action cards share this shell. They are visual sibl
 
 ### Buttons
 
-Two affordances only:
+Compose from shadcn `<Button>` (`src/components/ui/button.tsx`). Five variants are in active use; pick by intent, not by chrome:
 
-- **`button-primary`** — solid `primary` background, white text, `rounded-md`, h-32px. Used for commit actions: `Reset deadlines (3)`, `Send reminder (3)`, `Confirm receipt`, `File`.
-- **`link`** — text only, `ink-700`, no chrome, hover deepens to `ink-900`. Used for tertiary actions: `Snooze until tomorrow`, `Show all 7`, `Open thread`.
+- **`default` (primary commit)** — indigo solid pill (T2 — the next action). Used for: `Reset deadlines (3)`, `Send reminder (3)`, `Confirm receipt`, `File`. **At most one** primary on a viewport.
+- **`outline` (secondary commit)** — hairline border + surface bg, text `ink-700`. Used for: `Cancel` in modals, alternative-path actions next to a primary. Mercury references show outline pills paired with a primary; never used alone.
+- **`ghost` (tertiary)** — no chrome until hover. Used for: row-action buttons, sheet/modal close affordances, table-cell actions revealed on hover/focus, top-bar `+ New`-style triggers.
+- **`link`** — text only, `ink-700`, no chrome, hover deepens. Used for: `Snooze until tomorrow`, `Show all 7`, `Open thread` — anywhere the action is navigational rather than committing.
+- **`destructive`** — `bg-danger-solid` pill. Used only inside confirm modals (per §Confirm modal discipline) and the `Delete` affordance on detail panes.
 
-No outline buttons. No ghost buttons. No icon-only buttons except chevrons inside card headers.
+Plus the **`icon` size** for icon-only buttons — composed via `<IconButton>`, which adds the required `aria-label` + optional `<CountBadge>` slot. Mercury uses icon-only buttons for: search reveal, more-menu (`⋯`), eye toggle, mute, dismiss. All legitimate — the rule is "every icon button has a label," not "no icon buttons."
+
+**Shape:** `rounded-md` (8px) — matches the shadcn cva default. **Don't pill the buttons.** Mercury references show pills as their primary affordance; we deliberately keep buttons squared because the dense terminal register reads better with consistent corners across buttons / inputs / cards. Pills are reserved for indicators (`<StatusPill>`, `<FilterChip>`, `<CountBadge>`, `<StateBadge>` — see T3). Audit any `className="rounded-full"` override on a `<Button>` and remove it.
 
 ### Checkbox row
 
 Used inside expanded alert cards (one client per row) and inside expanded client action cards (one item per row). Hover state applies `sunken` bg to the entire row. Default state of every checkbox: **ticked** (opt-out is faster than opt-in for the common case).
+
+### Inputs (text, select, textarea)
+
+Composed from shadcn `<Input>` / `<Select>` / `<Textarea>`. Mercury references show inputs sitting slightly *below* page surface (sunken tint) so they read as fillable, not as cards.
+
+| Property | Value |
+|:---------|:------|
+| Height | `h-9` (36px) — matches button default; selects same |
+| Background | `bg-sunken` rest, `bg-surface` on focus |
+| Border | `border border-line` rest; `border-line-strong` on hover |
+| Focus | `focus-visible:outline-2 focus-visible:outline-indigo focus-visible:outline-offset-2` (never `outline: none`) |
+| Radius | `rounded-md` (8px) |
+| Padding | `px-3 py-2` (12 / 8) |
+| Label above | `text-label` (13/500) `text-ink-900`, 4px above the input |
+| Helper below | `text-caption` (12/400) `text-ink-500`, 4px below the input |
+| Placeholder | `text-ink-400` |
+| Disabled | `opacity-40 cursor-not-allowed bg-line` |
+| Invalid | `border-danger-border` + `aria-invalid="true"` + `text-caption text-danger-ink` error message in the helper slot |
+
+### Modals
+
+Composed from shadcn `<Dialog>` (`src/components/ui/dialog.tsx`). The behavioral contract lives in §Confirm modal discipline; the visual contract is below.
+
+| Property | Value |
+|:---------|:------|
+| Width | `max-w-md` (~448px) for confirms; `max-w-lg` (~512px) for forms |
+| Background | `bg-surface` |
+| Border | `border border-line` (1px hairline) |
+| Radius | `rounded-lg` (10px) — slightly rounder than cards (8px) so a modal reads as a discrete object floating above |
+| Shadow | `shadow-overlay` |
+| Backdrop | `bg-ink-900/40 backdrop-blur-[2px]`, `z-40` |
+| Modal layer | `z-50` |
+| Padding | `p-6` (24px) for the body; header same horizontal + `pt-6 pb-4`; footer `pt-4 pb-6` |
+| Title | `text-title` (18/600); no separator border between header and body |
+| Field group gap | `gap-card` (24px) between groups; `gap-region` (16px) inside a group |
+| Footer | Right-aligned, `gap-3` between buttons. **Cancel sits left of the commit.** Destructive commits use `Button variant=destructive`; non-destructive use the default indigo. |
+| Esc + outside-click | Close. Focus returns to the element that opened the modal (focus trap while open). |
+
+### Dropdown menus
+
+Composed from shadcn `<DropdownMenu>` (`src/components/ui/dropdown-menu.tsx`). Anchored to a trigger; floats above with subtle elevation.
+
+| Property | Value |
+|:---------|:------|
+| Background | `bg-surface` |
+| Border | `border border-line` |
+| Radius | `rounded-md` (8px) |
+| Shadow | `shadow-pop` |
+| Min-width | match trigger, or `w-48` / `w-56` when content is wider |
+| Item padding | `px-3 py-2` (12 / 8) |
+| Item gap | `gap-2` between leading icon and label |
+| Item rest | `text-ink-700` |
+| Item hover | `bg-sunken text-ink-900` |
+| Item disabled | `opacity-40 cursor-not-allowed` |
+| Separator | `border-t border-line my-1` |
+| Section eyebrow | `text-2xs uppercase tracking-wider text-ink-400 px-3 pt-2 pb-1` |
+| Helper line (non-interactive) | `text-2xs text-ink-400 px-3 py-1.5` (no hover bg) |
+
+### Sidebar (floating shell + nav items)
+
+The sidebar is a **floating card**, not a flush rail. It sits as a flex sibling of the main column (so wayfinding stays reliable — the menu is always exactly where the eye expects it), but visually offsets from the viewport edge with margin + rounded corners + soft shadow. Reads as a card hovering above the canvas, Mercury / Mac-OS aligned.
+
+**Shell — two modes by collapse state.** The floating treatment is *only* for the expanded sidebar. When collapsed, the sidebar flushes against the edge with a hairline right border — a 56px floating card is decoration, and the user collapsed it precisely to maximize canvas.
+
+| Property | Expanded (`w-56`) | Collapsed (`w-14`) |
+|:---------|:------------------|:--------------------|
+| Background | `bg-surface` | `bg-surface` |
+| Radius | `rounded-lg` (10px) — discrete object floating above canvas | none (flush rectangle) |
+| Elevation | `shadow-pop` | none |
+| Right edge | none (shadow separates) | `border-r border-line` (hairline) |
+| Offset from viewport | `my-3 ml-3` (12px top / bottom / left) | none (flush) |
+| Width | `w-56` (224px) | `w-14` (56px); persists in `localStorage` |
+
+**Nav items inside the shell**
+| Property | Value |
+|:---------|:------|
+| Item height | `h-9` (36px) — comfortable density without burning vertical space |
+| Item padding | `px-3` (12px) |
+| Item gap | `gap-3` between icon and label |
+| Icon size | 16px (Lucide default; shadcn `[&_svg]:size-4`) |
+| Item radius | `rounded-md` (8px) |
+| Rest | `text-ink-700 hover:bg-sunken` |
+| Active (you-are-here) | `bg-sunken text-ink-900 font-medium` |
+| Group eyebrow | `text-2xs uppercase tracking-wider text-ink-400 px-3 pt-4 pb-1` (e.g. `WORKSPACE`) |
+| Count badge slot | `<CountBadge>` placed `ml-auto`. Danger tone for unread alerts; neutral for inbox counts. |
+| Collapsed mode | icons centered, labels hidden, tooltips on hover. Touch target stays ≥ 44×44. |
+
+**Order discipline.** The first sidebar item is always `Today` (the action queue — the page CPAs land on by default). The second is always `Alerts` (the state-notification + suggested-action surface — the product's differentiator). After that: Timeline / Clients / Mail / Opportunities. Settings + Account live in the bottom-of-sidebar zone.
+
+**Account entrance** lives at the bottom-left of the sidebar (Linear / Notion convention). The trigger is `<Avatar>` + name + email + chevron; opens a `<DropdownMenu>` (with `side="top"`) holding Settings + Sign out. There is **no duplicate user dropdown in the TopBar** — single account surface.
 
 ## Do's and Don'ts
 
@@ -325,6 +426,8 @@ Used inside expanded alert cards (one client per row) and inside expanded client
 - **Default destructive-ish actions to all-ticked**, with live count on the commit button. Sarah unticks edge cases faster than she ticks the common case.
 - **Auto-hide empty sections** that don't carry meaning when zero (Just Happened). Always-present sections (State alerts, Action queue) keep their headers but render an honest empty state with a horizon ("Caught up. Next action due May 18.").
 - **Use space, not chrome, for hierarchy.** The 8/16/24/48 ladder does most of the work.
+- **Keep escape hatches visible.** Tertiary affordances — `Undo`, `Not applicable`, `Skip`, manual override — sit in the same surface as the primary action, not buried in a settings page. The senior CPA needs to opt out of any AI-assisted decision in the same gesture they'd take to accept it; a hidden opt-out destroys the trust the visible primary action earned. (`Snooze until tomorrow` on alerts, `Undo import` on the post-import screen, `Not applicable — dismiss with reason` on announcement detail.)
+- **Encode lifecycle status in shape, urgency in color.** Two independent axes that never collide. The deadline-status dot has three shapes — empty `○` (not started), half `◐` (in progress), filled `●` (due today / overdue) — colored by urgency tone. Shape tells you *where in the workflow*, color tells you *how soon*. See `src/components/DeadlineRow.tsx`.
 
 ### Don't
 
@@ -343,6 +446,7 @@ Used inside expanded alert cards (one client per row) and inside expanded client
 - **Don't introduce horizontal scroll on data tables.** If a table doesn't fit, drop or compact columns at the breakpoint — never set `min-w-[Npx]` + `overflow-x-auto` to push content sideways. CPAs scan column-wise; a horizontally-scrolled table loses its first-column anchor.
 - **Don't separate metric values with middle dots (`·`) when a clean row works.** `33 active clients · 8 due this week` reads like a comma-spliced sentence. Use horizontal whitespace (`gap-section`) and let weight+color carry hierarchy. Middle dots stay valid as **separators inside a single string of metadata** (`Tax 2025 · Federal · LLC`), but not as the structure of a metric row.
 - **Don't write a custom `<h1>` per page.** Use `<PageHeader title=... meta=... />` from `src/components/ui/PageHeader.tsx`. Same for section titles — use `<SectionHeader>`. Custom one-offs cause typography drift across pages.
+- **Don't render tautological status columns.** When a row's section, color, and countdown already communicate a state, don't add a fourth signal. Rows inside the *Overdue* section already carry red bg + red countdown — a fourth "Overdue" status tag is decoration, not information. Same rule on *Completed* sections, *Awaiting* sections, etc.
 
 ## Brand Vocabulary
 
@@ -401,6 +505,114 @@ Every multi-element component (card, row, banner, dialog) MUST satisfy these bef
 7. **All interaction states defined.** rest / hover / active / focus-visible / disabled (+ selected / loading where applicable). Missing states = fail unless explicit `N/A`.
 
 If a component spec doesn't answer all 7, send it back.
+
+## Element states (cross-cutting reference)
+
+Every interactive primitive defines these states. If a primitive isn't listed here, derive from the closest sibling.
+
+| Primitive | rest | hover | focus-visible | active (pressed) | disabled | selected / "on" |
+|:----------|:-----|:------|:--------------|:------------------|:---------|:----------------|
+| Button (default — indigo) | `bg-indigo text-white` | `bg-indigo-hover` | 2px indigo ring + 2px offset | `bg-indigo/90` | `opacity-40 cursor-not-allowed` | — |
+| Button (outline) | `border-line text-ink-700 bg-surface` | `bg-sunken` | 2px ring | `bg-line` | `opacity-40` | — |
+| Button (ghost) | `text-ink-700 bg-transparent` | `bg-sunken` | 2px ring | `bg-line` | `opacity-40` | — |
+| Button (link) | `text-ink-700 underline-offset-4` | `text-ink-900 underline` | 2px ring | `text-ink-900` | `opacity-40` | — |
+| Button (destructive) | `bg-danger-solid text-white` | `bg-danger-ink` | 2px ring | `bg-danger-ink/90` | `opacity-40` | — |
+| IconButton | (per Button variant) | (per variant) | 2px ring | (per variant) | `opacity-40` | — |
+| Input / Select / Textarea | `bg-sunken border-line` | `border-line-strong` | `bg-surface` + 2px indigo ring + 2px offset | — | `opacity-40 bg-line` | — |
+| Checkbox | unchecked: `bg-surface border-line-strong`; checked: `bg-indigo text-white` | `border-ink-700` | 2px ring | — | `opacity-40` | — |
+| Sidebar item | `text-ink-700` | `bg-sunken` | 2px ring | `bg-sunken` | `opacity-40` (rare) | active (you-are-here): `bg-sunken text-ink-900 font-medium` |
+| Dropdown item | `text-ink-700` | `bg-sunken text-ink-900` | (parent menu owns) | — | `opacity-40 cursor-not-allowed` | — |
+| FilterChip (chip) | `bg-sunken text-ink-700` | `bg-line text-ink-900` | 2px ring | `bg-line` | `opacity-40` | active filter: `bg-ink-900 text-surface` |
+| FilterChip (tab) | `text-ink-500 border-b-2 border-transparent` | `text-ink-700` | 2px ring | `text-ink-900` | `opacity-40` | active tab: `text-ink-900 border-b-2 border-ink-900` |
+| MetricTile (filter trigger) | `border-line bg-surface` | `border-ink-300` | 2px ring | — | — | active: `bg-ink-900 text-surface border-ink-900` |
+| Card (clickable) | `border-line bg-surface` | `border-ink-300` | 2px ring | — | — | — |
+| Tab row item | (see FilterChip tab variant) | | | | | |
+| Modal | `bg-surface border-line shadow-overlay` | (n/a) | (focus trapped to first focusable child) | (n/a) | (n/a) | open / closed only |
+| Tooltip | hidden | (n/a, parent triggers) | (n/a) | (n/a) | (n/a) | open: `bg-ink-900 text-white text-caption px-2 py-1 rounded` |
+
+**Two distinct "selected/on" archetypes — pick by what the affordance does:**
+
+- **You-are-here** (sidebar nav, active wizard step) — `bg-sunken text-ink-900 font-medium`. Subtle. The user navigated here; the marker just confirms.
+- **Filter-is-on** (FilterChip, MetricTile-as-filter) — `bg-ink-900 text-surface`. Loud. The user toggled state and needs to see the world has changed.
+
+Don't blur them. A sidebar item painted in the loud archetype reads like a filter; a filter painted in the subtle archetype reads like a label.
+
+## Information hierarchy (the 3-tier scan rule)
+
+Every screen must let the eye land in this order, in under 5 seconds. If you can't say which element is which tier, the screen has no hierarchy.
+
+| Tier | What | Visual treatment |
+|:-----|:-----|:------------------|
+| **T1 · Hero** | The one thing the user came here to see / decide / act on. Singular per viewport. | `text-display` + `font-semibold` + ample top whitespace; OR a large `<MetricTile>`; OR a single indigo CTA. |
+| **T2 · Support** | The 3–5 items that justify or contextualize the hero (counts, supporting cards, filters that scope the hero). | `text-body-strong` titles, hairline-bordered cards or rows, `gap-card` (24px) rhythm. |
+| **T3 · Background** | Everything else — meta, timestamps, source attribution, "show more", peripheral icons. | `text-caption text-ink-500`, no border, collapsed by default where possible. |
+
+**Failure modes** (each one is a hierarchy bug, not a styling bug):
+
+- **Tier inflation** — three things competing for hero. Pick one; demote the others to T2.
+- **Tier flattening** — every section uses the same heading weight. Tier 1 must outweigh tier 2 must outweigh tier 3 *visually*, not just semantically.
+- **Decoration tax** — an icon, badge, dot, or pill on every row. The eye has nothing to land on. Remove all but the one signal that changes a decision.
+- **Metadata creep** — secondary info painted in the same weight as primary (timestamps in `text-ink-700`, "5 min ago" in `font-medium`). Push to `caption` + `ink-500`, or drop.
+- **Repeat surfaces** — same content rendered twice (count in tab + same count in filter chip below). Pick one home; remove the other.
+
+When auditing a dense screen: print the Tier of every visible element. If T2 outnumbers T1 by more than 5×, or T3 outnumbers T2 by more than 3×, the screen is over-decorated — cut the smaller tiers first.
+
+## Confirm modal discipline
+
+Modals interrupt for input only (T7). The bar for triggering one is **damage that's hard to reverse**. Activity-logged reversible actions never get a modal — they get a toast.
+
+**Confirm modal REQUIRED on:**
+
+1. **Batch-adjust deadlines from announcement** — preview the date diff before applying.
+2. **Archive client** — show active-deadline count; warn if > 0.
+3. **CSV import commit** (final wizard step) — preview row counts.
+4. **Remove team member** — show how many client assignments revert to Owner.
+5. **Dismiss announcement** (the *not reversible gracefully* path) — explicit opt-in text: "I've reviewed this and none of my clients are affected." Prefer `Snooze until tomorrow` instead.
+6. **Remove filing bundle from client** — list the pending deadlines that will be deleted.
+7. **Send batch notification email** — preview recipient list + editable body before send.
+8. **Undo import** (within the 7-day window) — show the N clients / M deadlines that get wiped.
+
+**No modal on** (reversible + activity-logged):
+
+- Mark complete · Mark in progress · Defer · File extension
+- Add note · Edit note · Pin/unpin note
+- Toggle filters · Toggle view modes · Snooze (own affordance)
+
+Destructive confirms render the primary CTA in `bg-danger-solid text-white`. Non-destructive confirms render in the standard `bg-primary` ink. Cancel always sits left of the commit button. Esc closes. Focus returns to the element that opened the modal.
+
+## Destructive change preview
+
+Any change that **adds, removes, or replaces multiple records on commit** opens a migration preview modal before the change applies. Never silently remove. Never silently duplicate. Triggers: client entity-type change · primary-state change · filing-bundle swap · undo-import.
+
+Required preview shape — three diff lines, signed:
+
+```
+Changing entity from LLC → S-Corp
+
+–  Removes  3 pending deadlines (LLC-specific forms)
++  Adds     5 new deadlines (S-Corp forms)
+✓  Keeps    2 overlapping deadlines (federal)
+
+[Cancel]   [Apply changes]
+```
+
+- The `–` / `+` / `✓` glyphs are SVG (not unicode) for cross-platform fidelity, ink-tinted with the matching status family (`danger-ink` / `ok-ink` / `ink-700`).
+- Activity log writes a single entry summarizing all three counts — not three separate entries.
+- The commit button label includes the magnitude: `Apply changes (10)` if any number is large enough that the user would otherwise lose track.
+
+## Export modal — three-axis pattern
+
+Exports are decisions across three orthogonal axes. The modal renders one axis per row, radio groups inside each (no multi-select within an axis — one choice per axis).
+
+| Axis | Choices |
+|:-----|:--------|
+| **What** | Current filtered view · All active deadlines · Specific date range (date picker) · Specific client (when launched from a client page) |
+| **Format** | PDF (firm-branded client-facing report) · CSV (raw data, portability guarantee) · iCal `.ics` (subscription URL for calendar apps) |
+| **Recipient** | Download (default) · Email to self · Email to teammate (Team tier only) |
+
+**Trigger locations:** any `Export` button across the product points to the same modal — Today's "This Week" footer, Client Detail's `⋯` menu, Announcement Detail's affected-client list, `/timeline` page header. Same modal everywhere keeps the user's mental model intact (one entrance, one name).
+
+**No additional axes.** No "include archived?" checkbox, no "anonymize names?" toggle — those drift the surface into options-creep. If a future case demands a fourth axis, it earns its own dialog with its own load-bearing rationale.
 
 ## Responsive behavior
 
@@ -718,6 +930,61 @@ duplicate Sheet/modal showing the same content.
 This rule prevents the "Sheet that duplicates the page" failure mode and
 keeps deep-links to a single canonical URL per record.
 
+## Triage queue patterns
+
+The `/alerts` page is a triage queue. Three patterns make it feel like a queue (not a viewer) and protect the gap-loud invariant per memory `feedback_gap_over_fill`.
+
+### Handled-this-session fade
+
+After the CPA acts on an alert (Send all / Apply deadline / Forward bulletin / Snooze / Mark not applicable), the feed card fades to `opacity-60` with a `Handled this session` chip in the title zone. The card stays in the list — gap-loud info is preserved (the CPA can re-open) — but visually demotes so the eye skips it on the next scan.
+
+| Property | Value |
+|:---------|:------|
+| Card opacity (handled) | `opacity-60`, `hover:opacity-95` |
+| Chip | `bg-ok-bg border-ok-border text-ok-ink`, `<Check w-3 h-3>` icon, `text-2xs font-medium`, `rounded` (not pill — a chip, not an indicator) |
+| Selection ring | suppressed when handled — selected ring + faded card looks like an error |
+| Persistence | session-scoped (`useState<Set<string>>` on the page). Reload clears. |
+
+### Auto-advance after action
+
+Every "do" or "defer" action calls a single `onComplete(alertId)` callback. The page marks the alert handled (above) and then navigates to the next un-handled alert *in the active tab*:
+
+```
+   1. find current index in `filtered`
+   2. look forward — first un-handled alert after current
+   3. else look backward — first un-handled alert before current
+   4. else navigate to /alerts (no auto-select)
+```
+
+Tab-scoped on purpose: if the CPA is in "Affecting you" they want to clear that queue, not jump into "All announcements." When the queue is empty, the empty state speaks.
+
+### Partial selection in batch actions
+
+Batch actions ("Send 5 emails", "Apply deadline to 5 filings") are not all-or-nothing. The CPA can exclude individual clients before committing.
+
+UI: each affected client renders as a chip in a "Sending to N" sub-zone of the action card. Click a chip to toggle exclusion. Excluded chips render `line-through text-ink-400` with a rotated `<X>` glyph; included chips show the `<X>` only on hover.
+
+| Property | Value |
+|:---------|:------|
+| Included chip | `bg-surface border-line text-ink-700`, hover deepens to `border-danger-border text-danger-ink` (signals the click action: exclude) |
+| Excluded chip | `bg-transparent border-line text-ink-400 line-through`, hover restores to ink-700 (signals: include) |
+| Hover X glyph | `opacity-0 group-hover:opacity-100`; on excluded chips, the glyph is rotated 45° (visible at rest as the strike-through marker) |
+| Live count | the action's CTA reads `Send {N}` where N is the included count. Disabled when N = 0. |
+| State location | per-alert `Map<alertId, Set<clientId>>` on the page. Per-alert because the same client can be in multiple alerts and exclusion is per-decision. |
+
+### Sticky disposition footer
+
+Escape hatches (`Snooze until tomorrow`, `Mark not applicable`) sit in their own labeled sub-zone, **pinned above the composer outside the scroll container**, so they stay reachable regardless of how long the action list grows.
+
+| Property | Value |
+|:---------|:------|
+| Position | flex sibling between the scrollable body (`flex-1 overflow-y-auto`) and the composer footer — never inside the scroll container |
+| Background | `bg-canvas` (not `bg-surface`) so it visually separates from the action cards above |
+| Eyebrow | `text-2xs uppercase tracking-wider font-semibold text-ink-400` reading `DISPOSITION` |
+| Items | inline buttons separated by a middle dot, no helper text (terse — daily-use surface) |
+
+Per DESIGN.md §Do's: "Keep escape hatches visible." Disposition belongs in the same surface as the primary action, not buried in a settings page or hidden after a scroll.
+
 ## Outstanding gap: alertType-specific verbs
 
 `docs/specs/alert-detail-variants.md` defines a per-alertType primary verb
@@ -745,8 +1012,28 @@ across all 6 variants.
 
 Tailwind picks up new tokens from `tailwind.config.js` only on **dev server cold start**. If you add a token (`text-newSize`, `bg-newColor`, `mb-newSpacing`, etc.) and it doesn't render, restart the Vite dev server. HMR re-runs file watchers but does not rebuild the Tailwind config layer.
 
+## Archive — superseded guidelines
+
+Rules removed from the active doc on **2026-05-03** after a reference audit against `Downloads/design references_final/` (13 reference shots — Mercury banking dashboard ×11, Sana AI ×1, Retero ×1) and against the shadcn `<Button>` component we already ship. Kept here so a reader who finds the rule cited in a code comment, PR, or older doc knows why it's no longer load-bearing.
+
+**Resolution rule** (per user direction, 2026-05-03): when DESIGN.md, shadcn primitives, and the references disagree, **shadcn + references win**. DESIGN.md is updated to match.
+
+| Removed rule | Why it's archived |
+|:-------------|:------------------|
+| **"Two affordances only: `button-primary` + `link`. No outline buttons. No ghost buttons."** | shadcn `<Button>` ships `outline` / `ghost` / `secondary` / `destructive` as core variants. Mercury references show outline pills (Cancel, alternate-path) and ghost icon-buttons (search, more-menu, dismiss) as first-class affordances. Refusing them forced bespoke buttons across the product. Replaced by the variant-by-intent table in §Components > Buttons. |
+| **"No icon-only buttons except chevrons inside card headers."** | We ship `<IconButton>` (composes `Button variant=ghost size=icon` with required `aria-label`). Mercury uses icon-only buttons heavily. Replaced by §Components > Buttons paragraph on `icon` size + `<IconButton>`. |
+| **"Primary (deep ink) used only on primary commit buttons"** (§Colors prose) | The next-action CTA is **indigo**, not slate — established by T2, confirmed by Mercury references, applied in code (Today / Alerts CopilotPane / AnnouncementBanner). Slate `primary` token survives for the user-avatar circle and the user-menu trigger only. Updated in §Colors. |
+| **"Bounded max-width 840px"** as the universal layout rule (§Layout & Spacing prose) | Stale before this audit — `<PageContainer>` already had `default` / `wide` / `workshop` variants. The 840 cap survives for `default` only. Mercury table pages use ~1080px (matches our `wide`); workshops are full-viewport. Updated in §Layout & Spacing. |
+
+If you find another rule in this doc that contradicts the references or shadcn primitives, raise it — the active doc should always reflect what we actually build.
+
 ## Changelog
 
 - **2026-05-03** — Augmentation pass. Added §Brand Vocabulary, §The four alert surfaces, §Component anatomy rules, §Responsive behavior, §Voice & Microcopy, §Accessibility, §Motion, §Invisible correctness, §Shared primitives reference, §Implementation reference, §Devx note. Added Mercury-style indigo accent (`bg-indigo`) + pill radius (`rounded-pill`) as opt-in tokens for the next-action CTA. Added `text-display` / `text-title` / `text-body` / `text-label` / `text-caption` / `text-micro` semantic typography aliases. Created shared primitives: `<PageHeader>`, `<SectionHeader>`, `<Card>`, `<MetricTile>`, refreshed `<StatusPill>` to default `dot=false` (no decorative leading dot). Applied to Today (`/design/today`), Dashboard (`/`), Clients (`/clients`), Alerts (`/alerts`), Mail (`/mail`). Existing surfaces preserved — no functionality stripped, no routes changed.
 - **2026-05-03 (later)** — Mercury inheritance restored. Added §Reference inheritance (Mercury / Sana AI / Oku) + §Taste principles (T1–T8) so the doc tells the next builder *what Mercury looks like*, not just what to avoid. Switched canvas warm cream `#FAFAF7` → cool neutral `#F8F9FB` (Mercury / Sana / Oku align). Promoted AnnouncementBanner primary CTA from outline-slate to indigo pill so the Dashboard at `/` visibly carries the Mercury accent.
 - **2026-05-03 (v0u rollout)** — Reverse-merged from the v0u four-page rollout (Today / Alerts / Timeline / Clients). Added 6 shared primitives to §Shared primitives reference: `<Avatar>`, `<StateBadge>`, `<ClientChip>`, `<CountBadge>`, `<FilterChip>` (with `chip` + `tab` variants), `<IconButton>` (composes shadcn `Button variant=ghost size=icon`). Enhanced `<MetricTile>` with `helper` text + `active`/`onClick` filter-trigger props. New `width.pane = "440px"` token in tailwind.config for the co-pilot pane. Added §The /alerts workshop surface (2-column feed + co-pilot pane inside AppShell — replaces the old AnnouncementList → AnnouncementDetail two-page flow). Added §KPI tile = filter trigger + §Single drilldown destination per concept. Made "no emojis in product UI" + "no horizontal scroll on data tables" explicit Don'ts. Flagged outstanding gap: per-alertType verb taxonomy from `docs/specs/alert-detail-variants.md` not yet wired into the co-pilot pane (currently uses generic verbs across all 6 alertTypes).
+- **2026-05-03 (handoff consolidation)** — Folded residual design guidance from `files/DESIGN-HANDOFF.md` (v1) and `files/DESIGN-HANDOFF-ADDENDUM.md` (v1.3) into this doc and tombstoned both handoffs. Net additions: §Confirm modal discipline (the 8-required / no-modal taxonomy), §Destructive change preview (signed-diff migration modal pattern), §Export modal — three-axis pattern (what × format × recipient). Added two Do rules ("Keep escape hatches visible", "Encode lifecycle status in shape, urgency in color"). Added one Don't ("No tautological status columns"). DESIGN.md is now the single source for design styles + interaction patterns; the handoff files redirect here.
+- **2026-05-03 (reference audit)** — Audited 13 reference shots in `Downloads/design references_final/` (Mercury banking dashboard ×11, Sana AI ×1, Retero ×1) against DESIGN.md. Established resolution rule: **shadcn + references win** over DESIGN.md when they conflict. Four rules archived (see §Archive — superseded guidelines): "Two affordances only" (Mercury uses outline + ghost), "No icon-only buttons except chevrons" (we ship `<IconButton>`), "Primary (deep ink) used only on primary commit buttons" (the next-action color is indigo per T2 + Mercury, not slate), and "Bounded max-width 840px" as the universal rule (`<PageContainer>` has 3 variants — 840 cap survives only for `default`). Active sections rewritten: §Colors > Primary, §Layout & Spacing intro, §Components > Buttons.
+- **2026-05-03 (deep visual + states pass)** — User direction: keep `rounded-md` for buttons (do not pill them — deliberate departure from Mercury for terminal-density feel). T3 reframed: pills for indicators, soft rectangles for actions. New visual specs added under §Components: Inputs, Modals (visual contract; behavior in §Confirm modal discipline), Dropdown menus, Sidebar nav items — each with explicit padding / radius / background / border / hover / focus values. New §Element states cross-cutting reference table covering rest / hover / focus-visible / active / disabled / selected for every interactive primitive, plus the two distinct "selected/on" archetypes (you-are-here vs filter-is-on). New §Information hierarchy (the 3-tier scan rule) — Tier 1 hero / Tier 2 support / Tier 3 background — with named failure modes (tier inflation, tier flattening, decoration tax, metadata creep, repeat surfaces) for use during dense-screen audits.
+- **2026-05-03 (sidebar + Alerts UX pass)** — User direction. Sidebar restructured: (a) Alerts moved to position 2 (Today / Alerts / Timeline / Clients / Mail / Opportunities) so the differentiator surface is one keystroke from the inbox of work it generates; (b) Sarah Mitchell's account entrance pinned to bottom-left (Linear / Notion convention) and removed from TopBar — single account surface. Sidebar shell switched to **floating card** treatment (`my-3 ml-3 rounded-lg shadow-pop`, no right border) per user preference — anchored as a flex sibling so wayfinding stays reliable, but visually a card hovering over the canvas. Alerts page re-grouped into clearly-bordered scan zones: FeedCard now has Zone 1 ("what happened" — state, title, type, summary) + Zone 2 ("who/when affected" — divider + sunken sub-zone with chips + deadline shift); CopilotPane header has its own context strip with grouped meta (type · clients · deadline) below a hairline divider; new "Disposition" sub-zone groups escape hatches (Snooze + Mark not applicable) so they're findable but visually distinct from "do" actions. Lesson learned: density problems are usually **grouping** problems, not removal problems — section the page first, then audit each zone for decoration tax.
+- **2026-05-03 (Alerts critique pass + TopBar search + bell dedup)** — Acted on a self-critique of the shipped Alerts page. **Visual hierarchy fixes:** title moved to its own row (no type pill competing for the same line); type pill demoted to the meta line at `xs` size with the time pinned right; AFFECTS eyebrow + chips and the deadline shift now occupy separate visual rows in Zone 2 (calendar icon makes the deadline read as a temporal indicator). **CopilotPane:** middle-dot separators dropped from the meta strip in favor of `gap-3` whitespace (per DESIGN.md §Don't); "AI suggested actions" eyebrow lost its indigo + sparkles + redundant "AI" prefix → now just "Suggested actions" in `text-ink-500`; the email preview's nested-card chrome is gone (border-t divider only — DESIGN.md §Cards bans card-in-card); X close icon replaces the misleading right-chevron; the **Disposition section is now a sticky footer** above the composer (outside the scroll container) so escape hatches stay reachable. **Flow fixes:** session-scoped `handledIds` Set fades each acted-on card to `opacity-60` with a `Handled this session` ok-tinted chip; auto-advance navigates to the next un-handled alert in the active tab after every action; partial-selection chips inside the email action card let the CPA exclude individual clients with a click, with the Send CTA's count updating live (`Send 4` → `Send 3` once one chip is dropped). **TopBar search redesign:** flat sunken div replaced with a proper bordered input affordance (`bg-surface border border-line` rest, `border-line-strong` on hover, `focus-visible` indigo ring), `h-9` height matching shadcn input default, and the ⌘K hint is now a proper bordered chip on `bg-sunken`. **BellDropdown narrowed to non-alert notifications:** state-announcement alerts are no longer merged into the bell — that surface belongs to the sidebar Alerts badge + `/alerts` page (DESIGN.md §The four alert surfaces). Bell now scopes to bounces · team invites · extension approvals; one signal per concept. New §Triage queue patterns captures the three reusable shapes (handled-this-session fade, auto-advance after action, partial selection in batch actions, sticky disposition footer). Floating sidebar refined: collapsed mode (`w-14`) drops the float and goes flush with a `border-r border-line` — a 56px floating rail is decoration. Expanded keeps the lovely card.

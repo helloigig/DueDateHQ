@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, CheckCircle2, Megaphone } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -176,6 +176,36 @@ export function Today() {
   const confirmed = useMemo(buildConfirmedToday, []);
   const [confirmedExpanded, setConfirmedExpanded] = useState(false);
 
+  // Keyboard navigation for the Action Queue — v0m-triage-queue inheritance.
+  // j/k (or ↓/↑) move the cursor; Enter opens the focused client; Esc clears.
+  // Only fires when no input/textarea is focused so it doesn't fight typing.
+  const [queueCursor, setQueueCursor] = useState(0);
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (document.activeElement?.tagName ?? "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if (queue.length === 0) return;
+      if (e.key === "j" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setQueueCursor((i) => Math.min(queue.length - 1, i + 1));
+      } else if (e.key === "k" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setQueueCursor((i) => Math.max(0, i - 1));
+      } else if (e.key === "Escape") {
+        setQueueCursor(0);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [queue.length]);
+
+  // Scroll the focused row into view when the cursor moves.
+  useEffect(() => {
+    if (queue.length === 0) return;
+    const el = document.getElementById(`action-queue-row-${queueCursor}`);
+    el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [queueCursor, queue.length]);
+
   // State alerts — driven by real announcement data (mock-mode tRPC).
   // Renders as the v0u differentiator surface preview: cards on Today,
   // click navigates to /alerts/:id where the full feed + co-pilot pane
@@ -273,7 +303,27 @@ export function Today() {
       <section className="mb-section">
         <SectionHeader
           title="Action Queue"
-          meta={`${queue.length} ${queue.length === 1 ? "item" : "items"}`}
+          meta={
+            queue.length === 0
+              ? "0 items"
+              : `${queueCursor + 1} of ${queue.length}`
+          }
+          action={
+            queue.length > 0 ? (
+              <span className="text-2xs text-ink-400 inline-flex items-center gap-1">
+                <kbd className="font-mono text-2xs border border-line bg-sunken px-1 py-0.5 rounded">j</kbd>
+                <kbd className="font-mono text-2xs border border-line bg-sunken px-1 py-0.5 rounded">k</kbd>
+                <span className="ml-0.5">to navigate</span>
+                <span className="text-ink-300 mx-1" aria-hidden>·</span>
+                <Link
+                  to="/today/triage"
+                  className="text-ink-700 hover:text-ink-900 underline underline-offset-[3px] decoration-[1.5px] ml-1"
+                >
+                  Triage mode →
+                </Link>
+              </span>
+            ) : undefined
+          }
         />
         {queue.length === 0 ? (
           <EmptyState
@@ -286,11 +336,13 @@ export function Today() {
             {queue.map((item, i) => (
               <ActionQueueRow
                 key={item.id}
+                domId={`action-queue-row-${i}`}
                 clientName={item.clientName}
                 meta={item.meta}
                 urgency={item.urgency}
                 urgencyDays={item.urgencyDays}
                 action={item.action}
+                focused={i === queueCursor}
                 onAction={() => {
                   // Action button: opens the verb-specific flow (email
                   // composer for Send, thread for Open, draft preview for
@@ -305,6 +357,7 @@ export function Today() {
                   toast.success(verbCopy[item.action]);
                 }}
                 onRowClick={() => {
+                  setQueueCursor(i);
                   // Whole-row click: navigate to client detail. Real app
                   // would `navigate('/clients/' + item.clientId)`.
                   toast.info(`Open client detail: ${item.clientName}`);

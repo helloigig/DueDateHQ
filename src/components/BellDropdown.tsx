@@ -2,14 +2,12 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Bell,
-  Megaphone,
   Undo2,
   UserPlus,
   Check,
   type LucideIcon,
 } from "lucide-react";
-import type { Announcement, Notification, NotificationKind } from "../types";
-import { useAnnouncements, useMarkAnnouncementRead } from "../hooks/useAnnouncements";
+import type { Notification, NotificationKind } from "../types";
 import {
   useMarkAllNotificationsRead,
   useMarkNotificationRead,
@@ -17,17 +15,28 @@ import {
 } from "../hooks/useNotifications";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
-type FilterKind = "all" | NotificationKind;
+// Bell narrowed to NON-ALERT notifications (bounces · team invites ·
+// extension approvals). State announcements own their own surface
+// (sidebar Alerts badge → /alerts page); duplicating them in the
+// bell created two badges with the same meaning. One signal, one
+// home — see DESIGN.md §The four alert surfaces (bell vs banner vs
+// blocking modal vs /alerts page).
+type NonAlertKind = Exclude<NotificationKind, "alert">;
+type FilterKind = "all" | NonAlertKind;
 
-const ICONS: Record<NotificationKind, LucideIcon> = {
-  alert: Megaphone,
+const NON_ALERT_KINDS: NonAlertKind[] = [
+  "bounce",
+  "team_invite",
+  "extension_approved",
+];
+
+const ICONS: Record<NonAlertKind, LucideIcon> = {
   bounce: Undo2,
   team_invite: UserPlus,
   extension_approved: Check,
 };
 
-const ICON_TONE: Record<NotificationKind, string> = {
-  alert: "text-info-ink",
+const ICON_TONE: Record<NonAlertKind, string> = {
   bounce: "text-warn-ink",
   team_invite: "text-ink-500",
   extension_approved: "text-ok-ink",
@@ -35,60 +44,36 @@ const ICON_TONE: Record<NotificationKind, string> = {
 
 const FILTER_LABELS: Record<FilterKind, string> = {
   all: "All",
-  alert: "Alerts",
   bounce: "Bounces",
   team_invite: "Team",
   extension_approved: "Extensions",
 };
 
-function announcementAsNotification(a: Announcement): Notification {
-  return {
-    id: `ann-notif:${a.id}`,
-    kind: "alert",
-    createdAt: a.detectedAt,
-    title: `${a.stateCode}: ${a.title}`,
-    detail: `${a.affectedClientIds.length} client${
-      a.affectedClientIds.length === 1 ? "" : "s"
-    } affected · ${a.authority}`,
-    href: `/alerts/${a.id}`,
-    read: a.read,
-    announcementId: a.id,
-  };
-}
-
 export function BellDropdown() {
-  const announcementsQuery = useAnnouncements({ activeOnly: true });
   const notificationsQuery = useNotificationList();
-  const announcements = announcementsQuery.data ?? [];
-  const notifications = notificationsQuery.data ?? [];
-  const markAnnouncementRead = useMarkAnnouncementRead();
+  const allNotifications = notificationsQuery.data ?? [];
   const markNotificationRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<FilterKind>("all");
 
-  const merged: Notification[] = useMemo(() => {
-    const ids = new Set(
-      notifications.filter((n) => n.announcementId).map((n) => n.announcementId)
-    );
-    const fromAnnouncements = announcements
-      .filter((a) => !ids.has(a.id))
-      .map(announcementAsNotification);
-    return [...fromAnnouncements, ...notifications].sort((a, b) =>
-      b.createdAt.localeCompare(a.createdAt)
-    );
-  }, [announcements, notifications]);
+  const notifications: Notification[] = useMemo(
+    () =>
+      allNotifications
+        .filter((n) => n.kind !== "alert")
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [allNotifications],
+  );
 
   const filtered = useMemo(() => {
-    if (filter === "all") return merged;
-    return merged.filter((n) => n.kind === filter);
-  }, [merged, filter]);
+    if (filter === "all") return notifications;
+    return notifications.filter((n) => n.kind === filter);
+  }, [notifications, filter]);
 
-  const unreadCount = merged.filter((n) => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   const onItemClick = (n: Notification) => {
-    if (n.announcementId) markAnnouncementRead.mutate({ id: n.announcementId });
-    else markNotificationRead.mutate({ id: n.id });
+    markNotificationRead.mutate({ id: n.id });
     setOpen(false);
   };
 
@@ -128,20 +113,12 @@ export function BellDropdown() {
             </button>
           </div>
           <p className="text-2xs text-ink-400 mt-0.5">
-            alerts · bounces · invites · extensions
+            bounces · team invites · extension approvals
           </p>
         </div>
 
         <div className="flex gap-1 px-3 py-2 border-b border-line overflow-x-auto">
-          {(
-            [
-              "all",
-              "alert",
-              "bounce",
-              "team_invite",
-              "extension_approved",
-            ] as FilterKind[]
-          ).map((f) => (
+          {(["all", ...NON_ALERT_KINDS] as FilterKind[]).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -172,13 +149,21 @@ export function BellDropdown() {
           )}
         </ul>
 
-        <div className="border-t border-line px-3 py-2">
+        <div className="border-t border-line px-3 py-2 flex items-center justify-between">
+          <Link
+            to="/settings/notifications"
+            onClick={() => setOpen(false)}
+            className="text-xs text-ink-500 hover:text-ink-900"
+          >
+            Notification settings →
+          </Link>
           <Link
             to="/alerts"
             onClick={() => setOpen(false)}
             className="text-xs text-ink-500 hover:text-ink-900"
+            title="State announcements have their own surface"
           >
-            View all alerts →
+            State alerts →
           </Link>
         </div>
       </PopoverContent>
@@ -194,8 +179,10 @@ function NotificationItem({
   onClick: () => void;
 }) {
   const ts = new Date(notif.createdAt);
-  const Icon = ICONS[notif.kind];
-  const tone = ICON_TONE[notif.kind];
+  // Bell never shows alert-kind items (filtered upstream); cast safe.
+  const kind = notif.kind as NonAlertKind;
+  const Icon = ICONS[kind];
+  const tone = ICON_TONE[kind];
   return (
     <li>
       <Link
