@@ -125,7 +125,9 @@ function buildTriageQueue(): TriageItem[] {
       form: d.form,
       jurisdiction: d.jurisdiction,
       entityType: c.entityType,
-      servicePackage: c.servicePackage ?? `${jurisdictionLabel(d.jurisdiction)} ${c.entityType}`,
+      servicePackage:
+        c.servicePackages?.[0] ??
+        `${jurisdictionLabel(d.jurisdiction)} ${c.entityType}`,
       dueDate: d.officialDueDate,
       estimatedTax: undefined,
       status: d.status,

@@ -106,14 +106,15 @@ export function Sidebar() {
         //     restore the right hairline border. A 56px floating card
         //     is decoration; flush gives the user maximum canvas back
         //     when they've actively chosen to tuck the menu away.
-        // Floating shell when expanded: rounded card with shadow,
-        // offset from top + left only — NO bottom margin so the
-        // sidebar reaches the viewport bottom (avoids a visible
-        // canvas strip below the user-account block).
-        "shrink-0 bg-surface flex flex-col transition-[width] duration-150",
-        collapsed
-          ? "w-14 border-r border-line"
-          : "w-56 mt-3 ml-3 rounded-tl-lg rounded-bl-none rounded-tr-lg shadow-pop",
+        // Flush shell — single hairline right border, both modes.
+        // We tried a floating card (`my-3 ml-3 rounded-lg shadow-pop`)
+        // but it leaked canvas behind the sidebar AND created a seam
+        // where the rounded top-right corner met the topbar's straight
+        // left edge. Mercury references all flush their sidebars; we
+        // align with that. The visual lift comes from the topbar's
+        // border-b instead of from sidebar elevation.
+        "shrink-0 bg-surface flex flex-col border-r border-line transition-[width] duration-150",
+        collapsed ? "w-14" : "w-56",
       ].join(" ")}
     >
       <WorkspaceHeader

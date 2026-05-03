@@ -22,7 +22,7 @@ import { AnnouncementBanner } from "../components/AnnouncementBanner";
 import { ChaseBanner } from "../components/ChaseBanner";
 import { BlockingAlertsDialog } from "../components/BlockingAlertsDialog";
 import { OnboardingLayer2Widget } from "../components/OnboardingLayer2Widget";
-import { WelcomeTour } from "../components/WelcomeTour";
+// import { WelcomeTour } from "../components/WelcomeTour"; // hidden per user direction
 import { CapacityStrip } from "../components/CapacityStrip";
 import { ModeFHealth } from "../components/ModeFHealth";
 import { ActionQueue } from "../components/ActionQueue";
