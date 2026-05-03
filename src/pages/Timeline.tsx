@@ -6,7 +6,6 @@ import { env } from "../config";
 import { PageHeader } from "../components/ui/PageHeader";
 import { PageContainer } from "../components/ui/PageContainer";
 import { SectionHeader } from "../components/ui/SectionHeader";
-import { MetricTile } from "../components/ui/MetricTile";
 import { StatusPill } from "../components/ui/StatusPill";
 import { FilterChip } from "../components/ui/FilterChip";
 import { cn } from "../lib/utils";
@@ -221,34 +220,49 @@ export function Timeline() {
     <PageContainer variant="wide">
       <PageHeader title="Timeline" meta={`${kpis.active} active`} />
 
-      {/* KPI tiles — Mercury-style headline numbers, double as filter triggers */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-card mb-card">
-        <MetricTile
-          label="Behind"
-          value={kpis.behind}
-          tone={kpis.behind > 0 ? "warn" : "neutral"}
-          helper="Past internal target"
-          active={filter === "behind"}
-          onClick={() =>
-            setFilter((f) => (f === "behind" ? "all" : "behind"))
-          }
-        />
-        <MetricTile
-          label="Awaiting docs"
-          value={kpis.waiting}
-          tone={kpis.waiting > 0 ? "warn" : "neutral"}
-          helper="Client hasn't sent something"
-          active={filter === "waiting"}
-          onClick={() =>
-            setFilter((f) => (f === "waiting" ? "all" : "waiting"))
-          }
-        />
-        <MetricTile
-          label="Ready to file"
-          value={kpis.ready}
-          tone={kpis.ready > 0 ? "ok" : "neutral"}
-          helper="On track, no blockers"
-        />
+      {/* Ambient summary — one line above the filter chips. Replaces
+          the previous 3-tile MetricTile grid; the same counts are
+          already represented by the filter chips below (each chip's
+          `count` slot), so the tiles were duplicating signals while
+          burning ~120px of vertical canvas. The line keeps the
+          tone-coded numbers so the eye still picks up urgency at a
+          glance, but doesn't pretend to be a hero metric. */}
+      <div className="mb-region text-xs text-ink-500 flex items-center gap-3 flex-wrap">
+        <span>
+          <span
+            className={cn(
+              "tabular-nums font-semibold",
+              kpis.behind > 0 ? "text-warn-ink" : "text-ink-700",
+            )}
+          >
+            {kpis.behind}
+          </span>{" "}
+          behind internal
+        </span>
+        <span className="text-ink-300" aria-hidden>·</span>
+        <span>
+          <span
+            className={cn(
+              "tabular-nums font-semibold",
+              kpis.waiting > 0 ? "text-warn-ink" : "text-ink-700",
+            )}
+          >
+            {kpis.waiting}
+          </span>{" "}
+          awaiting docs
+        </span>
+        <span className="text-ink-300" aria-hidden>·</span>
+        <span>
+          <span
+            className={cn(
+              "tabular-nums font-semibold",
+              kpis.ready > 0 ? "text-ok-ink" : "text-ink-700",
+            )}
+          >
+            {kpis.ready}
+          </span>{" "}
+          ready to file
+        </span>
       </div>
 
       {/* Filter chips — single source of truth via shared FilterChip */}

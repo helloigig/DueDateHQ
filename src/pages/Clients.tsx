@@ -415,18 +415,18 @@ export function Clients() {
           Order: highest-priority gap-loud signal first → time-window last. */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-card">
         <MetricTile
-          label="Has waiting"
+          label="Awaiting reply"
           value={waitingFleetCount}
           tone={waitingFleetCount > 0 ? "warn" : "neutral"}
-          helper="Clients owe me docs"
+          helper="Client hasn't sent something"
           active={smartFilters.has("hasWaiting")}
           onClick={() => toggleSmart("hasWaiting")}
         />
         <MetricTile
-          label="Stuck"
+          label={`Awaiting >${STUCK_THRESHOLD_DAYS}d`}
           value={stuckFleetCount}
           tone={stuckFleetCount > 0 ? "danger" : "neutral"}
-          helper={`No reply in ${STUCK_THRESHOLD_DAYS}+ days`}
+          helper="Past reminder cadence — call them"
           active={smartFilters.has("stuck")}
           onClick={() => toggleSmart("stuck")}
         />

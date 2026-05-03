@@ -273,19 +273,14 @@ function FeedCard({
         </div>
       )}
 
-      {/* ── Zone 3 — inline action chips (hover-revealed) ──────
-          v0u shows action chips inline on every card so the CPA can
-          act without selecting + opening the right pane. We do the
-          same but reveal on hover/focus only — keeps the rest state
-          scannable per the density discipline.
-
-          Each button calls e.stopPropagation() so the card's onSelect
-          doesn't fire alongside. They DO call onComplete(a.id) which
-          marks the alert handled + auto-advances to the next.
-
-          Hidden when handled — re-doing the action would be confusing. */}
+      {/* ── Zone 3 — single dominant action (hover-revealed) ──
+          Cut from earlier rev: Apply / Forward / Snooze were
+          duplicating the right-pane actions and making cards heavy
+          with 4 inline buttons. Kept only the indigo `Send N` chip —
+          the dominant common-case action — visible on selection /
+          hover. Everything else lives in the pane. */}
       {!handled && (
-        <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity border-t border-line px-region py-2 flex items-center gap-1.5 flex-wrap bg-surface">
+        <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity border-t border-line px-region py-2 flex items-center justify-end bg-surface">
           <button
             type="button"
             onClick={(e) => {
@@ -295,54 +290,11 @@ function FeedCard({
               );
               onComplete(a.id);
             }}
-            className="inline-flex items-center gap-1 text-xs font-medium text-white bg-indigo hover:bg-indigo-hover transition-colors px-2 py-1 rounded"
+            className="inline-flex items-center gap-1 text-xs font-medium text-white bg-indigo hover:bg-indigo-hover transition-colors px-2.5 py-1 rounded"
             title="Send personalized email draft to each affected client"
           >
             <Send className="w-3 h-3" aria-hidden />
             Send {a.affectedClientIds.length}
-          </button>
-          {a.newDeadline && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                toast.success(
-                  `${a.affectedClientIds.length} deadlines moved to ${formatLongDate(a.newDeadline!)}`,
-                );
-                onComplete(a.id);
-              }}
-              className="inline-flex items-center gap-1 text-xs font-medium text-ink-700 hover:text-ink-900 hover:bg-sunken transition-colors px-2 py-1 rounded border border-line"
-              title={`Move ${a.affectedClientIds.length} affected filings to ${formatLongDate(a.newDeadline)}`}
-            >
-              <CalendarClock className="w-3 h-3" aria-hidden />
-              Apply deadline
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              toast.info(`Bulletin forwarded to ${a.affectedClientIds.length} clients`);
-              onComplete(a.id);
-            }}
-            className="inline-flex items-center gap-1 text-xs font-medium text-ink-700 hover:text-ink-900 hover:bg-sunken transition-colors px-2 py-1 rounded border border-line"
-            title="Forward the official bulletin with a short cover note"
-          >
-            <Forward className="w-3 h-3" aria-hidden />
-            Forward
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              toast.success("Snoozed until tomorrow");
-              onComplete(a.id);
-            }}
-            className="inline-flex items-center gap-1 text-xs text-ink-500 hover:text-ink-900 hover:bg-sunken transition-colors px-2 py-1 rounded ml-auto"
-            title="Hide until tomorrow; re-appears if unresolved"
-          >
-            <MoonStar className="w-3 h-3" aria-hidden />
-            Snooze
           </button>
         </div>
       )}
@@ -435,48 +387,25 @@ function CopilotPane({
   return (
     <aside className="w-pane shrink-0 bg-canvas border-l border-line flex flex-col overflow-hidden">
       {/* ── Header zone: Context ─────────────────────────────────
-          Two grouped sub-zones — "what is this" + a quiet meta strip
-          for at-a-glance scanning. Meta uses gap-3 spacing instead of
-          middle dots between metric values (DESIGN.md §Don't on
-          dot-spliced rows). Calendar icon makes the deadline shift
-          read as a temporal indicator, not just text. */}
-      <div className="bg-surface border-b border-line">
-        <div className="px-region pt-3 pb-3 flex items-start gap-3">
-          <StateBadge code={a.stateCode} />
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold text-ink-900 leading-snug">
-              {a.title}
-            </div>
-            <div className="text-xs text-ink-500 mt-0.5 truncate">
-              {a.authority}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 w-7 h-7 inline-flex items-center justify-center rounded text-ink-500 hover:bg-sunken hover:text-ink-900 transition-colors"
-            aria-label="Close detail pane"
-          >
-            <X className="w-4 h-4" aria-hidden />
-          </button>
+          Collapsed to ONE line — the feed card is the summary, the
+          pane is the detail. Re-rendering state + title + authority
+          + type + count + deadline here was 100% redundant with the
+          card the user just clicked. Pane header: state badge +
+          title + close X. Everything else (full client list, email
+          draft, action card) lives in the pane body. */}
+      <div className="bg-surface border-b border-line px-region py-3 flex items-start gap-3">
+        <StateBadge code={a.stateCode} />
+        <div className="flex-1 min-w-0 text-sm font-semibold text-ink-900 leading-snug pt-0.5">
+          {a.title}
         </div>
-        <div className="px-region pb-3 flex items-center gap-3 flex-wrap border-t border-line pt-2.5">
-          <StatusPill variant={TYPE_TONE[a.type]} size="xs">
-            {TYPE_LABEL[a.type]}
-          </StatusPill>
-          <span className="text-xs text-ink-700 tabular-nums">
-            <span className="font-semibold text-ink-900">{allAffected.length}</span>{" "}
-            {allAffected.length === 1 ? "client" : "clients"}
-          </span>
-          {a.newDeadline && (
-            <span className="inline-flex items-center gap-1 text-xs text-ink-700">
-              <CalendarClock className="w-3 h-3 text-ink-500" aria-hidden />
-              <span className="font-medium text-ink-900">
-                {formatLongDate(a.newDeadline)}
-              </span>
-            </span>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="shrink-0 w-7 h-7 inline-flex items-center justify-center rounded text-ink-500 hover:bg-sunken hover:text-ink-900 transition-colors"
+          aria-label="Close detail pane"
+        >
+          <X className="w-4 h-4" aria-hidden />
+        </button>
       </div>
 
       {/* ── Body zone: Suggested actions ─────────────────────── */}
