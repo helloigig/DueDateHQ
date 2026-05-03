@@ -45,41 +45,36 @@ export function WelcomeTour() {
 
   if (dismissed) return null;
 
-  // ───────────────────────────────────────────────── BANNER stage
+  // ───────────────────────────────────────────────── LAUNCHER stage
+  // Fixed bottom-left chip. Compact ("New here · 60-second tour") so it
+  // doesn't compete with the page content. Click expands into the modal.
   if (stage === "banner") {
     return (
-      <aside
-        className="bg-surface border border-line rounded-md px-4 py-2.5 flex items-center gap-3"
-        aria-label="Welcome"
-      >
-        <Sparkles
-          className="w-3.5 h-3.5 text-info-ink shrink-0"
-          aria-hidden
-        />
-        <p className="flex-1 min-w-0 text-xs text-ink-700">
-          <span className="text-2xs uppercase tracking-wider text-ink-500 font-semibold mr-2">
-            New here
-          </span>
-          <span className="text-ink-900">DueDateHQ surfaces what changed</span>
-          <span className="text-ink-500">
-            {" "}— state alerts, deadlines slipping past your buffer, clients
-            who&apos;ve gone quiet.{" "}
-          </span>
-        </p>
+      <div className="fixed bottom-4 left-4 z-30 flex items-center gap-2">
         <button
           onClick={() => setStage("modal")}
-          className="text-2xs text-ink-700 hover:text-ink-900 hover:bg-sunken px-2 py-1 rounded inline-flex items-center gap-1 shrink-0"
+          aria-label="Take 60-second tour"
+          className="bg-surface border border-line rounded-full pl-2 pr-3 py-1.5 flex items-center gap-2 shadow-pop hover:bg-sunken text-xs"
         >
-          60-second tour <ArrowRight className="w-3 h-3" aria-hidden />
+          <Sparkles
+            className="w-3.5 h-3.5 text-info-ink shrink-0"
+            aria-hidden
+          />
+          <span className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
+            New here
+          </span>
+          <span className="text-ink-700">60-second tour</span>
+          <ArrowRight className="w-3 h-3 text-ink-400" aria-hidden />
         </button>
         <button
           onClick={persist}
-          className="text-ink-400 hover:text-ink-700 shrink-0"
-          aria-label="Dismiss welcome banner"
+          className="bg-surface border border-line rounded-full p-1.5 text-ink-400 hover:text-ink-700 shadow-pop"
+          aria-label="Dismiss"
+          title="Dismiss"
         >
-          <X className="w-3.5 h-3.5" aria-hidden />
+          <X className="w-3 h-3" aria-hidden />
         </button>
-      </aside>
+      </div>
     );
   }
 

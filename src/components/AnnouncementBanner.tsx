@@ -1,14 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  AlertTriangle,
-  AlertCircle,
   Megaphone,
   ChevronRight,
   ChevronDown,
-  Clock,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import type { Announcement } from "../types";
 import {
@@ -23,34 +19,9 @@ import {
 } from "../hooks/useAnnouncements";
 import { StateHealthPill } from "./StateHealthPill";
 
-type Tone = "danger" | "warn" | "info";
-
-function toneFor(type: Announcement["type"], tier: EscalationTier): Tone {
-  // Reserve danger only for escalated (>72h unactioned). Fresh state alerts
-  // are info — they're news, not crises. PRD §1.6 calm-framing principle.
-  if (tier === "escalated") return "danger";
-  if (type === "disaster_extension" && tier !== "fresh") return "warn";
-  if (type === "pte_change" || type === "penalty_relief") return "info";
-  return "info";
-}
-
-const TONE_DOT: Record<Tone, string> = {
-  danger: "bg-danger-solid",
-  warn: "bg-warn-solid",
-  info: "bg-info-solid",
-};
-
-const TONE_TEXT: Record<Tone, string> = {
-  danger: "text-danger-ink",
-  warn: "text-warn-ink",
-  info: "text-info-ink",
-};
-
-function iconFor(type: Announcement["type"]): LucideIcon {
-  if (type === "disaster_extension") return AlertTriangle;
-  if (type === "pte_change" || type === "penalty_relief") return AlertCircle;
-  return Megaphone;
-}
+// Per DESIGN.md "remove useless things": dropped the leading severity dot
+// + per-type alert icon. The escalation chip and danger-tinted background
+// already carry urgency without extra chrome.
 
 /**
  * Smart-collapse state-alert banner. The cut between "show as a row" and
@@ -387,105 +358,57 @@ function AlertRow({
   onDismiss: () => void;
 }) {
   const ann = cluster.primary;
-  const hours = hoursSince(ann.detectedAt);
-  // For escalation, take the worst tier across the cluster — if any source
-  // has been unactioned >72h, the row is escalated.
   const tier = cluster.members
     .map((m) => escalationTier(hoursSince(m.detectedAt)))
     .reduce<EscalationTier>(
       (worst, t) => (TIER_RANK[t] > TIER_RANK[worst] ? t : worst),
       "fresh",
     );
-  const tone = toneFor(ann.type, tier);
-  const Icon = iconFor(ann.type);
-  const matchReason = matchReasonFor(ann);
-  // Distinct anchor URLs the BE has filed under this event: each cluster
-  // member contributes its canonical sourceUrl + any relatedSourceUrls
-  // the scraper folded in via title-fingerprint dedup. Distinct URLs is
-  // the honest "how many places have we seen this" — distinct articles
-  // (cluster.members.length) under-counts when BE dedup ran.
-  const sourceUrls = new Set<string>();
-  for (const m of cluster.members) {
-    sourceUrls.add(m.sourceUrl);
-    for (const u of m.relatedSourceUrls ?? []) sourceUrls.add(u);
-  }
-  const sourceCount = sourceUrls.size;
-  const tooltipLines: string[] = [];
-  for (const m of cluster.members) {
-    tooltipLines.push(`${m.authority}: ${m.title}`);
-    for (const u of m.relatedSourceUrls ?? []) {
-      tooltipLines.push(`  also seen at ${u}`);
-    }
-  }
-  const anyUnread = cluster.members.some((m) => !m.read);
 
   return (
     <li
       className={[
-        "px-4 py-2.5 flex items-center gap-3",
+        "px-region py-3 flex items-center gap-3",
         tier === "escalated" ? "bg-danger-bg/15" : "hover:bg-sunken/30",
       ].join(" ")}
     >
-      {/* Severity dot — color carries the urgency */}
-      <span
-        className={`w-2 h-2 rounded-full shrink-0 ${TONE_DOT[tone]}`}
-        aria-hidden
-      />
-      <Icon className={`w-3.5 h-3.5 shrink-0 ${TONE_TEXT[tone]}`} aria-hidden />
-
       <div className="flex-1 min-w-0">
+        {/* Title row — chip-style state code + escalated badge if needed.
+            No leading severity dot, no per-type alert icon — DESIGN.md
+            "remove useless things". */}
         <Link
           to={`/alerts/${ann.id}`}
-          className={`text-sm font-medium flex items-center gap-1 shrink-0 px-2.5 py-1 rounded hover:bg-surface/60 ${TONE_TEXT[tone]}`}
+          className="text-sm font-medium text-ink-900 hover:underline inline-flex items-center gap-2 flex-wrap"
           title="Review affected clients and apply the new deadline"
         >
-          <span className="font-semibold">{ann.stateCode}:</span>
+          <span className="text-2xs font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-sunken text-ink-700">
+            {ann.stateCode}
+          </span>
           <span>{ann.title}</span>
           {tier === "escalated" && (
-            <span className="text-2xs uppercase tracking-wide px-1 py-0.5 rounded bg-danger-bg text-danger-ink border border-danger-border font-semibold">
+            <span className="text-2xs uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-danger-bg text-danger-ink font-semibold">
               escalated
             </span>
           )}
-          {anyUnread && tier !== "escalated" && (
-            <span className="w-1.5 h-1.5 rounded-full bg-info-solid" title="Unread" />
-          )}
         </Link>
-        <p className="text-2xs text-ink-500 mt-0.5 flex items-center flex-wrap gap-x-2">
-          <span>
-            <span className="font-medium text-ink-700">
-              {ann.affectedClientIds.length} affected
+        {/* Sub-line — only the data that changes Sarah's decision:
+            count affected, new deadline (if any). The "matched on N entity
+            types" rationale belongs on the detail page, not here. */}
+        <p className="text-xs text-ink-500 mt-0.5 flex items-center flex-wrap gap-x-2">
+          {ann.affectedClientIds.length > 0 && (
+            <span>
+              <span className="font-medium text-ink-700">
+                {ann.affectedClientIds.length}
+              </span>{" "}
+              {ann.affectedClientIds.length === 1 ? "client" : "clients"}
             </span>
-          </span>
-          {matchReason && (
-            <>
-              <span className="text-ink-300">·</span>
-              <span>{matchReason}</span>
-            </>
           )}
           {ann.newDeadline && (
             <>
-              <span className="text-ink-300">·</span>
+              {ann.affectedClientIds.length > 0 && (
+                <span className="text-ink-300">·</span>
+              )}
               <span>new {formatLongDate(ann.newDeadline)}</span>
-            </>
-          )}
-          {sourceCount > 1 && (
-            <>
-              <span className="text-ink-300">·</span>
-              <span
-                className="inline-flex items-center px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line"
-                title={tooltipLines.join("\n")}
-              >
-                {sourceCount} sources
-              </span>
-            </>
-          )}
-          {tier !== "fresh" && (
-            <>
-              <span className="text-ink-300">·</span>
-              <span className={`flex items-center gap-1 ${TONE_TEXT[tone]}`}>
-                <Clock className="w-2.5 h-2.5" aria-hidden />
-                {Math.round(hours)}h unactioned
-              </span>
             </>
           )}
         </p>
@@ -494,11 +417,7 @@ function AlertRow({
       <PrimaryAction ann={ann} />
       <button
         onClick={onDismiss}
-        aria-label={
-          sourceCount > 1
-            ? `Dismiss ${sourceCount} sources for this event`
-            : "Dismiss alert"
-        }
+        aria-label="Dismiss alert"
         className="p-1 rounded text-ink-400 hover:text-ink-700 hover:bg-sunken shrink-0"
       >
         <X className="w-3 h-3" aria-hidden />
@@ -554,16 +473,3 @@ const TIER_RANK: Record<EscalationTier, number> = {
   blocking: 3,
 };
 
-/** Build a short "why these clients" explanation. Sources the announcement's
- *  parsed-impact (county / entity / tax filters). */
-function matchReasonFor(ann: Announcement): string | null {
-  const parts: string[] = [];
-  if (ann.counties.length === 1) parts.push(`${ann.counties[0]} County`);
-  else if (ann.counties.length > 1)
-    parts.push(`${ann.counties.length} counties`);
-  if (ann.entityTypes.length === 1) parts.push(ann.entityTypes[0]);
-  else if (ann.entityTypes.length > 1)
-    parts.push(`${ann.entityTypes.length} entity types`);
-  if (parts.length === 0) return null;
-  return `matched on ${parts.join(" + ")}`;
-}

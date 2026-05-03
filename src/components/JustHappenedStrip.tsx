@@ -1,20 +1,21 @@
 import { Link } from "react-router-dom";
-import { CheckCircle2, AlertTriangle, MessageSquare } from "lucide-react";
 import { trpc } from "../lib/api/client";
 import { MOCK_TODO_ITEMS } from "../data/mockTodoItems";
 import type { MockTodoItem } from "../data/mockTodoItems";
 import { env } from "../config";
 
-// JustHappenedStrip — overnight-diff triage row.
+// JustHappenedStrip — overnight diff, rendered as a single inline text
+// line. NOT a stack of colored pills (that visually competed with State
+// alerts and confused the page hierarchy — "is this another alert
+// surface?"). This strip answers "what changed in your inbox overnight?",
+// State alerts answers "what did the government just announce?". Two
+// different things, two different visual weights:
+//   • Just happened  = thin status line, ambient
+//   • State alerts   = full cards, demands attention
 //
-// Three counts the CPA wants to drain in seconds before they start chasing:
-//   • to confirm  — Mode A inbound, AI-classified, you rubber-stamp
-//   • issues      — Mode C anomaly flags, needs your eye
-//   • replies     — client wrote back (pushback / question intents)
-//
-// Same trpc.todoItems feed as ActionQueue (React Query dedupes, no extra
-// fetch). Hidden entirely when all counts are zero — the page shouldn't
-// reserve space for a row that says "nothing happened."
+// Three counts the CPA wants to drain in seconds before they start
+// chasing — Mode A inbound, Mode C anomaly flags, client replies.
+// Hidden entirely when all counts are zero.
 
 type Counts = { confirm: number; issues: number; replies: number };
 
@@ -45,75 +46,50 @@ export function JustHappenedStrip() {
     return null;
   }
 
+  const segments: Array<{ to: string; text: string; tone?: string }> = [];
+  if (counts.confirm > 0) {
+    segments.push({
+      to: "/clients",
+      text: `${counts.confirm} to confirm`,
+      tone: "text-ok-ink hover:text-ok-ink/80",
+    });
+  }
+  if (counts.issues > 0) {
+    segments.push({
+      to: "/clients",
+      text: `${counts.issues} to review`,
+      tone: "text-warn-ink hover:text-warn-ink/80",
+    });
+  }
+  if (counts.replies > 0) {
+    segments.push({
+      to: "/mail",
+      text: `${counts.replies} ${counts.replies === 1 ? "reply" : "replies"}`,
+      tone: "text-info-ink hover:text-info-ink/80",
+    });
+  }
+
   return (
-    <section
-      aria-label="Just happened"
-      className="flex items-center gap-2 flex-wrap"
+    <p
+      aria-label="Overnight from clients"
+      className="text-sm text-ink-500 flex items-center flex-wrap gap-x-2"
     >
-      <span className="text-2xs uppercase tracking-wider font-semibold text-ink-500 mr-1">
-        Just happened
-      </span>
-      {counts.confirm > 0 && (
-        <Pill
-          to="/clients"
-          icon={<CheckCircle2 className="w-3.5 h-3.5" aria-hidden />}
-          tone="success"
-          label={`${counts.confirm} to confirm`}
-          tooltip="Mode A — AI classified inbound documents; rubber-stamp to mark received"
-        />
-      )}
-      {counts.issues > 0 && (
-        <Pill
-          to="/clients"
-          icon={<AlertTriangle className="w-3.5 h-3.5" aria-hidden />}
-          tone="warn"
-          label={`${counts.issues} ${counts.issues === 1 ? "issue" : "issues"} flagged`}
-          tooltip="Mode C — AI flagged an anomaly that needs your judgment"
-        />
-      )}
-      {counts.replies > 0 && (
-        <Pill
-          to="/mail"
-          icon={<MessageSquare className="w-3.5 h-3.5" aria-hidden />}
-          tone="info"
-          label={`${counts.replies} client ${counts.replies === 1 ? "reply" : "replies"}`}
-          tooltip="Inbound replies waiting on you (pushback or question intent)"
-        />
-      )}
-    </section>
-  );
-}
-
-type Tone = "success" | "warn" | "info";
-
-const TONE_CLASSES: Record<Tone, string> = {
-  success:
-    "bg-success-bg/40 border-success-border text-success-ink hover:bg-success-bg/60",
-  warn: "bg-warn-bg/40 border-warn-border text-warn-ink hover:bg-warn-bg/60",
-  info: "bg-info-bg/40 border-info-border text-info-ink hover:bg-info-bg/60",
-};
-
-function Pill({
-  to,
-  icon,
-  tone,
-  label,
-  tooltip,
-}: {
-  to: string;
-  icon: React.ReactNode;
-  tone: Tone;
-  label: string;
-  tooltip: string;
-}) {
-  return (
-    <Link
-      to={to}
-      title={tooltip}
-      className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${TONE_CLASSES[tone]}`}
-    >
-      {icon}
-      <span>{label}</span>
-    </Link>
+      <span className="text-ink-700">Overnight from clients:</span>
+      {segments.map((s, i) => (
+        <span key={s.to + s.text} className="inline-flex items-center gap-2">
+          <Link
+            to={s.to}
+            className={`font-medium underline-offset-2 hover:underline ${s.tone ?? ""}`}
+          >
+            {s.text}
+          </Link>
+          {i < segments.length - 1 && (
+            <span className="text-ink-300" aria-hidden>
+              ·
+            </span>
+          )}
+        </span>
+      ))}
+    </p>
   );
 }

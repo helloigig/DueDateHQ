@@ -4,6 +4,7 @@ import { useClients } from "../hooks/useClients";
 import { useTriageDeadlines } from "../hooks/useDeadlines";
 import { useDetectAnnouncements } from "../hooks/useAnnouncements";
 import { useRealtimeAnnouncements } from "../hooks/useRealtimeAnnouncements";
+import { useSession } from "../data/session";
 import { ShortcutsModal } from "../components/ShortcutsModal";
 import { DashboardSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
@@ -46,6 +47,7 @@ export function Dashboard() {
   const announcementsQuery = useRealtimeAnnouncements();
   const detectMutation = useDetectAnnouncements();
   const location = useLocation();
+  const session = useSession();
   // /legacy/dashboard renders the pre-v0.7-amendment view: deadline list only,
   // no ActionQueue, no Mode F Health. Lets us A/B compare during transition.
   const isLegacy = location.pathname.startsWith("/legacy");
@@ -172,34 +174,40 @@ export function Dashboard() {
     );
   }
 
+  // Greeting uses the user's first name (not a client's name). Falls back
+  // to a friendly default if session is unavailable.
+  const greetingName =
+    session?.userName?.split(" ")[0] ||
+    session?.userInitials?.charAt(0) ||
+    "there";
+
   return (
-    <div className="max-w-[840px] mx-auto px-page-x py-page-y space-y-section">
-      {/* Header — date only. Per DESIGN.md: no greeting, no firm name,
-          no AI-usage chip, no operational summary. The sidebar tells you
-          where you are; the date is the only chrome that changes. */}
-      <header>
-        <h1 className="text-2xl font-semibold text-ink-900">Today</h1>
-        <p className="text-sm text-ink-500 mt-0.5">{todayLabel}</p>
+    <div className="max-w-[1200px] mx-auto px-page-x py-page-y space-y-card">
+      {/* Header — greeting + date. The "Hi, {name}" reads warmer than a
+          bare "Today" without taking up real estate. */}
+      <header className="flex items-baseline justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-ink-900">
+            Hi, {greetingName}
+          </h1>
+          <p className="text-sm text-ink-500 mt-0.5">{todayLabel}</p>
+        </div>
+        {/* Just happened rides on the same row when there's room, drops
+            below on narrow screens. Single inline text line — distinct
+            from State alerts, which are full cards. */}
+        <JustHappenedStrip />
       </header>
 
-      {/* First-run welcome — inline banner, click to expand. Self-gated
-          to fade after first session. */}
-      <WelcomeTour />
+      {/* Two-column grid (lg+) — State alerts left, Action queue right.
+          Both visible without page scroll on a typical laptop. Stacks on
+          smaller screens so mobile reads top-to-bottom. */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-card">
+        <AnnouncementBanner announcements={activeBanners} />
+        {!isLegacy && <ActionQueue />}
+      </div>
 
-      {/* §1: Just happened — overnight diff strip. Auto-hides at 0/0/0. */}
-      <JustHappenedStrip />
-
-      {/* §2: State alerts — banner always renders so a fresh firm sees
-          the "All clear" stripe (monitoring 50 states). The State-health
-          pill rides inline in the section header (replaces the previous
-          ModeFHealth card on Today, per DESIGN.md). */}
-      <AnnouncementBanner announcements={activeBanners} />
-
-      {/* §3: Action queue — verb-grouped per-client cards (PRD §4.8). */}
-      {!isLegacy && <ActionQueue />}
-
-      {/* Quiet clients — temporary placement; folds into the Action
-          queue card stack in a follow-up PR. Self-vanishes at zero. */}
+      {/* Quiet clients — temporary placement; folds into Action queue in
+          a follow-up PR. Self-vanishes at zero. */}
       <ChaseBanner />
 
       {/* Capacity — ≥3-staff firms only (gate inside the component). */}
@@ -207,6 +215,10 @@ export function Dashboard() {
 
       {/* Onboarding nudges — self-gates after wiring is done. */}
       <OnboardingLayer2Widget />
+
+      {/* First-run welcome — fixed bottom-left launcher. Below the
+          natural reading flow; click to expand into the modal tour. */}
+      <WelcomeTour />
 
       {/* Blocking-alerts overlay — fires only at >72h escalation. Stays as
           a modal because the spec demands a forced ack at that tier. */}

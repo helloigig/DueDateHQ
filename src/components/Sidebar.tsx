@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
   Home,
   Users,
@@ -11,11 +11,19 @@ import {
   PanelLeftOpen,
   GanttChartSquare,
   UserPlus,
+  LogOut,
 } from "lucide-react";
 import { useAnnouncements } from "../hooks/useAnnouncements";
-import { useSession } from "../data/session";
+import { signOut, useSession } from "../data/session";
 import { useStore } from "../data/store";
 import { useFeatureFlags } from "../hooks/useFeatureFlags";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 // 7-item sidebar per IA v0.7 amendment §2:
 //   Today / Timeline / Clients / Mail / Alerts / Opportunities / Settings
@@ -208,7 +216,103 @@ export function Sidebar() {
           )}
         </button>
       </div>
+
+      {/* User account — bottom of sidebar (per Yuqi's "account should be
+          bottom-left as well"). Was previously in TopBar; moving here
+          frees the top bar for search + new + bell only. */}
+      <UserMenuFooter collapsed={collapsed} />
     </aside>
+  );
+}
+
+/**
+ * Sticky user-account footer at the bottom of the sidebar. Click opens a
+ * dropdown with Settings + Sign out. Replaces the previous TopBar avatar
+ * dropdown — keeps the top bar focused on search + create + alerts.
+ */
+function UserMenuFooter({ collapsed }: { collapsed: boolean }) {
+  const session = useSession();
+  const navigate = useNavigate();
+  const initials = session?.userInitials || "SM";
+  const name = session?.userName || "Sarah Mitchell";
+  const email = session?.userEmail || "";
+
+  if (collapsed) {
+    return (
+      <div className="border-t border-line py-2 flex justify-center">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="w-8 h-8 rounded-full bg-ink-900 text-canvas flex items-center justify-center text-2xs font-medium hover:opacity-90"
+              aria-label="Open user menu"
+              title={name}
+            >
+              {initials}
+            </button>
+          </DropdownMenuTrigger>
+          <UserMenuContent name={name} email={email} navigate={navigate} />
+        </DropdownMenu>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-t border-line p-2">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-sunken text-left"
+            aria-label="Open user menu"
+          >
+            <div className="w-8 h-8 rounded-full bg-ink-900 text-canvas flex items-center justify-center text-2xs font-medium shrink-0">
+              {initials}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm text-ink-900 font-medium truncate">
+                {name}
+              </div>
+              {email && (
+                <div className="text-2xs text-ink-500 truncate">{email}</div>
+              )}
+            </div>
+          </button>
+        </DropdownMenuTrigger>
+        <UserMenuContent name={name} email={email} navigate={navigate} />
+      </DropdownMenu>
+    </div>
+  );
+}
+
+function UserMenuContent({
+  name,
+  email,
+  navigate,
+}: {
+  name: string;
+  email: string;
+  navigate: ReturnType<typeof useNavigate>;
+}) {
+  return (
+    <DropdownMenuContent align="start" side="top" className="w-56">
+      <div className="px-3 py-2 border-b border-line">
+        <div className="text-sm font-medium text-ink-900 truncate">{name}</div>
+        {email && (
+          <div className="text-2xs text-ink-500 truncate">{email}</div>
+        )}
+      </div>
+      <DropdownMenuItem onSelect={() => navigate("/settings")}>
+        Settings
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        onSelect={() => {
+          void signOut();
+        }}
+      >
+        <LogOut className="w-3.5 h-3.5 text-ink-500" aria-hidden />
+        Sign out
+      </DropdownMenuItem>
+    </DropdownMenuContent>
   );
 }
 

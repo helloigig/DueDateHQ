@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, UserPlus, Upload, LogOut, FilePlus } from "lucide-react";
+import { Search, UserPlus, Upload, FilePlus } from "lucide-react";
 import { AddClientModal } from "./AddClientModal";
 import { BellDropdown } from "./BellDropdown";
 import { CommandPaletteStub } from "./CommandPaletteStub";
-import { signOut, useSession } from "../data/session";
+import { useSession } from "../data/session";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +17,6 @@ export function TopBar() {
   const [modal, setModal] = useState<"client" | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const navigate = useNavigate();
-  const session = useSession();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -84,50 +83,6 @@ export function TopBar() {
 
       <TrialBadge />
       <BellDropdown />
-
-      <div className="flex items-center gap-2 pl-2 border-l border-line">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              className="flex items-center gap-2 px-1 py-1 rounded hover:bg-sunken"
-              aria-label="Open user menu"
-            >
-              <div className="w-8 h-8 rounded-full bg-ink-900 text-canvas flex items-center justify-center text-xs font-medium">
-                {session?.userInitials || "SC"}
-              </div>
-              <span className="hidden md:inline text-sm text-ink-700">
-                {session?.userName || "Sarah Chen"}
-              </span>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <div className="px-3 py-2 border-b border-line">
-              <div className="text-sm font-medium text-ink-900 truncate">
-                {session?.userName}
-              </div>
-              <div className="text-2xs text-ink-500 truncate">
-                {session?.userEmail}
-              </div>
-            </div>
-            <DropdownMenuItem onSelect={() => navigate("/settings")}>
-              Settings
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={() => {
-                // signOut() handles everything: clear Supabase, clear
-                // local session, hard-reload to /login. We do NOT call
-                // navigate() here — that would render /login mid-flight
-                // (with stale React state) and crash before the reload
-                // fires, which the user experiences as a frozen page.
-                void signOut();
-              }}
-            >
-              <LogOut className="w-3.5 h-3.5 text-ink-500" aria-hidden />
-              Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
 
       <AddClientModal open={modal === "client"} onClose={() => setModal(null)} />
       <CommandPaletteStub open={paletteOpen} onClose={() => setPaletteOpen(false)} />
