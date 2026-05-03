@@ -14,6 +14,7 @@ import {
   useNotifications as useNotificationList,
 } from "../hooks/useNotifications";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { CardHeader } from "./ui/CardHeader";
 
 // Bell narrowed to NON-ALERT notifications (bounces · team invites ·
 // extension approvals). State announcements own their own surface
@@ -101,17 +102,20 @@ export function BellDropdown() {
         className="w-96 p-0 overflow-hidden"
       >
         <div className="px-3 py-2 border-b border-line">
-          <div className="flex items-center">
-            <h3 className="text-sm font-semibold text-ink-900">Notifications</h3>
-            <span className="ml-2 text-xs text-ink-500">{unreadCount} unread</span>
-            <button
-              onClick={() => markAllRead.mutate()}
-              disabled={unreadCount === 0}
-              className="ml-auto text-xs text-ink-500 hover:text-ink-900 disabled:opacity-40"
-            >
-              Mark all read
-            </button>
-          </div>
+          <CardHeader
+            className="mb-0"
+            title="Notifications"
+            meta={`${unreadCount} unread`}
+            action={
+              <button
+                onClick={() => markAllRead.mutate()}
+                disabled={unreadCount === 0}
+                className="text-xs text-ink-500 hover:text-ink-900 disabled:opacity-40"
+              >
+                Mark all read
+              </button>
+            }
+          />
           <p className="text-2xs text-ink-400 mt-0.5">
             bounces · team invites · extension approvals
           </p>

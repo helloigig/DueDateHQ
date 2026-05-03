@@ -1,8 +1,8 @@
 import { Minus, Plus, Check } from "lucide-react";
 import type { Client, EntityType, StateCode } from "../types";
 import { STATE_NAMES } from "../types";
-import { useModalDialog } from "../hooks/useModalDialog";
 import { useDeadlinesForClient } from "../hooks/useDeadlines";
+import { ConfirmModal } from "./ui/ConfirmModal";
 
 export interface MigrationPatch {
   entityType: EntityType;
@@ -24,9 +24,8 @@ export function MigrationPreviewModal({
   onConfirm: () => void;
 }) {
   const deadlinesQuery = useDeadlinesForClient(
-    open && client ? client.id : undefined
+    open && client ? client.id : undefined,
   );
-  const dialogRef = useModalDialog(open, onCancel);
 
   if (!open || !client || !patch) return null;
 
@@ -62,30 +61,13 @@ export function MigrationPreviewModal({
   const summary = buildHeadline(client, patch);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 backdrop-blur-sm"
-      onClick={onCancel}
-    >
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="migration-title"
-        onClick={(e) => e.stopPropagation()}
-        className="bg-surface rounded-lg shadow-xl border border-line w-full max-w-lg mx-4 outline-none"
-      >
-        <div className="px-5 py-4 border-b border-line">
-          <h2
-            id="migration-title"
-            className="text-base font-semibold text-ink-900"
-          >
-            Preview deadline changes
-          </h2>
-          <p className="text-xs text-ink-500 mt-0.5">{summary}</p>
-        </div>
-
-        <div className="px-5 py-4 space-y-3 text-sm">
+    <ConfirmModal
+      open={open}
+      onOpenChange={(o) => !o && onCancel()}
+      title="Preview deadline changes"
+      description={summary}
+      body={
+        <div className="space-y-3 text-sm">
           <MigrationRow
             icon={<Minus className="w-3.5 h-3.5" aria-hidden />}
             tone="danger"
@@ -120,24 +102,11 @@ export function MigrationPreviewModal({
             deadlines stay recoverable via the activity log for 24h.
           </p>
         </div>
-
-        <div className="px-5 py-3 bg-canvas rounded-b-lg flex items-center justify-end gap-2">
-          <button
-            onClick={onCancel}
-            className="text-sm px-3 py-1.5 rounded border border-line bg-surface hover:bg-canvas"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            data-autofocus
-            className="text-sm px-3 py-1.5 rounded bg-ink-900 text-white font-medium hover:bg-ink-900"
-          >
-            Apply changes
-          </button>
-        </div>
-      </div>
-    </div>
+      }
+      commitLabel="Apply changes"
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+    />
   );
 }
 
