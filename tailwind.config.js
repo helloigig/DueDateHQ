@@ -24,10 +24,21 @@ export default {
         line: "#E2E8F0",
         "line-strong": "#CBD5E1",
 
-        // Single accent
+        // Single accent (legacy slate — kept for back-compat with existing
+        // surfaces; do not use on new design-system surfaces)
         accent: {
           DEFAULT: "#0F172A",
           hover: "#1E293B",
+        },
+
+        // New design-system accent (per docs/design-system.md §2)
+        // Indigo — reserved for "the next action" only (T2: one accent, one
+        // viewport, one action).
+        indigo: {
+          DEFAULT: "#5B5BD6",
+          hover: "#4A4AC9",
+          soft: "#ECECFE",
+          ink: "#3D3DAF",
         },
 
         // Status
@@ -61,6 +72,7 @@ export default {
         md: "8px",
         lg: "10px",
         xl: "12px",
+        pill: "9999px", // T3: actions are pill-shaped (buttons, status pills, search bar)
       },
 
       boxShadow: {
