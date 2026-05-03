@@ -216,6 +216,8 @@ Move the Supabase service-role + secret keys into `backend/.env.local`. The rest
 
 ## Troubleshooting
 
+> **Prod is down? Start here:** [`docs/runbooks/fly-deploy.md`](../docs/runbooks/fly-deploy.md) has a step-by-step triage flow (port mismatch → migrations → secrets shadowing → frontend wiring → CORS) plus the integration callback registry and the 2026-05-02 incident reference. The table below covers the lower-stakes dev/local issues.
+
 | Symptom | Cause | Fix |
 |---|---|---|
 | `auth.session` returns null after bootstrap | Email-confirmation pending in Supabase | Disable email confirmation in dev (Auth → Providers → Email → Confirm email = off) |
@@ -224,6 +226,8 @@ Move the Supabase service-role + secret keys into `backend/.env.local`. The rest
 | CORS error in browser | `CORS_ORIGIN` doesn't match your FE URL | `fly secrets set CORS_ORIGIN=https://your-frontend.vercel.app` then `fly deploy` |
 | `prepared statement "..." already exists` on queries | Connecting to PgBouncer with `prepare: true` | Already handled — `postgres()` is initialized with `prepare: false` in `src/db/client.ts` |
 | Backend dev server crashes on save | Stale `.vite` pre-bundle | `rm -rf node_modules/.vite` and restart |
+| Health check critical / `/health` times out | Port mismatch or shadow secret overriding `[env]` | See [fly-deploy runbook §1-5](../docs/runbooks/fly-deploy.md#when-prod-is-unreachable-triage-flow) |
+| `relation "..." does not exist` after deploy | Drizzle skipped a migration (journal/timestamp issue) | See [fly-deploy runbook §4](../docs/runbooks/fly-deploy.md#4-are-migrations-actually-running) — SQL is idempotent so re-running by hand via Supabase SQL editor is safe |
 
 ---
 

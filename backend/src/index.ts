@@ -227,7 +227,14 @@ app.get("/oauth/callback", async (c) => {
 app.use(
   "/exports/*",
   serveStatic({
-    root: ARTIFACT_DIR.startsWith("/") ? ARTIFACT_DIR : `./${ARTIFACT_DIR}`,
+    // serveStatic wants a path relative to cwd or absolute. Cover three
+    // shapes so we never end up with the `././.artifacts` we used to
+    // boot-warn on: absolute (/var/...), already-relative (./foo), or
+    // bare (foo).
+    root:
+      ARTIFACT_DIR.startsWith("/") || ARTIFACT_DIR.startsWith("./")
+        ? ARTIFACT_DIR
+        : `./${ARTIFACT_DIR}`,
     rewriteRequestPath: (path) => path.replace(/^\/exports/, ""),
   }),
 );
