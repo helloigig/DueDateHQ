@@ -54,6 +54,7 @@ import {
   eligibilityLabel,
   type PhaseEligibility,
 } from "../lib/phase2Eligibility";
+import { SettingsFederalFormsPanel } from "./SettingsFederalFormsPanel";
 
 const NAV = [
   { to: "/settings", label: "Account", icon: User, end: true },
@@ -67,6 +68,7 @@ const NAV = [
   { to: "/settings/notifications", label: "Notifications", icon: Bell },
   { to: "/settings/alerts", label: "Alert digest", icon: Bell },
   { to: "/settings/ai", label: "AI eval", icon: Brain },
+  { to: "/settings/federal-forms", label: "Federal forms", icon: ShieldCheck },
   { to: "/settings/data", label: "Data", icon: Download },
 ];
 
@@ -108,6 +110,7 @@ export function Settings() {
           <Route path="imports" element={<ImportsPanel />} />
           <Route path="team" element={<TeamPanel />} />
           <Route path="ai" element={<AiEvalPanel />} />
+          <Route path="federal-forms" element={<SettingsFederalFormsPanel />} />
           <Route path="data" element={<DataPanel />} />
         </Routes>
       </div>

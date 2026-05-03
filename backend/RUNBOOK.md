@@ -193,24 +193,57 @@ VITE_USE_MOCK_API=false
 
 ## Secret hygiene
 
-`backend/.env.local` is gitignored. **Backend secrets must never live in the frontend `.env`** — Vite only exposes `VITE_*` to the browser, but the file is still a single point of leak (laptop theft, accidental `git add -f`, screen-sharing).
+Three buckets, each with a specific home:
 
-You currently have these in `~/Desktop/DueDateHQ_dashboard/.env`:
+| Bucket | Home | Examples |
+|---|---|---|
+| **Frontend** (browser-bundled) | `.env` at repo root — **`VITE_*` only** | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
+| **Backend** (server runtime) | `backend/.env.local` — anything the Node process reads | `DATABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `GEMINI_API_KEY`, `SENTRY_DSN`, `GMAIL_*`, `INBOUND_WEBHOOK_SECRET` |
+| **Deploy-time** (CI / one-shot) | 1Password + `gh secrets set` — **never** in any `.env` file | `FLY_API_TOKEN`, `CLOUDFLARE_*` |
 
+`.env*` files are gitignored. `fly auth login` writes to `~/.fly/config.yml` for interactive deploys — you don't need `FLY_API_TOKEN` on disk for that.
+
+**Why this matters:** Vite only exposes `VITE_*` keys to the browser, but every secret in the FE `.env` is still a leak surface (laptop theft, accidental `git add -f`, screen-sharing, every git worktree carrying its own copy). Keep FE `.env` to two keys; everything else has a better home.
+
+### Pushing backend secrets to Fly
+
+`fly secrets import` reads `KEY=VALUE` lines from a file and applies them atomically:
+
+```bash
+cd ~/Desktop/DueDateHQ_dashboard
+fly secrets import -a duedatehq < backend/.env.local
 ```
-SUPABASE_SERVICE_ROLE_KEY  ← belongs in backend/.env.local + fly secrets
-SUPABASE_SECRET_KEY         ← same
-REDIS_URL                   ← Phase 1 (BullMQ workers)
-UPSTASH_REDIS_REST_TOKEN    ← Phase 1
-RESEND_API_KEY              ← Phase 1 (email)
-GEMINI_API_KEY              ← Phase 1 (AI)
-ANTHROPIC_API_KEY           ← Phase 1 (AI fallback)
-CLOUDFLARE_API_TOKEN        ← Phase 1 (scrapers)
-FLY_API_TOKEN               ← CI only, never on disk in any .env
-SENTRY_AUTH_TOKEN           ← CI only (sourcemap upload)
+
+Use this whenever you add a new env var the backend reads at runtime. Verify with `fly secrets list -a duedatehq` and compare against `backend/.env.local` keys. Watch the `PORT` / `NODE_ENV` warning above — those belong in `[env]`, not in secrets.
+
+**`fly secrets import` does NOT push `fly.toml` changes.** App config (`auto_stop_machines`, `min_machines_running`, vm size) only updates on `fly deploy`. After changing `fly.toml`, run `fly deploy` even if no source code changed.
+
+### Worktree env files
+
+Git worktrees are independent filesystems. `backend/.env.local` does NOT propagate from the parent — each worktree starts without it and the backend won't boot.
+
+**Don't duplicate the file across worktrees.** Symlink to the parent so edits propagate:
+
+```bash
+ln -sf ~/Desktop/DueDateHQ_dashboard/backend/.env.local \
+       ~/Desktop/DueDateHQ_dashboard/.claude/worktrees/<NAME>/backend/.env.local
 ```
 
-Move the Supabase service-role + secret keys into `backend/.env.local`. The rest can stay in your shell as you provision Phase 1 services. The Fly token belongs in `~/.fly/config.yml` (created by `fly auth login`); don't keep it on disk in plaintext .env files.
+The symlink itself is gitignored (it's `.env.local`), so this never accidentally commits. Edit the parent's file once → every linked worktree picks up the change.
+
+---
+
+## Verifying a backend deploy
+
+After every backend deploy that affects scraper, env, or runtime config, walk this 5-step ladder. Each step rules out a different layer:
+
+1. **Local boot** — `npm run backend:dev` reaches `backend.listening port:8000`. Confirms env-schema validation passes locally.
+2. **Fly machines started** — `fly status -a duedatehq` shows at least one machine `state: started` with `1 passing` health check. (`stopped` + `1 warning` is the auto-stop idle state, not a failure — only worry if you can't get one to `started`.)
+3. **Boot logs flow** — `fly logs -a duedatehq` shows `backend.listening` and `scraper.cycle.result` within 30 seconds of start.
+4. **Code actually running** — the log JSON includes any new fields your change added (e.g. `duplicatesSkipped` after the May 2 dedup PR). If a field is missing, the running image isn't the one you think — check `fly status` for `Image:` line, compare against latest `fly deploy` output.
+5. **Database side-effects** — for changes that write new columns, query Supabase SQL editor against the changed table. New rows should land with the new columns populated as expected.
+
+If a step fails, stop and diagnose before moving on. Skipping ahead just confuses the picture.
 
 ---
 
