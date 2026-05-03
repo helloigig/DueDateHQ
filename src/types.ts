@@ -88,7 +88,13 @@ export interface Deadline {
   clientId: string;
   form: string;
   jurisdiction: "federal" | StateCode;
+  /** Hard deadline from the jurisdiction's calendar — immutable. */
   officialDueDate: string;
+  /** Firm-set internal target (typically `officialDueDate - {buffer}`).
+      Optional in the type for legacy / mock rows; UI derives a default
+      buffer from the form class when absent. See DESIGN.md
+      §Internal vs official due. ISO YYYY-MM-DD, no time component. */
+  internalDueDate?: string;
   status: DeadlineStatus;
   assignedUser?: string;
   completedAt?: string;

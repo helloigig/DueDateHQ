@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import { MultiSelectChip } from "../components/MultiSelectChip";
+import { DueDate } from "../components/ui/DueDate";
 import { clients as MOCK_CLIENTS } from "../data/mockClients";
 import type { ClientTier } from "../types";
 import { cn } from "../lib/utils";
@@ -59,7 +60,16 @@ type Stage = "initial_meeting" | "collect" | "prepare" | "review" | "file";
 type TaskRow = {
   client: string;
   task: string;
+  /** Display string ("Apr 15") — kept for compatibility, used as the
+      visible date on rows without a parseable ISO. */
   dueDate: string;
+  /** ISO `YYYY-MM-DD` — official deadline. Powers the <DueDate> primitive
+      so tone shifts (overdue / behind internal) are correct. */
+  officialDueIso?: string;
+  /** ISO — firm-set internal target. Optional; <DueDate> derives a
+      buffer from formClass when absent. */
+  internalDueIso?: string;
+  formClass?: "annual_return" | "quarterly" | "monthly" | "extension" | "other";
   currentStage: Stage;
   daysBehind: number;
   missingCount: number;
@@ -86,6 +96,9 @@ const MOCK_TIMELINES: TaskRow[] = [
     client: "Apex Fund",
     task: "1065 Partner Forms",
     dueDate: "Mar 15",
+    officialDueIso: "2026-03-15",
+    internalDueIso: "2026-03-08",
+    formClass: "annual_return",
     currentStage: "collect",
     daysBehind: 7,
     missingCount: 8,
@@ -98,6 +111,9 @@ const MOCK_TIMELINES: TaskRow[] = [
     client: "Emily Hartfield",
     task: "1040 NY",
     dueDate: "Apr 15",
+    officialDueIso: "2026-04-15",
+    internalDueIso: "2026-04-08",
+    formClass: "annual_return",
     currentStage: "collect",
     daysBehind: 4,
     missingCount: 5,
@@ -110,6 +126,9 @@ const MOCK_TIMELINES: TaskRow[] = [
     client: "Marcus Chen",
     task: "S-Corp CA",
     dueDate: "Mar 31",
+    officialDueIso: "2026-03-31",
+    internalDueIso: "2026-03-24",
+    formClass: "annual_return",
     currentStage: "prepare",
     daysBehind: 2,
     missingCount: 3,
@@ -122,6 +141,9 @@ const MOCK_TIMELINES: TaskRow[] = [
     client: "Sarah Mitchell",
     task: "1040 TX",
     dueDate: "Apr 15",
+    officialDueIso: "2026-04-15",
+    internalDueIso: "2026-04-08",
+    formClass: "annual_return",
     currentStage: "review",
     daysBehind: 0,
     missingCount: 1,
@@ -134,6 +156,9 @@ const MOCK_TIMELINES: TaskRow[] = [
     client: "Jordan Lee",
     task: "1040 Federal",
     dueDate: "Apr 15",
+    officialDueIso: "2026-04-15",
+    internalDueIso: "2026-04-08",
+    formClass: "annual_return",
     currentStage: "file",
     daysBehind: 0,
     missingCount: 0,
@@ -190,6 +215,9 @@ function groupLiveMilestones(rows: LiveMilestone[]): TaskRow[] {
         ? [lead.formType, lead.jurisdiction].filter(Boolean).join(" · ")
         : "—";
     const lookup = CLIENT_LOOKUP.get(lead.clientId);
+    // Strip time component if present — DESIGN.md locked policy: dates only.
+    const officialDueIso =
+      dueIso && dueIso.length >= 10 ? dueIso.slice(0, 10) : undefined;
     out.push({
       taskId,
       clientId: lead.clientId,
@@ -201,6 +229,11 @@ function groupLiveMilestones(rows: LiveMilestone[]): TaskRow[] {
             day: "numeric",
           })
         : "—",
+      officialDueIso,
+      // Internal target derived by <DueDate> via formClass when not provided.
+      // BE doesn't yet send firm-level overrides; FE applies the default
+      // buffer (annual_return: -7d) until the field ships on milestones.
+      formClass: "annual_return",
       currentStage,
       daysBehind: 0,
       missingCount: ms.filter((m) => m.status === "blocked" || m.status === "overdue").length,
@@ -809,11 +842,24 @@ function TaskTimelineRow({
           )}
           <div
             className={cn(
-              "text-xs truncate",
+              "text-xs",
               nested ? "text-ink-700" : "text-ink-500",
             )}
           >
-            {t.task} <span className="text-ink-400">· due {t.dueDate}</span>
+            <span className="truncate">{t.task}</span>
+            <span className="text-ink-400 mx-1">·</span>
+            {t.officialDueIso ? (
+              <DueDate
+                official={t.officialDueIso}
+                internal={t.internalDueIso}
+                formClass={t.formClass}
+                filed={t.currentStage === "file" && t.daysBehind === 0 && t.missingCount === 0}
+                inline
+                className="text-xs"
+              />
+            ) : (
+              <span className="text-ink-400">due {t.dueDate}</span>
+            )}
           </div>
         </div>
 

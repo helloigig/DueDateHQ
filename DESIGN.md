@@ -930,6 +930,114 @@ duplicate Sheet/modal showing the same content.
 This rule prevents the "Sheet that duplicates the page" failure mode and
 keeps deep-links to a single canonical URL per record.
 
+## Internal vs official due — product-wide
+
+CPAs work to a buffer. The **official due date** is the IRS / state's
+hard deadline; the **internal target** is the firm-set date the CPA
+plans to file by. Both are first-class data on every deadline; both
+appear on every deadline display.
+
+### Data model
+
+`Deadline.officialDueDate: string` — required, immutable, source of
+truth from the jurisdiction's calendar.
+
+`Deadline.internalDueDate?: string` — firm-set buffer. Optional in
+the type because legacy data and mock fixtures may not have it; UI
+falls back to a derived buffer when absent.
+
+### Default buffer (when `internalDueDate` is absent)
+
+| Form class | Buffer |
+|:---|:---|
+| Annual income returns (1040 / 1120 / 1120-S / 1065) | official − 7 days |
+| Quarterly estimates (1040-ES / 1120-W) | official − 3 days |
+| Monthly filings (sales tax, payroll) | official − 2 days |
+| Extension filings (4868 / 7004) | same as official (no buffer — filing the extension is the action) |
+
+The buffer is a firm-level setting; we ship the defaults above and
+expose per-firm + per-form overrides in Settings. Until the BE
+supports overrides, FE renders defaults from the form class.
+
+### Display contract — `<DueDate>`
+
+Every deadline display uses the `<DueDate>` primitive
+(`src/components/ui/DueDate.tsx`). Never render `officialDueDate` or
+`internalDueDate` raw — the primitive enforces the convention.
+
+| Property | Value |
+|:---------|:------|
+| Primary line | The official date — `text-ink-900`, `font-medium`, `text-sm`, `tabular-nums`. Always shown. Format via `<DateLabel>` (Today / Tomorrow / "MMM D"). |
+| Secondary line | `target {date}` — `text-ink-500`, `text-xs`, `tabular-nums`. Shown when internal differs from official. Format same. |
+| Behind-internal | When today > internal AND status is not ready/filed, the secondary line tone shifts to `text-warn-ink` and reads `behind target — {N}d` instead of `target {date}`. |
+| Overdue official | When today > official AND status is not filed, the primary line tone shifts to `text-danger-ink` and the row's status pill reads `Overdue Nd`. The secondary line is suppressed (the overdue signal carries everything). |
+| Already filed | Both lines render in `text-ink-500` strike-through. The row sits behind the gap. |
+
+### Status logic
+
+| Today's date vs… | Status reads |
+|:---|:---|
+| `today < internal` | "On track" — no extra signal |
+| `today > internal` and `today < official` | **"Behind internal target"** — warn-ink secondary line, warn pill on row |
+| `today > official` and not filed | **"Overdue"** — danger-ink primary line, danger pill on row |
+| filed before official | "Filed" — ok pill, both dates strike-through (audit value, hidden by default) |
+
+### Locked policies (memory `feedback_deadlines_dates_only.md`)
+
+- **Dates only — never times.** Tax filings are whole-day. No "5:00 PM CT", no "7 hours remaining," no time-slot calendars.
+- Both `officialDueDate` and `internalDueDate` are ISO `YYYY-MM-DD` (no time component).
+- `<DueDate>` strips any time component if passed an ISO datetime by mistake.
+
+### Where it shows
+
+| Surface | Display |
+|:---|:---|
+| Today's Action Queue row | `<DueDate>` in the meta line |
+| Timeline row | `<DueDate>` replaces the bare "due {date}" string |
+| Clients table — Next deadline column | `<DueDate>` in the cell |
+| Alerts CopilotPane — deadline shifts | Show old → new official; internal target rolls forward by the same buffer |
+| Deadline detail page | Both dates with the buffer math visible |
+| Email drafts | Internal date never sent to clients — they only see official |
+
+## Today vs Timeline — separation of concerns
+
+Recurring product question: should Timeline be merged into Today as a date-range filter? **Recommendation: keep them separate.**
+
+### What each surface answers
+
+| Surface | Question it answers | Mental model |
+|:---|:---|:---|
+| **Today** (`/`) | "What do I need to *do* right now?" | Action queue — chases, replies, approvals, today's filings. Reactive. |
+| **Timeline** (`/timeline`) | "What's coming up across all my clients in the next 30 days?" | Forward plan — capacity, multi-client load, vacation scheduling. Proactive. |
+| **Triage mode** (`/today/triage`) | "Walk me through one item at a time, fast." | Focused queue — Superhuman-style sweep. Inherits Today's queue. |
+
+### Why a single page with a date filter falls short
+
+- **Different verbs.** Today's verbs are commit-now: Send chase, Mark received, File. Timeline's verbs are plan-ahead: Move milestone, Reassign, Defer. Same verbs on the same page would mean every row exposes both sets — clutter.
+- **Different sort orders.** Today sorts by urgency-now (overdue → due-today → awaiting-review). Timeline sorts by chronology + per-client grouping. A toggleable sort hides the right answer behind a control.
+- **Different defaults.** Today defaults to "show me what needs action." Timeline defaults to "show me everything in flight." A filter that defaults to one cuts off the other's value.
+- **Today is the daily destination.** CPAs open the app many times a day; the URL `/` should always answer "what now?" — not "depends on the date filter."
+- **Timeline is the weekly/monthly destination.** Capacity planning happens in distinct sessions (Friday afternoon, end-of-month review). Lumping it into the daily surface dilutes both.
+
+### Where the surfaces *should* converge
+
+- **The action queue itself.** The deadlines feeding Today's Action Queue and the tasks feeding Timeline draw from the same `Deadline` + `TaskMilestone` records. The split is purely in how each surface filters and presents that pool.
+- **The filter primitives.** Both pages should use the same `MultiSelectChip` / `FilterChip` shapes (already done after the #16 work).
+- **DueDate display.** Both pages render `<DueDate>` for the official + internal target convention.
+- **Triage mode.** `/today/triage` is reachable from Today but operates on the same task pool Timeline shows. One queue, two views.
+
+### The one case for merging — and why it doesn't pay off
+
+If Timeline were truly empty most of the time (e.g., quiet practice with 5 clients), keeping it as a separate sidebar item adds nav weight for little payoff. **But:** for the target persona (Sarah Mitchell, 49 clients; Yan Jing, 600), Timeline is never empty during filing season — it's where load gets distributed across staff. The sidebar weight is earned.
+
+### Conclusion
+
+Keep Today and Timeline separate. Borrow the strongest parts of each across:
+- Today inherits Timeline's keyboard-driven queue feel (#21 stage Dialog pattern can move into Today's Action Queue when actions need confirmation).
+- Timeline inherits Today's "what's up first" highlighting (focus indicator, auto-advance) for the triage mode that overlays it.
+
+The two pages aren't competing surfaces — they're two readings of the same data, and the cost of maintaining them as separate destinations is dwarfed by the cognitive cost of compressing them into one.
+
 ## Triage queue patterns
 
 The `/alerts` page is a triage queue. Three patterns make it feel like a queue (not a viewer) and protect the gap-loud invariant per memory `feedback_gap_over_fill`.
