@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Inbox as InboxIcon, Send, FileEdit, AlertTriangle, Mail as MailIcon } from "lucide-react";
 import { trpc } from "../lib/api/client";
 import { env } from "../config";
+import { PageHeader } from "../components/ui/PageHeader";
 
 // Mail surface — per IA v0.7 amendment §3.8.
 //
@@ -157,22 +158,25 @@ export function Mail() {
   const issuesCount = (issuesQuery.data ?? []).length;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 md:px-6 py-4">
-      <header className="mb-4">
-        <h1 className="text-xl font-semibold text-ink-900 flex items-center gap-2">
-          <MailIcon className="w-5 h-5" aria-hidden />
-          Mail
-        </h1>
-        <p className="text-sm text-ink-500 mt-0.5">
-          Cross-client communication. AI classifies inbound; bytes stay in your
-          email account.
-        </p>
-      </header>
+    <div className="max-w-[840px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      <PageHeader
+        title={
+          <>
+            <MailIcon className="inline w-5 h-5 mr-2 -mt-0.5" aria-hidden />
+            Mail
+          </>
+        }
+      />
+      <p className="text-sm text-ink-500 -mt-section mb-card">
+        Cross-client communication — AI classifies inbound; bytes stay in your
+        email account.
+      </p>
 
-      {/* Reminders Out — gap-over-fill prominent top section per IA v0.7 §3.8 */}
+      {/* Reminders Out — gap-over-fill prominent top section per IA v0.7 §3.8.
+          Border 1px (DESIGN.md max), warn-bg (token, not -bg/40 mix). */}
       <section
         aria-labelledby="reminders-out-heading"
-        className="rounded-md border-2 border-warning-border bg-warning-bg/40 p-4 mb-6"
+        className="rounded-md border border-warn-border bg-warn-bg p-region mb-card"
       >
         <header className="flex items-center justify-between gap-2 mb-3">
           <h2

@@ -3,6 +3,7 @@ import { ChevronRight, Clock, History } from "lucide-react";
 import { useAnnouncements } from "../hooks/useAnnouncements";
 import { PageSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
+import { PageHeader } from "../components/ui/PageHeader";
 import {
   escalationTier,
   formatLongDate,
@@ -48,15 +49,23 @@ export function AnnouncementList() {
       </div>
     );
   }
+
   const activeAnnouncements = announcements.filter((a) => !a.dismissed);
   const hasAny = announcements.length > 0;
   const allDismissed = hasAny && activeAnnouncements.length === 0;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 md:px-6 py-6">
-      <h1 className="text-lg font-semibold text-ink-900">Alerts</h1>
-      <p className="text-sm text-ink-500 mt-1">
-        State DOR announcements affecting your clients · scanned hourly across
+    <div className="max-w-[840px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      <PageHeader
+        title="Alerts"
+        meta={
+          activeAnnouncements.length > 0
+            ? `${activeAnnouncements.length} active`
+            : undefined
+        }
+      />
+      <p className="text-sm text-ink-500 -mt-section mb-card">
+        State DOR announcements affecting your clients — scanned hourly across
         50 authorities.
       </p>
 

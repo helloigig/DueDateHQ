@@ -62,6 +62,9 @@ const Settings = lazy(() =>
 const Calendar = lazy(() =>
   import("./pages/Calendar").then((m) => ({ default: m.Calendar })),
 );
+const TodayDesign = lazy(() =>
+  import("./pages/Today").then((m) => ({ default: m.Today })),
+);
 const OnboardingFirm = lazy(() =>
   import("./pages/onboarding/OnboardingFirm").then((m) => ({
     default: m.OnboardingFirm,
@@ -206,6 +209,10 @@ export default function App() {
           <Route path="inbox" element={<Navigate to="/mail" replace />} />
           <Route path="legacy/to-review" element={<Inbox />} />
           <Route path="calendar" element={<Calendar />} />
+          {/* Design preview: new Today page per docs/specs/today-page.md.
+              Non-destructive — old Dashboard still serves "/" until this is
+              approved as the Today replacement. */}
+          <Route path="design/today" element={<TodayDesign />} />
           <Route path="opportunities" element={<Insights />} />
           {/* Legacy /insights route — redirect to canonical /opportunities */}
           <Route path="insights" element={<Navigate to="/opportunities" replace />} />

@@ -6,10 +6,14 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Surfaces
-        canvas: "#FAFAF7",
+        // Surfaces — Mercury-aligned cool neutral palette (2026-05-03 refresh).
+        // The previous warm cream (#FAFAF7) gave the product a paper feeling
+        // but read as "Notion-ish" not "operational". Cool neutral pairs with
+        // the indigo accent cleanly and matches the Mercury / Sana / Oku
+        // reference family.
+        canvas: "#F8F9FB",
         surface: "#FFFFFF",
-        sunken: "#F5F4EF",
+        sunken: "#F2F3F5",
 
         // Text
         ink: {
@@ -24,10 +28,21 @@ export default {
         line: "#E2E8F0",
         "line-strong": "#CBD5E1",
 
-        // Single accent
+        // Single accent (legacy slate — kept for back-compat with existing
+        // surfaces; do not use on new design-system surfaces)
         accent: {
           DEFAULT: "#0F172A",
           hover: "#1E293B",
+        },
+
+        // New design-system accent (per docs/design-system.md §2)
+        // Indigo — reserved for "the next action" only (T2: one accent, one
+        // viewport, one action).
+        indigo: {
+          DEFAULT: "#5B5BD6",
+          hover: "#4A4AC9",
+          soft: "#ECECFE",
+          ink: "#3D3DAF",
         },
 
         // Status
@@ -53,6 +68,19 @@ export default {
         lg:   ["16px", { lineHeight: "24px" }],
         xl:   ["18px", { lineHeight: "26px" }],
         "2xl":["22px", { lineHeight: "28px", letterSpacing: "-0.01em" }],
+
+        // DESIGN.md named typography tokens (preferred over numeric scale
+        // when the role is semantic — `text-display` reads more clearly
+        // in JSX than `text-2xl font-semibold`).
+        display:      ["22px", { lineHeight: "28px", letterSpacing: "-0.01em" }],
+        title:        ["18px", { lineHeight: "26px" }],
+        "body-lg":    ["14px", { lineHeight: "20px", fontWeight: "500" }],
+        body:         ["14px", { lineHeight: "20px" }],
+        label:        ["13px", { lineHeight: "20px", fontWeight: "500" }],
+        caption:      ["12px", { lineHeight: "16px" }],
+        micro:        ["11px", { lineHeight: "16px", fontWeight: "600", letterSpacing: "0.05em" }],
+        // Mercury-style headline numeric (page-level KPIs only).
+        "numeric-lg": ["26px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600" }],
       },
 
       borderRadius: {
@@ -61,6 +89,7 @@ export default {
         md: "8px",
         lg: "10px",
         xl: "12px",
+        pill: "9999px", // T3: actions are pill-shaped (buttons, status pills, search bar)
       },
 
       boxShadow: {

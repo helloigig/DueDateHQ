@@ -28,7 +28,11 @@ import { ModeFHealth } from "../components/ModeFHealth";
 import { ActionQueue } from "../components/ActionQueue";
 import { JustHappenedStrip } from "../components/JustHappenedStrip";
 import { AiUsageInfo } from "../components/AiUsageInfo";
-import { useLocation } from "react-router-dom";
+import { PageHeader } from "../components/ui/PageHeader";
+import { DateLabel } from "../components/ui/DateLabel";
+import { MetricTile } from "../components/ui/MetricTile";
+import { Mail, CheckCircle2, Plus, Megaphone, type LucideIcon } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { Announcement } from "../types";
 
 const DONE_STATUSES = new Set(["completed", "filed_extension"]);
@@ -54,7 +58,7 @@ const DONE_STATUSES = new Set(["completed", "filed_extension"]);
  *     surfaced via per-row actions in the queue).
  */
 export function Dashboard() {
-  const session = useSession();
+  useSession();
   const clientsQuery = useClients();
   const triageQuery = useTriageDeadlines();
   const announcementsQuery = useRealtimeAnnouncements();
@@ -162,15 +166,7 @@ export function Dashboard() {
     };
   }, [tasks, clients]);
 
-  const todayLabel = useMemo(
-    () =>
-      TODAY.toLocaleDateString("en-US", {
-        weekday: "long",
-        month: "long",
-        day: "numeric",
-      }),
-    [],
-  );
+  const todayIso = useMemo(() => toIso(TODAY), []);
 
   const hasNoClients = clients.length === 0;
 
@@ -198,10 +194,17 @@ export function Dashboard() {
 
   if (hasNoClients) {
     return (
-      <div className="max-w-5xl mx-auto px-6 py-12 space-y-6">
-        <div className="flex justify-end">
-          <AiUsageInfo />
-        </div>
+      <div className="max-w-[840px] mx-auto px-4 md:px-6 lg:px-8 py-section">
+        <PageHeader
+          title={
+            <>
+              Today
+              <span className="ml-2 font-medium text-ink-500">
+                <DateLabel value={todayIso} format="short" />
+              </span>
+            </>
+          }
+        />
         <EmptyState
           title="Let's get your clients in."
           actions={
@@ -220,72 +223,52 @@ export function Dashboard() {
     );
   }
 
-  const firmName = session?.firmName ?? "";
-
   return (
-    <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-4">
-      {/* Thin top strip — date + firm name + AI affordance. No big greeting. */}
-      <header className="flex items-baseline gap-2 text-xs flex-wrap">
-        <span className="text-ink-500">{todayLabel}</span>
-        {firmName && (
-          <>
-            <span className="text-ink-300">·</span>
-            <span className="text-ink-700 font-medium">{firmName}</span>
-          </>
-        )}
-        <span className="ml-auto self-center">
-          <AiUsageInfo />
-        </span>
-      </header>
+    <div className="max-w-[1080px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      {/* PAGE HEADER ROW — Mercury Home anatomy: H1 left + action button row
+          right. The action row carries the page's "what can I do here right
+          now" affordances (Mercury Home: Send / Transfer / Deposit / Request).
+          Per T2 — only the first action ("Send chase") wears the indigo
+          accent; the rest are ghost pills. */}
+      <div className="mb-card flex items-end justify-between gap-card flex-wrap">
+        <PageHeader
+          className="mb-0"
+          title={
+            <>
+              Today
+              <span className="ml-2 font-medium text-ink-500">
+                <DateLabel value={todayIso} format="short" />
+              </span>
+            </>
+          }
+        />
+        <DashboardActionRow />
+      </div>
 
-      {/* One-line operational summary. Two-tier urgency: warn for past
-          internal target (common), danger for past official (rare). Both
-          conditional — no zero-counts shouted at the CPA. */}
-      <p
-        className="text-sm text-ink-700 flex items-center flex-wrap gap-x-3 gap-y-1 tabular-nums"
-        aria-label="Firm summary"
-      >
-        <span>
-          <span className="text-ink-900 font-semibold">
-            {summary.activeClients}
-          </span>{" "}
-          <span className="text-ink-500">active clients</span>
-        </span>
-        <span className="text-ink-300">·</span>
-        <span>
-          <span className="text-ink-900 font-semibold">
-            {summary.dueThisWeek}
-          </span>{" "}
-          <span className="text-ink-500">due this week</span>
-        </span>
-        {summary.dueToday > 0 && (
-          <>
-            <span className="text-ink-300">·</span>
-            <span className="text-warn-ink">
-              <span className="font-semibold">{summary.dueToday}</span> filing
-              today
-            </span>
-          </>
-        )}
-        {summary.pastInternalTarget > 0 && (
-          <>
-            <span className="text-ink-300">·</span>
-            <span className="text-warn-ink">
-              <span className="font-semibold">{summary.pastInternalTarget}</span>{" "}
-              past internal target
-            </span>
-          </>
-        )}
-        {summary.pastOfficial > 0 && (
-          <>
-            <span className="text-ink-300">·</span>
-            <span className="text-danger-ink">
-              <span className="font-semibold">{summary.pastOfficial}</span>{" "}
-              past official — file extension
-            </span>
-          </>
-        )}
-      </p>
+      {/* KPI STRIP — 4-up MetricTile grid (Mercury-style). Each tile is a
+          card with eyebrow label + display-numeric tabular value. The right
+          two tiles fold to warn/danger tone when nonzero so today's pulse
+          reads at a glance. Grid: 4-up at md+, 2-up at sm. */}
+      <div className="mb-card grid grid-cols-2 md:grid-cols-4 gap-region">
+        <MetricTile label="Active clients" value={summary.activeClients} />
+        <MetricTile label="Due this week" value={summary.dueThisWeek} />
+        <MetricTile
+          label="Filing today"
+          value={summary.dueToday}
+          tone={summary.dueToday > 0 ? "warn" : "neutral"}
+        />
+        <MetricTile
+          label={summary.pastOfficial > 0 ? "Past official" : "Past target"}
+          value={summary.pastOfficial > 0 ? summary.pastOfficial : summary.pastInternalTarget}
+          tone={
+            summary.pastOfficial > 0
+              ? "danger"
+              : summary.pastInternalTarget > 0
+              ? "warn"
+              : "neutral"
+          }
+        />
+      </div>
 
       {/* First-run welcome — inline banner, click to expand. */}
       <WelcomeTour />
@@ -377,7 +360,8 @@ export function Dashboard() {
         ]}
       />
 
-      <div className="pt-2 pb-6 text-2xs text-ink-400 flex items-center justify-end">
+      <div className="pt-2 pb-6 text-2xs text-ink-400 flex items-center justify-between gap-4">
+        <AiUsageInfo />
         <button
           onClick={() => setShortcutsOpen(true)}
           className="hover:text-ink-700 flex items-center gap-1"
@@ -389,6 +373,67 @@ export function Dashboard() {
         </button>
       </div>
     </div>
+  );
+}
+
+// DashboardActionRow — top-right pill button cluster on the Dashboard page
+// header. Mercury Home anatomy: the page's primary actions sit beside the
+// title, not buried inside sections. Per T2 — only the first action wears
+// the indigo accent (the "next likely action"); the rest are ghost pills.
+function DashboardActionRow() {
+  const navigate = useNavigate();
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <ActionPill
+        primary
+        icon={Mail}
+        label="Send chase"
+        onClick={() => navigate("/mail")}
+      />
+      <ActionPill
+        icon={CheckCircle2}
+        label="Mark received"
+        onClick={() => navigate("/mail")}
+      />
+      <ActionPill
+        icon={Megaphone}
+        label="View alerts"
+        onClick={() => navigate("/alerts")}
+      />
+      <ActionPill
+        icon={Plus}
+        label="New client"
+        onClick={() => navigate("/clients?new=1")}
+      />
+    </div>
+  );
+}
+
+// ActionPill — pill-shaped page-header CTA. Per T3 (pills for actions) +
+// T2 (only one indigo accent on the page).
+function ActionPill({
+  primary,
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  primary?: boolean;
+  icon: LucideIcon;
+  label: string;
+  onClick?: () => void;
+}) {
+  const cls = primary
+    ? "bg-indigo text-white hover:bg-indigo-hover border-transparent"
+    : "bg-surface text-ink-700 hover:bg-sunken border-line hover:border-line-strong";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-pill border transition-colors whitespace-nowrap ${cls}`}
+    >
+      <Icon className="w-4 h-4" aria-hidden />
+      {label}
+    </button>
   );
 }
 

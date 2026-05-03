@@ -563,7 +563,7 @@ function PrimaryAction({ ann }: { ann: Announcement }) {
     return (
       <Link
         to={`/alerts/${ann.id}?action=review`}
-        className="text-xs font-medium text-ink-900 px-2.5 py-1 rounded border border-line bg-surface hover:bg-sunken inline-flex items-center gap-1 shrink-0"
+        className="text-xs font-medium text-white bg-indigo hover:bg-indigo-hover px-3 py-1.5 rounded-pill inline-flex items-center gap-1 shrink-0 transition-colors"
         title={
           ann.type === "disaster_extension" && ann.newDeadline
             ? "Review the AI-drafted note. Bundled deadline shift is included by default."
