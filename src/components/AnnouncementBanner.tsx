@@ -1,14 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  AlertTriangle,
-  AlertCircle,
   Megaphone,
   ChevronRight,
   ChevronDown,
   Clock,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import type { Announcement } from "../types";
 import {
@@ -21,6 +18,7 @@ import {
   useDismissAnnouncement,
   useMarkAnnouncementRead,
 } from "../hooks/useAnnouncements";
+import { StateBadge } from "./ui/StateBadge";
 
 type Tone = "danger" | "warn" | "info";
 
@@ -33,23 +31,11 @@ function toneFor(type: Announcement["type"], tier: EscalationTier): Tone {
   return "info";
 }
 
-const TONE_DOT: Record<Tone, string> = {
-  danger: "bg-danger-solid",
-  warn: "bg-warn-solid",
-  info: "bg-info-solid",
-};
-
 const TONE_TEXT: Record<Tone, string> = {
   danger: "text-danger-ink",
   warn: "text-warn-ink",
   info: "text-info-ink",
 };
-
-function iconFor(type: Announcement["type"]): LucideIcon {
-  if (type === "disaster_extension") return AlertTriangle;
-  if (type === "pte_change" || type === "penalty_relief") return AlertCircle;
-  return Megaphone;
-}
 
 /**
  * Smart-collapse state-alert banner. The cut between "show as a row" and
@@ -277,12 +263,11 @@ export function AnnouncementBanner({
               </span>
             </>
           )}
-          {actionable.length > 0 && (
+          {actionable.length > 0 && actionable.length < clusters.length && (
             <>
               <span className="text-ink-300"> · </span>
               <span>
-                {actionable.length} need{actionable.length === 1 ? "s" : ""}{" "}
-                review
+                {actionable.length} affecting your clients
               </span>
             </>
           )}
@@ -436,7 +421,6 @@ function AlertRow({
       "fresh",
     );
   const tone = toneFor(ann.type, tier);
-  const Icon = iconFor(ann.type);
   const matchReason = matchReasonFor(ann);
   // Distinct anchor URLs the BE has filed under this event: each cluster
   // member contributes its canonical sourceUrl + any relatedSourceUrls
@@ -465,20 +449,16 @@ function AlertRow({
         tier === "escalated" ? "bg-danger-bg/15" : "hover:bg-sunken/30",
       ].join(" ")}
     >
-      {/* Severity dot — color carries the urgency */}
-      <span
-        className={`w-2 h-2 rounded-full shrink-0 ${TONE_DOT[tone]}`}
-        aria-hidden
-      />
-      <Icon className={`w-3.5 h-3.5 shrink-0 ${TONE_TEXT[tone]}`} aria-hidden />
+      {/* Single jurisdiction signal — replaces the previous dot+icon
+          combo (3 visual signals for the same thing was decoration tax). */}
+      <StateBadge code={ann.stateCode} size="sm" />
 
       <div className="flex-1 min-w-0">
         <Link
           to={`/alerts/${ann.id}`}
-          className={`text-sm font-medium flex items-center gap-1 shrink-0 px-2.5 py-1 rounded hover:bg-surface/60 ${TONE_TEXT[tone]}`}
+          className={`text-sm font-medium flex items-center gap-1.5 px-2.5 py-1 rounded hover:bg-surface/60 ${tier === "escalated" ? TONE_TEXT[tone] : "text-ink-900"}`}
           title="Review affected clients and apply the new deadline"
         >
-          <span className="font-semibold">{ann.stateCode}:</span>
           <span>{ann.title}</span>
           {tier === "escalated" && (
             <span className="text-2xs uppercase tracking-wide px-1 py-0.5 rounded bg-danger-bg text-danger-ink border border-danger-border font-semibold">

@@ -32,11 +32,10 @@ export function TopBar() {
 
   return (
     <header className="h-14 shrink-0 bg-surface border-b border-line flex items-center gap-3 px-5">
-      {/* Search affordance — visually a real input (bg-surface +
-          hairline border) so it reads as fillable, not as a flat
-          area. Click opens the command palette; ⌘K hint pinned right.
-          Hover deepens the border; focus shows the indigo ring. */}
-      <div className="flex-1 max-w-md">
+      {/* Search affordance — fixed compact width on the left so it
+          doesn't dominate the topbar; right-side actions group pulls
+          to the edge via `ml-auto` on the +New trigger. */}
+      <div className="w-72 shrink-0">
         <button
           onClick={() => setPaletteOpen(true)}
           title="Search (⌘K)"
@@ -73,7 +72,7 @@ export function TopBar() {
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button className="shrink-0">+ New</Button>
+          <Button className="shrink-0 ml-auto">+ New</Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuItem onSelect={() => setModal("client")}>

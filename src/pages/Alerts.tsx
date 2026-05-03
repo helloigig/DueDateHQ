@@ -194,8 +194,9 @@ function FeedCard({
       <div className="p-region flex items-start gap-3">
         <StateBadge code={a.stateCode} />
         <div className="flex-1 min-w-0">
-          {/* Title on its own row — hero, no competition */}
-          <h3 className="text-base font-semibold text-ink-900 leading-snug">
+          {/* Title on its own row — hero, one size up from the
+              meta line so the eye lands here first. */}
+          <h3 className="text-lg font-semibold text-ink-900 leading-snug">
             {a.title}
           </h3>
 
@@ -401,11 +402,9 @@ function CopilotPane({
   onClose: () => void;
 }) {
   const [draftIndex, setDraftIndex] = useState(0);
-  const [composer, setComposer] = useState("");
 
   useEffect(() => {
     setDraftIndex(0);
-    setComposer("");
   }, [announcement?.id]);
 
   if (!announcement) {
@@ -677,10 +676,10 @@ function CopilotPane({
       </div>
 
       {/* ── Disposition zone — sticky footer ─────────────────────
-          Pinned above the composer (outside the scroll container) so
-          escape hatches stay reachable regardless of how long the
-          action list grows. Per DESIGN.md §Do's: "Keep escape
-          hatches visible." */}
+          Pinned at the bottom of the pane (outside the scroll
+          container) so escape hatches stay reachable regardless of
+          how long the action list grows. Per DESIGN.md §Do's: "Keep
+          escape hatches visible." */}
       <div className="border-t border-line bg-canvas px-region py-2">
         <div className="text-2xs uppercase tracking-wider font-semibold text-ink-400 mb-1.5">
           Disposition
@@ -711,53 +710,6 @@ function CopilotPane({
         </div>
       </div>
 
-      {/* Composer */}
-      <div className="border-t border-line bg-sunken/30 p-region">
-        <div className="bg-surface border border-line-strong rounded-md p-2.5 focus-within:border-indigo focus-within:ring-2 focus-within:ring-indigo-soft transition-colors">
-          <div className="flex items-end gap-2">
-            <textarea
-              rows={1}
-              value={composer}
-              onChange={(e) => setComposer(e.target.value)}
-              placeholder="Ask about this announcement, or refine an action…"
-              className="flex-1 resize-none bg-transparent text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none min-h-[22px] max-h-[100px]"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                if (!composer.trim()) return;
-                toast.success("AI is thinking…");
-                setComposer("");
-              }}
-              disabled={!composer.trim()}
-              className={cn(
-                "shrink-0 w-7 h-7 inline-flex items-center justify-center rounded text-white transition-colors",
-                composer.trim()
-                  ? "bg-indigo hover:bg-indigo-hover"
-                  : "bg-ink-300 cursor-not-allowed",
-              )}
-              aria-label="Send refinement"
-            >
-              <Send className="w-3.5 h-3.5" aria-hidden />
-            </button>
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5 flex-wrap mt-2">
-          {(a.type === "disaster_extension"
-            ? ["Which counties qualify?", "Make emails warmer", "What if a client opts out?"]
-            : ["Make emails warmer", "Suggest follow-up cadence", "Skip non-applicable clients"]
-          ).map((hint) => (
-            <button
-              key={hint}
-              type="button"
-              onClick={() => setComposer(hint)}
-              className="text-xs text-ink-700 bg-surface border border-line hover:border-line-strong hover:bg-sunken px-2.5 py-1 rounded-pill transition-colors"
-            >
-              {hint}
-            </button>
-          ))}
-        </div>
-      </div>
     </aside>
   );
 }

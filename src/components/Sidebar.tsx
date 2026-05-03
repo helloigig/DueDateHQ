@@ -106,10 +106,14 @@ export function Sidebar() {
         //     restore the right hairline border. A 56px floating card
         //     is decoration; flush gives the user maximum canvas back
         //     when they've actively chosen to tuck the menu away.
+        // Floating shell when expanded: rounded card with shadow,
+        // offset from top + left only — NO bottom margin so the
+        // sidebar reaches the viewport bottom (avoids a visible
+        // canvas strip below the user-account block).
         "shrink-0 bg-surface flex flex-col transition-[width] duration-150",
         collapsed
           ? "w-14 border-r border-line"
-          : "w-56 my-3 ml-3 rounded-lg shadow-pop",
+          : "w-56 mt-3 ml-3 rounded-tl-lg rounded-bl-none rounded-tr-lg shadow-pop",
       ].join(" ")}
     >
       <WorkspaceHeader

@@ -230,7 +230,7 @@ export function Dashboard() {
           now" affordances (Mercury Home: Send / Transfer / Deposit / Request).
           Per T2 — only the first action ("Send chase") wears the indigo
           accent; the rest are ghost pills. */}
-      <div className="mb-card flex items-end justify-between gap-card flex-wrap">
+      <div className="mb-region flex items-end justify-between gap-region flex-wrap">
         <PageHeader
           className="mb-0"
           title={
@@ -270,8 +270,10 @@ export function Dashboard() {
         />
       </div>
 
-      {/* First-run welcome — inline banner, click to expand. */}
-      <WelcomeTour />
+      {/* WelcomeTour hidden per user direction — adds noise on the daily
+          surface; reintroduce as an onboarding-only banner gated on
+          firstSession if we want a tour later. */}
+      {/* <WelcomeTour /> */}
 
       {/* ─────────────────────────────────────────────────────────────────
           Today narrative (5 sections, read top → bottom):
