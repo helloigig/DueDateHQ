@@ -30,7 +30,9 @@ import { JustHappenedStrip } from "../components/JustHappenedStrip";
 import { AiUsageInfo } from "../components/AiUsageInfo";
 import { PageHeader } from "../components/ui/PageHeader";
 import { DateLabel } from "../components/ui/DateLabel";
-import { useLocation } from "react-router-dom";
+import { MetricTile } from "../components/ui/MetricTile";
+import { Mail, CheckCircle2, Plus, Megaphone, type LucideIcon } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { Announcement } from "../types";
 
 const DONE_STATUSES = new Set(["completed", "filed_extension"]);
@@ -222,50 +224,50 @@ export function Dashboard() {
   }
 
   return (
-    <div className="max-w-[840px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
-      {/* Page header — DESIGN.md §Typography display. Date inline, no
-          greeting, no firm name (sidebar already shows the firm), no AI
-          chip in the header (DESIGN.md "Don't add greetings, firm names,
-          or AI usage chips to the header"). AI usage moved to the bottom
-          shortcuts strip below. */}
-      <PageHeader
-        title={
-          <>
-            Today
-            <span className="ml-2 font-medium text-ink-500">
-              <DateLabel value={todayIso} format="short" />
-            </span>
-          </>
-        }
-      />
+    <div className="max-w-[1080px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      {/* PAGE HEADER ROW — Mercury Home anatomy: H1 left + action button row
+          right. The action row carries the page's "what can I do here right
+          now" affordances (Mercury Home: Send / Transfer / Deposit / Request).
+          Per T2 — only the first action ("Send chase") wears the indigo
+          accent; the rest are ghost pills. */}
+      <div className="mb-card flex items-end justify-between gap-card flex-wrap">
+        <PageHeader
+          className="mb-0"
+          title={
+            <>
+              Today
+              <span className="ml-2 font-medium text-ink-500">
+                <DateLabel value={todayIso} format="short" />
+              </span>
+            </>
+          }
+        />
+        <DashboardActionRow />
+      </div>
 
-      {/* Operational summary — Mercury-style metric strip. No middle-dot
-          separators (rule: "avoid dots in labels"). Air + tabular-nums +
-          two-level ink hierarchy do the work. Conditional warn/danger
-          metrics fold in only when nonzero. */}
-      <div
-        className="mb-card flex flex-wrap items-baseline gap-x-section gap-y-2 tabular-nums"
-        aria-label="Firm summary"
-      >
-        <SummaryMetric value={summary.activeClients} label="active clients" />
-        <SummaryMetric value={summary.dueThisWeek} label="due this week" />
-        {summary.dueToday > 0 && (
-          <SummaryMetric value={summary.dueToday} label="filing today" tone="warn" />
-        )}
-        {summary.pastInternalTarget > 0 && (
-          <SummaryMetric
-            value={summary.pastInternalTarget}
-            label="past internal target"
-            tone="warn"
-          />
-        )}
-        {summary.pastOfficial > 0 && (
-          <SummaryMetric
-            value={summary.pastOfficial}
-            label="past official — file extension"
-            tone="danger"
-          />
-        )}
+      {/* KPI STRIP — 4-up MetricTile grid (Mercury-style). Each tile is a
+          card with eyebrow label + display-numeric tabular value. The right
+          two tiles fold to warn/danger tone when nonzero so today's pulse
+          reads at a glance. Grid: 4-up at md+, 2-up at sm. */}
+      <div className="mb-card grid grid-cols-2 md:grid-cols-4 gap-region">
+        <MetricTile label="Active clients" value={summary.activeClients} />
+        <MetricTile label="Due this week" value={summary.dueThisWeek} />
+        <MetricTile
+          label="Filing today"
+          value={summary.dueToday}
+          tone={summary.dueToday > 0 ? "warn" : "neutral"}
+        />
+        <MetricTile
+          label={summary.pastOfficial > 0 ? "Past official" : "Past target"}
+          value={summary.pastOfficial > 0 ? summary.pastOfficial : summary.pastInternalTarget}
+          tone={
+            summary.pastOfficial > 0
+              ? "danger"
+              : summary.pastInternalTarget > 0
+              ? "warn"
+              : "neutral"
+          }
+        />
       </div>
 
       {/* First-run welcome — inline banner, click to expand. */}
@@ -374,34 +376,64 @@ export function Dashboard() {
   );
 }
 
-// SummaryMetric — Mercury-style inline KPI used in the Dashboard
-// operational summary. No dots; whitespace + size + color carry hierarchy.
-function SummaryMetric({
-  value,
-  label,
-  tone,
-}: {
-  value: number;
-  label: string;
-  tone?: "warn" | "danger";
-}) {
-  const labelTone =
-    tone === "danger"
-      ? "text-danger-ink"
-      : tone === "warn"
-      ? "text-warn-ink"
-      : "text-ink-500";
-  const valueTone =
-    tone === "danger"
-      ? "text-danger-ink"
-      : tone === "warn"
-      ? "text-warn-ink"
-      : "text-ink-900";
+// DashboardActionRow — top-right pill button cluster on the Dashboard page
+// header. Mercury Home anatomy: the page's primary actions sit beside the
+// title, not buried inside sections. Per T2 — only the first action wears
+// the indigo accent (the "next likely action"); the rest are ghost pills.
+function DashboardActionRow() {
+  const navigate = useNavigate();
   return (
-    <div className="flex items-baseline gap-2">
-      <span className={`text-xl font-semibold ${valueTone}`}>{value}</span>
-      <span className={`text-sm ${labelTone}`}>{label}</span>
+    <div className="flex items-center gap-2 flex-wrap">
+      <ActionPill
+        primary
+        icon={Mail}
+        label="Send chase"
+        onClick={() => navigate("/mail")}
+      />
+      <ActionPill
+        icon={CheckCircle2}
+        label="Mark received"
+        onClick={() => navigate("/mail")}
+      />
+      <ActionPill
+        icon={Megaphone}
+        label="View alerts"
+        onClick={() => navigate("/alerts")}
+      />
+      <ActionPill
+        icon={Plus}
+        label="New client"
+        onClick={() => navigate("/clients?new=1")}
+      />
     </div>
+  );
+}
+
+// ActionPill — pill-shaped page-header CTA. Per T3 (pills for actions) +
+// T2 (only one indigo accent on the page).
+function ActionPill({
+  primary,
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  primary?: boolean;
+  icon: LucideIcon;
+  label: string;
+  onClick?: () => void;
+}) {
+  const cls = primary
+    ? "bg-indigo text-white hover:bg-indigo-hover border-transparent"
+    : "bg-surface text-ink-700 hover:bg-sunken border-line hover:border-line-strong";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-pill border transition-colors whitespace-nowrap ${cls}`}
+    >
+      <Icon className="w-4 h-4" aria-hidden />
+      {label}
+    </button>
   );
 }
 

@@ -16,16 +16,26 @@ import { cn } from "@/lib/utils";
 // shared card; default has the card border.
 
 export type DeltaTone = "up" | "down" | "neutral";
+export type ValueTone = "neutral" | "warn" | "danger" | "ok";
 
 export interface MetricTileProps extends React.HTMLAttributes<HTMLDivElement> {
   label: string;
   value: React.ReactNode; // can be a Money/Date component
   delta?: { tone: DeltaTone; label: string };
+  /** Color of the headline value (default neutral ink-900). */
+  tone?: ValueTone;
   /** Drop the surrounding card chrome (use when nested inside a Card). */
   flush?: boolean;
   /** Make the tile clickable. */
   onClick?: () => void;
 }
+
+const valueColor: Record<ValueTone, string> = {
+  neutral: "text-ink-900",
+  warn: "text-warn-ink",
+  danger: "text-danger-ink",
+  ok: "text-ok-ink",
+};
 
 const deltaIcon: Record<DeltaTone, React.ComponentType<{ className?: string }> | null> = {
   up: ArrowUp,
@@ -40,9 +50,10 @@ const deltaColor: Record<DeltaTone, string> = {
 };
 
 export const MetricTile = React.forwardRef<HTMLDivElement, MetricTileProps>(
-  ({ className, label, value, delta, flush, onClick, ...props }, ref) => {
+  ({ className, label, value, delta, tone, flush, onClick, ...props }, ref) => {
     const Icon = delta ? deltaIcon[delta.tone] : null;
     const interactive = !!onClick;
+    const valueClass = valueColor[tone ?? "neutral"];
     return (
       <div
         ref={ref}
@@ -70,7 +81,7 @@ export const MetricTile = React.forwardRef<HTMLDivElement, MetricTileProps>(
         <div className="text-micro font-semibold uppercase tracking-wider text-ink-500">
           {label}
         </div>
-        <div className="mt-1.5 text-[26px] font-semibold text-ink-900 tabular-nums leading-[32px] tracking-[-0.01em]">
+        <div className={cn("mt-1.5 text-[26px] font-semibold tabular-nums leading-[32px] tracking-[-0.01em]", valueClass)}>
           {value}
         </div>
         {delta && (
