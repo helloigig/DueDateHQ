@@ -53,7 +53,7 @@ export function TopBar() {
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="text-sm px-3 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover">
+          <button className="text-sm px-3 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover whitespace-nowrap shrink-0">
             + New
           </button>
         </DropdownMenuTrigger>
@@ -95,7 +95,7 @@ export function TopBar() {
               <div className="w-8 h-8 rounded-full bg-ink-900 text-canvas flex items-center justify-center text-xs font-medium">
                 {session?.userInitials || "SC"}
               </div>
-              <span className="hidden md:inline text-sm text-ink-700">
+              <span className="hidden lg:inline text-sm text-ink-700 whitespace-nowrap">
                 {session?.userName || "Sarah Chen"}
               </span>
             </button>
@@ -173,7 +173,7 @@ function TrialBadge() {
   return (
     <Link
       to="/settings/billing"
-      className={`hidden md:inline-flex items-center text-2xs font-medium px-2 py-1 rounded border transition-colors ${toneClass}`}
+      className={`hidden lg:inline-flex items-center text-2xs font-medium px-2 py-1 rounded border transition-colors whitespace-nowrap shrink-0 ${toneClass}`}
       title="Trial details — Settings → Billing"
     >
       {status.label}

@@ -311,3 +311,253 @@ Used inside expanded alert cards (one client per row) and inside expanded client
 - **Don't show form-type counts ("affecting ~15 form types").** Show actual form codes (1040, 1020-S) and client counts. Specificity always.
 - **Don't use a 5th spacing value.** If you need one, you're wrong about the grouping or the rhythm.
 - **Don't ship Mode F Health as its own card on Today.** It's an inline pill on the State alerts header. The detail page lives at `/system-status`.
+
+## Brand Vocabulary
+
+These are load-bearing terms. Microcopy uses them verbatim. Synonym drift is forbidden — every drift creates a translation step the user has to do.
+
+| Term | Means | Never call it |
+|:-----|:------|:--------------|
+| **Action Queue** | The user's main work surface — items needing their action | Tasks · Inbox · Your tasks · To-do |
+| **Today** | The today-focused entry view (one of 7 sidebar destinations) | Home · Dashboard · Daily |
+| **Service Package** | A bundle of related deadlines for a client (e.g. "Tax 2025 — LLC + State + Quarterlies") | Bundle · Filing bundle · Engagement package |
+| **Chase** | An outbound email asking a client for missing info/docs | Reminder (acceptable inside the AI prompt; never in UI label) · Nudge |
+| **State Notification** | A change announced by an external authority (IRS, state DOR) that affects multiple clients | Update · Alert (alert is the surface, not the event) |
+| **`received_confirmed`** | The terminal state of a document/info request — fires the §5.3 invariant confirm-pulse | Marked complete · Done (these are the user-facing words; received_confirmed is the technical state) |
+| **Action Surface** | A UI region that combines state + suggested action ("X just announced Y, here are affected clients, here's the email draft") | Card with action · Smart panel |
+| **Mode F** | Internal: state-monitoring health mode | (technical only — never in UI copy; surfaced as "State alerts health" in user-facing labels) |
+| **Phase 1 / Phase 2** | The two-phase chase pattern (push → pull) | (use the numbers) |
+| **Substrate** | The underlying data layer (Postmark inbox, state DOR API, Calendly) | (technical only) |
+
+**Voice rule:** when in doubt about UI copy, **say it the way a senior CPA would say it**, not the way an enterprise SaaS would. "Send chase" beats "Trigger reminder workflow." "Mark received" beats "Confirm document acquisition."
+
+## The four alert surfaces
+
+DueDateHQ presents alerts on four distinct surfaces. Each carries a different urgency contract. **Don't blur them — picking the right surface IS the message.**
+
+| Surface | When | Behavior |
+|:--------|:-----|:---------|
+| **Bell** (top-bar dropdown) | Mixed inbox of all unread alerts. Click bell → list. | Asynchronous. The CPA pulls when ready. Badge count updates in real-time. |
+| **Banner** (top of `/today` or `/clients`) | A state notification with multi-client impact, contextual to the current view. **At most ONE visible** per viewport. | Dismissable for the session. Action is always an inline link (`Review impacts →`), NEVER a primary button. Re-appears on next page load if unresolved. |
+| **Blocking modal** | A single alert >72h overdue that requires a decision before continuing. | Owns the screen with backdrop. Has only two paths: act on it OR snooze (NOT dismiss). |
+| **`/alerts` page** | Full-page list view of every active alert, filterable. | The "I want to triage everything" surface. Read-write; supports bulk actions. |
+
+**Canonical mapping** (when a state notification arrives):
+
+```
+ARRIVES → bell badge increments + alerts page row inserted
+       ↓
+       if affects ≥1 client → banner appears on /today (one banner max)
+       ↓
+       if alert ages >72h with no action → escalates to blocking modal
+       ↓
+       on action OR snooze → all four surfaces update in lockstep
+```
+
+**Mode F Health** (the state-monitoring infrastructure) is NOT a fifth surface. It's an inline pill on the State alerts section header (`47/50 · 3 stale`), per `Don't` rule.
+
+## Component anatomy rules
+
+Every multi-element component (card, row, banner, dialog) MUST satisfy these before shipping. They prevent the most common layout failures (Shokz-style: "$79 hidden behind CTA").
+
+1. **Zone map first.** Name the areas — `[avatar] [name+meta] [status pill] [primary action]` — before pixel values. Elements never leak across zone boundaries.
+2. **Reading order explicit.** State the L→R / T→B scan path: e.g. `name → meta → status → primary action`. The DOM order matches.
+3. **Non-overlap guarantee for primary info.** The deadline date / client name / `Overdue Nd` pill is **never** covered by an interactive affordance. Primary info zones get min-widths so CTAs can't squeeze them.
+4. **Hit-target separation.** Tappable rows containing nested tappables (Send button, ✕ dismiss, chevron) give each nested element its own 44×44 hit area + `e.stopPropagation()` on the click handler.
+5. **Truncation policy per text element.** Declare: never / 1 line ellipsis / 2 lines ellipsis / hides-at-breakpoint. No "flex-1 truncate" without intention.
+6. **Responsive collapse stated.** What happens when the component narrows? (side-by-side → stacked? footer wraps to two rows? meta hides?)
+7. **All interaction states defined.** rest / hover / active / focus-visible / disabled (+ selected / loading where applicable). Missing states = fail unless explicit `N/A`.
+
+If a component spec doesn't answer all 7, send it back.
+
+## Responsive behavior
+
+DueDateHQ is **desktop-first**. A CPA does focused work on a 13"+ screen; mobile is for triage glances (the bell, the queue, marking received). Optimize desktop fully; make mobile usable.
+
+### Breakpoints (Tailwind defaults)
+
+| Name | Min width | Layout |
+|:-----|:----------|:-------|
+| `xs` / `sm` | < 768 | Mobile — sidebar hidden, BottomTabBar visible, single column, drawer for sidebar nav |
+| `md` | 768–1023 | Tablet — sidebar in icon-only mode (or full if user expanded), single column, no BottomTabBar |
+| `lg` | 1024–1279 | Small desktop — full sidebar, single column at `max-w-840px` |
+| `xl` / `2xl` | ≥ 1280 | Desktop / wide — full sidebar, single column at `max-w-840px` (page does NOT widen) |
+
+### Top-bar collapse rules
+
+| Element | Visible from |
+|:--------|:-------------|
+| `+ New` button | always (`whitespace-nowrap shrink-0`) |
+| Bell + badge | always |
+| Avatar | always |
+| User name (next to avatar) | `lg` and up |
+| Trial badge ("Pro trial · 30 days left") | `lg` and up |
+| Search bar long label ("Search clients, deadlines, alerts") | `sm` and up — collapses to "Search" below |
+| ⌘K hint | `sm` and up |
+
+**Why `lg`, not `md`:** at 768–1023 the sidebar takes 224px, leaving ~544px for top-bar content. Adding the trial badge + user name pushes total fixed-width content past available space and triggers wrapping. Hide them at `md` and the bar stays clean.
+
+### Sidebar
+
+- Collapses to `w-14` (56px) icon-only mode on user toggle (persists via `localStorage`).
+- At `< sm`: hidden entirely, BottomTabBar takes over for primary nav.
+- Items keep ≥44px touch target in icon-only mode.
+
+### Page content
+
+- `max-w-[840px]` is the canonical content width. Honored across breakpoints.
+- Page padding: `px-4` mobile · `px-6` tablet · `px-8` desktop. Vertical: `py-6` mobile · `py-8` desktop.
+- Tables (when present): horizontal scroll allowed; **never reflow tabular data into stacked cards** (CPAs scan column-wise).
+- Action queue rows: status pill + primary action stay in the row at all breakpoints. On `< sm` the meta line truncates harder; status pill drops to its own line under the meta if needed.
+
+### Touch targets
+
+- Default: 44×44 minimum (WCAG 2.1 AA).
+- Mobile-primary surfaces (BottomTabBar, primary buttons in row): 48×48.
+- Inline icon-only actions: visual 32×32 with hit area expanded via padding to 44×44.
+
+## Voice & Microcopy
+
+The product voice is **calm, factual, respectful of time**. CPAs are senior professionals. Don't over-explain; don't celebrate; don't apologize for system errors that aren't user-caused.
+
+### Three guiding moves
+
+1. **Verb + object on actions.** "Send reminder" not "Send". "Mark received" not "Confirm". The user reads the button without scanning the row's status pill.
+2. **State the state, then the suggestion.** "Form 941 was revised. 72 clients affected. Review impacts →" (state → impact → action).
+3. **Numbers carry the load.** Microcopy supports the number, doesn't replace it. "$2,200 due Apr 18" beats "An amount is due in a few days."
+
+### Microcopy reference
+
+| Surface | Copy | Why |
+|:--------|:-----|:----|
+| Page title (Today) | `Today, May 3` (date inline; medium-weight ink) | Factual. Not "Welcome, Sarah" — desk, not stage. |
+| Empty `/alerts` | `No active alerts.` | Calm fact. NOT "All caught up!" — no celebration. |
+| Empty Action Queue | `Caught up. Next action due May 18.` | Provides horizon (per Do rule "Auto-hide empty…honest empty state with a horizon"). |
+| Confirmation toast (received_confirmed) | `Marked received.` | Past tense, terse, no exclamation. |
+| Error toast (chase send failed) | `Couldn't send. Retry, or check the email address.` | Direct: what failed, what to try. NOT "Oops!" |
+| Banner (state change) | `IRS revised Form 941. 72 of your clients are affected. Review impacts →` | State → impact → verb. |
+| Button: send chase | `Send reminder` | Verb + object. Plural-stable: "Send reminder (3)" when batch. |
+| Button: review reply | `Open thread` | Domain term. NOT "View" / "See". |
+| Button: review AI draft | `Review draft` | Sets expectation that the user will edit/approve. |
+| Mode F health (when healthy) | `50/50 · all sources connected` | Inline; the absence of bad news IS the message. |
+| Loading state | `Loading…` | Boring is correct. NOT "Just a moment!" / "Hang tight!" |
+| Onboarding first-run | `Welcome, Sarah. Add your first client to start tracking deadlines.` | Personalized once (first run only), factual, immediately actionable. |
+
+### Forbidden words / phrases
+
+- "Oops!" / "Whoops!" — never apologize for system errors that aren't the user's fault.
+- "Awesome!" / "Great!" / `🎉` — never celebrate routine actions.
+- "AI is learning" / "Our AI is thinking" — never expose AI internals as decoration.
+- "Just a moment!" / "Hang tight!" — boring "Loading…" is correct.
+- "Reminder" (when "chase" is the brand term in spec docs) — vocabulary discipline. *Note: button labels say "Send reminder" because that's the CPA's everyday word; "chase" is internal vocab.*
+- "Bundle" / "Filing bundle" (when "service package" is the brand term).
+- "Dashboard" as a sidebar destination (use "Today").
+- `Mode A/B/C/D/E/F` in any user-facing copy.
+
+### Casing
+
+- **Sentence case for everything** — buttons, labels, page titles, banner copy. No Title Case CTAs. UPPERCASE reserved for sidebar group eyebrows (`WORKSPACE`).
+- **Punctuation:** commas inside; periods at end of sentences in body copy; **no periods on button labels or single-line statuses**.
+
+## Accessibility
+
+WCAG 2.1 AA is the floor. The product gets used by working CPAs at 7am with coffee and bifocals — readability isn't optional.
+
+### Verified contrast pairs
+
+| Pair | Ratio | Pass |
+|:-----|:------|:-----|
+| `ink-900` on `canvas` | 16.4:1 | AAA |
+| `ink-900` on `surface` | 17.1:1 | AAA |
+| `ink-700` on `surface` | 9.8:1 | AAA |
+| `ink-500` on `surface` | 4.9:1 | AA (body) |
+| `ink-400` on `surface` | 3.1:1 | AA Large only — never use for body |
+| `on-primary` on `primary` | 16.7:1 | AAA |
+| `ok-ink` on `ok-bg` | 5.8:1 | AAA |
+| `warn-ink` on `warn-bg` | 7.2:1 | AAA |
+| `danger-ink` on `danger-bg` | 6.4:1 | AAA |
+| `info-ink` on `info-bg` | 6.8:1 | AAA |
+
+### Other a11y rules
+
+- **Focus visibility:** `:focus-visible` only (never `:focus`); 2px outline + 2px offset; **never `outline: none`**.
+- **Target size:** 44×44 minimum; 48×48 for mobile-primary surfaces; inline actions get visual 32×32 with padding-expanded hit area.
+- **Color independence:** every status carries an icon or label, never color alone. (E.g. "Overdue 3d" pill carries the word + dot + danger-tint; the word does the work for color-blind users.)
+- **Reduced motion:** `prefers-reduced-motion: reduce` is wired globally in `src/index.css`. Per-moment fallbacks (see Motion §) degrade to opacity-only.
+- **Keyboard nav:** Tab order follows visible reading order. Sidebar items + Action queue rows reachable via Tab. Modal closes on Escape. `j` / `k` move between rows where supported.
+- **Screen reader:** every icon has `aria-label` (decorative icons get `aria-hidden="true"`). Status pills announce as "Status: Overdue 3 days." Modal opens announce title.
+- **Form errors:** `aria-invalid="true"` + `aria-describedby` linking to error message rendered in `danger-ink` below the input.
+
+## Motion
+
+Motion confirms; it does not perform. Subtle, fast, professional. The product is used 30× a day; animation that doesn't earn its keep becomes friction.
+
+### Easing tokens
+
+```css
+--ease-out-strong:  cubic-bezier(0.23, 1, 0.32, 1);   /* default for entries */
+--ease-out-quick:   cubic-bezier(0.4, 0, 0.2, 1);     /* for hover/state change */
+```
+
+**Forbidden:** CSS defaults (`ease`, `ease-in`, `ease-in-out`) — too soft, lack punch. Specifically `ease-in` is forbidden on UI animations (sluggish at the watching moment).
+
+### Duration ladder (bound to element type)
+
+| Element | Duration |
+|:--------|:---------|
+| Button press feedback | 80–160 ms |
+| Tooltips, small popovers | 125–200 ms |
+| Hover state changes | 160 ms |
+| Dropdowns, selects | 150–250 ms |
+| Toast slide-in / out | 200 ms in / 140 ms out |
+| Modal enter / exit | 220 ms in / 140 ms exit |
+| Section fade-up (`.animate-ddhq-fade-up`) | 220 ms |
+| The §5.3 confirm-pulse (`.animate-ddhq-confirm`) | 700 ms (the ONE delight moment) |
+
+**Asymmetric rule:** exits are always faster than enters. Default pair: 220 ms enter / 140 ms exit. Slow where the user is deciding, fast where the system is responding.
+
+### Frequency-based rule
+
+| Frequency | Decision |
+|:----------|:---------|
+| Keyboard navigation (Tab, Esc, ⌘K) | **No animation.** Repeated 100+/day; animation feels laggy. |
+| Sidebar item hover | **No animation.** Bg color change only, instant. |
+| Row hover in queue | Subtle bg shift, 160 ms — not 220 ms. |
+| Modal / popover open | Standard 220–320 ms. |
+| Toast appearance | 200 ms slide + opacity. |
+| `received_confirmed` row flip | 700 ms confirm pulse — the ONE delight moment. |
+
+### Signature motion (already shipped in `src/index.css`)
+
+1. **`.animate-ddhq-confirm`** — 700 ms green outward radial glow on a row when its checklist item flips to `received_confirmed`. Non-looping. The single delight moment.
+2. **`.animate-ddhq-fade-up`** — new rows in tables/lists fade-in + slide up 4 px. 220 ms `--ease-out-strong`. Stagger 60 ms when ≥3 new rows enter together.
+3. **`.animate-ddhq-ai-shimmer`** — gentle opacity pulse on AI-source pills. 2.6 s `ease-in-out` infinite.
+
+### Reduced-motion fallbacks
+
+- Confirm pulse → opacity-only fade-in of green check (no glow).
+- Fade-up → instant insertion (no transform).
+- Modal → instant open (no scale).
+- AI shimmer → static `opacity: 0.85` (no pulse).
+
+## Invisible correctness
+
+The barely-audible voices that compound. These are easy to forget and easy to spot when missing.
+
+| Surface | Token / rule |
+|:--------|:-------------|
+| Text selection | `bg ink-900 at 24% alpha` · `color ink-900` |
+| Caret color | `caret-color: var(--ink-900)` on inputs |
+| Scrollbar | thin (8 px) · thumb `ink-400 at 32% alpha` · hover `ink-400 at 56%` |
+| Link underline | `text-underline-offset: 3px` · `text-decoration-thickness: 1.5px` · color matches text · hover dims to 70% opacity |
+| Tap-highlight | `-webkit-tap-highlight-color: transparent` + custom `:active` state per component |
+| Tooltip delay | first hover: 400 ms · subsequent (within 300 ms): instant + no animation |
+| Smooth scroll | `scroll-behavior: smooth` on `<html>` |
+| Anchor scroll-margin | `scroll-margin-top: var(--nav-height) + 12px` on every scroll target |
+| Focus-visible ring | only on `:focus-visible`, never on `:focus` · never `outline: none` · 2 px solid `primary` + 2 px offset |
+| Broken image fallback | `bg sunken` + alt text in `caption` ink-500 + 16 px lucide `<ImageOff>` |
+| Font smoothing | `-webkit-font-smoothing: antialiased` on dark-canvas surfaces only (toasts) |
+| `select-none` on chrome | sidebar items, button labels, status pills — prevent accidental drag-select |
+| Number inputs | `appearance: none` on currency inputs (kill browser spinners) |
+| Empty cell rendering | render `—` (em dash) in `ink-400`, never blank |
+| Print stylesheet | links unfurl URLs; `@page` margin 0.5in; brand fonts swap to system |
