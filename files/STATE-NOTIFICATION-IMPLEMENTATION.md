@@ -38,8 +38,9 @@ State authority site (50 DORs + DC + SoS)
           │ affected clients per firm
           ▼
    ┌─────────────┐  ──► Email (Resend)
-   │  Notifier   │  ──► In-app banner (dashboard)
-   └──────┬──────┘  ──► Bell/notification center
+   │  Notifier   │  ──► Dashboard AnnouncementBanner (canonical alert surface — every undismissed alert; news-only folds to compact chip; see duedatehq-dashboard-spec.md §1A)
+   └──────┬──────┘  ──► Action-queue state-alert row (derived — Mode F TodoItem, the "go act on it" entry; see ACTION-QUEUE-IMPLEMENTATION.md §4.1)
+          │         ──► Bell/notification center
           │         ──► Public /changes page entry
           ▼
    ┌─────────────┐
