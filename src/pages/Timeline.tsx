@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { trpc } from "../lib/api/client";
 import { env } from "../config";
 import { PageHeader } from "../components/ui/PageHeader";
@@ -8,7 +9,35 @@ import { PageContainer } from "../components/ui/PageContainer";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { StatusPill } from "../components/ui/StatusPill";
 import { FilterChip } from "../components/ui/FilterChip";
+import { Button } from "../components/ui/button";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
+import { MultiSelectChip } from "../components/MultiSelectChip";
+import { clients as MOCK_CLIENTS } from "../data/mockClients";
+import type { ClientTier } from "../types";
 import { cn } from "../lib/utils";
+
+// Lookup map: clientId → entityType / tier / primaryState. Used to
+// enrich TaskRow with cross-axis filter dimensions (entity, tier,
+// jurisdiction). Kept module-level so the lookup is stable across
+// re-renders without a useMemo per cell.
+const CLIENT_LOOKUP = new Map(
+  MOCK_CLIENTS.map((c) => [
+    c.id,
+    {
+      entityType: c.entityType,
+      tier: c.tier,
+      primaryState: c.primaryState,
+    },
+  ]),
+);
 
 /**
  * Timeline — IA v0.7 §3.9a forward-planning surface.
@@ -37,6 +66,11 @@ type TaskRow = {
   milestoneStatus: ("done" | "in_progress" | "not_started")[];
   taskId?: string;
   clientId?: string;
+  // Filter / surface dimensions sourced from the client record.
+  // Optional because mock rows without a clientId can't resolve them.
+  jurisdiction?: string;
+  entityType?: string;
+  tier?: ClientTier;
 };
 
 const STAGE_LABELS: Record<Stage, string> = {
@@ -56,6 +90,9 @@ const MOCK_TIMELINES: TaskRow[] = [
     daysBehind: 7,
     missingCount: 8,
     milestoneStatus: ["done", "done", "in_progress", "not_started", "not_started"],
+    jurisdiction: "federal",
+    entityType: "Partnership",
+    tier: "premium",
   },
   {
     client: "Emily Hartfield",
@@ -65,6 +102,9 @@ const MOCK_TIMELINES: TaskRow[] = [
     daysBehind: 4,
     missingCount: 5,
     milestoneStatus: ["done", "done", "in_progress", "not_started", "not_started"],
+    jurisdiction: "NY",
+    entityType: "Individual",
+    tier: "standard",
   },
   {
     client: "Marcus Chen",
@@ -74,6 +114,9 @@ const MOCK_TIMELINES: TaskRow[] = [
     daysBehind: 2,
     missingCount: 3,
     milestoneStatus: ["done", "done", "done", "in_progress", "not_started"],
+    jurisdiction: "CA",
+    entityType: "S-Corp",
+    tier: "premium",
   },
   {
     client: "Sarah Mitchell",
@@ -83,6 +126,9 @@ const MOCK_TIMELINES: TaskRow[] = [
     daysBehind: 0,
     missingCount: 1,
     milestoneStatus: ["done", "done", "done", "in_progress", "not_started"],
+    jurisdiction: "TX",
+    entityType: "Individual",
+    tier: "standard",
   },
   {
     client: "Jordan Lee",
@@ -92,6 +138,9 @@ const MOCK_TIMELINES: TaskRow[] = [
     daysBehind: 0,
     missingCount: 0,
     milestoneStatus: ["done", "done", "done", "done", "in_progress"],
+    jurisdiction: "federal",
+    entityType: "Individual",
+    tier: "standard",
   },
 ];
 
@@ -140,6 +189,7 @@ function groupLiveMilestones(rows: LiveMilestone[]): TaskRow[] {
       lead.formType || lead.jurisdiction
         ? [lead.formType, lead.jurisdiction].filter(Boolean).join(" · ")
         : "—";
+    const lookup = CLIENT_LOOKUP.get(lead.clientId);
     out.push({
       taskId,
       clientId: lead.clientId,
@@ -155,6 +205,9 @@ function groupLiveMilestones(rows: LiveMilestone[]): TaskRow[] {
       daysBehind: 0,
       missingCount: ms.filter((m) => m.status === "blocked" || m.status === "overdue").length,
       milestoneStatus,
+      jurisdiction: lead.jurisdiction ?? lookup?.primaryState,
+      entityType: lookup?.entityType,
+      tier: lookup?.tier,
     });
   }
   return out;
@@ -162,8 +215,49 @@ function groupLiveMilestones(rows: LiveMilestone[]): TaskRow[] {
 
 type FilterMode = "all" | "waiting" | "behind";
 
+interface AttrFilters {
+  jurisdiction: string[];
+  entity: string[];
+  tier: string[];
+}
+
+const EMPTY_ATTR: AttrFilters = { jurisdiction: [], entity: [], tier: [] };
+
+const ENTITY_OPTIONS = [
+  { value: "Individual", label: "Individual" },
+  { value: "LLC", label: "LLC" },
+  { value: "S-Corp", label: "S-Corp" },
+  { value: "C-Corp", label: "C-Corp" },
+  { value: "Partnership", label: "Partnership" },
+];
+
+const TIER_OPTIONS = [
+  { value: "premium", label: "Premium" },
+  { value: "standard", label: "Standard" },
+];
+
+function jurisdictionLabel(j: string): string {
+  return j === "federal" ? "FED" : j;
+}
+
 export function Timeline() {
   const [filter, setFilter] = useState<FilterMode>("waiting");
+  const [attr, setAttr] = useState<AttrFilters>(EMPTY_ATTR);
+  // Stage-action confirm dialog state — null when closed.
+  const [stageAction, setStageAction] = useState<{
+    row: TaskRow;
+    nextStage: Stage | null; // null = "File" complete
+  } | null>(null);
+  // Per-client expand/collapse — collapsed by default for groups with
+  // taskCount > 1, expanded for single-task clients.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggleGroup = (key: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   const fleetQuery = trpc.taskMilestones.fleetStack.useQuery({});
   const liveTimelines = useMemo(
     // Cast through unknown — FE-side router types are stale until BE
@@ -195,11 +289,38 @@ export function Timeline() {
     return { active, behind, waiting, ready };
   }, [source]);
 
+  // Jurisdiction options derived from the source so the filter only
+  // shows codes that exist in the data (no hardcoded 50-state list).
+  const jurisdictionOptions = useMemo(() => {
+    const codes = new Set<string>();
+    for (const t of source) if (t.jurisdiction) codes.add(t.jurisdiction);
+    return Array.from(codes)
+      .sort((a, b) => a.localeCompare(b))
+      .map((code) => ({ value: code, label: jurisdictionLabel(code) }));
+  }, [source]);
+
   const filtered = useMemo(() => {
-    if (filter === "waiting") return source.filter((t) => t.missingCount > 0);
-    if (filter === "behind") return source.filter((t) => t.daysBehind > 0);
-    return source;
-  }, [source, filter]);
+    let out = source;
+    if (filter === "waiting") out = out.filter((t) => t.missingCount > 0);
+    if (filter === "behind") out = out.filter((t) => t.daysBehind > 0);
+    if (attr.jurisdiction.length) {
+      out = out.filter(
+        (t) => t.jurisdiction && attr.jurisdiction.includes(t.jurisdiction),
+      );
+    }
+    if (attr.entity.length) {
+      out = out.filter(
+        (t) => t.entityType && attr.entity.includes(t.entityType),
+      );
+    }
+    if (attr.tier.length) {
+      out = out.filter((t) => t.tier && attr.tier.includes(t.tier));
+    }
+    return out;
+  }, [source, filter, attr]);
+
+  const hasAttrFilters =
+    attr.jurisdiction.length + attr.entity.length + attr.tier.length > 0;
 
   // Sort: missing × 10 + behind × 5 = "needs attention" score (per spec).
   const sorted = useMemo(
@@ -265,7 +386,41 @@ export function Timeline() {
         </span>
       </div>
 
-      {/* Filter chips — single source of truth via shared FilterChip */}
+      {/* Attribute filters — second axis (jurisdiction / entity / tier).
+          Hierarchy: chips below answer "what's the workflow state?",
+          these answer "what slice of the fleet?" Multi-select; compose
+          with the chips. Mirrors the Clients page filter row. */}
+      <div className="mb-region flex items-center gap-2 flex-wrap">
+        <MultiSelectChip
+          label="Jurisdiction"
+          options={jurisdictionOptions}
+          selected={attr.jurisdiction}
+          onChange={(next) => setAttr((a) => ({ ...a, jurisdiction: next }))}
+        />
+        <MultiSelectChip
+          label="Entity"
+          options={ENTITY_OPTIONS}
+          selected={attr.entity}
+          onChange={(next) => setAttr((a) => ({ ...a, entity: next }))}
+        />
+        <MultiSelectChip
+          label="Tier"
+          options={TIER_OPTIONS}
+          selected={attr.tier}
+          onChange={(next) => setAttr((a) => ({ ...a, tier: next }))}
+        />
+        {hasAttrFilters && (
+          <button
+            type="button"
+            onClick={() => setAttr(EMPTY_ATTR)}
+            className="text-xs text-ink-500 hover:text-ink-900 underline underline-offset-2 ml-1"
+          >
+            Clear all
+          </button>
+        )}
+      </div>
+
+      {/* Workflow-state chips — single source of truth via shared FilterChip */}
       <div className="flex items-center gap-1 mb-card">
         <FilterChip
           active={filter === "all"}
@@ -301,7 +456,12 @@ export function Timeline() {
                 title="Behind schedule"
                 meta={`${behindList.length} ${behindList.length === 1 ? "task" : "tasks"}`}
               />
-              <TaskTable rows={behindList} />
+              <TaskTable
+                rows={behindList}
+                collapsed={collapsed}
+                onToggleGroup={toggleGroup}
+                onStageClick={(row, ns) => setStageAction({ row, nextStage: ns })}
+              />
             </section>
           )}
           {filter !== "behind" && onTrackList.length > 0 && (
@@ -310,7 +470,12 @@ export function Timeline() {
                 title="On track"
                 meta={`${onTrackList.length} ${onTrackList.length === 1 ? "task" : "tasks"}`}
               />
-              <TaskTable rows={onTrackList} />
+              <TaskTable
+                rows={onTrackList}
+                collapsed={collapsed}
+                onToggleGroup={toggleGroup}
+                onStageClick={(row, ns) => setStageAction({ row, nextStage: ns })}
+              />
             </section>
           )}
           {filter === "behind" && (
@@ -319,11 +484,81 @@ export function Timeline() {
                 title="Behind schedule"
                 meta={`${behindList.length} ${behindList.length === 1 ? "task" : "tasks"}`}
               />
-              <TaskTable rows={behindList} />
+              <TaskTable
+                rows={behindList}
+                collapsed={collapsed}
+                onToggleGroup={toggleGroup}
+                onStageClick={(row, ns) => setStageAction({ row, nextStage: ns })}
+              />
             </section>
           )}
         </>
       )}
+
+      {/* Stage-action confirm Dialog — opens when the CPA clicks a row's
+          stage label. Surfaces the exact transition (e.g. "Mark Collect
+          done · advance to Prepare") so the action is non-magical. Confirm
+          fires a toast (real wiring lands when the BE mutation ships;
+          spec lives in §21 of the design critique). */}
+      <Dialog
+        open={!!stageAction}
+        onOpenChange={(open) => !open && setStageAction(null)}
+      >
+        <DialogContent size="md">
+          <DialogHeader>
+            <DialogTitle>
+              {stageAction?.nextStage
+                ? `Mark ${STAGE_LABELS[stageAction.row.currentStage]} done?`
+                : `Mark ${stageAction?.row.task ?? "task"} filed?`}
+            </DialogTitle>
+            <DialogDescription>
+              {stageAction?.nextStage
+                ? `${stageAction.row.client} · ${stageAction.row.task} will advance from ${STAGE_LABELS[stageAction.row.currentStage]} to ${STAGE_LABELS[stageAction.nextStage]}.`
+                : `${stageAction?.row.client} · ${stageAction?.row.task} will be marked filed and removed from the active queue.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody>
+            {stageAction?.row.missingCount && stageAction.row.missingCount > 0 ? (
+              <p className="text-xs text-warn-ink bg-warn-bg border border-warn-border rounded p-2">
+                Heads up — {stageAction.row.missingCount} item
+                {stageAction.row.missingCount === 1 ? " is" : "s are"} still
+                marked waiting on the client. Advancing now records the step
+                as done despite the open items.
+              </p>
+            ) : (
+              <p className="text-xs text-ink-500">
+                Audit-trailed with timestamp + your user. Reversible from the
+                task detail page within 24h.
+              </p>
+            )}
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setStageAction(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                if (!stageAction) return;
+                const verb = stageAction.nextStage
+                  ? `${STAGE_LABELS[stageAction.row.currentStage]} marked done`
+                  : "Marked filed";
+                toast.success(
+                  `${verb} · ${stageAction.row.client} · ${stageAction.row.task}`,
+                );
+                setStageAction(null);
+              }}
+              className="bg-indigo hover:bg-indigo-hover text-white"
+            >
+              {stageAction?.nextStage ? "Advance" : "Mark filed"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   );
 }
@@ -362,12 +597,28 @@ function groupRowsByClient(rows: TaskRow[]): { key: string; client: string; clie
   return Array.from(groups.values());
 }
 
-function TaskTable({ rows }: { rows: TaskRow[] }) {
+function TaskTable({
+  rows,
+  collapsed,
+  onToggleGroup,
+  onStageClick,
+}: {
+  rows: TaskRow[];
+  collapsed: Set<string>;
+  onToggleGroup: (key: string) => void;
+  onStageClick: (row: TaskRow, nextStage: Stage | null) => void;
+}) {
   const groups = groupRowsByClient(rows);
   return (
     <div className="bg-surface border border-line rounded-md overflow-hidden divide-y divide-line">
       {groups.map((g) => (
-        <ClientGroup key={g.key} group={g} />
+        <ClientGroup
+          key={g.key}
+          group={g}
+          collapsed={collapsed.has(g.key)}
+          onToggle={() => onToggleGroup(g.key)}
+          onStageClick={onStageClick}
+        />
       ))}
     </div>
   );
@@ -375,73 +626,136 @@ function TaskTable({ rows }: { rows: TaskRow[] }) {
 
 function ClientGroup({
   group,
+  collapsed,
+  onToggle,
+  onStageClick,
 }: {
   group: { key: string; client: string; clientId?: string; tasks: TaskRow[] };
+  collapsed: boolean;
+  onToggle: () => void;
+  onStageClick: (row: TaskRow, nextStage: Stage | null) => void;
 }) {
   const navigate = useNavigate();
   const taskCount = group.tasks.length;
+  // Worst-case urgency across the group's tasks. Drives the StatusPill
+  // on the group header so the eye picks up the dominant signal at a
+  // glance — same archetype as the per-row pill, scaled up to the
+  // client level.
   const worstBehind = group.tasks.reduce(
     (m, t) => Math.max(m, t.daysBehind),
     0,
   );
   const totalWaiting = group.tasks.reduce((s, t) => s + t.missingCount, 0);
-  // Single-task clients render flush (no header row) — header would just
-  // duplicate the row's identity column.
+  const tier = group.tasks[0]?.tier;
+  // Single-task clients render flush (no header row) — header would
+  // just duplicate the row's identity column.
   if (taskCount === 1) {
-    return <TaskTimelineRow t={group.tasks[0]} />;
+    return <TaskTimelineRow t={group.tasks[0]} onStageClick={onStageClick} />;
   }
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => {
-          if (group.clientId) navigate(`/clients/${group.clientId}`);
-        }}
-        disabled={!group.clientId}
+      <div
         className={cn(
-          "w-full flex items-center gap-3 px-region py-2 bg-sunken/40 border-b border-line text-left transition-colors",
-          group.clientId
-            ? "hover:bg-sunken cursor-pointer"
-            : "cursor-default",
-          "focus-visible:outline-none focus-visible:bg-sunken",
+          "flex items-center gap-3 px-region py-2 bg-sunken/40 border-b border-line",
+          !collapsed && "border-b-line",
+          collapsed && "border-b-transparent",
         )}
-        title={group.clientId ? `Open ${group.client}` : undefined}
       >
-        <span className="text-sm font-semibold text-ink-900 truncate">
+        {/* Toggle expand/collapse — chevron rotates based on state. */}
+        <button
+          type="button"
+          onClick={onToggle}
+          className="shrink-0 w-5 h-5 inline-flex items-center justify-center rounded text-ink-500 hover:text-ink-900 hover:bg-sunken transition-colors"
+          aria-label={collapsed ? `Expand ${group.client}` : `Collapse ${group.client}`}
+          aria-expanded={!collapsed}
+        >
+          <ChevronRight
+            className={cn(
+              "w-3.5 h-3.5 transition-transform",
+              !collapsed && "rotate-90",
+            )}
+            aria-hidden
+          />
+        </button>
+        {/* Client name — clickable to client detail (separate target
+            from the toggle so the row's two affordances don't fight). */}
+        <button
+          type="button"
+          onClick={() => {
+            if (group.clientId) navigate(`/clients/${group.clientId}`);
+          }}
+          disabled={!group.clientId}
+          className={cn(
+            "text-sm font-semibold text-ink-900 truncate text-left",
+            group.clientId ? "hover:underline cursor-pointer" : "cursor-default",
+          )}
+          title={group.clientId ? `Open ${group.client}` : undefined}
+        >
           {group.client}
-        </span>
+        </button>
+        {tier && <TimelineTierPill tier={tier} />}
         <span className="text-xs text-ink-500 tabular-nums shrink-0">
           {taskCount} tasks
         </span>
-        {totalWaiting > 0 && (
-          <span className="text-xs text-ink-500 shrink-0">
-            <span className="text-warn-ink font-medium">{totalWaiting}</span>{" "}
-            waiting
-          </span>
-        )}
-        {worstBehind > 0 && (
-          <span className="text-xs text-ink-500 shrink-0">
-            worst{" "}
-            <span className="text-danger-ink font-medium">
-              {worstBehind}d behind
-            </span>
-          </span>
-        )}
-      </button>
-      <ul className="divide-y divide-line/60" role="list">
-        {group.tasks.map((t) => (
-          <TaskTimelineRow
-            key={t.taskId ?? `${group.key}-${t.task}`}
-            t={t}
-            nested
-          />
-        ))}
-      </ul>
+        <div className="ml-auto flex items-center gap-2 shrink-0">
+          {worstBehind > 0 ? (
+            <StatusPill variant="danger" size="xs">
+              worst {worstBehind}d behind
+            </StatusPill>
+          ) : totalWaiting > 0 ? (
+            <StatusPill variant="warn" size="xs">
+              {totalWaiting} waiting
+            </StatusPill>
+          ) : (
+            <StatusPill variant="ok" size="xs">
+              On track
+            </StatusPill>
+          )}
+        </div>
+      </div>
+      {!collapsed && (
+        <ul className="divide-y divide-line/60" role="list">
+          {group.tasks.map((t) => (
+            <TaskTimelineRow
+              key={t.taskId ?? `${group.key}-${t.task}`}
+              t={t}
+              nested
+              onStageClick={onStageClick}
+            />
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
 
-function TaskTimelineRow({ t, nested }: { t: TaskRow; nested?: boolean }) {
+function TimelineTierPill({ tier }: { tier: ClientTier }) {
+  const styles =
+    tier === "premium"
+      ? "bg-indigo-soft text-indigo-ink border-indigo-soft"
+      : "bg-sunken text-ink-700 border-line";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center text-2xs font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0",
+        styles,
+      )}
+      title={`${tier === "premium" ? "Premium" : "Standard"} tier client`}
+    >
+      {tier === "premium" ? "Premium" : "Standard"}
+    </span>
+  );
+}
+
+function TaskTimelineRow({
+  t,
+  nested,
+  onStageClick,
+}: {
+  t: TaskRow;
+  nested?: boolean;
+  onStageClick: (row: TaskRow, nextStage: Stage | null) => void;
+}) {
   const navigate = useNavigate();
   const stages: Stage[] = [
     "initial_meeting",
@@ -451,15 +765,26 @@ function TaskTimelineRow({ t, nested }: { t: TaskRow; nested?: boolean }) {
     "file",
   ];
   const navigable = !!(t.taskId && t.clientId);
+  // The stage button advances `currentStage` → next-in-sequence; if
+  // current is the last (file), advance triggers "mark filed" (null).
+  const currentIdx = stages.indexOf(t.currentStage);
+  const nextStage: Stage | null = stages[currentIdx + 1] ?? null;
 
   return (
     <li className="list-none">
-      <button
-        type="button"
+      <div
+        role={navigable ? "button" : undefined}
+        tabIndex={navigable ? 0 : undefined}
         onClick={() => {
           if (navigable) navigate(`/clients/${t.clientId}/tasks/${t.taskId}`);
         }}
-        disabled={!navigable}
+        onKeyDown={(e) => {
+          if (!navigable) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            navigate(`/clients/${t.clientId}/tasks/${t.taskId}`);
+          }
+        }}
         className={cn(
           "group w-full text-left flex items-center gap-4 px-region py-3 transition-colors",
           nested && "pl-card", // indent under client group header
@@ -475,8 +800,11 @@ function TaskTimelineRow({ t, nested }: { t: TaskRow; nested?: boolean }) {
         {/* Identity — when nested, drop the client name (parent header has it) */}
         <div className="w-56 shrink-0 min-w-0">
           {!nested && (
-            <div className="text-sm font-semibold text-ink-900 truncate">
-              {t.client}
+            <div className="flex items-center gap-2 mb-0.5">
+              <div className="text-sm font-semibold text-ink-900 truncate flex-1 min-w-0">
+                {t.client}
+              </div>
+              {t.tier && <TimelineTierPill tier={t.tier} />}
             </div>
           )}
           <div
@@ -540,9 +868,27 @@ function TaskTimelineRow({ t, nested }: { t: TaskRow; nested?: boolean }) {
               Ready
             </StatusPill>
           )}
-          <span className="text-xs text-ink-500 tabular-nums hidden md:inline">
+          {/* Stage action — clicking opens a confirm Dialog. Stops
+              propagation so the row's click-to-open-detail doesn't
+              fire alongside. Title is the stage's "complete this step"
+              verb (current step) or "Mark filed" (final step). */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onStageClick(t, nextStage);
+            }}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="text-xs font-medium text-indigo-ink hover:text-indigo-hover hover:bg-indigo-soft px-2 py-1 rounded transition-colors hidden md:inline-flex items-center gap-1"
+            title={
+              nextStage
+                ? `Mark ${STAGE_LABELS[t.currentStage]} done · advance to ${STAGE_LABELS[nextStage]}`
+                : `Mark ${STAGE_LABELS[t.currentStage]} complete`
+            }
+          >
             {STAGE_LABELS[t.currentStage]}
-          </span>
+            <ChevronRight className="w-3 h-3" aria-hidden />
+          </button>
         </div>
 
         <ChevronRight
@@ -554,7 +900,7 @@ function TaskTimelineRow({ t, nested }: { t: TaskRow; nested?: boolean }) {
           )}
           aria-hidden
         />
-      </button>
+      </div>
     </li>
   );
 }
