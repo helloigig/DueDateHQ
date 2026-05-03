@@ -1,27 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
-  Bell,
   Bookmark,
   CalendarClock,
-  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Forward,
-  Globe,
-  HelpCircle,
-  ListChecks,
   Mail,
   Megaphone,
   MoonStar,
   MoreHorizontal,
-  Package,
   Pencil,
   RefreshCw,
   Send,
-  Settings,
   Sparkles,
-  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -145,50 +137,6 @@ A quick note: the ${a.authority} published an update — ${a.title}. ${a.summary
 I'll let you know if it changes anything on your end. Source: ${a.sourceUrl}
 
 Sarah`;
-}
-
-// ── Rail ──────────────────────────────────────────────────────────────────
-
-function RailButton({
-  icon: Icon,
-  label,
-  to,
-  active,
-  badge,
-}: {
-  icon: typeof Bell;
-  label: string;
-  to: string;
-  active?: boolean;
-  badge?: number;
-}) {
-  return (
-    <Link
-      to={to}
-      title={label}
-      aria-label={label}
-      className={cn(
-        "relative w-10 h-10 inline-flex items-center justify-center rounded-md text-ink-500 hover:bg-sunken hover:text-ink-900 transition-colors",
-        active && "bg-sunken text-ink-900",
-      )}
-    >
-      <Icon className="w-[18px] h-[18px]" aria-hidden />
-      {active && (
-        <span
-          aria-hidden
-          className="absolute -left-2 top-2 bottom-2 w-[3px] bg-ink-900 rounded-r"
-        />
-      )}
-      {badge !== undefined && badge > 0 && (
-        <span
-          aria-hidden
-          className="absolute top-1 right-1 min-w-3.5 h-3.5 px-1 bg-danger-solid text-white rounded-pill text-[9px] font-bold inline-flex items-center justify-center leading-none"
-        >
-          {badge > 9 ? "9+" : badge}
-        </span>
-      )}
-    </Link>
-  );
 }
 
 // ── Feed card ─────────────────────────────────────────────────────────────
@@ -374,7 +322,7 @@ function CopilotPane({
 
   if (!announcement) {
     return (
-      <aside className="w-[440px] shrink-0 bg-canvas border-l border-line flex flex-col items-center justify-center text-center px-region">
+      <aside className="w-pane shrink-0 bg-canvas border-l border-line flex flex-col items-center justify-center text-center px-region">
         <Sparkles className="w-8 h-8 text-ink-300 mb-3" aria-hidden />
         <div className="text-sm font-semibold text-ink-700">
           Pick an alert to see suggested actions
@@ -395,7 +343,7 @@ function CopilotPane({
   const body = currentClient ? draftBody(a, currentClient) : "";
 
   return (
-    <aside className="w-[440px] shrink-0 bg-canvas border-l border-line flex flex-col overflow-hidden">
+    <aside className="w-pane shrink-0 bg-canvas border-l border-line flex flex-col overflow-hidden">
       {/* Header — context strip */}
       <div className="px-region py-3 bg-surface border-b border-line">
         <div className="flex items-start gap-3">
@@ -696,45 +644,9 @@ export function Alerts() {
   };
 
   return (
-    <div className="h-screen w-screen flex bg-canvas overflow-hidden text-ink-900">
-      {/* ── Rail ─────────────────────────────────────────────────────── */}
-      <nav
-        aria-label="Primary"
-        className="w-14 shrink-0 bg-surface border-r border-line flex flex-col items-center py-2.5 gap-1"
-      >
-        <Link
-          to="/"
-          aria-label="Workspace"
-          className="w-8 h-8 mb-1.5 rounded-md bg-ink-900 text-surface inline-flex items-center justify-center text-xs font-bold"
-        >
-          DD
-        </Link>
-        <RailButton
-          icon={Megaphone}
-          label="Alerts"
-          to="/alerts"
-          active
-          badge={totals.affecting}
-        />
-        <RailButton icon={ListChecks} label="Today" to="/" />
-        <RailButton icon={CalendarDays} label="Timeline" to="/timeline" />
-        <RailButton icon={Users} label="Clients" to="/clients" />
-        <RailButton icon={Package} label="Mail" to="/mail" />
-        <RailButton icon={Globe} label="Opportunities" to="/opportunities" />
-        <div className="flex-1" />
-        <RailButton icon={HelpCircle} label="Help" to="/" />
-        <RailButton icon={Settings} label="Settings" to="/settings" />
-        <Link
-          to="/settings"
-          aria-label="Account"
-          className="w-7 h-7 rounded-pill bg-ink-700 text-surface inline-flex items-center justify-center text-[10px] font-bold mt-1"
-        >
-          SM
-        </Link>
-      </nav>
-
+    <div className="flex h-full bg-canvas overflow-hidden text-ink-900">
       {/* ── Center feed ──────────────────────────────────────────────── */}
-      <main className="flex-1 min-w-0 flex flex-col bg-canvas overflow-hidden">
+      <section className="flex-1 min-w-0 flex flex-col bg-canvas overflow-hidden">
         <header className="bg-surface border-b border-line px-6 pt-4 pb-3 sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold tracking-tight text-ink-900 leading-tight">
@@ -810,7 +722,7 @@ export function Alerts() {
             ))
           )}
         </div>
-      </main>
+      </section>
 
       {/* ── Co-pilot pane ────────────────────────────────────────────── */}
       <CopilotPane

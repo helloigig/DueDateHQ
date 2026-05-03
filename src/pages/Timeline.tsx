@@ -362,19 +362,100 @@ function EmptyTimeline({ filter }: { filter: FilterMode }) {
   );
 }
 
+/** Group rows by client, preserving the input order's first appearance.
+ *  A client with N tasks shows as ONE group with N nested rows — keeps the
+ *  fleet view scannable when a single client carries 8 deadlines. */
+function groupRowsByClient(rows: TaskRow[]): { key: string; client: string; clientId?: string; tasks: TaskRow[] }[] {
+  const groups = new Map<string, { key: string; client: string; clientId?: string; tasks: TaskRow[] }>();
+  for (const t of rows) {
+    const key = t.clientId ?? t.client;
+    const g = groups.get(key);
+    if (g) g.tasks.push(t);
+    else groups.set(key, { key, client: t.client, clientId: t.clientId, tasks: [t] });
+  }
+  return Array.from(groups.values());
+}
+
 function TaskTable({ rows }: { rows: TaskRow[] }) {
+  const groups = groupRowsByClient(rows);
   return (
-    <div className="bg-surface border border-line rounded-md overflow-hidden">
-      <ul className="divide-y divide-line" role="list">
-        {rows.map((t) => (
-          <TaskTimelineRow key={t.taskId ?? `${t.client}-${t.task}`} t={t} />
+    <div className="bg-surface border border-line rounded-md overflow-hidden divide-y divide-line">
+      {groups.map((g) => (
+        <ClientGroup key={g.key} group={g} />
+      ))}
+    </div>
+  );
+}
+
+function ClientGroup({
+  group,
+}: {
+  group: { key: string; client: string; clientId?: string; tasks: TaskRow[] };
+}) {
+  const navigate = useNavigate();
+  const taskCount = group.tasks.length;
+  const worstBehind = group.tasks.reduce(
+    (m, t) => Math.max(m, t.daysBehind),
+    0,
+  );
+  const totalWaiting = group.tasks.reduce((s, t) => s + t.missingCount, 0);
+  // Single-task clients render flush (no header row) — header would just
+  // duplicate the row's identity column.
+  if (taskCount === 1) {
+    return <TaskTimelineRow t={group.tasks[0]} />;
+  }
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => {
+          if (group.clientId) navigate(`/clients/${group.clientId}`);
+        }}
+        disabled={!group.clientId}
+        className={cn(
+          "w-full flex items-center gap-3 px-region py-2 bg-sunken/40 border-b border-line text-left transition-colors",
+          group.clientId
+            ? "hover:bg-sunken cursor-pointer"
+            : "cursor-default",
+          "focus-visible:outline-none focus-visible:bg-sunken",
+        )}
+        title={group.clientId ? `Open ${group.client}` : undefined}
+      >
+        <span className="text-sm font-semibold text-ink-900 truncate">
+          {group.client}
+        </span>
+        <span className="text-xs text-ink-500 tabular-nums shrink-0">
+          {taskCount} tasks
+        </span>
+        {totalWaiting > 0 && (
+          <span className="text-xs text-ink-500 shrink-0">
+            <span className="text-warn-ink font-medium">{totalWaiting}</span>{" "}
+            waiting
+          </span>
+        )}
+        {worstBehind > 0 && (
+          <span className="text-xs text-ink-500 shrink-0">
+            worst{" "}
+            <span className="text-danger-ink font-medium">
+              {worstBehind}d behind
+            </span>
+          </span>
+        )}
+      </button>
+      <ul className="divide-y divide-line/60" role="list">
+        {group.tasks.map((t) => (
+          <TaskTimelineRow
+            key={t.taskId ?? `${group.key}-${t.task}`}
+            t={t}
+            nested
+          />
         ))}
       </ul>
     </div>
   );
 }
 
-function TaskTimelineRow({ t }: { t: TaskRow }) {
+function TaskTimelineRow({ t, nested }: { t: TaskRow; nested?: boolean }) {
   const navigate = useNavigate();
   const stages: Stage[] = [
     "initial_meeting",
@@ -395,6 +476,7 @@ function TaskTimelineRow({ t }: { t: TaskRow }) {
         disabled={!navigable}
         className={cn(
           "group w-full text-left flex items-center gap-4 px-region py-3 transition-colors",
+          nested && "pl-card", // indent under client group header
           navigable ? "hover:bg-sunken cursor-pointer" : "cursor-default",
           "focus-visible:outline-none focus-visible:bg-sunken",
         )}
@@ -404,12 +486,19 @@ function TaskTimelineRow({ t }: { t: TaskRow }) {
             : "Example row — sign in and add a client to see your real tasks here"
         }
       >
-        {/* Identity */}
+        {/* Identity — when nested, drop the client name (parent header has it) */}
         <div className="w-56 shrink-0 min-w-0">
-          <div className="text-sm font-semibold text-ink-900 truncate">
-            {t.client}
-          </div>
-          <div className="text-xs text-ink-500 truncate">
+          {!nested && (
+            <div className="text-sm font-semibold text-ink-900 truncate">
+              {t.client}
+            </div>
+          )}
+          <div
+            className={cn(
+              "text-xs truncate",
+              nested ? "text-ink-700" : "text-ink-500",
+            )}
+          >
             {t.task} <span className="text-ink-400">· due {t.dueDate}</span>
           </div>
         </div>

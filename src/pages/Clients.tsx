@@ -7,7 +7,6 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { MetricTile } from "../components/ui/MetricTile";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { MultiSelectChip } from "../components/MultiSelectChip";
-import { SpotlightStrip, type SpotlightCard } from "../components/SpotlightStrip";
 import { PageSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
 import { useClients } from "../hooks/useClients";
@@ -114,8 +113,6 @@ export function Clients() {
     if (!t) return [];
     return [...t.overdue, ...t.thisWeek, ...t.thisMonth, ...t.longTerm];
   }, [triageQuery.data]);
-  const overdueDeadlines = triageQuery.data?.overdue ?? [];
-
   const announcementsQuery = useAnnouncements({ activeOnly: true });
   const announcements = announcementsQuery.data ?? [];
 
@@ -162,84 +159,6 @@ export function Clients() {
     }
     return s;
   }, [announcements]);
-
-  const spotlightCards = useMemo<SpotlightCard[]>(() => {
-    const cards: SpotlightCard[] = [];
-
-    // 1) Needs attention now — clients with at least one overdue deadline.
-    const overdueClientIds = new Set(overdueDeadlines.map((d) => d.clientId));
-    const overdueClients = allClients.filter((c) => overdueClientIds.has(c.id));
-    if (overdueClients.length > 0) {
-      cards.push({
-        key: "overdue",
-        icon: "overdue",
-        title: "Needs attention now",
-        reason: `${overdueClients.length === 1 ? "1 client has" : `${overdueClients.length} clients have`} an overdue deadline.`,
-        clients: overdueClients
-          .slice(0, 3)
-          .map((c) => ({ id: c.id, name: c.name })),
-        totalCount: overdueClients.length,
-      });
-    }
-
-    // 2) Premium, quiet — premium tier with no deadline in the next 30 days
-    //    (drifting / under-served — worth a proactive check-in).
-    const horizonIso = new Date(TODAY.getTime() + 30 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 10);
-    const nextDueByClient = new Map<string, string>();
-    for (const d of deadlines) {
-      if (d.status === "completed" || d.status === "filed_extension") continue;
-      const prev = nextDueByClient.get(d.clientId);
-      if (!prev || d.officialDueDate < prev) {
-        nextDueByClient.set(d.clientId, d.officialDueDate);
-      }
-    }
-    const quietPremium = allClients.filter((c) => {
-      if (c.tier !== "premium" || c.status !== "active") return false;
-      const next = nextDueByClient.get(c.id);
-      return !next || next > horizonIso;
-    });
-    if (quietPremium.length > 0) {
-      cards.push({
-        key: "premium-quiet",
-        icon: "quiet",
-        title: "Premium, quiet",
-        reason: `Premium clients with no deadline in the next 30 days — worth a proactive check-in.`,
-        clients: quietPremium
-          .slice(0, 3)
-          .map((c) => ({ id: c.id, name: c.name })),
-        totalCount: quietPremium.length,
-        action: {
-          label: "Filter to Premium",
-          onClick: () =>
-            setFilters((f) => ({ ...f, tier: ["premium"] })),
-        },
-      });
-    }
-
-    // 3) State alerts active — clients matched to a recent unread announcement.
-    const alertClientIds = new Set<string>();
-    for (const a of announcements) {
-      if (a.dismissed) continue;
-      for (const id of a.affectedClientIds) alertClientIds.add(id);
-    }
-    const alertClients = allClients.filter((c) => alertClientIds.has(c.id));
-    if (alertClients.length > 0 && announcements.length > 0) {
-      cards.push({
-        key: "state-alert",
-        icon: "alert",
-        title: "State alert active",
-        reason: `${announcements.length === 1 ? "1 announcement matches" : `${announcements.length} announcements match`} clients in your book.`,
-        clients: alertClients
-          .slice(0, 3)
-          .map((c) => ({ id: c.id, name: c.name })),
-        totalCount: alertClients.length,
-      });
-    }
-
-    return cards;
-  }, [allClients, overdueDeadlines, deadlines, announcements]);
 
   const atLimit =
     flags.hasClientLimit &&
@@ -474,8 +393,6 @@ export function Clients() {
           + Add client
         </button>
       </div>
-
-      <SpotlightStrip cards={spotlightCards} />
 
       {/* Smart filter chips per IA v0.7 §3.2 — boolean predicates over
           computed roster state. "Has waiting" is the gap-over-fill default

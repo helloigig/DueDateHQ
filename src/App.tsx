@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 // Auth pages stay eagerly imported — they're the entry points (post-signout
 // redirect target + magic-link landing) and are individually tiny. Loading
 // them lazily would just add a Suspense flash on the most-hit page.
@@ -215,30 +215,17 @@ export default function App() {
           <Route path="clients" element={<Clients />} />
           <Route path="clients/:id" element={<ClientDetail />} />
           <Route path="clients/:id/tasks/:taskId" element={<TaskDetail />} />
-          {/* /alerts moved outside AppShell — see route below the AppShell
-              wrapper. Stub here keeps redirects from legacy deep-links clean. */}
+          {/* /alerts is the v0u feed + co-pilot pane workshop. Mounted
+              INSIDE AppShell so it shares the same sidebar/topbar/banner
+              chrome as Today/Timeline/Clients (consistency). The page
+              itself splits its main area into feed (flex-1) + 440px pane. */}
+          <Route path="alerts" element={<Alerts />} />
+          <Route path="alerts/:id" element={<Alerts />} />
           <Route path="import" element={<Import />} />
           <Route path="settings/*" element={<Settings />} />
           <Route path="*" element={<Placeholder name="Not found" />} />
         </Route>
-      ) : null}
-      {/* /alerts is the v0u 3-column workshop surface. Mounted OUTSIDE
-          AppShell (no sidebar/topbar) so the v0u rail + feed + co-pilot
-          pane own the viewport. Still gated by localSession via the
-          duplicate guard below. */}
-      {localSession && (
-        <Route
-          element={
-            <SessionProvider>
-              <Outlet />
-            </SessionProvider>
-          }
-        >
-          <Route path="alerts" element={<Alerts />} />
-          <Route path="alerts/:id" element={<Alerts />} />
-        </Route>
-      )}
-      {!localSession && supabaseAuthPending ? (
+      ) : supabaseAuthPending ? (
         // Supabase has auth (URL hash or stored token) but local session
         // hasn't been bridged yet. Show a non-redirecting loading screen so
         // the SupabaseAuthBridge useEffect has time to fire + populate the
