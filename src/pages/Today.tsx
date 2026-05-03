@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, CheckCircle2, Megaphone } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -10,7 +10,6 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { ActionQueueRow, type RowUrgency, type RowAction } from "@/components/today/ActionQueueRow";
 import { TimelineDayRow } from "@/components/today/TimelineDayRow";
 import { StateAlertCard, type AffectedClient } from "@/components/today/StateAlertCard";
-import { SuggestedActionsSheet } from "@/components/today/SuggestedActionsSheet";
 import { type DotStackUrgency } from "@/components/ui/DotStack";
 import { clients as MOCK_CLIENTS } from "@/data/mockClients";
 import { deadlines as MOCK_DEADLINES } from "@/data/mockDeadlines";
@@ -177,14 +176,13 @@ export function Today() {
   const [confirmedExpanded, setConfirmedExpanded] = useState(false);
 
   // State alerts — driven by real announcement data (mock-mode tRPC).
-  // Renders as the v0u differentiator surface: card list + click → Sheet.
+  // Renders as the v0u differentiator surface preview: cards on Today,
+  // click navigates to /alerts/:id where the full feed + co-pilot pane
+  // lives. (No in-page Sheet — one drilldown destination shared across
+  // all surfaces, per the chrome-consistency pass.)
+  const navigate = useNavigate();
   const announcementsQuery = useAnnouncements({ activeOnly: true });
   const announcements = announcementsQuery.data ?? [];
-  const [openAnnId, setOpenAnnId] = useState<string | null>(null);
-  const openAnnouncement = useMemo(
-    () => announcements.find((a) => a.id === openAnnId) ?? null,
-    [announcements, openAnnId],
-  );
   const dismissMutation = useDismissAnnouncement();
   const affectedFor = useMemo(() => {
     return (a: Announcement): AffectedClient[] => {
@@ -259,8 +257,7 @@ export function Today() {
                 key={a.id}
                 announcement={a}
                 affectedClients={affectedFor(a)}
-                selected={openAnnId === a.id}
-                onOpen={() => setOpenAnnId(a.id)}
+                onOpen={() => navigate(`/alerts/${a.id}`)}
                 onSnooze={() => {
                   dismissMutation.mutate({ id: a.id });
                   toast.success("Snoozed until tomorrow");
@@ -270,17 +267,6 @@ export function Today() {
           </div>
         )}
       </section>
-
-      <SuggestedActionsSheet
-        open={!!openAnnId}
-        onOpenChange={(o) => {
-          if (!o) setOpenAnnId(null);
-        }}
-        announcement={openAnnouncement}
-        affectedClients={
-          openAnnouncement ? affectedFor(openAnnouncement) : []
-        }
-      />
 
       {/* Action Queue — gap-first dominant section */}
       <section className="mb-section">

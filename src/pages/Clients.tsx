@@ -494,7 +494,7 @@ export function Clients() {
 
       <AddClientModal open={addOpen} onClose={() => setAddOpen(false)} />
 
-      <div className="bg-surface border border-line rounded-md overflow-x-auto">
+      <div className="bg-surface border border-line rounded-md">
         <table className="w-full text-sm">
           <thead className="bg-sunken text-2xs uppercase tracking-wider text-ink-700">
             <tr>
