@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Search, Upload, X } from "lucide
 import { AddClientModal } from "../components/AddClientModal";
 import { ExportClientsButton } from "../components/ExportClientsButton";
 import { PageHeader } from "../components/ui/PageHeader";
+import { PageContainer } from "../components/ui/PageContainer";
 import { MetricTile } from "../components/ui/MetricTile";
 import { IconButton } from "../components/ui/IconButton";
 import { Button } from "../components/ui/button";
@@ -282,7 +283,7 @@ export function Clients() {
 
   if (allClients.length === 0) {
     return (
-      <div className="max-w-[840px] mx-auto px-4 md:px-6 lg:px-8 py-section">
+      <PageContainer>
         {/* Single-purpose direct empty state. The user came to /clients
             deliberately to manage clients — give them one strong action,
             not a re-onboarding menu. */}
@@ -312,7 +313,7 @@ export function Clients() {
           </p>
         </div>
         <AddClientModal open={addOpen} onClose={() => setAddOpen(false)} />
-      </div>
+      </PageContainer>
     );
   }
 
@@ -338,7 +339,7 @@ export function Clients() {
   };
 
   return (
-    <div className="max-w-[840px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8 space-y-card">
+    <PageContainer className="space-y-section">
       {/* Header — title meta carries the active-count, actions live inline so
           "Add client" + "Import CSV" sit on the same row as the page name. */}
       <PageHeader
@@ -663,7 +664,7 @@ export function Clients() {
           </tbody>
         </table>
       </div>
-    </div>
+    </PageContainer>
   );
 }
 

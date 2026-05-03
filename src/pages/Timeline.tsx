@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { trpc } from "../lib/api/client";
 import { env } from "../config";
 import { PageHeader } from "../components/ui/PageHeader";
+import { PageContainer } from "../components/ui/PageContainer";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { MetricTile } from "../components/ui/MetricTile";
 import { StatusPill } from "../components/ui/StatusPill";
@@ -217,7 +218,7 @@ export function Timeline() {
   const onTrackList = sorted.filter((t) => t.daysBehind === 0);
 
   return (
-    <div className="mx-auto max-w-[1080px] px-4 md:px-6 lg:px-8 py-6 md:py-8">
+    <PageContainer variant="wide">
       <PageHeader title="Timeline" meta={`${kpis.active} active`} />
 
       {/* KPI tiles — Mercury-style headline numbers, double as filter triggers */}
@@ -309,7 +310,7 @@ export function Timeline() {
           )}
         </>
       )}
-    </div>
+    </PageContainer>
   );
 }
 

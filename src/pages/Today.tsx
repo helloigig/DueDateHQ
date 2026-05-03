@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { DateLabel } from "@/components/ui/DateLabel";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PageContainer } from "@/components/ui/PageContainer";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { ActionQueueRow, type RowUrgency, type RowAction } from "@/components/today/ActionQueueRow";
 import { TimelineDayRow } from "@/components/today/TimelineDayRow";
@@ -195,7 +196,7 @@ export function Today() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-[840px] px-4 md:px-6 lg:px-8 py-6 md:py-8">
+    <PageContainer>
       {/* Page header — DESIGN.md §Typography display (22px / 600). Date inline
           (T8: desk, not stage). PageHeader primitive enforces consistency
           across all pages — see src/components/ui/PageHeader.tsx. */}
@@ -389,6 +390,6 @@ export function Today() {
           </div>
         )}
       </section>
-    </div>
+    </PageContainer>
   );
 }

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  Bookmark,
   CalendarClock,
   ChevronLeft,
   ChevronRight,
@@ -9,7 +8,6 @@ import {
   Mail,
   Megaphone,
   MoonStar,
-  MoreHorizontal,
   Pencil,
   RefreshCw,
   Send,
@@ -20,6 +18,9 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { StateBadge } from "@/components/ui/StateBadge";
 import { ClientChip } from "@/components/ui/ClientChip";
 import { FilterChip } from "@/components/ui/FilterChip";
+import { PageContainer } from "@/components/ui/PageContainer";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/button";
 import {
   formatLongDate,
   hoursSince,
@@ -217,24 +218,6 @@ function FeedCard({
             </div>
           )}
         </div>
-        <div className="shrink-0 flex items-center gap-1">
-          <button
-            type="button"
-            onClick={(e) => e.stopPropagation()}
-            className="w-7 h-7 inline-flex items-center justify-center rounded text-ink-500 hover:bg-sunken hover:text-ink-900 transition-colors"
-            aria-label="Bookmark"
-          >
-            <Bookmark className="w-3.5 h-3.5" aria-hidden />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => e.stopPropagation()}
-            className="w-7 h-7 inline-flex items-center justify-center rounded text-ink-500 hover:bg-sunken hover:text-ink-900 transition-colors"
-            aria-label="More"
-          >
-            <MoreHorizontal className="w-3.5 h-3.5" aria-hidden />
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -271,13 +254,9 @@ function ActionRow({
           {description}
         </div>
       </div>
-      <button
-        type="button"
-        onClick={onClick}
-        className="shrink-0 inline-flex items-center h-7 px-3 rounded-pill text-xs font-medium bg-surface border border-line text-ink-700 hover:bg-sunken hover:border-line-strong transition-colors"
-      >
+      <Button size="sm" variant="outline" onClick={onClick} className="shrink-0">
         {cta}
-      </button>
+      </Button>
     </article>
   );
 }
@@ -395,18 +374,17 @@ function CopilotPane({
                     ` · explains the ${formatLongDate(a.newDeadline)} deadline`}
                 </div>
               </div>
-              <button
-                type="button"
+              <Button
                 onClick={() =>
                   toast.success(
                     `Sent draft to ${clientCount} ${clientCount === 1 ? "client" : "clients"}`,
                   )
                 }
-                className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-pill text-xs font-semibold bg-indigo text-white hover:bg-indigo-hover transition-colors"
+                className="shrink-0 bg-indigo hover:bg-indigo-hover text-surface"
               >
-                <Send className="w-3 h-3" aria-hidden />
+                <Send aria-hidden />
                 Send all
-              </button>
+              </Button>
             </div>
 
             {currentClient && (
@@ -616,21 +594,12 @@ export function Alerts() {
   };
 
   return (
-    <div className="flex h-full bg-canvas overflow-hidden text-ink-900">
+    <PageContainer variant="workshop">
       {/* ── Center feed ──────────────────────────────────────────────── */}
       <section className="flex-1 min-w-0 flex flex-col bg-canvas overflow-hidden">
-        <header className="bg-surface border-b border-line px-6 pt-4 pb-3 sticky top-0 z-10">
-          <h1 className="text-display font-semibold tracking-[-0.01em] text-ink-900">
-            State alerts
-          </h1>
-          <div className="mt-1 flex items-center gap-2 text-xs text-ink-500">
-            <span
-              aria-hidden
-              className="inline-block w-1.5 h-1.5 bg-ok-solid rounded-pill"
-            />
-            50 / 50 states monitored · last scrape 14m ago
-          </div>
-          <div className="mt-3 flex items-center gap-1 border-b border-line">
+        <div className="px-4 md:px-6 lg:px-8 pt-6 md:pt-8 pb-region bg-surface border-b border-line sticky top-0 z-10">
+          <PageHeader title="Alerts" meta={`${totals.all} active`} className="mb-region" />
+          <div className="flex items-center gap-1 border-b border-line -mb-region">
             <FilterChip
               variant="tab"
               active={tab === "affecting"}
@@ -656,9 +625,9 @@ export function Alerts() {
               Resolved
             </FilterChip>
           </div>
-        </header>
+        </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-3">
+        <div className="flex-1 overflow-y-auto px-4 md:px-6 lg:px-8 py-region flex flex-col gap-card">
           {announcementsQuery.isLoading ? (
             <div className="text-center text-sm text-ink-500 py-12">
               Loading state alerts…
@@ -697,7 +666,7 @@ export function Alerts() {
         announcement={selected}
         onClose={handleClearSelection}
       />
-    </div>
+    </PageContainer>
   );
 }
 

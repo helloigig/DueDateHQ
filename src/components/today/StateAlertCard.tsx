@@ -10,6 +10,7 @@ import type { Announcement } from "@/types";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { StateBadge } from "@/components/ui/StateBadge";
 import { ClientChip } from "@/components/ui/ClientChip";
+import { Button } from "@/components/ui/button";
 import { hoursSince, formatLongDate } from "@/data/dateHelpers";
 import { cn } from "@/lib/utils";
 
@@ -167,51 +168,46 @@ export function StateAlertCard({
         )}
       </button>
 
-      {/* Action chips footer — separated by dashed rule (v0u signature) */}
+      {/* Action footer — shadcn Button across the board.
+          Primary = indigo via className override (T2 next-action accent).
+          Secondary = outline. Snooze = ghost. */}
       <div className="px-region pb-3 pt-3 border-t border-dashed border-line ml-12 mr-region flex items-center gap-2 flex-wrap">
-        <span className="text-2xs uppercase tracking-wider font-semibold text-indigo-ink inline-flex items-center gap-1">
-          <Sparkles className="w-3 h-3" aria-hidden />
+        <span className="text-micro uppercase tracking-wider font-semibold text-indigo-ink inline-flex items-center gap-1">
+          <Sparkles aria-hidden />
           AI suggested
         </span>
-        <button
-          type="button"
+        <Button
+          size="sm"
           onClick={onOpen}
-          className="inline-flex items-center gap-1.5 h-7 px-3 rounded-pill text-xs font-semibold bg-indigo text-white hover:bg-indigo-hover transition-colors"
+          className="bg-indigo hover:bg-indigo-hover text-surface"
         >
-          <Mail className="w-3 h-3" aria-hidden />
+          <Mail aria-hidden />
           Review draft for {affectedCount} {affectedCount === 1 ? "client" : "clients"}
-          <ChevronRight className="w-3 h-3" aria-hidden />
-        </button>
+          <ChevronRight aria-hidden />
+        </Button>
         {a.newDeadline && (
-          <button
-            type="button"
-            onClick={onOpen}
-            className="inline-flex items-center gap-1.5 h-7 px-3 rounded-pill text-xs font-medium bg-surface border border-line text-ink-700 hover:bg-sunken hover:border-line-strong transition-colors"
-          >
-            <CalendarClock className="w-3 h-3" aria-hidden />
+          <Button size="sm" variant="outline" onClick={onOpen}>
+            <CalendarClock aria-hidden />
             Apply new deadline
-          </button>
+          </Button>
         )}
-        <button
-          type="button"
-          onClick={onOpen}
-          className="inline-flex items-center gap-1.5 h-7 px-3 rounded-pill text-xs font-medium bg-surface border border-line text-ink-700 hover:bg-sunken hover:border-line-strong transition-colors"
-        >
-          <Forward className="w-3 h-3" aria-hidden />
+        <Button size="sm" variant="outline" onClick={onOpen}>
+          <Forward aria-hidden />
           Forward bulletin
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
           onClick={(e) => {
             e.stopPropagation();
             onSnooze();
           }}
-          className="ml-auto inline-flex items-center gap-1.5 h-7 px-2.5 rounded-pill text-xs text-ink-500 hover:text-ink-900 hover:bg-sunken transition-colors"
           aria-label="Snooze until tomorrow"
+          className="ml-auto"
         >
-          <MoonStar className="w-3 h-3" aria-hidden />
+          <MoonStar aria-hidden />
           Snooze
-        </button>
+        </Button>
       </div>
     </article>
   );

@@ -81,8 +81,10 @@ export const MetricTile = React.forwardRef<HTMLDivElement, MetricTileProps>(
         className={cn(
           !flush && "bg-surface border border-line rounded-md p-region",
           interactive &&
-            "cursor-pointer transition-colors hover:bg-sunken/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-line-strong",
-          active && "border-ink-900 ring-1 ring-ink-900",
+            "cursor-pointer transition-colors hover:bg-sunken/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-900 focus-visible:ring-offset-2",
+          // Active state matches FilterChip (one source of truth for "this
+          // is selected") — ink-900 fill + inverted text.
+          active && "bg-ink-900 border-ink-900 text-surface [&_*]:!text-surface",
           className,
         )}
         {...props}
