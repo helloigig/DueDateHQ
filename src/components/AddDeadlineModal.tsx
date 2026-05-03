@@ -221,7 +221,7 @@ export function AddDeadlineModal({
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-lg shadow-xl border border-line w-full max-w-md mx-4 outline-none"
+        className="bg-surface rounded-lg shadow-xl border border-line w-full max-w-md mx-4 outline-none"
       >
         <div className="px-5 py-3 border-b border-line">
           <h2 className="text-sm font-semibold text-ink-900">
@@ -247,7 +247,7 @@ export function AddDeadlineModal({
               value={form}
               onChange={(e) => setForm(e.target.value)}
               disabled={formsQuery.isLoading}
-              className="w-full px-2.5 py-1.5 rounded border border-line bg-white disabled:opacity-50"
+              className="w-full px-2.5 py-1.5 rounded border border-line bg-surface disabled:opacity-50"
             >
               <optgroup label="Most common">
                 {COMMON_FORMS.map((f) => (
@@ -317,7 +317,7 @@ export function AddDeadlineModal({
                 onChange={(e) =>
                   setJurisdiction(e.target.value as typeof jurisdiction)
                 }
-                className="w-full px-2.5 py-1.5 rounded border border-line bg-white"
+                className="w-full px-2.5 py-1.5 rounded border border-line bg-surface"
               >
                 {jurisdictionOptions.map((j) => (
                   <option key={j} value={j}>
@@ -343,7 +343,7 @@ export function AddDeadlineModal({
         <div className="px-5 py-3 bg-canvas rounded-b-lg flex items-center justify-end gap-2">
           <button
             onClick={onClose}
-            className="text-sm px-3 py-1.5 rounded border border-line bg-white hover:bg-canvas"
+            className="text-sm px-3 py-1.5 rounded border border-line bg-surface hover:bg-canvas"
           >
             Cancel
           </button>

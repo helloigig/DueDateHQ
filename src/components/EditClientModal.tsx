@@ -87,7 +87,7 @@ export function EditClientModal({
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-lg shadow-xl border border-line w-full max-w-lg mx-4 outline-none"
+        className="bg-surface rounded-lg shadow-xl border border-line w-full max-w-lg mx-4 outline-none"
       >
         <div className="px-5 py-3 border-b border-line">
           <h2 className="text-sm font-semibold text-ink-900">Edit client</h2>
@@ -113,7 +113,7 @@ export function EditClientModal({
               <select
                 value={entity}
                 onChange={(e) => setEntity(e.target.value as EntityType)}
-                className="w-full px-2.5 py-1.5 rounded border border-line bg-white"
+                className="w-full px-2.5 py-1.5 rounded border border-line bg-surface"
               >
                 {ENTITY_OPTIONS.map((e) => (
                   <option key={e} value={e}>
@@ -129,7 +129,7 @@ export function EditClientModal({
               <select
                 value={state}
                 onChange={(e) => setState(e.target.value as StateCode)}
-                className="w-full px-2.5 py-1.5 rounded border border-line bg-white"
+                className="w-full px-2.5 py-1.5 rounded border border-line bg-surface"
               >
                 {STATE_OPTIONS.map((s) => (
                   <option key={s} value={s}>
@@ -159,7 +159,7 @@ export function EditClientModal({
                     className={`text-xs px-2 py-1 rounded border ${
                       on
                         ? "bg-ink-900 text-white border-ink-900"
-                        : "bg-white text-ink-700 border-line hover:bg-canvas"
+                        : "bg-surface text-ink-700 border-line hover:bg-canvas"
                     }`}
                   >
                     {s}
@@ -203,7 +203,7 @@ export function EditClientModal({
         <div className="px-5 py-3 bg-canvas rounded-b-lg flex items-center justify-end gap-2">
           <button
             onClick={onClose}
-            className="text-sm px-3 py-1.5 rounded border border-line bg-white hover:bg-canvas"
+            className="text-sm px-3 py-1.5 rounded border border-line bg-surface hover:bg-canvas"
           >
             Cancel
           </button>

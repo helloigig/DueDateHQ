@@ -78,7 +78,7 @@ export function DismissWithReasonDialog({
               onChange={(e) => setCustom(e.target.value)}
               rows={2}
               placeholder="What's the reason?"
-              className="w-full text-sm px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+              className="w-full text-sm px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-indigo resize-none"
             />
           )}
         </DialogBody>

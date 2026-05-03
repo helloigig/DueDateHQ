@@ -44,7 +44,7 @@ export function AlertActionBar({
 
   return (
     <section
-      className={`mt-5 bg-white border ${tone.border} rounded-lg p-4 flex flex-wrap items-center gap-2 sticky bottom-4 shadow-sm`}
+      className={`mt-5 bg-surface border ${tone.border} rounded-lg p-4 flex flex-wrap items-center gap-2 sticky bottom-4 shadow-sm`}
       aria-label="Alert actions"
     >
       <button

@@ -89,7 +89,7 @@ export function BlockingAlertsDialog({
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="e.g. awaiting client confirmation; already reviewed in practice manager"
                 rows={2}
-                className="w-full text-sm px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+                className="w-full text-sm px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-indigo resize-none"
               />
             </div>
             <div className="flex items-center gap-2 self-end shrink-0">

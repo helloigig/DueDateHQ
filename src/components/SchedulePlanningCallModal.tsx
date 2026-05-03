@@ -107,7 +107,7 @@ export function SchedulePlanningCallModal({
                   className={`p-2.5 rounded border text-left text-sm ${
                     windowChoice === opt.value
                       ? "border-info-border bg-info-bg/40 ring-2 ring-info-solid/30"
-                      : "border-line bg-white hover:bg-sunken/30"
+                      : "border-line bg-surface hover:bg-sunken/30"
                   }`}
                 >
                   <div className="font-medium text-ink-900">{opt.label}</div>

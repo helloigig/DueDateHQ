@@ -230,7 +230,7 @@ function UploadStep({
   const hasFile = status.kind === "ok";
 
   return (
-    <div className="bg-white border border-line rounded-lg p-8">
+    <div className="bg-surface border border-line rounded-lg p-8">
       <button
         type="button"
         onClick={onPick}
@@ -336,7 +336,7 @@ function MapStep({
   const confidence: "high" | "low" =
     mapping.filter((m) => m.confidence === "high").length >= 3 ? "high" : "low";
   return (
-    <div className="bg-white border border-line rounded-lg">
+    <div className="bg-surface border border-line rounded-lg">
       <div className="px-5 py-4 border-b border-line">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-ink-700">
@@ -396,7 +396,7 @@ function MapStep({
       <div className="px-5 py-3 bg-canvas rounded-b-lg flex items-center justify-between">
         <button
           onClick={onBack}
-          className="text-sm px-3 py-1.5 rounded border border-line bg-white hover:bg-canvas"
+          className="text-sm px-3 py-1.5 rounded border border-line bg-surface hover:bg-canvas"
         >
           ← Back
         </button>
@@ -453,7 +453,7 @@ function PreviewStep({
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   return (
-    <div className="bg-white border border-line rounded-lg">
+    <div className="bg-surface border border-line rounded-lg">
       <div className="px-5 py-4 border-b border-line flex items-center gap-3">
         <h2 className="text-sm font-semibold text-ink-700">
           Preview ({rows.length} rows)
@@ -547,7 +547,7 @@ function PreviewStep({
       <div className="px-5 py-3 bg-canvas rounded-b-lg flex items-center justify-between">
         <button
           onClick={onBack}
-          className="text-sm px-3 py-1.5 rounded border border-line bg-white hover:bg-canvas"
+          className="text-sm px-3 py-1.5 rounded border border-line bg-surface hover:bg-canvas"
         >
           ← Back
         </button>
@@ -629,7 +629,7 @@ function FixInline({
           <select
             value={entity}
             onChange={(e) => setEntity(e.target.value as EntityType)}
-            className="px-2 py-1 rounded border border-line bg-white text-sm"
+            className="px-2 py-1 rounded border border-line bg-surface text-sm"
           >
             <option value="">— pick —</option>
             {ENTITY_OPTIONS.map((e) => (
@@ -647,7 +647,7 @@ function FixInline({
           <select
             value={state}
             onChange={(e) => setState(e.target.value as StateCode)}
-            className="px-2 py-1 rounded border border-line bg-white text-sm"
+            className="px-2 py-1 rounded border border-line bg-surface text-sm"
           >
             <option value="">— pick —</option>
             {STATE_OPTIONS.map((s) => (
@@ -667,7 +667,7 @@ function FixInline({
             onChange={(e) => setEmail(e.target.value)}
             type="email"
             placeholder="contact@example.com"
-            className="px-2 py-1 rounded border border-line bg-white text-sm"
+            className="px-2 py-1 rounded border border-line bg-surface text-sm"
           />
         </label>
       )}
@@ -791,7 +791,7 @@ function CommittingStep({
   ];
 
   return (
-    <div className="bg-white border border-line rounded-lg p-8">
+    <div className="bg-surface border border-line rounded-lg p-8">
       <h2 className="text-sm font-semibold text-ink-700">Importing…</h2>
       <div className="mt-4 h-2 rounded-full bg-sunken overflow-hidden">
         <div
@@ -859,7 +859,7 @@ function DoneStep({
   // fake deadline count: ~12 per client
   const generatedDeadlines = importedCount * 12;
   return (
-    <div className="bg-white border border-line rounded-lg p-8 text-center">
+    <div className="bg-surface border border-line rounded-lg p-8 text-center">
       <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto text-2xl">
         ✓
       </div>

@@ -291,7 +291,7 @@ export function AnnouncementDetail() {
         ‹ Alerts
       </Link>
 
-      <div className="mt-4 border border-line bg-white rounded-lg p-5">
+      <div className="mt-4 border border-line bg-surface rounded-lg p-5">
         <div className="flex items-start gap-3">
           <span className="inline-flex items-center justify-center px-2.5 py-1 rounded text-sm font-semibold bg-sunken text-ink-900 border border-line shrink-0">
             {ann.stateCode}
@@ -446,7 +446,7 @@ export function AnnouncementDetail() {
           uncertain) "let me audit the parse." Evidence sits below in collapsed
           <details> blocks. Headline + empty-state copy vary by alertType
           (sourced from alertTypeConfig). */}
-      <section className="mt-5 bg-white border border-line rounded-lg overflow-hidden">
+      <section className="mt-5 bg-surface border border-line rounded-lg overflow-hidden">
         <div className="flex items-center px-4 py-3 border-b border-line">
           <h2 className="text-sm font-semibold text-ink-700">
             🎯 {alertCfg.verdictHeadline(ann.affectedClientIds.length, clients.length)}
@@ -564,7 +564,7 @@ export function AnnouncementDetail() {
           audit, not gating. We expand parsed-impact automatically when
           confidence is low so a sketchy parse can't hide. */}
       <details
-        className="mt-5 bg-white border border-line rounded-lg group"
+        className="mt-5 bg-surface border border-line rounded-lg group"
         open={ann.parseConfidence === "low" || ann.matchConfidence === "low"}
       >
         <summary className="cursor-pointer list-none flex items-center gap-2 px-4 py-3 text-sm font-semibold text-ink-700 hover:bg-canvas rounded-t-lg group-open:border-b group-open:border-line">
@@ -612,7 +612,7 @@ export function AnnouncementDetail() {
       </details>
 
       {(relatedAlerts.length > 0 || ann.relatedAnnouncementIds.length > 0) && (
-        <details className="mt-3 bg-white border border-line rounded-lg group">
+        <details className="mt-3 bg-surface border border-line rounded-lg group">
           <summary className="cursor-pointer list-none flex items-center gap-2 px-4 py-3 text-sm font-semibold text-ink-700 hover:bg-canvas rounded-t-lg group-open:border-b group-open:border-line">
             <span className="text-xs text-ink-400 group-open:rotate-90 transition-transform">▶</span>
             <Link2 className="w-3.5 h-3.5" aria-hidden />

@@ -80,7 +80,7 @@ export function QuickActionModal({
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-lg shadow-xl border border-line w-full max-w-md mx-4 outline-none"
+        className="bg-surface rounded-lg shadow-xl border border-line w-full max-w-md mx-4 outline-none"
       >
         <div className="px-5 py-3 border-b border-line">
           <div className="text-xs uppercase tracking-wide text-ink-500">

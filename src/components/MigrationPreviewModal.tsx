@@ -73,7 +73,7 @@ export function MigrationPreviewModal({
         aria-modal="true"
         aria-labelledby="migration-title"
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-lg shadow-xl border border-line w-full max-w-lg mx-4 outline-none"
+        className="bg-surface rounded-lg shadow-xl border border-line w-full max-w-lg mx-4 outline-none"
       >
         <div className="px-5 py-4 border-b border-line">
           <h2
@@ -124,7 +124,7 @@ export function MigrationPreviewModal({
         <div className="px-5 py-3 bg-canvas rounded-b-lg flex items-center justify-end gap-2">
           <button
             onClick={onCancel}
-            className="text-sm px-3 py-1.5 rounded border border-line bg-white hover:bg-canvas"
+            className="text-sm px-3 py-1.5 rounded border border-line bg-surface hover:bg-canvas"
           >
             Cancel
           </button>

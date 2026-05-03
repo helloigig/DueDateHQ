@@ -63,4 +63,4 @@ export function AuthField({
 }
 
 export const authInputClass =
-  "w-full px-2.5 py-1.5 rounded border border-line bg-surface text-ink-900 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-accent";
+  "w-full px-2.5 py-1.5 rounded border border-line bg-surface text-ink-900 placeholder:text-ink-400 focus:outline-none focus:ring-2 focus:ring-indigo";

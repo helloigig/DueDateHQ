@@ -153,7 +153,7 @@ export function BatchNotifyModal({
               data-autofocus
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-indigo"
             />
           </label>
           <label className="block">
@@ -164,7 +164,7 @@ export function BatchNotifyModal({
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={12}
-              className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-accent font-mono text-xs resize-none"
+              className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-indigo font-mono text-xs resize-none"
             />
           </label>
         </div>

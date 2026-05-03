@@ -183,7 +183,7 @@ export function AddClientModal({
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-lg shadow-xl border border-line w-full max-w-lg mx-4 outline-none"
+        className="bg-surface rounded-lg shadow-xl border border-line w-full max-w-lg mx-4 outline-none"
       >
         <div className="px-5 py-4 border-b border-line flex items-center">
           <h2 className="text-base font-semibold text-ink-900">
@@ -249,7 +249,7 @@ export function AddClientModal({
             <>
               <button
                 onClick={onClose}
-                className="text-sm px-3 py-1.5 rounded border border-line bg-white hover:bg-canvas"
+                className="text-sm px-3 py-1.5 rounded border border-line bg-surface hover:bg-canvas"
               >
                 Cancel
               </button>
@@ -265,7 +265,7 @@ export function AddClientModal({
               <button
                 onClick={() => setStep("form")}
                 disabled={submitting}
-                className="text-sm px-3 py-1.5 rounded border border-line bg-white hover:bg-canvas disabled:opacity-40"
+                className="text-sm px-3 py-1.5 rounded border border-line bg-surface hover:bg-canvas disabled:opacity-40"
               >
                 ← Back to edit
               </button>
@@ -341,7 +341,7 @@ function FormStep(props: {
           <select
             value={entity}
             onChange={(e) => setEntity(e.target.value as EntityType)}
-            className="w-full px-2.5 py-1.5 rounded border border-line bg-white"
+            className="w-full px-2.5 py-1.5 rounded border border-line bg-surface"
           >
             {ENTITY_OPTIONS.map((e) => (
               <option key={e} value={e}>
@@ -354,7 +354,7 @@ function FormStep(props: {
           <select
             value={state}
             onChange={(e) => setState(e.target.value as StateCode)}
-            className="w-full px-2.5 py-1.5 rounded border border-line bg-white"
+            className="w-full px-2.5 py-1.5 rounded border border-line bg-surface"
           >
             {STATE_OPTIONS.map((s) => (
               <option key={s} value={s}>
@@ -381,7 +381,7 @@ function FormStep(props: {
                 className={`text-xs px-2 py-1 rounded border ${
                   on
                     ? "bg-ink-900 text-white border-ink-900"
-                    : "bg-white text-ink-700 border-line hover:bg-canvas"
+                    : "bg-surface text-ink-700 border-line hover:bg-canvas"
                 }`}
               >
                 {s}
