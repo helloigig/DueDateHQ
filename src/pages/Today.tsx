@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, CheckCircle2 } from "lucide-react";
+import { ChevronDown, CheckCircle2, Megaphone } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Banner } from "@/components/ui/Banner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { DateLabel } from "@/components/ui/DateLabel";
@@ -9,10 +9,17 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { ActionQueueRow, type RowUrgency, type RowAction } from "@/components/today/ActionQueueRow";
 import { TimelineDayRow } from "@/components/today/TimelineDayRow";
+import { StateAlertCard, type AffectedClient } from "@/components/today/StateAlertCard";
+import { SuggestedActionsSheet } from "@/components/today/SuggestedActionsSheet";
 import { type DotStackUrgency } from "@/components/ui/DotStack";
 import { clients as MOCK_CLIENTS } from "@/data/mockClients";
 import { deadlines as MOCK_DEADLINES } from "@/data/mockDeadlines";
 import { TODAY, parseDate, daysBetween, addDays, toIso } from "@/data/dateHelpers";
+import {
+  useAnnouncements,
+  useDismissAnnouncement,
+} from "@/hooks/useAnnouncements";
+import type { Announcement } from "@/types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -167,8 +174,27 @@ export function Today() {
   const queue = useMemo(buildQueue, []);
   const timeline = useMemo(buildTimeline, []);
   const confirmed = useMemo(buildConfirmedToday, []);
-  const [bannerDismissed, setBannerDismissed] = useState(false);
   const [confirmedExpanded, setConfirmedExpanded] = useState(false);
+
+  // State alerts — driven by real announcement data (mock-mode tRPC).
+  // Renders as the v0u differentiator surface: card list + click → Sheet.
+  const announcementsQuery = useAnnouncements({ activeOnly: true });
+  const announcements = announcementsQuery.data ?? [];
+  const [openAnnId, setOpenAnnId] = useState<string | null>(null);
+  const openAnnouncement = useMemo(
+    () => announcements.find((a) => a.id === openAnnId) ?? null,
+    [announcements, openAnnId],
+  );
+  const dismissMutation = useDismissAnnouncement();
+  const affectedFor = useMemo(() => {
+    return (a: Announcement): AffectedClient[] => {
+      const map = new Map(MOCK_CLIENTS.map((c) => [c.id, c]));
+      return a.affectedClientIds
+        .map((id) => map.get(id))
+        .filter((c): c is NonNullable<typeof c> => Boolean(c))
+        .map((c) => ({ id: c.id, name: c.name, email: c.contactEmail }));
+    };
+  }, []);
 
   return (
     <div className="mx-auto max-w-[840px] px-4 md:px-6 lg:px-8 py-6 md:py-8">
@@ -186,27 +212,75 @@ export function Today() {
         }
       />
 
-      {/* State notification banner — info banner with inline action link
-          (DESIGN.md §The four alert surfaces — banners use inline link, never
-          primary button; one banner max per viewport). */}
-      {!bannerDismissed && (
-        <div className="mb-card">
-          <Banner
-            variant="info"
-            onDismiss={() => setBannerDismissed(true)}
-            action={{
-              label: "Review impacts",
-              onClick: () =>
-                toast.info("Would open /alerts filtered to Form 941 impacts"),
-            }}
-          >
-            <strong className="font-semibold">IRS revised Form 941</strong>{" "}
-            <span className="text-info-ink/90">
-              — 72 of your clients are affected
+      {/* State alerts — the v0.7 differentiator surface (v0u synthesis).
+          One section per concept — replaces the prior hardcoded info banner.
+          Empty state mimics the existing AnnouncementBanner "All clear" so
+          the page never reads as broken when zero announcements are active. */}
+      <section className="mb-section">
+        <SectionHeader
+          title="State alerts"
+          meta={
+            announcementsQuery.isLoading
+              ? "Loading…"
+              : announcements.length > 0
+                ? `${announcements.length} active`
+                : "All clear"
+          }
+          action={
+            <Link
+              to="/alerts"
+              className="text-xs text-ink-500 hover:text-ink-900 underline underline-offset-[3px] decoration-[1.5px]"
+            >
+              All alerts
+            </Link>
+          }
+        />
+        {announcementsQuery.isLoading ? (
+          <div className="text-sm text-ink-500 py-6 text-center border-t border-line">
+            Loading state alerts…
+          </div>
+        ) : announcements.length === 0 ? (
+          <div className="bg-surface border border-line rounded-md px-4 py-3 flex items-center gap-3">
+            <span
+              className="w-2 h-2 rounded-pill bg-ok-solid shrink-0"
+              aria-hidden
+            />
+            <Megaphone className="w-4 h-4 text-ink-500 shrink-0" aria-hidden />
+            <span className="text-sm text-ink-700">
+              <span className="font-semibold text-ink-900">All clear.</span>{" "}
+              Monitoring 50 state authorities — nothing affecting your clients
+              right now.
             </span>
-          </Banner>
-        </div>
-      )}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-card">
+            {announcements.map((a) => (
+              <StateAlertCard
+                key={a.id}
+                announcement={a}
+                affectedClients={affectedFor(a)}
+                selected={openAnnId === a.id}
+                onOpen={() => setOpenAnnId(a.id)}
+                onSnooze={() => {
+                  dismissMutation.mutate({ id: a.id });
+                  toast.success("Snoozed until tomorrow");
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <SuggestedActionsSheet
+        open={!!openAnnId}
+        onOpenChange={(o) => {
+          if (!o) setOpenAnnId(null);
+        }}
+        announcement={openAnnouncement}
+        affectedClients={
+          openAnnouncement ? affectedFor(openAnnouncement) : []
+        }
+      />
 
       {/* Action Queue — gap-first dominant section */}
       <section className="mb-section">
