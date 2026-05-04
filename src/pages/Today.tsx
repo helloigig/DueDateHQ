@@ -1,18 +1,25 @@
-import { useMemo, useState } from "react";
-import { ChevronDown, CheckCircle2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, CheckCircle2, Megaphone } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Banner } from "@/components/ui/Banner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { DateLabel } from "@/components/ui/DateLabel";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PageContainer } from "@/components/ui/PageContainer";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { ActionQueueRow, type RowUrgency, type RowAction } from "@/components/today/ActionQueueRow";
 import { TimelineDayRow } from "@/components/today/TimelineDayRow";
+import { StateAlertCard, type AffectedClient } from "@/components/today/StateAlertCard";
 import { type DotStackUrgency } from "@/components/ui/DotStack";
 import { clients as MOCK_CLIENTS } from "@/data/mockClients";
 import { deadlines as MOCK_DEADLINES } from "@/data/mockDeadlines";
 import { TODAY, parseDate, daysBetween, addDays, toIso } from "@/data/dateHelpers";
+import {
+  useAnnouncements,
+  useDismissAnnouncement,
+} from "@/hooks/useAnnouncements";
+import type { Announcement } from "@/types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -167,11 +174,59 @@ export function Today() {
   const queue = useMemo(buildQueue, []);
   const timeline = useMemo(buildTimeline, []);
   const confirmed = useMemo(buildConfirmedToday, []);
-  const [bannerDismissed, setBannerDismissed] = useState(false);
   const [confirmedExpanded, setConfirmedExpanded] = useState(false);
 
+  // Keyboard navigation for the Action Queue — v0m-triage-queue inheritance.
+  // j/k (or ↓/↑) move the cursor; Enter opens the focused client; Esc clears.
+  // Only fires when no input/textarea is focused so it doesn't fight typing.
+  const [queueCursor, setQueueCursor] = useState(0);
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (document.activeElement?.tagName ?? "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if (queue.length === 0) return;
+      if (e.key === "j" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setQueueCursor((i) => Math.min(queue.length - 1, i + 1));
+      } else if (e.key === "k" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setQueueCursor((i) => Math.max(0, i - 1));
+      } else if (e.key === "Escape") {
+        setQueueCursor(0);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [queue.length]);
+
+  // Scroll the focused row into view when the cursor moves.
+  useEffect(() => {
+    if (queue.length === 0) return;
+    const el = document.getElementById(`action-queue-row-${queueCursor}`);
+    el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [queueCursor, queue.length]);
+
+  // State alerts — driven by real announcement data (mock-mode tRPC).
+  // Renders as the v0u differentiator surface preview: cards on Today,
+  // click navigates to /alerts/:id where the full feed + co-pilot pane
+  // lives. (No in-page Sheet — one drilldown destination shared across
+  // all surfaces, per the chrome-consistency pass.)
+  const navigate = useNavigate();
+  const announcementsQuery = useAnnouncements({ activeOnly: true });
+  const announcements = announcementsQuery.data ?? [];
+  const dismissMutation = useDismissAnnouncement();
+  const affectedFor = useMemo(() => {
+    return (a: Announcement): AffectedClient[] => {
+      const map = new Map(MOCK_CLIENTS.map((c) => [c.id, c]));
+      return a.affectedClientIds
+        .map((id) => map.get(id))
+        .filter((c): c is NonNullable<typeof c> => Boolean(c))
+        .map((c) => ({ id: c.id, name: c.name, email: c.contactEmail }));
+    };
+  }, []);
+
   return (
-    <div className="mx-auto max-w-[840px] px-4 md:px-6 lg:px-8 py-6 md:py-8">
+    <PageContainer>
       {/* Page header — DESIGN.md §Typography display (22px / 600). Date inline
           (T8: desk, not stage). PageHeader primitive enforces consistency
           across all pages — see src/components/ui/PageHeader.tsx. */}
@@ -186,33 +241,89 @@ export function Today() {
         }
       />
 
-      {/* State notification banner — info banner with inline action link
-          (DESIGN.md §The four alert surfaces — banners use inline link, never
-          primary button; one banner max per viewport). */}
-      {!bannerDismissed && (
-        <div className="mb-card">
-          <Banner
-            variant="info"
-            onDismiss={() => setBannerDismissed(true)}
-            action={{
-              label: "Review impacts",
-              onClick: () =>
-                toast.info("Would open /alerts filtered to Form 941 impacts"),
-            }}
-          >
-            <strong className="font-semibold">IRS revised Form 941</strong>{" "}
-            <span className="text-info-ink/90">
-              — 72 of your clients are affected
+      {/* State alerts — the v0.7 differentiator surface (v0u synthesis).
+          One section per concept — replaces the prior hardcoded info banner.
+          Empty state mimics the existing AnnouncementBanner "All clear" so
+          the page never reads as broken when zero announcements are active. */}
+      <section className="mb-section">
+        <SectionHeader
+          title="State alerts"
+          meta={
+            announcementsQuery.isLoading
+              ? "Loading…"
+              : announcements.length > 0
+                ? `${announcements.length} active`
+                : "All clear"
+          }
+          action={
+            <Link
+              to="/alerts"
+              className="text-xs text-ink-500 hover:text-ink-900 underline underline-offset-[3px] decoration-[1.5px]"
+            >
+              All alerts
+            </Link>
+          }
+        />
+        {announcementsQuery.isLoading ? (
+          <div className="text-sm text-ink-500 py-6 text-center border-t border-line">
+            Loading state alerts…
+          </div>
+        ) : announcements.length === 0 ? (
+          <div className="bg-surface border border-line rounded-md px-4 py-3 flex items-center gap-3">
+            <span
+              className="w-2 h-2 rounded-pill bg-ok-solid shrink-0"
+              aria-hidden
+            />
+            <Megaphone className="w-4 h-4 text-ink-500 shrink-0" aria-hidden />
+            <span className="text-sm text-ink-700">
+              <span className="font-semibold text-ink-900">All clear.</span>{" "}
+              Monitoring 50 state authorities — nothing affecting your clients
+              right now.
             </span>
-          </Banner>
-        </div>
-      )}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-card">
+            {announcements.map((a) => (
+              <StateAlertCard
+                key={a.id}
+                announcement={a}
+                affectedClients={affectedFor(a)}
+                onOpen={() => navigate(`/alerts/${a.id}`)}
+                onSnooze={() => {
+                  dismissMutation.mutate({ id: a.id });
+                  toast.success("Snoozed until tomorrow");
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* Action Queue — gap-first dominant section */}
       <section className="mb-section">
         <SectionHeader
           title="Action Queue"
-          meta={`${queue.length} ${queue.length === 1 ? "item" : "items"}`}
+          meta={
+            queue.length === 0
+              ? "0 items"
+              : `${queueCursor + 1} of ${queue.length}`
+          }
+          action={
+            queue.length > 0 ? (
+              <span className="text-2xs text-ink-400 inline-flex items-center gap-1">
+                <kbd className="font-mono text-2xs border border-line bg-sunken px-1 py-0.5 rounded">j</kbd>
+                <kbd className="font-mono text-2xs border border-line bg-sunken px-1 py-0.5 rounded">k</kbd>
+                <span className="ml-0.5">to navigate</span>
+                <span className="text-ink-300 mx-1" aria-hidden>·</span>
+                <Link
+                  to="/today/triage"
+                  className="text-ink-700 hover:text-ink-900 underline underline-offset-[3px] decoration-[1.5px] ml-1"
+                >
+                  Triage mode →
+                </Link>
+              </span>
+            ) : undefined
+          }
         />
         {queue.length === 0 ? (
           <EmptyState
@@ -225,11 +336,13 @@ export function Today() {
             {queue.map((item, i) => (
               <ActionQueueRow
                 key={item.id}
+                domId={`action-queue-row-${i}`}
                 clientName={item.clientName}
                 meta={item.meta}
                 urgency={item.urgency}
                 urgencyDays={item.urgencyDays}
                 action={item.action}
+                focused={i === queueCursor}
                 onAction={() => {
                   // Action button: opens the verb-specific flow (email
                   // composer for Send, thread for Open, draft preview for
@@ -244,6 +357,7 @@ export function Today() {
                   toast.success(verbCopy[item.action]);
                 }}
                 onRowClick={() => {
+                  setQueueCursor(i);
                   // Whole-row click: navigate to client detail. Real app
                   // would `navigate('/clients/' + item.clientId)`.
                   toast.info(`Open client detail: ${item.clientName}`);
@@ -329,6 +443,6 @@ export function Today() {
           </div>
         )}
       </section>
-    </div>
+    </PageContainer>
   );
 }

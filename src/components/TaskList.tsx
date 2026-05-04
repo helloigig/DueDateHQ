@@ -494,7 +494,7 @@ function TaskRow({
       aria-label={`${row.client.name} · ${row.task.formType}`}
       className={[
         "px-4 py-3 group cursor-pointer outline-none",
-        "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent",
+        "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo",
         // Stack on mobile, row on sm+. Mobile gets vertical breathing room.
         "flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3",
         row.isOverdue ? "bg-danger-bg/20 hover:bg-danger-bg/30" : "hover:bg-sunken/40",

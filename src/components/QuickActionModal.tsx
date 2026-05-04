@@ -71,7 +71,7 @@ export function QuickActionModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 backdrop-blur-sm"
       onClick={close}
     >
       <div
@@ -80,15 +80,15 @@ export function QuickActionModal({
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-lg shadow-xl border border-slate-200 w-full max-w-md mx-4 outline-none"
+        className="bg-surface rounded-lg shadow-xl border border-line w-full max-w-md mx-4 outline-none"
       >
-        <div className="px-5 py-3 border-b border-slate-100">
-          <div className="text-xs uppercase tracking-wide text-slate-500">
+        <div className="px-5 py-3 border-b border-line">
+          <div className="text-xs uppercase tracking-wide text-ink-500">
             {client.name}
           </div>
-          <div className="text-sm font-semibold text-slate-900">
+          <div className="text-sm font-semibold text-ink-900">
             {deadline.form} ·{" "}
-            <span className="font-normal text-slate-600">
+            <span className="font-normal text-ink-700">
               {formatLongDate(deadline.officialDueDate)}
             </span>
           </div>
@@ -122,11 +122,11 @@ export function QuickActionModal({
               hint="Attach a note to this deadline"
               onClick={() => setMode("note")}
             />
-            <li className="px-5 py-2 border-t border-slate-100 mt-1">
+            <li className="px-5 py-2 border-t border-line mt-1">
               <Link
                 to={`/clients/${client.id}`}
                 onClick={close}
-                className="text-sm text-slate-500 hover:text-slate-900"
+                className="text-sm text-ink-500 hover:text-ink-900"
               >
                 View client detail →
               </Link>
@@ -136,29 +136,29 @@ export function QuickActionModal({
 
         {mode === "defer" && (
           <div className="px-5 py-4 space-y-3">
-            <label className="block text-xs font-medium text-slate-600">
+            <label className="block text-xs font-medium text-ink-700">
               New due date
               <input
                 type="date"
                 value={deferDate}
                 onChange={(e) => setDeferDate(e.target.value)}
-                className="mt-1 w-full px-2.5 py-1.5 rounded border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm"
+                className="mt-1 w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-ink-900 text-sm"
               />
             </label>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-ink-500">
               Defers only this deadline. Official IRS date stays archived in
               the activity log.
             </p>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setMode("choose")}
-                className="text-sm px-3 py-1.5 rounded border border-slate-200 hover:bg-slate-50"
+                className="text-sm px-3 py-1.5 rounded border border-line hover:bg-canvas"
               >
                 ← Back
               </button>
               <button
                 onClick={onDeferSubmit}
-                className="text-sm px-3 py-1.5 rounded bg-slate-900 text-white hover:bg-slate-800"
+                className="text-sm px-3 py-1.5 rounded bg-ink-900 text-white hover:bg-ink-900"
               >
                 Defer
               </button>
@@ -168,7 +168,7 @@ export function QuickActionModal({
 
         {mode === "note" && (
           <div className="px-5 py-4 space-y-3">
-            <label className="block text-xs font-medium text-slate-600">
+            <label className="block text-xs font-medium text-ink-700">
               Note body
               <textarea
                 autoFocus
@@ -176,20 +176,20 @@ export function QuickActionModal({
                 onChange={(e) => setNote(e.target.value)}
                 rows={4}
                 placeholder="e.g. Waiting on K-1 from Acme 1065"
-                className="mt-1 w-full px-2.5 py-1.5 rounded border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 text-sm resize-none"
+                className="mt-1 w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-ink-900 text-sm resize-none"
               />
             </label>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setMode("choose")}
-                className="text-sm px-3 py-1.5 rounded border border-slate-200 hover:bg-slate-50"
+                className="text-sm px-3 py-1.5 rounded border border-line hover:bg-canvas"
               >
                 ← Back
               </button>
               <button
                 onClick={onNoteSubmit}
                 disabled={!note.trim()}
-                className="text-sm px-3 py-1.5 rounded bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40"
+                className="text-sm px-3 py-1.5 rounded bg-ink-900 text-white hover:bg-ink-900 disabled:opacity-40"
               >
                 Save note
               </button>
@@ -214,10 +214,10 @@ function ActionRow({
     <li>
       <button
         onClick={onClick}
-        className="w-full text-left px-5 py-2.5 hover:bg-slate-50"
+        className="w-full text-left px-5 py-2.5 hover:bg-canvas"
       >
-        <div className="text-sm text-slate-900 font-medium">{label}</div>
-        <div className="text-xs text-slate-500">{hint}</div>
+        <div className="text-sm text-ink-900 font-medium">{label}</div>
+        <div className="text-xs text-ink-500">{hint}</div>
       </button>
     </li>
   );

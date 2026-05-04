@@ -888,7 +888,7 @@ function ImportsPanel() {
                 <strong>{undoTarget.deadlinesCreated}</strong> generated
                 deadline{undoTarget.deadlinesCreated === 1 ? "" : "s"}.
               </p>
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-ink-500">
                 Any notes or status changes made on those clients since import
                 will be lost.
               </p>

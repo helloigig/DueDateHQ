@@ -78,7 +78,7 @@ export function EditClientModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -87,33 +87,33 @@ export function EditClientModal({
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-lg shadow-xl border border-slate-200 w-full max-w-lg mx-4 outline-none"
+        className="bg-surface rounded-lg shadow-xl border border-line w-full max-w-lg mx-4 outline-none"
       >
-        <div className="px-5 py-3 border-b border-slate-100">
-          <h2 className="text-sm font-semibold text-slate-900">Edit client</h2>
+        <div className="px-5 py-3 border-b border-line">
+          <h2 className="text-sm font-semibold text-ink-900">Edit client</h2>
         </div>
 
         <div className="px-5 py-4 space-y-3 text-sm">
           <label className="block">
-            <span className="text-xs font-medium text-slate-600 mb-1 block">
+            <span className="text-xs font-medium text-ink-700 mb-1 block">
               Client name
             </span>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
+              className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-ink-900"
             />
           </label>
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="text-xs font-medium text-slate-600 mb-1 block">
+              <span className="text-xs font-medium text-ink-700 mb-1 block">
                 Entity type
               </span>
               <select
                 value={entity}
                 onChange={(e) => setEntity(e.target.value as EntityType)}
-                className="w-full px-2.5 py-1.5 rounded border border-slate-200 bg-white"
+                className="w-full px-2.5 py-1.5 rounded border border-line bg-surface"
               >
                 {ENTITY_OPTIONS.map((e) => (
                   <option key={e} value={e}>
@@ -123,13 +123,13 @@ export function EditClientModal({
               </select>
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-slate-600 mb-1 block">
+              <span className="text-xs font-medium text-ink-700 mb-1 block">
                 Primary state
               </span>
               <select
                 value={state}
                 onChange={(e) => setState(e.target.value as StateCode)}
-                className="w-full px-2.5 py-1.5 rounded border border-slate-200 bg-white"
+                className="w-full px-2.5 py-1.5 rounded border border-line bg-surface"
               >
                 {STATE_OPTIONS.map((s) => (
                   <option key={s} value={s}>
@@ -141,7 +141,7 @@ export function EditClientModal({
           </div>
 
           <div>
-            <span className="text-xs font-medium text-slate-600 mb-1 block">
+            <span className="text-xs font-medium text-ink-700 mb-1 block">
               Nexus states
             </span>
             <div className="flex flex-wrap gap-1.5">
@@ -158,8 +158,8 @@ export function EditClientModal({
                     }
                     className={`text-xs px-2 py-1 rounded border ${
                       on
-                        ? "bg-slate-900 text-white border-slate-900"
-                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                        ? "bg-ink-900 text-white border-ink-900"
+                        : "bg-surface text-ink-700 border-line hover:bg-canvas"
                     }`}
                   >
                     {s}
@@ -170,25 +170,25 @@ export function EditClientModal({
           </div>
 
           <label className="block">
-            <span className="text-xs font-medium text-slate-600 mb-1 block">
+            <span className="text-xs font-medium text-ink-700 mb-1 block">
               Contact email
             </span>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
+              className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-ink-900"
             />
           </label>
 
           <label className="block">
-            <span className="text-xs font-medium text-slate-600 mb-1 block">
+            <span className="text-xs font-medium text-ink-700 mb-1 block">
               Phone (optional)
             </span>
             <input
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
+              className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-ink-900"
             />
           </label>
 
@@ -200,17 +200,17 @@ export function EditClientModal({
           )}
         </div>
 
-        <div className="px-5 py-3 bg-slate-50 rounded-b-lg flex items-center justify-end gap-2">
+        <div className="px-5 py-3 bg-canvas rounded-b-lg flex items-center justify-end gap-2">
           <button
             onClick={onClose}
-            className="text-sm px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50"
+            className="text-sm px-3 py-1.5 rounded border border-line bg-surface hover:bg-canvas"
           >
             Cancel
           </button>
           <button
             onClick={onSave}
             disabled={!canSave}
-            className="text-sm px-3 py-1.5 rounded font-medium text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-40"
+            className="text-sm px-3 py-1.5 rounded font-medium text-white bg-ink-900 hover:bg-ink-900 disabled:opacity-40"
           >
             {stateOrEntityChanged ? "Review changes" : "Save changes"}
           </button>

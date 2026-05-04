@@ -124,7 +124,7 @@ export function DeadlineRow({
           "border-b border-line last:border-b-0",
           isOverdue ? "bg-danger-bg hover:bg-danger-bg/70" : "hover:bg-sunken",
           "focus:bg-sunken focus-within:bg-sunken",
-          "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent",
+          "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo",
           suppressClientName && "pl-8",
         ]
           .filter(Boolean)

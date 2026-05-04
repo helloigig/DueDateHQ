@@ -45,6 +45,12 @@ export interface ActionQueueRowProps {
   onAction?: () => void;
   onRowClick?: () => void;
   isLast?: boolean;
+  /** Keyboard cursor — Today's j/k navigation marks one row as the focused
+      "current" item. Adds a subtle indigo bar + bg so the eye can find
+      the cursor without losing context of surrounding rows. */
+  focused?: boolean;
+  /** Stable DOM id so the parent can scroll the focused row into view. */
+  domId?: string;
 }
 
 export function ActionQueueRow({
@@ -56,10 +62,13 @@ export function ActionQueueRow({
   onAction,
   onRowClick,
   isLast,
+  focused = false,
+  domId,
 }: ActionQueueRowProps) {
   const pill = urgencyToPill[urgency];
   return (
     <div
+      id={domId}
       role="button"
       tabIndex={0}
       onClick={onRowClick}
@@ -74,10 +83,17 @@ export function ActionQueueRow({
         // visibly highlights on hover. Cursor-pointer signals tappability.
         // px-3 -mx-3 lets the hover bg extend slightly beyond the row's
         // text content for a comfortable target.
-        "group flex items-start gap-4 py-4 px-3 -mx-3 cursor-pointer transition-colors hover:bg-sunken focus-visible:bg-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-line-strong",
+        "group relative flex items-start gap-4 py-4 px-3 -mx-3 cursor-pointer transition-colors hover:bg-sunken focus-visible:bg-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-line-strong",
         !isLast && "border-b border-line",
+        focused && "bg-sunken",
       )}
     >
+      {focused && (
+        <span
+          className="absolute left-[-12px] top-3 bottom-3 w-[3px] rounded-r bg-indigo"
+          aria-hidden
+        />
+      )}
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-ink-900 truncate leading-snug">
           {clientName}

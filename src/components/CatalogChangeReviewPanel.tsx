@@ -100,7 +100,7 @@ export function CatalogChangeReviewPanel({
   // Admin variant: full diff panel.
   return (
     <>
-      <section className="mt-5 bg-white border border-line rounded-lg overflow-hidden">
+      <section className="mt-5 bg-surface border border-line rounded-lg overflow-hidden">
         <div className="px-4 py-3 border-b border-line bg-sunken/40">
           <h3 className="text-sm font-semibold text-ink-900">
             Review catalog change — Form {formNumber}
@@ -122,7 +122,7 @@ export function CatalogChangeReviewPanel({
                     d.confidence === "high"
                       ? "bg-ok-bg text-ok-ink"
                       : d.confidence === "medium"
-                        ? "bg-slate-100 text-ink-700"
+                        ? "bg-sunken text-ink-700"
                         : "bg-warn-bg text-warn-ink"
                   }`}
                 >
@@ -162,7 +162,7 @@ export function CatalogChangeReviewPanel({
           </p>
         </div>
 
-        <div className="px-4 py-3 border-t border-line flex items-center gap-2 bg-white">
+        <div className="px-4 py-3 border-t border-line flex items-center gap-2 bg-surface">
           <Button onClick={() => onApply(editing ? overrides : undefined)}>
             <Check className="w-4 h-4 mr-1" aria-hidden />
             {editing ? "Apply with modifications" : "Apply catalog change"}

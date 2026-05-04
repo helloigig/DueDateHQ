@@ -76,7 +76,7 @@ export function StatusBanner() {
     level === "danger"
       ? "bg-danger-bg border-danger-border text-danger-ink"
       : level === "warn"
-        ? "bg-warning-bg border-warning-border text-warning-ink"
+        ? "bg-warn-bg border-warn-border text-warn-ink"
         : "bg-info-bg border-info-border text-info-ink";
 
   return (

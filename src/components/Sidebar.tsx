@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
   Home,
   Users,
@@ -11,27 +11,34 @@ import {
   PanelLeftOpen,
   GanttChartSquare,
   UserPlus,
+  LogOut,
 } from "lucide-react";
 import { useAnnouncements } from "../hooks/useAnnouncements";
-import { useSession } from "../data/session";
+import { useSession, signOut } from "../data/session";
 import { useStore } from "../data/store";
 import { useFeatureFlags } from "../hooks/useFeatureFlags";
+import { CountBadge } from "./ui/CountBadge";
+import { Avatar } from "./ui/Avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 // 7-item sidebar per IA v0.7 amendment §2:
-//   Today / Timeline / Clients / Mail / Alerts / Opportunities / Settings
+//   Today / Alerts / Timeline / Clients / Mail / Opportunities / Settings
 //
-// "Today" is reactive — the action queue (per `feedback_gap_over_fill`).
-// "Timeline" is forward-planning — cross-client mini-timeline stack.
-// "Mail" is cross-client communication (per `feedback_unified_ai_surface`,
-//   ships Day 1 even though Method B OAuth volume is initially low).
-// "Opportunities" surfaces Mode E + Layer B/C signals (advisory / churn /
-//   pricing / capacity).
+// Alerts sits second so the state-notification + suggested-action surface
+// (the product's differentiator) is one keystroke from "Today" — the
+// signal lives next to the inbox of work it generates.
 const primary = [
   { to: "/", label: "Today", Icon: Home, end: true },
+  { to: "/alerts", label: "Alerts", Icon: Bell, end: false },
   { to: "/timeline", label: "Timeline", Icon: GanttChartSquare, end: false },
   { to: "/clients", label: "Clients", Icon: Users, end: false },
   { to: "/mail", label: "Mail", Icon: Mail, end: false },
-  { to: "/alerts", label: "Alerts", Icon: Bell, end: false },
   { to: "/opportunities", label: "Opportunities", Icon: Lightbulb, end: false },
 ];
 
@@ -91,7 +98,22 @@ export function Sidebar() {
   return (
     <aside
       className={[
-        "shrink-0 bg-surface border-r border-line flex flex-col transition-[width] duration-150",
+        // Sidebar shell — two visual modes.
+        //   Expanded (`w-56`): floating card — Mac OS / Mercury
+        //     aesthetic. `my-3 ml-3` offset + `rounded-lg shadow-pop`,
+        //     no right border. Reads as a tool, not a rail.
+        //   Collapsed (`w-14`): flush rail. Drop the margin + shadow,
+        //     restore the right hairline border. A 56px floating card
+        //     is decoration; flush gives the user maximum canvas back
+        //     when they've actively chosen to tuck the menu away.
+        // Flush shell — single hairline right border, both modes.
+        // We tried a floating card (`my-3 ml-3 rounded-lg shadow-pop`)
+        // but it leaked canvas behind the sidebar AND created a seam
+        // where the rounded top-right corner met the topbar's straight
+        // left edge. Mercury references all flush their sidebars; we
+        // align with that. The visual lift comes from the topbar's
+        // border-b instead of from sidebar elevation.
+        "shrink-0 bg-surface flex flex-col border-r border-line transition-[width] duration-150",
         collapsed ? "w-14" : "w-56",
       ].join(" ")}
     >
@@ -121,28 +143,22 @@ export function Sidebar() {
               <>
                 {isActive && (
                   <span
-                    className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-accent"
+                    className={`absolute top-1 bottom-1 rounded-r bg-accent ${
+                      collapsed ? "-left-2 w-[3px]" : "left-0 w-0.5"
+                    }`}
                     aria-hidden
                   />
                 )}
                 <Icon className="w-4 h-4 shrink-0" aria-hidden />
                 {!collapsed && <span className="flex-1">{label}</span>}
-                {!collapsed &&
-                  to === "/alerts" &&
-                  unread > 0 && (
-                    <span className="ml-auto bg-danger-solid text-white text-2xs rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center tabular-nums">
-                      {unread}
-                    </span>
-                  )}
-                {collapsed &&
-                  to === "/alerts" &&
-                  unread > 0 && (
-                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-danger-solid" />
-                  )}
+                {!collapsed && to === "/alerts" && unread > 0 && (
+                  <CountBadge count={unread} tone="danger" className="ml-auto" />
+                )}
+                {collapsed && to === "/alerts" && unread > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-danger-solid" />
+                )}
                 {!collapsed && to === "/mail" && inboxCount > 0 && (
-                  <span className="ml-auto bg-sunken text-ink-700 text-2xs rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center tabular-nums border border-line">
-                    {inboxCount}
-                  </span>
+                  <CountBadge count={inboxCount} tone="neutral" className="ml-auto" />
                 )}
                 {collapsed && to === "/mail" && inboxCount > 0 && (
                   <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-info-solid" />
@@ -208,7 +224,96 @@ export function Sidebar() {
           )}
         </button>
       </div>
+
+      {/* User account — bottom-left, Linear/Notion convention.
+          Replaces the user dropdown that used to live in the TopBar so
+          there's a single account entrance. */}
+      <UserAccountTrigger collapsed={collapsed} />
     </aside>
+  );
+}
+
+/**
+ * Bottom-of-sidebar account trigger — avatar + name + chevron, opens a
+ * dropdown with Settings and Sign out. Mirrors Linear's pattern (account
+ * entrance pinned bottom-left, separated by a hairline) so it's always
+ * one click away regardless of which page the user is on.
+ *
+ * Collapsed mode: just the avatar; same dropdown.
+ */
+function UserAccountTrigger({ collapsed }: { collapsed: boolean }) {
+  const session = useSession();
+  const navigate = useNavigate();
+
+  const initials = session?.userInitials || "SC";
+  const name = session?.userName || "Sarah Chen";
+  const email = session?.userEmail;
+
+  return (
+    <div className="border-t border-line px-2 py-2">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className={`w-full flex items-center rounded-md text-sm text-ink-700 hover:bg-sunken transition-colors ${
+              collapsed ? "justify-center py-2" : "gap-2 px-2 py-1.5"
+            }`}
+            aria-label="Open account menu"
+            title={collapsed ? name : undefined}
+          >
+            <Avatar
+              size="md"
+              tone="primary"
+              initials={initials}
+              name={name}
+            />
+            {!collapsed && (
+              <>
+                <div className="flex-1 min-w-0 text-left">
+                  <div className="text-sm font-medium text-ink-900 truncate leading-tight">
+                    {name}
+                  </div>
+                  {email && (
+                    <div className="text-2xs text-ink-500 truncate leading-tight">
+                      {email}
+                    </div>
+                  )}
+                </div>
+                <span className="text-ink-400 text-xs shrink-0" aria-hidden>
+                  ⌄
+                </span>
+              </>
+            )}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" side="top" className="w-56">
+          <div className="px-3 py-2 border-b border-line">
+            <div className="text-sm font-medium text-ink-900 truncate">
+              {name}
+            </div>
+            {email && (
+              <div className="text-2xs text-ink-500 truncate">{email}</div>
+            )}
+          </div>
+          <DropdownMenuItem onSelect={() => navigate("/settings")}>
+            <Settings className="w-3.5 h-3.5 text-ink-500" aria-hidden />
+            Settings
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={() => {
+              // signOut() handles Supabase clear + hard reload to /login.
+              // Don't navigate() here — that would render /login mid-flight
+              // with stale state and crash before the reload fires.
+              void signOut();
+            }}
+          >
+            <LogOut className="w-3.5 h-3.5 text-ink-500" aria-hidden />
+            Sign out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }
 
@@ -278,12 +383,13 @@ function WorkspaceHeader({
   if (collapsed) {
     return (
       <div className="h-14 flex items-center justify-center border-b border-line px-3">
-        <span
-          className="w-7 h-7 rounded-md bg-accent text-canvas flex items-center justify-center text-2xs font-semibold"
+        <Avatar
+          variant="square"
+          size="md"
+          tone="primary"
+          name={firmName}
           title={firmName}
-        >
-          {firmName.slice(0, 2).toUpperCase()}
-        </span>
+        />
       </div>
     );
   }
@@ -295,9 +401,7 @@ function WorkspaceHeader({
         className="flex items-center gap-2 w-full hover:bg-sunken rounded px-2 py-1.5 -mx-1 group"
         aria-expanded={open}
       >
-        <span className="w-7 h-7 rounded-md bg-accent text-canvas flex items-center justify-center text-2xs font-semibold shrink-0">
-          {firmName.slice(0, 2).toUpperCase()}
-        </span>
+        <Avatar variant="square" size="md" tone="primary" name={firmName} />
         <div className="flex flex-col justify-center min-w-0 flex-1 text-left">
           <span className="font-semibold text-ink-900 text-sm leading-tight truncate">
             {firmName}
@@ -322,9 +426,7 @@ function WorkspaceHeader({
               Current workspace
             </p>
             <div className="px-3 py-2 flex items-center gap-2 bg-sunken/40 mx-1 rounded">
-              <span className="w-5 h-5 rounded bg-accent text-canvas flex items-center justify-center text-2xs font-semibold">
-                {firmName.slice(0, 2).toUpperCase()}
-              </span>
+              <Avatar variant="square" size="sm" tone="primary" name={firmName} />
               <span className="text-sm font-medium text-ink-900 truncate flex-1">
                 {firmName}
               </span>

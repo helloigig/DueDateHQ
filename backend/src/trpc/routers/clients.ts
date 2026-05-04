@@ -5,6 +5,7 @@ import { firmProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
 import {
   checklistItems,
+  clientNotes,
   clients,
   clientServicePackages,
   deadlines,
@@ -489,5 +490,87 @@ export const clientsRouter = router({
     )
     .mutation(async () => {
       return { ok: true as const, removed: 0 };
+    }),
+
+  /**
+   * Append a note to a client's note feed (Client Detail, PRD §4.6).
+   * Distinct from `clients.notes` (legacy single text field on the
+   * client row) — feed entries are append-only, pinnable, and may
+   * link to a specific deadline.
+   */
+  addNote: firmProcedure
+    .input(
+      z.object({
+        clientId: z.string().uuid(),
+        body: z.string().min(1).max(4000),
+        relatedDeadlineId: z.string().uuid().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify the client belongs to this firm — never let a stray
+      // clientId from a stale tab insert a note into a different firm.
+      const [owned] = await db
+        .select({ id: clients.id })
+        .from(clients)
+        .where(
+          and(eq(clients.id, input.clientId), eq(clients.firmId, ctx.firmId)),
+        );
+      if (!owned) throw new TRPCError({ code: "NOT_FOUND" });
+      const [row] = await db
+        .insert(clientNotes)
+        .values({
+          firmId: ctx.firmId,
+          clientId: input.clientId,
+          authorUserId: ctx.dbUser.id,
+          body: input.body,
+          relatedDeadlineId: input.relatedDeadlineId ?? null,
+        })
+        .returning();
+      if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return { id: row.id };
+    }),
+
+  toggleNotePin: firmProcedure
+    .input(
+      z.object({
+        clientId: z.string().uuid(),
+        noteId: z.string().uuid(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const note = await db.query.clientNotes.findFirst({
+        where: and(
+          eq(clientNotes.id, input.noteId),
+          eq(clientNotes.clientId, input.clientId),
+          eq(clientNotes.firmId, ctx.firmId),
+        ),
+      });
+      if (!note) throw new TRPCError({ code: "NOT_FOUND" });
+      await db
+        .update(clientNotes)
+        .set({ pinned: !note.pinned })
+        .where(eq(clientNotes.id, note.id));
+      return { ok: true as const };
+    }),
+
+  deleteNote: firmProcedure
+    .input(
+      z.object({
+        clientId: z.string().uuid(),
+        noteId: z.string().uuid(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const result = await db
+        .delete(clientNotes)
+        .where(
+          and(
+            eq(clientNotes.id, input.noteId),
+            eq(clientNotes.clientId, input.clientId),
+            eq(clientNotes.firmId, ctx.firmId),
+          ),
+        );
+      if (result.count === 0) throw new TRPCError({ code: "NOT_FOUND" });
+      return { ok: true as const };
     }),
 });

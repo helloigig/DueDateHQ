@@ -56,7 +56,7 @@ const CHANGE_KIND_LABEL: Record<string, string> = {
 
 const CONFIDENCE_TONE: Record<string, string> = {
   high: "bg-ok-bg text-ok-ink border-ok-border",
-  medium: "bg-slate-100 text-ink-700 border-slate-200",
+  medium: "bg-sunken text-ink-700 border-line",
   low: "bg-warn-bg text-warn-ink border-warn-border",
 };
 
@@ -156,7 +156,7 @@ export function SettingsFederalFormsPanel() {
                   <span className="text-sm text-ink-700 truncate">
                     {event.form.formName}
                   </span>
-                  <span className="ml-auto text-2xs px-1.5 py-0.5 rounded bg-slate-100 text-ink-700 border border-slate-200">
+                  <span className="ml-auto text-2xs px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line">
                     {CHANGE_KIND_LABEL[event.changeKind] ?? event.changeKind}
                   </span>
                   <span

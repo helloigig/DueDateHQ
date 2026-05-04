@@ -1,6 +1,6 @@
 # DueDateHQ — Design-Ready Pack
 
-> Single-entry index. Start with **[DESIGN-HANDOFF.md](./DESIGN-HANDOFF.md)** — that's the document to hand to Claude Code to execute the design pass.
+> Single-entry index. **Design styles + interaction patterns** live in [`DESIGN.md`](../DESIGN.md) at the repo root — that is the canonical source. Everything below is product / engineering / research context.
 
 ---
 
@@ -8,8 +8,9 @@
 
 | File | What it is | Use when |
 |------|------------|----------|
-| **[DESIGN-HANDOFF.md](./DESIGN-HANDOFF.md)** | Base handoff: tokens, audit, prioritized tasks, verification, reference component, pattern sheet | Handing off to Claude Code / designer |
-| **[DESIGN-HANDOFF-ADDENDUM.md](./DESIGN-HANDOFF-ADDENDUM.md)** | v1.1 behavioral overrides + new patterns from a parallel CC session (alert escalation ladder, confirm taxonomy, heatmap popover, "Alerts" rename, etc.) | Always read after the base handoff |
+| **[`../DESIGN.md`](../DESIGN.md)** | Canonical design system: tokens, primitives, taste principles (T1–T8), do/don'ts, alert surfaces, modal taxonomy, export pattern, voice, motion, a11y. Single source for visual + interaction design. | Anything design-related |
+| ~~DESIGN-HANDOFF.md~~ | **Superseded 2026-05-03 → see [`DESIGN.md`](../DESIGN.md).** Tombstone preserves a "where each section went" map. | Historical reference only |
+| ~~DESIGN-HANDOFF-ADDENDUM.md~~ | **Superseded 2026-05-03 → see [`DESIGN.md`](../DESIGN.md).** Tombstone maps every A* / B* item to its new home. | Historical reference only |
 | **[USER-INTERVIEW-GUIDE.md](./USER-INTERVIEW-GUIDE.md)** | Runbook for CPA discovery calls: outreach, 20-min script, question bank, synthesis template, decision gates | Conducting user interviews |
 | **[STATE-NOTIFICATION-IMPLEMENTATION.md](./STATE-NOTIFICATION-IMPLEMENTATION.md)** | Engineering plan for Story 3 spine: scraper → LLM parser → matcher → notifier → escalation. Data model, prompts, phased rollout, tech stack | Building the state announcement pipeline |
 | **[BACKEND-IMPLEMENTATION.md](./BACKEND-IMPLEMENTATION.md)** | Full backend: stack, architecture diagram, complete Postgres schema, tRPC + REST API, RLS multi-tenancy, background jobs, auth/security, deployment, 5-phase implementation plan | Building the server side |
@@ -51,4 +52,4 @@ Restore any file by moving it out of `_archive/`.
 
 ---
 
-*Ready to execute. Open [DESIGN-HANDOFF.md](./DESIGN-HANDOFF.md) and go.*
+*For design work, open [`DESIGN.md`](../DESIGN.md). For product / engineering / research work, use the table above.*

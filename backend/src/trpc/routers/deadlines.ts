@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { firmProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
@@ -139,5 +139,149 @@ export const deadlinesRouter = router({
         );
       if (result.count === 0) throw new TRPCError({ code: "NOT_FOUND" });
       return { ok: true as const };
+    }),
+
+  /**
+   * Defer a deadline to a new date. Sets status=`deferred` and shifts
+   * `adjustedDueDate` (the date the dashboard times off — PRD §8.5).
+   * `officialDueDate` stays put: the jurisdiction's hard date is
+   * immutable; only the firm's working date moves.
+   */
+  defer: firmProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        newDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const result = await db
+        .update(deadlines)
+        .set({
+          status: "deferred",
+          adjustedDueDate: input.newDate,
+          updatedAt: sql`now()`,
+        })
+        .where(
+          and(eq(deadlines.id, input.id), eq(deadlines.firmId, ctx.firmId)),
+        );
+      if (result.count === 0) throw new TRPCError({ code: "NOT_FOUND" });
+      return { ok: true as const };
+    }),
+
+  /**
+   * Mark a deadline as having had an extension filed. Returns `{ id }` —
+   * the FE caller treats this as the same row, but the contract leaves
+   * room to mint a follow-up extension deadline in Phase 1.
+   */
+  fileExtension: firmProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const result = await db
+        .update(deadlines)
+        .set({ status: "filed_extension", updatedAt: sql`now()` })
+        .where(
+          and(eq(deadlines.id, input.id), eq(deadlines.firmId, ctx.firmId)),
+        );
+      if (result.count === 0) throw new TRPCError({ code: "NOT_FOUND" });
+      return { id: input.id };
+    }),
+
+  /**
+   * Confirm the jurisdiction has accepted the extension request. No-op
+   * status change in Phase 0 (the row is already `filed_extension`); a
+   * dedicated `extension_approved_at` column will land in Phase 1 when
+   * the IRS/state acknowledgment ingestion is wired.
+   */
+  markExtensionApproved: firmProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const result = await db
+        .update(deadlines)
+        .set({ updatedAt: sql`now()` })
+        .where(
+          and(eq(deadlines.id, input.id), eq(deadlines.firmId, ctx.firmId)),
+        );
+      if (result.count === 0) throw new TRPCError({ code: "NOT_FOUND" });
+      return { ok: true as const };
+    }),
+
+  /**
+   * Mass deadline shift driven by a state announcement (e.g. "OR
+   * postpones Q3 estimates from 9/15 to 10/15 for hurricane relief").
+   * For each client in `clientIds`, finds any deadline whose
+   * `adjustedDueDate` matches `oldDate` and bumps it to `newDate`.
+   *
+   * Distinct from `announcements.batchAdjustDeadlines`, which is
+   * announcement-id-driven and updates by jurisdiction. This variant
+   * gives the FE a direct "I picked these clients, shift these dates"
+   * affordance for the alert-detail panel and cross-state cleanup.
+   */
+  batchAdjust: firmProcedure
+    .input(
+      z.object({
+        clientIds: z.array(z.string().uuid()).min(1).max(500),
+        oldDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        newDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        announcementTitle: z.string().max(200).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const result = await db
+        .update(deadlines)
+        .set({
+          adjustedDueDate: input.newDate,
+          updatedAt: sql`now()`,
+        })
+        .where(
+          and(
+            eq(deadlines.firmId, ctx.firmId),
+            inArray(deadlines.clientId, input.clientIds),
+            eq(deadlines.adjustedDueDate, input.oldDate),
+          ),
+        );
+      return { ok: true as const, deadlinesUpdated: result.count };
+    }),
+
+  /**
+   * Manually add an ad-hoc deadline (catalog gap, one-off filing).
+   * `period` is derived from the year of `officialDueDate` so the row
+   * satisfies the NOT NULL constraint without the FE having to know
+   * about service templates. `adjustedDueDate` defaults to the
+   * official date — weekend/holiday shifting is Phase 1.
+   */
+  quickAdd: firmProcedure
+    .input(
+      z.object({
+        clientId: z.string().uuid(),
+        form: z.string().min(1).max(80),
+        jurisdiction: z.string().min(2).max(20),
+        officialDueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify the client belongs to this firm.
+      const [owned] = await db
+        .select({ id: clients.id })
+        .from(clients)
+        .where(
+          and(eq(clients.id, input.clientId), eq(clients.firmId, ctx.firmId)),
+        );
+      if (!owned) throw new TRPCError({ code: "NOT_FOUND" });
+      const year = input.officialDueDate.slice(0, 4);
+      const [row] = await db
+        .insert(deadlines)
+        .values({
+          firmId: ctx.firmId,
+          clientId: input.clientId,
+          period: year,
+          formType: input.form,
+          jurisdiction: input.jurisdiction,
+          officialDueDate: input.officialDueDate,
+          adjustedDueDate: input.officialDueDate,
+        })
+        .returning();
+      if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return { id: row.id };
     }),
 });

@@ -1,6 +1,7 @@
 import { router } from "./init.js";
 import { aiRouter } from "./routers/ai.js";
 import { aiInferencesRouter } from "./routers/aiInferences.js";
+import { aiInsightsRouter } from "./routers/aiInsights.js";
 import { filesFromClientsRouter } from "./routers/digest-sms.js";
 import {
   announcementsRouter,
@@ -49,6 +50,7 @@ export const appRouter = router({
   uploads: uploadsRouter,
   ai: aiRouter,
   aiInferences: aiInferencesRouter,
+  aiInsights: aiInsightsRouter,
   filesFromClients: filesFromClientsRouter,
   multistate: multistateRouter,
   // v0.7 amendment surfaces (Phase 1 backend connection):

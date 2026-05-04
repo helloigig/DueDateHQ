@@ -88,7 +88,7 @@ type Tone = "success" | "warn" | "info";
 
 const TONE_CLASSES: Record<Tone, string> = {
   success:
-    "bg-success-bg/40 border-success-border text-success-ink hover:bg-success-bg/60",
+    "bg-ok-bg/40 border-ok-border text-ok-ink hover:bg-ok-bg/60",
   warn: "bg-warn-bg/40 border-warn-border text-warn-ink hover:bg-warn-bg/60",
   info: "bg-info-bg/40 border-info-border text-info-ink hover:bg-info-bg/60",
 };

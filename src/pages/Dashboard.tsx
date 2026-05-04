@@ -18,22 +18,27 @@ import {
   escalationTier,
 } from "../data/dateHelpers";
 import { useDashboardPreferences } from "../data/preferences";
-import { AnnouncementBanner } from "../components/AnnouncementBanner";
 import { ChaseBanner } from "../components/ChaseBanner";
 import { BlockingAlertsDialog } from "../components/BlockingAlertsDialog";
 import { OnboardingLayer2Widget } from "../components/OnboardingLayer2Widget";
-import { WelcomeTour } from "../components/WelcomeTour";
+// import { WelcomeTour } from "../components/WelcomeTour"; // hidden per user direction
 import { CapacityStrip } from "../components/CapacityStrip";
-import { ModeFHealth } from "../components/ModeFHealth";
+// ModeFHealth removed — the same monitoring signal ("50/50 states ·
+// last scrape 14m ago") is already on /alerts as the ambient line.
+// Two surfaces showing the same health was redundant.
+// import { ModeFHealth } from "../components/ModeFHealth";
 import { ActionQueue } from "../components/ActionQueue";
 import { JustHappenedStrip } from "../components/JustHappenedStrip";
 import { AiUsageInfo } from "../components/AiUsageInfo";
 import { PageHeader } from "../components/ui/PageHeader";
 import { DateLabel } from "../components/ui/DateLabel";
 import { MetricTile } from "../components/ui/MetricTile";
-import { Mail, CheckCircle2, Plus, Megaphone, type LucideIcon } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { SectionHeader } from "../components/ui/SectionHeader";
+import { StateAlertCard } from "../components/StateAlertCard";
+import { Megaphone, Mail, CheckCircle2, Plus, ChevronRight, type LucideIcon } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { Announcement } from "../types";
+import { escalationTier as escTier } from "../data/dateHelpers";
 
 const DONE_STATUSES = new Set(["completed", "filed_extension"]);
 
@@ -230,7 +235,7 @@ export function Dashboard() {
           now" affordances (Mercury Home: Send / Transfer / Deposit / Request).
           Per T2 — only the first action ("Send chase") wears the indigo
           accent; the rest are ghost pills. */}
-      <div className="mb-card flex items-end justify-between gap-card flex-wrap">
+      <div className="mb-region flex items-end justify-between gap-region flex-wrap">
         <PageHeader
           className="mb-0"
           title={
@@ -245,13 +250,14 @@ export function Dashboard() {
         <DashboardActionRow />
       </div>
 
-      {/* KPI STRIP — 4-up MetricTile grid (Mercury-style). Each tile is a
-          card with eyebrow label + display-numeric tabular value. The right
-          two tiles fold to warn/danger tone when nonzero so today's pulse
-          reads at a glance. Grid: 4-up at md+, 2-up at sm. */}
-      <div className="mb-card grid grid-cols-2 md:grid-cols-4 gap-region">
-        <MetricTile label="Active clients" value={summary.activeClients} />
-        <MetricTile label="Due this week" value={summary.dueThisWeek} />
+      {/* KPI STRIP — 2 tiles (was 4). Cut: "Active clients" (slow-moving
+          stat that doesn't change a CPA's day) + "Due this week"
+          (overlaps "Filing today" since today is in this week). Kept
+          the two that DRIVE the day: "Filing today" (warn when
+          nonzero) + "Past official" / "Past target" (danger / warn).
+          The roster count + week-window are visible on Clients +
+          Timeline respectively — no need to repeat here. */}
+      <div className="mb-card grid grid-cols-1 md:grid-cols-2 gap-region max-w-md">
         <MetricTile
           label="Filing today"
           value={summary.dueToday}
@@ -270,8 +276,10 @@ export function Dashboard() {
         />
       </div>
 
-      {/* First-run welcome — inline banner, click to expand. */}
-      <WelcomeTour />
+      {/* WelcomeTour hidden per user direction — adds noise on the daily
+          surface; reintroduce as an onboarding-only banner gated on
+          firstSession if we want a tour later. */}
+      {/* <WelcomeTour /> */}
 
       {/* ─────────────────────────────────────────────────────────────────
           Today narrative (5 sections, read top → bottom):
@@ -291,13 +299,12 @@ export function Dashboard() {
       {/* §1: Just happened — overnight diff strip. */}
       <JustHappenedStrip />
 
-      {/* State alerts — every undismissed alert. Banner always renders so
-          a fresh firm sees the "All clear" stripe (monitoring 50 states)
-          instead of a silent gap. Actionable rows render full; news-only
-          ones fold into a "N news items" chip. The ActionQueue below
-          carries the *derived actions* for actionable alerts; the banner
-          is the alert surface itself. Both surfaces co-exist by design. */}
-      <AnnouncementBanner announcements={activeBanners} />
+      {/* State alerts — preview surface. Top 3 most-urgent rendered as
+          the canonical <StateAlertCard variant="preview"> (same shape
+          as /alerts so the user doesn't see two layouts of the same
+          data). Click navigates to /alerts/:id where the action lives.
+          Empty state shows a calm "all clear" line. */}
+      <StateAlertsPreview announcements={activeBanners} />
 
       {/* §2: Action queue — AI-curated TodoItem feed (PRD §4.8 nine
           sources, urgency-sorted with waiting_multiplier). State alerts
@@ -313,10 +320,10 @@ export function Dashboard() {
           waiting). Self-vanishes when zero. */}
       <ChaseBanner />
 
-      {/* §4: Mode F Health — state-monitoring's own monitoring (per IA
-          v0.7 §3.9d). Overall status from announcement query state; per-
-          state breakdown illustrative pending Phase 3 backend. */}
-      {!isLegacy && <ModeFHealth />}
+      {/* §4: ModeFHealth removed — see import block above. The state-
+          monitoring health signal lives once, on the /alerts page
+          ambient line ("50/50 states monitored · last scrape 14m ago"),
+          which the Dashboard's StateAlertsPreview links into. */}
 
       {/* §5: Capacity — ≥3-staff firms only (gate inside the component).
           Solo Sarah never sees this; mid-firm Yan Jing always does. */}
@@ -376,6 +383,152 @@ export function Dashboard() {
   );
 }
 
+// StateAlertsPreview — Dashboard's compact alert surface.
+//
+// Hard rule: Dashboard shows ONLY escalated alerts (>72h unactioned —
+// past soft SLA, demand action TODAY). Routine alerts collapse to an
+// ambient count line — they're one sidebar click away on /alerts.
+//
+// This earns the section's real estate. Routine alerts on Today
+// duplicated the /alerts page for no UX gain; the CPA is going to
+// /alerts to act on them anyway. Reserving Today for the truly
+// urgent makes the morning glance honest.
+//
+// Three states:
+//   • 0 alerts            → calm "all clear" line
+//   • 0 escalated, N affecting → ambient line ("N affecting · all under SLA")
+//   • M escalated, N total      → M cards inline + "{N-M} more routine →" link
+function StateAlertsPreview({
+  announcements,
+}: {
+  announcements: Announcement[];
+}) {
+  const navigate = useNavigate();
+
+  // Empty: monitoring assurance, calm.
+  if (announcements.length === 0) {
+    return (
+      <section
+        className="bg-surface border border-line rounded-md px-4 py-2.5 flex items-center gap-3 mb-section"
+        aria-label="State alerts"
+      >
+        <span
+          className="w-2 h-2 rounded-full shrink-0 bg-ok-solid"
+          aria-hidden
+        />
+        <Megaphone className="w-3.5 h-3.5 shrink-0 text-ink-500" aria-hidden />
+        <span className="flex-1 text-sm text-ink-700">
+          <span className="font-medium text-ink-900">All clear.</span>{" "}
+          <span className="text-ink-500">
+            Monitoring 50 state authorities — nothing affecting your clients
+            right now.
+          </span>
+        </span>
+        <Link
+          to="/alerts"
+          className="text-2xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-0.5 shrink-0"
+        >
+          History <ChevronRight className="w-3 h-3" aria-hidden />
+        </Link>
+      </section>
+    );
+  }
+
+  // Affecting-firm subset.
+  const affecting = announcements.filter(
+    (a) => !a.dismissed && a.affectedClientIds.length > 0,
+  );
+
+  // Escalated subset — the only thing that earns Today's real estate.
+  const escalated = affecting.filter(
+    (a) => escTier(hoursSince(a.detectedAt)) === "escalated",
+  );
+  const routineCount = affecting.length - escalated.length;
+
+  // No escalated — single ambient line. Same shape as the empty state
+  // (calm), different copy (you have stuff, but not on fire).
+  if (escalated.length === 0) {
+    return (
+      <Link
+        to="/alerts"
+        className="block bg-surface border border-line rounded-md px-4 py-2.5 flex items-center gap-3 mb-section hover:border-line-strong transition-colors"
+        aria-label="State alerts"
+      >
+        <span
+          className="w-2 h-2 rounded-full shrink-0 bg-info-solid"
+          aria-hidden
+        />
+        <Megaphone className="w-3.5 h-3.5 shrink-0 text-ink-500" aria-hidden />
+        <span className="flex-1 text-sm text-ink-700">
+          <span className="font-medium text-ink-900 tabular-nums">
+            {affecting.length}
+          </span>{" "}
+          {affecting.length === 1 ? "alert" : "alerts"} affecting your clients
+          <span className="text-ink-500"> · all under SLA</span>
+        </span>
+        <span className="text-2xs text-ink-500 inline-flex items-center gap-0.5 shrink-0">
+          Open <ChevronRight className="w-3 h-3" aria-hidden />
+        </span>
+      </Link>
+    );
+  }
+
+  // Escalated present — sort escalated by impact (deadline-shifting,
+  // then most clients) so the most urgent card is first.
+  const sortedEscalated = [...escalated].sort((a, b) => {
+    const aShift = a.newDeadline ? 1 : 0;
+    const bShift = b.newDeadline ? 1 : 0;
+    if (aShift !== bShift) return bShift - aShift;
+    if (a.affectedClientIds.length !== b.affectedClientIds.length) {
+      return b.affectedClientIds.length - a.affectedClientIds.length;
+    }
+    return b.detectedAt.localeCompare(a.detectedAt);
+  });
+
+  return (
+    <section className="mb-section">
+      <SectionHeader
+        title="Escalated alerts"
+        meta={
+          escalated.length === 1
+            ? "1 past 72h SLA — act today"
+            : `${escalated.length} past 72h SLA — act today`
+        }
+        action={
+          <Link
+            to="/alerts"
+            className="text-xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-1"
+          >
+            All alerts <ChevronRight className="w-3 h-3" aria-hidden />
+          </Link>
+        }
+      />
+      <div className="flex flex-col gap-card">
+        {sortedEscalated.map((a) => (
+          <StateAlertCard
+            key={a.id}
+            a={a}
+            variant="preview"
+            onSelect={() => navigate(`/alerts/${a.id}`)}
+          />
+        ))}
+      </div>
+      {routineCount > 0 && (
+        <div className="mt-3 flex justify-center">
+          <Link
+            to="/alerts"
+            className="inline-flex items-center gap-1 text-xs text-ink-500 hover:text-ink-900 hover:underline underline-offset-[3px] decoration-[1.5px]"
+          >
+            {routineCount} more routine{" "}
+            {routineCount === 1 ? "alert" : "alerts"} on /alerts
+            <ChevronRight className="w-3.5 h-3.5" aria-hidden />
+          </Link>
+        </div>
+      )}
+    </section>
+  );
+}
+
 // DashboardActionRow — top-right pill button cluster on the Dashboard page
 // header. Mercury Home anatomy: the page's primary actions sit beside the
 // title, not buried inside sections. Per T2 — only the first action wears
@@ -395,11 +548,9 @@ function DashboardActionRow() {
         label="Mark received"
         onClick={() => navigate("/mail")}
       />
-      <ActionPill
-        icon={Megaphone}
-        label="View alerts"
-        onClick={() => navigate("/alerts")}
-      />
+      {/* "View alerts" cut — sidebar Alerts nav + the inline "View all
+          alerts →" link inside the State alerts section already cover
+          this. Three paths to the same destination was redundant. */}
       <ActionPill
         icon={Plus}
         label="New client"

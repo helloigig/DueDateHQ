@@ -6,7 +6,19 @@ export type EntityType =
   | "Partnership"
   | "Trust";
 
-export type StateCode = "CA" | "NY" | "TX" | "LA" | "FL";
+export type StateCode =
+  | "CA"
+  | "NY"
+  | "TX"
+  | "LA"
+  | "FL"
+  // Added 2026-05-04 for non-affecting mock announcements (OR PTE,
+  // MI corporate rate, WA B&O, IL-1040). Keeping the type narrow but
+  // honest about the states the demo references.
+  | "OR"
+  | "MI"
+  | "WA"
+  | "IL";
 
 export const STATE_NAMES: Record<StateCode, string> = {
   CA: "California",
@@ -14,6 +26,10 @@ export const STATE_NAMES: Record<StateCode, string> = {
   TX: "Texas",
   LA: "Louisiana",
   FL: "Florida",
+  OR: "Oregon",
+  MI: "Michigan",
+  WA: "Washington",
+  IL: "Illinois",
 };
 
 export type ClientStatus = "active" | "inactive" | "prospect" | "archived";
@@ -88,7 +104,13 @@ export interface Deadline {
   clientId: string;
   form: string;
   jurisdiction: "federal" | StateCode;
+  /** Hard deadline from the jurisdiction's calendar — immutable. */
   officialDueDate: string;
+  /** Firm-set internal target (typically `officialDueDate - {buffer}`).
+      Optional in the type for legacy / mock rows; UI derives a default
+      buffer from the form class when absent. See DESIGN.md
+      §Internal vs official due. ISO YYYY-MM-DD, no time component. */
+  internalDueDate?: string;
   status: DeadlineStatus;
   assignedUser?: string;
   completedAt?: string;

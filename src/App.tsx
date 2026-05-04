@@ -40,15 +40,11 @@ const Mail = lazy(() =>
 const Timeline = lazy(() =>
   import("./pages/Timeline").then((m) => ({ default: m.Timeline })),
 );
-const AnnouncementList = lazy(() =>
-  import("./pages/AnnouncementList").then((m) => ({
-    default: m.AnnouncementList,
-  })),
-);
-const AnnouncementDetail = lazy(() =>
-  import("./pages/AnnouncementDetail").then((m) => ({
-    default: m.AnnouncementDetail,
-  })),
+// /alerts is the v0u 3-column workshop surface (rail | feed | pane).
+// Mounted OUTSIDE AppShell so the v0u layout owns the viewport — the rail
+// inside Alerts.tsx carries primary nav for this surface.
+const Alerts = lazy(() =>
+  import("./pages/Alerts").then((m) => ({ default: m.Alerts })),
 );
 const Import = lazy(() =>
   import("./pages/Import").then((m) => ({ default: m.Import })),
@@ -64,6 +60,9 @@ const Calendar = lazy(() =>
 );
 const TodayDesign = lazy(() =>
   import("./pages/Today").then((m) => ({ default: m.Today })),
+);
+const TodayTriage = lazy(() =>
+  import("./pages/TodayTriage").then((m) => ({ default: m.TodayTriage })),
 );
 const OnboardingFirm = lazy(() =>
   import("./pages/onboarding/OnboardingFirm").then((m) => ({
@@ -213,14 +212,23 @@ export default function App() {
               Non-destructive — old Dashboard still serves "/" until this is
               approved as the Today replacement. */}
           <Route path="design/today" element={<TodayDesign />} />
+          {/* v0m focused triage mode — single-card, keyboard-driven.
+              Inherits the Action Queue from Today; mounted inside AppShell
+              so the floating sidebar + topbar stay consistent. Reach via
+              the "Triage mode →" link on Today, or directly /today/triage. */}
+          <Route path="today/triage" element={<TodayTriage />} />
           <Route path="opportunities" element={<Insights />} />
           {/* Legacy /insights route — redirect to canonical /opportunities */}
           <Route path="insights" element={<Navigate to="/opportunities" replace />} />
           <Route path="clients" element={<Clients />} />
           <Route path="clients/:id" element={<ClientDetail />} />
           <Route path="clients/:id/tasks/:taskId" element={<TaskDetail />} />
-          <Route path="alerts" element={<AnnouncementList />} />
-          <Route path="alerts/:id" element={<AnnouncementDetail />} />
+          {/* /alerts is the v0u feed + co-pilot pane workshop. Mounted
+              INSIDE AppShell so it shares the same sidebar/topbar/banner
+              chrome as Today/Timeline/Clients (consistency). The page
+              itself splits its main area into feed (flex-1) + 440px pane. */}
+          <Route path="alerts" element={<Alerts />} />
+          <Route path="alerts/:id" element={<Alerts />} />
           <Route path="import" element={<Import />} />
           <Route path="settings/*" element={<Settings />} />
           <Route path="*" element={<Placeholder name="Not found" />} />
