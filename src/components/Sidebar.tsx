@@ -12,6 +12,7 @@ import {
   GanttChartSquare,
   UserPlus,
   LogOut,
+  History,
 } from "lucide-react";
 import { useAnnouncements } from "../hooks/useAnnouncements";
 import { useSession, signOut } from "../data/session";
@@ -40,6 +41,7 @@ const primary = [
   { to: "/clients", label: "Clients", Icon: Users, end: false },
   { to: "/mail", label: "Mail", Icon: Mail, end: false },
   { to: "/opportunities", label: "Opportunities", Icon: Lightbulb, end: false },
+  { to: "/activity", label: "Activity", Icon: History, end: false },
 ];
 
 const COLLAPSED_KEY = "duedatehq.sidebar_collapsed.v1";

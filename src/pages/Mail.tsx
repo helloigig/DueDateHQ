@@ -1,6 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Inbox as InboxIcon, Send, FileEdit, AlertTriangle, Mail as MailIcon } from "lucide-react";
+import {
+  Inbox as InboxIcon,
+  Send,
+  FileEdit,
+  AlertTriangle,
+  Mail as MailIcon,
+  Check,
+  Link2,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
 import { trpc } from "../lib/api/client";
 import { env } from "../config";
 import { PageHeader } from "../components/ui/PageHeader";
@@ -64,6 +74,9 @@ const INBOX_MOCK: InboxRow[] = [
 ];
 
 type InboxRow = {
+  /** inbound_replies row id — present for live BE rows; undefined for the
+   *  static demo mock fallback (then per-row actions stay disabled). */
+  id?: string;
   intent: string;
   client: string;
   task: string;
@@ -83,6 +96,19 @@ export function Mail() {
   const [tab, setTab] = useState<Tab>("inbox");
   const inboxQuery = trpc.inboundReplies.list.useQuery({ limit: 50 });
   const issuesQuery = trpc.deliveryEvents.issues.useQuery({ limit: 50 });
+  const utils = trpc.useUtils();
+  const markActionedMutation = trpc.inboundReplies.markActioned.useMutation({
+    onSuccess: () => {
+      void utils.inboundReplies.list.invalidate();
+    },
+  });
+  const linkToTaskMutation = trpc.inboundReplies.linkToTask.useMutation({
+    onSuccess: () => {
+      void utils.inboundReplies.list.invalidate();
+    },
+  });
+  // Reply currently selected for "Link to task" picker (null = closed).
+  const [linking, setLinking] = useState<InboxRow | null>(null);
 
   // Map raw inbound_replies rows to the display shape. Without a join to
   // tasks/clients (held off to keep the router stateless), best-effort
@@ -95,6 +121,7 @@ export function Mail() {
     // sync.
     const rWithClient = r as typeof r & { clientId?: string | null };
     return {
+      id: r.id,
       intent: r.replyIntent ?? r.topLevelClass ?? "unknown",
       client: r.fromAddress.split("@")[0] ?? r.fromAddress,
       task:
@@ -300,6 +327,7 @@ export function Mail() {
           </p>
           {inbox.map((m, i) => {
             const canOpenTask = Boolean(m.taskId);
+            const hasActions = Boolean(m.id);
             const onClick = () => {
               if (m.taskId && m.clientId) {
                 navigate(`/clients/${m.clientId}/tasks/${m.taskId}`);
@@ -311,9 +339,28 @@ export function Mail() {
                 // mailbox-wide context.
               }
             };
+            const onMarkActioned = (e: React.MouseEvent) => {
+              e.stopPropagation();
+              if (!m.id) return;
+              markActionedMutation.mutate(
+                { id: m.id },
+                {
+                  onSuccess: () => {
+                    toast.success("Marked actioned");
+                  },
+                  onError: (err) => {
+                    toast.error(`Couldn't mark — ${err.message.slice(0, 80)}`);
+                  },
+                },
+              );
+            };
+            const onOpenLinkPicker = (e: React.MouseEvent) => {
+              e.stopPropagation();
+              setLinking(m);
+            };
             return (
               <article
-                key={i}
+                key={m.id ?? i}
                 role="button"
                 tabIndex={canOpenTask || m.clientId ? 0 : -1}
                 onClick={onClick}
@@ -344,6 +391,29 @@ export function Mail() {
                   </span>
                 </header>
                 <p className="text-sm text-ink-700 line-clamp-1">{m.preview}</p>
+                {hasActions && (
+                  <footer className="mt-2 flex items-center gap-2 pt-2 border-t border-line/60">
+                    <button
+                      type="button"
+                      onClick={onOpenLinkPicker}
+                      className="inline-flex items-center gap-1 text-2xs px-2 py-0.5 rounded border border-line text-ink-700 hover:bg-sunken"
+                      aria-label="Link this reply to a task"
+                    >
+                      <Link2 className="w-3 h-3" aria-hidden />
+                      {m.taskId ? "Re-link" : "Link to task"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onMarkActioned}
+                      disabled={markActionedMutation.isPending}
+                      className="inline-flex items-center gap-1 text-2xs px-2 py-0.5 rounded border border-line text-ink-700 hover:bg-sunken disabled:opacity-50"
+                      aria-label="Mark this reply as actioned"
+                    >
+                      <Check className="w-3 h-3" aria-hidden />
+                      Mark actioned
+                    </button>
+                  </footer>
+                )}
               </article>
             );
           })}
@@ -402,6 +472,165 @@ export function Mail() {
         client × task. Bytes stay in your email — we hold extracted text + facts +
         thumbnails. Full mail integration ships in Phase 3.
       </p>
+
+      {linking && (
+        <TaskPicker
+          row={linking}
+          isLinking={linkToTaskMutation.isPending}
+          onClose={() => setLinking(null)}
+          onPick={(taskId) => {
+            if (!linking.id) return;
+            linkToTaskMutation.mutate(
+              { id: linking.id, taskId },
+              {
+                onSuccess: () => {
+                  toast.success("Linked to task");
+                  setLinking(null);
+                },
+                onError: (err) => {
+                  toast.error(`Couldn't link — ${err.message.slice(0, 80)}`);
+                },
+              },
+            );
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Task picker modal — searchable list of (client, task) pairs the CPA
+ * can link an inbound reply to. Used when Method A's classifier didn't
+ * route an inbound, or when the reply belongs on a different task than
+ * the one auto-linked.
+ *
+ * Wired to live BE: pulls clients via clients.list and tasks via
+ * tasks.list. Filters by free-text against client name + form type.
+ */
+function TaskPicker({
+  row,
+  isLinking,
+  onClose,
+  onPick,
+}: {
+  row: InboxRow;
+  isLinking: boolean;
+  onClose: () => void;
+  onPick: (taskId: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const clientsQuery = trpc.clients.list.useQuery({});
+  const tasksQuery = trpc.tasks.list.useQuery();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  type ClientLite = { id: string; name: string };
+  type TaskLite = { id: string; clientId: string; formType: string; jurisdiction: string };
+
+  const clients = useMemo<ClientLite[]>(() => {
+    const data = clientsQuery.data;
+    if (!data) return [];
+    if (Array.isArray(data)) return data as ClientLite[];
+    if (typeof data === "object" && "items" in data)
+      return (data as { items: ClientLite[] }).items;
+    return [];
+  }, [clientsQuery.data]);
+  const tasks = useMemo<TaskLite[]>(
+    () => (tasksQuery.data ?? []) as TaskLite[],
+    [tasksQuery.data],
+  );
+
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const clientById = new Map(clients.map((c) => [c.id, c]));
+    return tasks
+      .map((t) => {
+        const client = clientById.get(t.clientId);
+        if (!client) return null;
+        return {
+          taskId: t.id,
+          clientName: client.name,
+          formType: t.formType,
+          jurisdiction: t.jurisdiction,
+          combined: `${client.name} ${t.formType} ${t.jurisdiction}`.toLowerCase(),
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+      .filter((x) => (q ? x.combined.includes(q) : true))
+      .slice(0, 50);
+  }, [clients, tasks, query]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Pick a task to link this reply to"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-ink-900/30 p-4 pt-[10vh]"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="bg-surface border border-line rounded-lg shadow-overlay w-full max-w-lg max-h-[70vh] overflow-hidden flex flex-col">
+        <header className="flex items-center px-4 py-3 border-b border-line gap-2">
+          <Link2 className="w-3.5 h-3.5 text-ink-500" aria-hidden />
+          <h2 className="text-sm font-semibold text-ink-900">
+            Link reply to a task
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="ml-auto text-ink-500 hover:text-ink-900"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" aria-hidden />
+          </button>
+        </header>
+        <div className="px-4 py-2 border-b border-line text-2xs text-ink-500">
+          Reply: <span className="text-ink-700">{row.client}</span> · {row.preview.slice(0, 60)}
+        </div>
+        <input
+          type="search"
+          autoFocus
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by client or form…"
+          className="m-3 px-3 py-2 border border-line rounded text-sm bg-surface focus:outline-none focus:ring-1 focus:ring-accent"
+        />
+        <ul className="flex-1 overflow-y-auto divide-y divide-line">
+          {clientsQuery.isLoading || tasksQuery.isLoading ? (
+            <li className="px-4 py-6 text-sm text-ink-500">Loading…</li>
+          ) : matches.length === 0 ? (
+            <li className="px-4 py-6 text-sm text-ink-500">
+              {query ? "No matches" : "No tasks yet"}
+            </li>
+          ) : (
+            matches.map((m) => (
+              <li key={m.taskId}>
+                <button
+                  type="button"
+                  onClick={() => onPick(m.taskId)}
+                  disabled={isLinking}
+                  className="w-full text-left px-4 py-2 hover:bg-sunken/40 disabled:opacity-50 flex items-baseline gap-2"
+                >
+                  <span className="text-sm font-medium text-ink-900 truncate">
+                    {m.clientName}
+                  </span>
+                  <span className="text-2xs text-ink-500 tabular-nums">
+                    {m.formType.toUpperCase()} · {m.jurisdiction.toUpperCase()}
+                  </span>
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+      </div>
     </div>
   );
 }

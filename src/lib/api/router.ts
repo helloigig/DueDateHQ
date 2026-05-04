@@ -679,6 +679,20 @@ export const appRouter = t.router({
           url?: string;
         }> => NOT_IMPL()
       ),
+    list: t.procedure.query(
+      async (): Promise<
+        Array<{
+          id: string;
+          kind: string;
+          status: "queued" | "ready" | "failed";
+          downloadUrl: string | null;
+          errorMessage: string | null;
+          requestedAt: string | Date;
+          completedAt: string | Date | null;
+          createdAt: string | Date;
+        }>
+      > => NOT_IMPL()
+    ),
   }),
 
   uploads: t.router({
@@ -765,6 +779,39 @@ export const appRouter = t.router({
     listForTask: t.procedure
       .input(z.object({ taskId: z.string(), limit: z.number().optional() }))
       .query(async (): Promise<ActivityEntry[]> => NOT_IMPL()),
+    list: t.procedure
+      .input(
+        z
+          .object({
+            limit: z.number().int().min(1).max(200).optional(),
+            beforeCreatedAt: z.string().optional(),
+            eventType: z.string().optional(),
+            clientId: z.string().optional(),
+          })
+          .optional(),
+      )
+      .query(
+        async (): Promise<{
+          items: Array<{
+            id: number | string;
+            firmId: string;
+            taskId: string;
+            eventType: string;
+            actorKind: "user" | "system" | "ai" | "client";
+            actorUserId: string | null;
+            description: string;
+            payload: unknown;
+            relatedChecklistItemId: string | null;
+            relatedEmailDraftId: string | null;
+            createdAt: string | Date;
+            clientId: string;
+            clientName: string;
+            taskFormType: string;
+            taskJurisdiction: string;
+          }>;
+          nextCursor: string | null;
+        }> => NOT_IMPL(),
+      ),
   }),
 
   emails: t.router({
