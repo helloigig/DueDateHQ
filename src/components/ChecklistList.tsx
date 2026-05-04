@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus, ChevronRight, AlertTriangle } from "lucide-react";
+import { Plus, ChevronRight, AlertTriangle, Siren, Check } from "lucide-react";
 import { ChecklistRow } from "./ChecklistRow";
 import type { ChecklistItem } from "../types";
 import { useAddChecklistItem } from "../hooks/useChecklist";
@@ -91,9 +91,7 @@ export function ChecklistList({ taskId, items, onOpenEmailDraft }: Props) {
           className="bg-surface border-2 border-warn-border rounded-md overflow-hidden"
         >
           <header className="flex items-center px-4 py-2.5 bg-warn-bg/50 border-b border-warn-border gap-3">
-            <span aria-hidden className="text-base leading-none">
-              🚨
-            </span>
+            <Siren className="w-4 h-4 text-warn-solid" aria-hidden />
             <h2
               id="still-waiting-heading"
               className="text-xs font-semibold uppercase tracking-wider text-ink-900"
@@ -186,7 +184,7 @@ export function ChecklistList({ taskId, items, onOpenEmailDraft }: Props) {
               id="complete-heading"
               className="text-xs font-medium text-ink-500 tracking-wide flex items-center gap-2"
             >
-              <span className="text-ok-solid">✓</span>
+              <Check className="w-3 h-3 text-ok-solid" aria-hidden />
               <span className="tabular-nums">{groups.complete.length}</span>{" "}
               {groups.complete.length === 1 ? "item" : "items"} complete
               <span className="text-ink-400">·</span>

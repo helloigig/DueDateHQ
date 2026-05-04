@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ExternalLink, FileText, Sparkles, AlertTriangle } from "lucide-react";
+import { ExternalLink, FileText, Sparkles, AlertTriangle, Check } from "lucide-react";
 import type { Client } from "../types";
 import type { Deadline } from "../types";
 import { trpc } from "../lib/api/client";
@@ -290,7 +290,9 @@ function FormRow({
           </a>
         )}
         {covered ? (
-          <span className="text-2xs text-ok-ink font-medium">Covered ✓</span>
+          <span className="inline-flex items-center gap-0.5 text-2xs text-ok-ink font-medium">
+            Covered <Check className="w-3 h-3" aria-hidden />
+          </span>
         ) : (
           onAdd && (
             <button

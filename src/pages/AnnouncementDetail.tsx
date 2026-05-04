@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { History, Link2 } from "lucide-react";
+import { History, Link2, Check, Target, FileText, AlertTriangle } from "lucide-react";
 import { actions } from "../data/store";
 import { trpc } from "../lib/api/client";
 import { useAnnouncement, useAnnouncements } from "../hooks/useAnnouncements";
@@ -349,7 +349,10 @@ export function AnnouncementDetail() {
 
       {flash && (
         <div className="mt-4 rounded border border-emerald-200 bg-emerald-50 text-emerald-800 text-sm px-4 py-3 flex items-center gap-3">
-          <span className="flex-1">✓ {flash}</span>
+          <span className="inline-flex items-center gap-1.5 flex-1">
+            <Check className="w-3.5 h-3.5 shrink-0" aria-hidden />
+            {flash}
+          </span>
           {lastBatch && (
             <button
               onClick={undoLastBatch}
@@ -448,8 +451,9 @@ export function AnnouncementDetail() {
           (sourced from alertTypeConfig). */}
       <section className="mt-5 bg-surface border border-line rounded-lg overflow-hidden">
         <div className="flex items-center px-4 py-3 border-b border-line">
-          <h2 className="text-sm font-semibold text-ink-700">
-            🎯 {alertCfg.verdictHeadline(ann.affectedClientIds.length, clients.length)}
+          <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-700">
+            <Target className="w-4 h-4" aria-hidden />
+            {alertCfg.verdictHeadline(ann.affectedClientIds.length, clients.length)}
           </h2>
           {ann.affectedClientIds.length > 0 && !alertCfg.isAdminGated && (
             <button
@@ -466,8 +470,8 @@ export function AnnouncementDetail() {
           // Empty state — type-specific copy. Page stays reachable so CPA can
           // read evidence + dismiss with reason.
           <div className="px-4 py-10 text-center">
-            <div className="w-10 h-10 rounded-full bg-sunken mx-auto flex items-center justify-center text-lg">
-              ✓
+            <div className="w-10 h-10 rounded-full bg-sunken mx-auto flex items-center justify-center">
+              <Check className="w-5 h-5 text-ink-700" aria-hidden />
             </div>
             <p className="text-sm font-medium text-ink-900 mt-3">
               {alertCfg.emptyStateCopy(ann)}
@@ -569,7 +573,8 @@ export function AnnouncementDetail() {
       >
         <summary className="cursor-pointer list-none flex items-center gap-2 px-4 py-3 text-sm font-semibold text-ink-700 hover:bg-canvas rounded-t-lg group-open:border-b group-open:border-line">
           <span className="text-xs text-ink-400 group-open:rotate-90 transition-transform">▶</span>
-          📄 What the alert says
+          <FileText className="w-4 h-4 text-ink-500" aria-hidden />
+          What the alert says
           <span
             className={`ml-auto text-xs px-2 py-0.5 rounded ${CONFIDENCE_TONE[ann.parseConfidence]}`}
           >
@@ -604,9 +609,12 @@ export function AnnouncementDetail() {
           )}
         </dl>
         {(ann.parseConfidence === "low" || ann.matchConfidence === "low") && (
-          <div className="px-4 py-3 bg-amber-50 border-t border-amber-100 text-xs text-amber-900">
-            ⚠ Low confidence — verify against the official source before acting.{" "}
-            <button className="underline">Report parsing issue</button>
+          <div className="px-4 py-3 bg-amber-50 border-t border-amber-100 text-xs text-amber-900 flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden />
+            <span>
+              Low confidence — verify against the official source before acting.{" "}
+              <button className="underline">Report parsing issue</button>
+            </span>
           </div>
         )}
       </details>

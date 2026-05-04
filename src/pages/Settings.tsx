@@ -19,6 +19,8 @@ import {
   Brain,
   TrendingDown,
   Sparkles,
+  X as XIcon,
+  Check,
 } from "lucide-react";
 import { actions, useStore } from "../data/store";
 import { useImportHistory } from "../hooks/useImports";
@@ -1737,9 +1739,10 @@ function ReminderTemplateEditor({
           </h2>
           <button
             onClick={onClose}
-            className="ml-auto text-ink-500 hover:text-ink-900 text-sm"
+            className="ml-auto inline-flex items-center text-ink-500 hover:text-ink-900"
+            aria-label="Close"
           >
-            ✕
+            <XIcon className="w-4 h-4" aria-hidden />
           </button>
         </header>
         <div className="overflow-y-auto px-5 py-4 space-y-3">
@@ -2254,14 +2257,14 @@ function ConditionRow({
   return (
     <li className="flex items-start gap-2">
       <span
-        className={`mt-0.5 inline-flex w-3.5 h-3.5 rounded-full items-center justify-center text-2xs shrink-0 ${
+        className={`mt-0.5 inline-flex w-3.5 h-3.5 rounded-full items-center justify-center shrink-0 ${
           met
             ? "bg-ok-bg text-ok-ink border border-ok-border"
             : "bg-sunken text-ink-400 border border-line"
         }`}
         aria-hidden
       >
-        {met ? "✓" : "·"}
+        {met ? <Check className="w-2.5 h-2.5" aria-hidden /> : <span className="w-1 h-1 rounded-full bg-current" />}
       </span>
       <div className="flex-1 min-w-0">
         <span

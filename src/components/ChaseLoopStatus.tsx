@@ -226,10 +226,11 @@ export function ChaseLoopStatus() {
               >
                 <button
                   onClick={() => confirmWithUndo(c, setState)}
-                  className="text-2xs px-1.5 py-0.5 rounded bg-warn-bg text-warn-ink border border-warn-border hover:bg-warn-bg/70 shrink-0"
+                  className="inline-flex items-center text-2xs px-1.5 py-0.5 rounded bg-warn-bg text-warn-ink border border-warn-border hover:bg-warn-bg/70 shrink-0"
                   title="Confirm — only you can do this"
+                  aria-label="Confirm"
                 >
-                  ✓
+                  <Check className="w-3 h-3" aria-hidden />
                 </button>
                 <button
                   onClick={() => navigate(`/clients/${client.id}/tasks/${task.id}`)}
@@ -288,10 +289,11 @@ export function ChaseLoopStatus() {
                       checklistItem: c,
                     })
                   }
-                  className="text-2xs px-1.5 py-0.5 rounded bg-indigo text-white hover:bg-indigo-hover shrink-0"
+                  className="inline-flex items-center text-2xs px-1.5 py-0.5 rounded bg-indigo text-white hover:bg-indigo-hover shrink-0"
                   title="Send AI-drafted reminder"
+                  aria-label="Send AI-drafted reminder"
                 >
-                  ✉
+                  <Mail className="w-3 h-3" aria-hidden />
                 </button>
                 <span className="truncate flex-1">
                   <span className="font-medium text-ink-900">{client.name}</span>

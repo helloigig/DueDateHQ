@@ -77,7 +77,7 @@ function buildEntries(task: Task): AuditEntry[] {
       timestamp: e.sentAt ?? e.createdAt,
       type: "email_sent",
       actor: e.sendMethod === "phase2_auto" ? "ai (phase 2)" : "cpa",
-      summary: `📤 ${e.subject}`,
+      summary: e.subject,
       payload: {
         to: e.to,
         cc: e.cc,

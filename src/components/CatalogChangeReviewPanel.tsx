@@ -11,7 +11,7 @@
  * review work and a modal would be too transient.
  */
 import { useState } from "react";
-import { Check, X, Edit3, FileText } from "lucide-react";
+import { Check, X, Edit3, FileText, ClipboardList } from "lucide-react";
 import type { Announcement } from "../types";
 import { Button } from "./ui/button";
 import {
@@ -75,8 +75,9 @@ export function CatalogChangeReviewPanel({
         <div className="flex items-start gap-3">
           <FileText className="w-4 h-4 text-info-ink mt-0.5" aria-hidden />
           <div className="flex-1">
-            <h3 className="text-sm font-semibold text-ink-900">
-              📋 Pending admin review
+            <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-900">
+              <ClipboardList className="w-4 h-4 text-info-ink" aria-hidden />
+              Pending admin review
             </h3>
             <p className="text-sm text-ink-700 mt-1">
               Your firm's admin will review and apply the catalog update for

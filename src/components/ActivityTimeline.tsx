@@ -1,24 +1,43 @@
 import { useState } from "react";
+import {
+  Check,
+  CheckCircle2,
+  Plus,
+  Pencil,
+  Hourglass,
+  Star,
+  Archive,
+  ArrowLeftRight,
+  StickyNote,
+  Tag,
+  Send,
+  Inbox,
+  FileText,
+  AlertTriangle,
+  Bot,
+  Circle,
+  type LucideIcon,
+} from "lucide-react";
 import type { ActivityEntry, ActivityType } from "../types";
 
-const ICON: Record<ActivityType, string> = {
-  status_change: "✓",
-  deadline_added: "➕",
-  deadline_updated: "✎",
-  extension_filed: "⏳",
-  client_created: "★",
-  client_edited: "✎",
-  client_archived: "📦",
-  batch_adjust: "⇄",
-  note_added: "📝",
-  bundle_assigned: "🏷",
-  email_sent: "📤",
-  email_received: "📥",
-  document_received: "📄",
-  document_confirmed: "✔",
-  document_flagged: "⚠",
-  ai_inferred: "🤖",
-  checklist_state_change: "•",
+const ICON: Record<ActivityType, LucideIcon> = {
+  status_change: Check,
+  deadline_added: Plus,
+  deadline_updated: Pencil,
+  extension_filed: Hourglass,
+  client_created: Star,
+  client_edited: Pencil,
+  client_archived: Archive,
+  batch_adjust: ArrowLeftRight,
+  note_added: StickyNote,
+  bundle_assigned: Tag,
+  email_sent: Send,
+  email_received: Inbox,
+  document_received: FileText,
+  document_confirmed: CheckCircle2,
+  document_flagged: AlertTriangle,
+  ai_inferred: Bot,
+  checklist_state_change: Circle,
 };
 
 const FILTER_GROUPS: Array<{
@@ -105,8 +124,11 @@ export function ActivityTimeline({
               key={e.id}
               className="px-4 py-2.5 flex items-start gap-3 text-sm"
             >
-              <span aria-hidden className="text-base leading-5 select-none w-5 text-center">
-                {ICON[e.type] ?? "•"}
+              <span aria-hidden className="leading-5 select-none w-5 flex items-center justify-center text-ink-500">
+                {(() => {
+                  const Icon = ICON[e.type] ?? Circle;
+                  return <Icon className="w-3.5 h-3.5" />;
+                })()}
               </span>
               <div className="flex-1 min-w-0">
                 <p className="text-ink-900">{e.summary}</p>

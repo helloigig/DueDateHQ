@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { X as XIcon } from "lucide-react";
 import { actions } from "../data/store";
 import type { EntityType, StateCode } from "../types";
 import { STATE_NAMES } from "../types";
@@ -210,10 +211,10 @@ export function AddClientModal({
           </span>
           <button
             onClick={onClose}
-            className="ml-auto text-ink-400 hover:text-ink-700"
+            className="ml-auto inline-flex items-center text-ink-400 hover:text-ink-700"
             aria-label="Close"
           >
-            ✕
+            <XIcon className="w-4 h-4" aria-hidden />
           </button>
         </div>
 

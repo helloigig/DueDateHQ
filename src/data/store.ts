@@ -551,7 +551,7 @@ export const actions = {
         appendActivity(
           clientId,
           "ai_inferred",
-          `📖 ${currentUserName()} reviewed state alert: ${ann.stateCode}: ${ann.title}`
+          `${currentUserName()} reviewed state alert: ${ann.stateCode}: ${ann.title}`
         );
       }
     }
@@ -1034,14 +1034,14 @@ export const actions = {
       appendActivity(
         task.clientId,
         "document_received",
-        `📄 Received: ${payload.filename} — AI classified as ${payload.aiClassification} (${payload.aiConfidence})`,
+        `Received: ${payload.filename} — AI classified as ${payload.aiClassification} (${payload.aiConfidence})`,
         task.deadlineId
       );
       if (payload.flagReason) {
         appendActivity(
           task.clientId,
           "document_flagged",
-          `⚠️ Mode C flag: ${payload.flagReason}`,
+          `Mode C flag: ${payload.flagReason}`,
           task.deadlineId
         );
       }

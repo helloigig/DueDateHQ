@@ -21,6 +21,7 @@ import {
   rowsFromCsv,
   detectSource,
 } from "../data/csvParser";
+import { Check, Upload, AlertTriangle } from "lucide-react";
 
 type Step = "upload" | "map" | "preview" | "committing" | "done";
 
@@ -91,7 +92,7 @@ export function Import() {
                       : "bg-line text-ink-500"
                   }`}
                 >
-                  {done ? "✓" : i + 1}
+                  {done ? <Check className="w-3 h-3" aria-hidden /> : i + 1}
                 </span>
                 <span
                   className={
@@ -255,7 +256,13 @@ function UploadStep({
             : "border-line-strong hover:border-line-strong hover:bg-canvas"
         }`}
       >
-        <span className="text-4xl">{hasFile ? "✓" : "↑"}</span>
+        <span className="flex items-center justify-center">
+          {hasFile ? (
+            <Check className="w-8 h-8 text-emerald-600" aria-hidden />
+          ) : (
+            <Upload className="w-8 h-8 text-ink-500" aria-hidden />
+          )}
+        </span>
         <div className="text-sm font-medium text-ink-700">
           {hasFile
             ? `${status.name} · ${status.count} row${
@@ -365,11 +372,15 @@ function MapStep({
               </td>
               <td className="px-4 py-2.5">
                 {m.confidence === "high" && (
-                  <span className="text-emerald-600 text-xs">✓ Confident</span>
+                  <span className="inline-flex items-center gap-1 text-emerald-600 text-xs">
+                    <Check className="w-3 h-3" aria-hidden />
+                    Confident
+                  </span>
                 )}
                 {m.confidence === "low" && (
-                  <span className="text-amber-700 bg-amber-50 text-xs px-2 py-0.5 rounded">
-                    ⚠ Review
+                  <span className="inline-flex items-center gap-1 text-amber-700 bg-amber-50 text-xs px-2 py-0.5 rounded">
+                    <AlertTriangle className="w-3 h-3" aria-hidden />
+                    Review
                   </span>
                 )}
                 {m.confidence === "ignore" && (
@@ -459,8 +470,9 @@ function PreviewStep({
           Preview ({rows.length} rows)
         </h2>
         <div className="ml-auto flex items-center gap-2 text-xs">
-          <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
-            ✓ {readyCount} ready
+          <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+            <Check className="w-3 h-3" aria-hidden />
+            {readyCount} ready
           </span>
           {flaggedCount > 0 && (
             <span className="text-warn-ink bg-warn-bg border border-warn-border px-2 py-0.5 rounded font-medium">
@@ -504,7 +516,7 @@ function PreviewStep({
                   >
                     <td className="px-4 py-2.5 text-ink-900 truncate">
                       {issue && (
-                        <span className="text-amber-600 mr-1">⚠</span>
+                        <AlertTriangle className="w-3 h-3 inline text-amber-600 mr-1" aria-hidden />
                       )}
                       {r.name}
                     </td>
@@ -843,7 +855,7 @@ function CommittingStep({
                 }`}
                 aria-hidden
               >
-                {done ? "✓" : ""}
+                {done ? <Check className="w-2.5 h-2.5" aria-hidden /> : null}
               </span>
               <span
                 className={`text-sm ${
@@ -884,8 +896,8 @@ function DoneStep({
   const generatedDeadlines = importedCount * 12;
   return (
     <div className="bg-surface border border-line rounded-lg p-8 text-center">
-      <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto text-2xl">
-        ✓
+      <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+        <Check className="w-7 h-7" aria-hidden />
       </div>
       <h2 className="mt-4 text-lg font-semibold text-ink-900">
         Import complete
