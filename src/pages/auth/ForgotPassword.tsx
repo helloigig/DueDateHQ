@@ -2,13 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { trpc } from "../../lib/api/client";
 import { forgotPasswordSchema } from "../../types/schemas";
-import {
-  AuthShell,
-  AuthField,
-  AuthInput,
-  PrimaryButton,
-  FormError,
-} from "./AuthShell";
+import { AuthShell, AuthField, authInputClass } from "./AuthShell";
 import { env } from "../../config";
 import { supabase } from "../../lib/supabase";
 
@@ -23,6 +17,9 @@ export function ForgotPassword() {
     onError: (err) => setError(err.message),
   });
 
+  // Real mode: Supabase emails a recovery link to {origin}/reset-password.
+  // The link arrives with tokens in the URL hash; supabase-js picks them
+  // up via `detectSessionInUrl: true` and fires PASSWORD_RECOVERY.
   const realForgot = async (parsed: { email: string }) => {
     setPending(true);
     setError(null);
@@ -58,18 +55,16 @@ export function ForgotPassword() {
 
   if (success || mockForgot.isSuccess) {
     return (
-      <AuthShell
-        title="Check your email"
-        subtitle={
-          <>
-            If <span className="font-medium text-ink-900">{email}</span>{" "}
-            matches an account, we just sent a password-reset link. The link
-            expires in 30 minutes.
-          </>
-        }
-      >
-        <Link to="/login" className="text-sm text-indigo hover:underline font-medium">
-          ← Back to sign in
+      <AuthShell title="Check your email">
+        <p className="text-sm text-ink-700">
+          If <span className="font-medium">{email}</span> matches an account,
+          we just sent a password-reset link. The link expires in 30 minutes.
+        </p>
+        <Link
+          to="/login"
+          className="mt-4 inline-block text-sm text-ink-900 underline"
+        >
+          Back to sign in
         </Link>
       </AuthShell>
     );
@@ -80,36 +75,31 @@ export function ForgotPassword() {
       title="Reset your password"
       subtitle="We'll email you a link. The link works once and expires fast."
       footer={
-        <Link to="/login" className="text-indigo font-medium hover:underline">
-          ← Back to sign in
+        <Link to="/login" className="text-ink-900 underline">
+          Back to sign in
         </Link>
       }
     >
-      <form onSubmit={onSubmit} className="space-y-5">
+      <form onSubmit={onSubmit} className="space-y-3 text-sm">
         <AuthField label="Email" error={error ?? undefined}>
-          <AuthInput
+          <input
             type="email"
             value={email}
             onChange={(e) => {
               setEmail(e.target.value);
               setError(null);
             }}
-            placeholder="you@yourfirm.com"
+            className={authInputClass}
             autoFocus
           />
         </AuthField>
-
-        {error && !mockForgot.isPending && (
-          <FormError>{error}</FormError>
-        )}
-
-        <PrimaryButton
+        <button
           type="submit"
-          loading={mockForgot.isPending || pending}
-          disabled={!email}
+          disabled={mockForgot.isPending || pending}
+          className="w-full text-sm px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40"
         >
-          {mockForgot.isPending || pending ? "Sending" : "Send reset link"}
-        </PrimaryButton>
+          {mockForgot.isPending || pending ? "Sending…" : "Send reset link"}
+        </button>
       </form>
     </AuthShell>
   );

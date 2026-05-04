@@ -50,7 +50,7 @@ export function UpgradePrompt({
       </p>
       <Link
         to="/settings"
-        className="mt-4 inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover"
+        className="mt-4 inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover"
       >
         Upgrade to {label}
         <ArrowUpRight className="w-3.5 h-3.5" aria-hidden />

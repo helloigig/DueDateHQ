@@ -3,13 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { trpc } from "../../lib/api/client";
 import { acceptInviteSchema } from "../../types/schemas";
 import { signIn } from "../../data/session";
-import {
-  AuthShell,
-  AuthField,
-  AuthInput,
-  PrimaryButton,
-  FormError,
-} from "./AuthShell";
+import { AuthShell, AuthField, authInputClass } from "./AuthShell";
 
 interface InvitePreview {
   firmName: string;
@@ -23,6 +17,7 @@ export function AcceptInvite() {
   const [params] = useSearchParams();
   const token = params.get("token") ?? "";
 
+  // Mock invite preview — backend will return this from a public lookup.
   const preview: InvitePreview | null = useMemo(() => {
     if (!token) return null;
     return {
@@ -57,9 +52,9 @@ export function AcceptInvite() {
   if (!token || !preview) {
     return (
       <AuthShell title="Invite link missing or expired">
-        <p className="text-sm text-ink-700 leading-relaxed">
+        <p className="text-sm text-ink-700">
           Ask your firm owner to send a fresh invitation, or{" "}
-          <Link to="/login" className="text-indigo font-medium hover:underline">
+          <Link to="/login" className="text-ink-900 underline">
             sign in
           </Link>{" "}
           if you already have an account.
@@ -87,42 +82,46 @@ export function AcceptInvite() {
   return (
     <AuthShell
       title={`Join ${preview.firmName}`}
-      subtitle={
-        <>
-          <span className="font-medium text-ink-900">{preview.inviterName}</span>{" "}
-          invited you as <span className="font-medium text-ink-900">{preview.role}</span>.
-        </>
-      }
+      subtitle={`${preview.inviterName} invited you as ${preview.role}.`}
     >
-      <form onSubmit={onSubmit} className="space-y-5">
+      <form onSubmit={onSubmit} className="space-y-3 text-sm">
         <AuthField label="Email">
-          <AuthInput value={preview.email} disabled className="opacity-60" />
+          <input
+            value={preview.email}
+            disabled
+            className={authInputClass + " opacity-60"}
+          />
         </AuthField>
         <AuthField label="Your name" error={errors.userName}>
-          <AuthInput
+          <input
             value={userName}
             onChange={(e) => setUserName(e.target.value)}
-            placeholder="Sam Castillo"
+            className={authInputClass}
             autoFocus
           />
         </AuthField>
-        <AuthField label="Password" hint="At least 8 characters." error={errors.password}>
-          <AuthInput
+        <AuthField label="Password (min 8 chars)" error={errors.password}>
+          <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            className={authInputClass}
           />
         </AuthField>
 
-        {submitError && <FormError>{submitError}</FormError>}
+        {submitError && (
+          <div className="text-xs text-danger-ink bg-danger-bg border border-danger-border rounded px-3 py-2">
+            {submitError}
+          </div>
+        )}
 
-        <PrimaryButton
+        <button
           type="submit"
-          loading={accept.isPending}
-          disabled={!userName || !password}
+          disabled={accept.isPending}
+          className="w-full text-sm px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40"
         >
-          {accept.isPending ? "Joining" : "Accept and join"}
-        </PrimaryButton>
+          {accept.isPending ? "Joining…" : "Accept and join"}
+        </button>
       </form>
     </AuthShell>
   );

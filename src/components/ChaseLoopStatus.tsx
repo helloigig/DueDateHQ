@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useStore } from "../data/store";
 import { confirmWithUndo } from "../lib/confirmWithUndo";
+import { useSetChecklistItemState } from "../hooks/useChecklist";
 import { useAllOpenInsights } from "../hooks/useAiInsights";
 import { TODAY, toIso } from "../data/dateHelpers";
 import { EmailDraftModal, type EmailDraftIntent } from "./EmailDraftModal";
@@ -31,6 +32,7 @@ export function ChaseLoopStatus() {
   const { checklistItems, tasks, clients } = useStore();
   const insights = useAllOpenInsights();
   const today = toIso(TODAY);
+  const setState = useSetChecklistItemState();
   const [emailIntent, setEmailIntent] = useState<EmailDraftIntent | null>(null);
 
   const taskById = useMemo(
@@ -223,7 +225,7 @@ export function ChaseLoopStatus() {
                 className="text-xs text-ink-700 flex items-center gap-2"
               >
                 <button
-                  onClick={() => confirmWithUndo(c)}
+                  onClick={() => confirmWithUndo(c, setState)}
                   className="text-2xs px-1.5 py-0.5 rounded bg-warn-bg text-warn-ink border border-warn-border hover:bg-warn-bg/70 shrink-0"
                   title="Confirm — only you can do this"
                 >
@@ -286,7 +288,7 @@ export function ChaseLoopStatus() {
                       checklistItem: c,
                     })
                   }
-                  className="text-2xs px-1.5 py-0.5 rounded bg-accent text-canvas hover:bg-accent-hover shrink-0"
+                  className="text-2xs px-1.5 py-0.5 rounded bg-indigo text-white hover:bg-indigo-hover shrink-0"
                   title="Send AI-drafted reminder"
                 >
                   ✉

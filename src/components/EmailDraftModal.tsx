@@ -373,7 +373,7 @@ export function EmailDraftModal({ open, intent, onClose }: Props) {
           <button
             onClick={send}
             disabled={generating || !subject.trim() || !body.trim()}
-            className="text-sm px-4 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+            className="text-sm px-4 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
           >
             <Send className="w-3.5 h-3.5" aria-hidden />
             {scheduledFor ? "Schedule send" : "Send"}

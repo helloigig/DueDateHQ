@@ -72,7 +72,7 @@ export class AppErrorBoundary extends Component<
               </button>
               <button
                 onClick={this.hardReload}
-                className="px-4 py-2 text-sm rounded bg-accent text-canvas hover:bg-accent-hover"
+                className="px-4 py-2 text-sm rounded bg-indigo text-white hover:bg-indigo-hover"
               >
                 Reload app
               </button>

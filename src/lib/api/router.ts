@@ -338,6 +338,16 @@ export const appRouter = t.router({
     batchAdjustDeadlines: t.procedure
       .input(jsonPassthrough)
       .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    sendBulletinEmails: t.procedure
+      .input(jsonPassthrough)
+      .mutation(
+        async (): Promise<{
+          sentCount: number;
+          skippedCount: number;
+          sent: Array<{ clientId: string; draftId: string }>;
+          skipped: Array<{ clientId: string; reason: string }>;
+        }> => NOT_IMPL(),
+      ),
     detect: t.procedure.mutation(
       async (): Promise<{
         fetched: number;

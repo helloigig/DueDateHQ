@@ -16,7 +16,10 @@
     font-variant-numeric: tabular-nums;
   }
   :focus-visible {
-    outline: 2px solid #0F172A;
+    /* Indigo ring per DESIGN.md §Element states + §Invisible correctness.
+       Hardcoded so the ring paints before Tailwind hydrates; matches the
+       `indigo` token in tailwind.config.js. */
+    outline: 2px solid #5B5BD6;
     outline-offset: 2px;
     border-radius: 4px;
   }

@@ -152,7 +152,7 @@ export function PriorityCard({
               </div>
               <Link
                 to={`/alerts/${item.alert.id}`}
-                className="text-sm font-medium px-2.5 py-1 rounded-md bg-accent text-canvas hover:bg-accent-hover flex items-center gap-1"
+                className="text-sm font-medium px-2.5 py-1 rounded-md bg-indigo text-white hover:bg-indigo-hover flex items-center gap-1"
               >
                 Review
                 <ChevronRight className="w-3.5 h-3.5" aria-hidden />
