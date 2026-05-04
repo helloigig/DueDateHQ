@@ -65,12 +65,12 @@ export function Import() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 md:px-6 py-6">
+    <div className="max-w-5xl mx-auto px-4 md:px-6 py-6">
       <Link to="/clients" className="text-sm text-ink-500 hover:underline">
         ‹ Clients
       </Link>
       <h1 className="mt-3 text-xl font-semibold text-ink-900">
-        Import clients from CSV
+        Upload clients from CSV
       </h1>
 
       <ol className="mt-5 mb-6 flex items-center gap-2 text-sm">
@@ -279,24 +279,10 @@ function UploadStep({
       )}
 
       <div className="mt-5 text-xs text-ink-500">
-        <div className="font-medium text-ink-700 mb-1">Supported sources</div>
-        <div className="flex flex-wrap gap-1.5">
-          {[
-            "File In Time",
-            "TaxDome",
-            "Drake",
-            "ProConnect",
-            "QuickBooks",
-            "Plain Excel",
-          ].map((s) => (
-            <span
-              key={s}
-              className="px-2 py-0.5 rounded bg-sunken text-ink-700"
-            >
-              {s}
-            </span>
-          ))}
-        </div>
+        <p>
+          You can export client lists as CSV from File In Time, TaxDome, Drake,
+          ProConnect, QuickBooks — or save a plain Excel sheet as CSV.
+        </p>
         <p className="mt-2">
           Don't see yours? Any CSV with client data works — you'll confirm the
           column mapping in the next step.
@@ -503,7 +489,7 @@ function PreviewStep({
                       <span className="text-amber-700">?</span>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 text-ink-700 truncate max-w-[180px]">
+                  <td className="px-4 py-2.5 text-ink-700">
                     {r.email || <span className="text-amber-700">—</span>}
                   </td>
                   <td className="px-4 py-2.5 text-ink-700">
@@ -544,7 +530,10 @@ function PreviewStep({
         </tbody>
       </table>
 
-      <div className="px-5 py-3 bg-canvas rounded-b-lg flex items-center justify-between">
+      {/* Action bar — sticks to the viewport bottom while the user scrolls
+          the table to fix flagged rows. Border-top + surface bg keeps it
+          legible against scrolled content underneath. */}
+      <div className="sticky bottom-0 px-5 py-3 bg-surface border-t border-line rounded-b-lg flex items-center justify-between z-10">
         <button
           onClick={onBack}
           className="text-sm px-3 py-1.5 rounded border border-line bg-surface hover:bg-canvas"

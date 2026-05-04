@@ -33,15 +33,13 @@ export function OnboardingChoosePath() {
     <OnboardingShell
       step={2}
       totalSteps={3}
-      estimate="~60 seconds"
       title="Bring your roster in"
-      subtitle="The fastest way is a CSV. No CSV? Connect QuickBooks or Xero instead — same outcome."
-      brandLine="Customer-visible language: 'upload' for files, 'connect' for OAuth. Never 'import.'"
+      subtitle="Drop a CSV, connect your accounting tool, or start with a few clients."
     >
-      {/* Primary affordance — CSV upload, big and obvious */}
+      {/* Primary — CSV upload */}
       <Link
         to="/onboarding/import"
-        className="block bg-surface border-2 border-line rounded-md p-6 hover:border-accent hover:shadow-pop transition-all group max-w-3xl"
+        className="block bg-surface border-2 border-line rounded-md p-6 hover:border-accent hover:shadow-pop transition-all group max-w-5xl"
       >
         <div className="flex items-start gap-4">
           <span className="w-12 h-12 rounded-md bg-sunken border border-line flex items-center justify-center text-ink-700 shrink-0">
@@ -57,8 +55,7 @@ export function OnboardingChoosePath() {
               </span>
             </div>
             <p className="text-sm text-ink-500 mt-1">
-              Drag a roster from File In Time, TaxDome, Drake, ProConnect,
-              QuickBooks export, or plain Excel. AI auto-maps the columns. ~2 minutes.
+              Drag a roster from your existing tool. AI auto-maps the columns.
             </p>
           </div>
           <ArrowRight
@@ -68,70 +65,51 @@ export function OnboardingChoosePath() {
         </div>
       </Link>
 
-      {/* Secondary: connect existing software (the "no CSV" answer) */}
-      <div className="mt-5">
-        <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold mb-2">
-          No CSV at hand?
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-w-3xl">
-          <ConnectChoice
-            provider="quickbooks"
-            title="Connect QuickBooks"
-            detail="Pulls your client list with entity types in one OAuth click. Tier 0 two-way sync."
-            onClick={() => setOauthProvider("quickbooks")}
-          />
-          <ConnectChoice
-            provider="xero"
-            title="Connect Xero"
-            detail="Same as QuickBooks for international firms. Tier 0 two-way sync."
-            onClick={() => setOauthProvider("xero")}
-          />
-        </div>
-        <p className="text-2xs text-ink-400 mt-2">
-          Both unlock financial profiles and Mode B/C/E anchors immediately. Phase 2 OAuth in this build.
-        </p>
+      {/* 3-tile row — QuickBooks, Xero, Add manually */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 max-w-5xl">
+        <ConnectTile
+          icon={<QboLogo />}
+          title="Connect QuickBooks"
+          detail="One OAuth click — pulls your client list."
+          onClick={() => setOauthProvider("quickbooks")}
+        />
+        <ConnectTile
+          icon={<XeroLogo />}
+          title="Connect Xero"
+          detail="Same as QuickBooks for international firms."
+          onClick={() => setOauthProvider("xero")}
+        />
+        <ConnectTile
+          icon={
+            <span className="w-7 h-7 rounded-md bg-sunken border border-line flex items-center justify-center text-ink-700">
+              <UserPlus className="w-4 h-4" aria-hidden />
+            </span>
+          }
+          title="Add 5 manually"
+          detail="For small books or kicking the tires."
+          to="/onboarding/manual"
+        />
       </div>
 
-      {/* Tertiary: small books or kicking the tires */}
-      <div className="mt-5">
-        <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold mb-2">
-          Or — start small
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-w-3xl">
-          <SecondaryChoice
-            to="/onboarding/manual"
-            icon={<UserPlus className="w-4 h-4" aria-hidden />}
-            title="Add 5 manually"
-            detail="For small books or skeptics. ~60s per client."
-          />
-          <SecondaryChoice
-            to="/onboarding/demo"
-            icon={<Sparkles className="w-4 h-4" aria-hidden />}
-            title="Try the demo workspace"
-            detail="49 fake clients + a live state alert. Wipeable anytime."
-          />
-        </div>
-      </div>
-
-      {/* Skip-for-now footer — accountants poking around shouldn't be
-          forced to import or fake-demo. They mark onboarding complete and
-          land on the empty dashboard, with the OnboardingLayer2 widget
-          surfacing this same set of options later. */}
-      <div className="mt-8 pt-6 border-t border-line max-w-3xl">
+      {/* Demo + Skip on the same line */}
+      <div className="mt-8 pt-6 border-t border-line max-w-5xl flex items-center gap-6 text-xs">
+        <Link
+          to="/onboarding/demo"
+          className="inline-flex items-center gap-1.5 text-ink-700 hover:text-ink-900"
+        >
+          <Sparkles className="w-3.5 h-3.5" aria-hidden />
+          Try the demo workspace
+        </Link>
         <button
           type="button"
           onClick={() => {
             updateSession({ onboardingComplete: true });
             navigate("/", { replace: true });
           }}
-          className="text-xs text-ink-500 hover:text-ink-900 underline"
+          className="text-ink-500 hover:text-ink-900 underline"
         >
-          Skip for now — I'll add clients later
+          Skip for now
         </button>
-        <p className="text-2xs text-ink-400 mt-1">
-          Your dashboard works empty. You can connect a source from Settings
-          → Integrations whenever you're ready.
-        </p>
       </div>
 
       <OAuthWireframeModal
@@ -142,58 +120,44 @@ export function OnboardingChoosePath() {
   );
 }
 
-function ConnectChoice({
-  provider,
-  title,
-  detail,
-  onClick,
-}: {
-  provider: "quickbooks" | "xero";
-  title: string;
-  detail: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="text-left bg-surface border border-line rounded-md p-4 hover:border-accent hover:shadow-pop transition-all flex items-start gap-3 disabled:opacity-50"
-    >
-      <span className="w-9 h-9 rounded-md flex items-center justify-center shrink-0">
-        {provider === "quickbooks" ? <QboLogo /> : <XeroLogo />}
-      </span>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-ink-900">{title}</p>
-        <p className="text-xs text-ink-500 mt-0.5">{detail}</p>
-      </div>
-    </button>
-  );
-}
-
-function SecondaryChoice({
-  to,
+/** Unified tile — handles both router link (manual) and OAuth modal trigger (QBO/Xero). */
+function ConnectTile({
   icon,
   title,
   detail,
+  to,
+  onClick,
 }: {
-  to: string;
   icon: React.ReactNode;
   title: string;
   detail: string;
+  to?: string;
+  onClick?: () => void;
 }) {
-  return (
-    <Link
-      to={to}
-      className="bg-surface border border-line rounded-md p-3 hover:bg-sunken transition-colors flex items-start gap-3"
-    >
-      <span className="w-8 h-8 rounded-md bg-sunken flex items-center justify-center text-ink-700 shrink-0">
+  const className =
+    "text-left bg-surface border border-line rounded-md p-4 hover:border-accent hover:shadow-pop transition-all flex items-start gap-3";
+  const inner = (
+    <>
+      <span className="w-9 h-9 rounded-md flex items-center justify-center shrink-0">
         {icon}
       </span>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-ink-900">{title}</p>
         <p className="text-xs text-ink-500 mt-0.5">{detail}</p>
       </div>
-    </Link>
+    </>
+  );
+  if (to) {
+    return (
+      <Link to={to} className={className}>
+        {inner}
+      </Link>
+    );
+  }
+  return (
+    <button type="button" onClick={onClick} className={className}>
+      {inner}
+    </button>
   );
 }
 
