@@ -15,7 +15,21 @@ const ENTITY_OPTIONS: EntityType[] = [
   "Partnership",
   "Trust",
 ];
-const STATE_OPTIONS: StateCode[] = ["CA", "NY", "TX", "LA", "FL"];
+// 10 states with seeded service templates. Picking any other state
+// produces no deadlines today, so we don't expose them in the UI.
+// See `data/supportedStates.ts` for the gating rule.
+const STATE_OPTIONS: StateCode[] = [
+  "CA",
+  "FL",
+  "GA",
+  "IL",
+  "LA",
+  "MA",
+  "NJ",
+  "NY",
+  "PA",
+  "TX",
+];
 
 // Mock-mode local fallback. Real mode pulls from BE via servicePackages.suggestForClient.
 function localSuggestBundle(entity: EntityType, state: StateCode): string {

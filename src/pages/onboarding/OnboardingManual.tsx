@@ -105,7 +105,20 @@ export function OnboardingManual() {
                 }
                 className="w-full border border-line rounded px-2 py-1.5 text-sm bg-surface"
               >
-                {(["CA", "NY", "TX", "FL", "LA"] as StateCode[]).map((s) => (
+                {(
+                  [
+                    "CA",
+                    "FL",
+                    "GA",
+                    "IL",
+                    "LA",
+                    "MA",
+                    "NJ",
+                    "NY",
+                    "PA",
+                    "TX",
+                  ] as StateCode[]
+                ).map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>

@@ -13,7 +13,19 @@ const ENTITY_OPTIONS: EntityType[] = [
   "Partnership",
   "Trust",
 ];
-const STATE_OPTIONS: StateCode[] = ["CA", "NY", "TX", "LA", "FL"];
+// 10 states with seeded service templates. See `data/supportedStates.ts`.
+const STATE_OPTIONS: StateCode[] = [
+  "CA",
+  "FL",
+  "GA",
+  "IL",
+  "LA",
+  "MA",
+  "NJ",
+  "NY",
+  "PA",
+  "TX",
+];
 
 export function EditClientModal({
   open,

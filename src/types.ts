@@ -7,29 +7,41 @@ export type EntityType =
   | "Trust";
 
 export type StateCode =
+  // The 10 states with seeded service templates in
+  // backend/src/db/seed-data.ts. Picking one of these spawns deadlines
+  // when the client's package is assigned. See `data/supportedStates.ts`
+  // for the runtime gating; this union should stay aligned.
   | "CA"
-  | "NY"
-  | "TX"
-  | "LA"
   | "FL"
-  // Added 2026-05-04 for non-affecting mock announcements (OR PTE,
-  // MI corporate rate, WA B&O, IL-1040). Keeping the type narrow but
-  // honest about the states the demo references.
+  | "GA"
+  | "IL"
+  | "LA"
+  | "MA"
+  | "NJ"
+  | "NY"
+  | "PA"
+  | "TX"
+  // Decorative-only — referenced by mock announcements (OR PTE, MI
+  // corporate rate, WA B&O). The product won't generate filings here
+  // until seed-data.ts grows templates for them.
   | "OR"
   | "MI"
-  | "WA"
-  | "IL";
+  | "WA";
 
 export const STATE_NAMES: Record<StateCode, string> = {
   CA: "California",
-  NY: "New York",
-  TX: "Texas",
-  LA: "Louisiana",
   FL: "Florida",
+  GA: "Georgia",
+  IL: "Illinois",
+  LA: "Louisiana",
+  MA: "Massachusetts",
+  NJ: "New Jersey",
+  NY: "New York",
+  PA: "Pennsylvania",
+  TX: "Texas",
   OR: "Oregon",
   MI: "Michigan",
   WA: "Washington",
-  IL: "Illinois",
 };
 
 export type ClientStatus = "active" | "inactive" | "prospect" | "archived";

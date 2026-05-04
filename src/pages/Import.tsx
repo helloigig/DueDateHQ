@@ -10,6 +10,10 @@ import {
 } from "../data/mockImportData";
 import type { EntityType, StateCode } from "../types";
 import { STATE_NAMES } from "../types";
+import {
+  isSupportedState,
+  UNSUPPORTED_STATE_HINT,
+} from "../data/supportedStates";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import {
   parseCsv,
@@ -178,6 +182,12 @@ function recomputeIssues(r: DetectedRow): string[] {
   const issues: string[] = [];
   if (!r.entityType) issues.push("entity_missing");
   if (!r.primaryState) issues.push("state_unknown");
+  // CSV rows can carry any 2-letter state. Flag unsupported ones the
+  // same way we flag missing data — if we accept the row, no deadlines
+  // will spawn for it and the dashboard will lie.
+  if (r.primaryState && !isSupportedState(r.primaryState)) {
+    issues.push("state_unsupported");
+  }
   if (!r.email) issues.push("email_missing");
   return issues;
 }
@@ -437,7 +447,19 @@ const ENTITY_OPTIONS: EntityType[] = [
   "Partnership",
   "Trust",
 ];
-const STATE_OPTIONS: StateCode[] = ["CA", "NY", "TX", "LA", "FL"];
+// 10 states with seeded service templates. See `data/supportedStates.ts`.
+const STATE_OPTIONS: StateCode[] = [
+  "CA",
+  "FL",
+  "GA",
+  "IL",
+  "LA",
+  "MA",
+  "NJ",
+  "NY",
+  "PA",
+  "TX",
+];
 
 function PreviewStep({
   rows,
@@ -662,9 +684,17 @@ function FixInline({
         </label>
       ) : null}
 
-      {row.issues.includes("state_unknown") && (
+      {(row.issues.includes("state_unknown") ||
+        row.issues.includes("state_unsupported")) && (
         <label className="text-xs text-ink-700">
-          <span className="block mb-1">Primary state</span>
+          <span className="block mb-1">
+            Primary state
+            {row.issues.includes("state_unsupported") && (
+              <span className="ml-1.5 text-2xs text-warn-ink">
+                ({row.primaryState} — {UNSUPPORTED_STATE_HINT})
+              </span>
+            )}
+          </span>
           <select
             value={state}
             onChange={(e) => setState(e.target.value as StateCode)}

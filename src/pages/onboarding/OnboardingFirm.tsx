@@ -6,6 +6,10 @@ import { updateSession, useSession } from "../../data/session";
 import { env } from "../../config";
 import { trpc } from "../../lib/api/client";
 import { US_STATES } from "../../data/usStates";
+import {
+  isSupportedState,
+  UNSUPPORTED_STATE_HINT,
+} from "../../data/supportedStates";
 
 // Common US time zones — covers ~99% of CPA firms. Auto-detected zones
 // outside this list still appear (we add them dynamically below the list).
@@ -91,6 +95,9 @@ export function OnboardingFirm() {
   const homeState = filingStates[0];
 
   const toggleState = (s: string) => {
+    // Guard at the action layer too so any future caller (keyboard, paste,
+    // CSV-driven default, etc.) can't slip an unsupported state through.
+    if (!isSupportedState(s)) return;
     setFilingStates((prev) => {
       if (prev.includes(s)) {
         // Don't allow removing the last state — there must always be a home.
@@ -340,25 +347,33 @@ function StateMultiSelect({
                 }
                 const picked = isPicked(code);
                 const isHome = code === home;
+                const supported = isSupportedState(code);
                 return (
                   <button
                     key={code}
                     type="button"
                     onClick={() => onToggle(code)}
+                    disabled={!supported}
                     onMouseEnter={() => setHoverCode(code)}
                     onMouseLeave={() =>
                       setHoverCode((h) => (h === code ? null : h))
                     }
-                    title={meta.name + (isHome ? " — home state" : "")}
-                    aria-label={`${meta.name}${picked ? ", selected" : ""}${isHome ? ", home state" : ""}`}
+                    title={
+                      supported
+                        ? meta.name + (isHome ? " — home state" : "")
+                        : `${meta.name} — ${UNSUPPORTED_STATE_HINT}`
+                    }
+                    aria-label={`${meta.name}${picked ? ", selected" : ""}${isHome ? ", home state" : ""}${!supported ? ", not yet supported" : ""}`}
                     aria-pressed={picked}
                     className={[
                       "w-9 h-9 rounded text-2xs font-mono font-semibold transition-all relative",
-                      isHome
-                        ? "bg-accent text-canvas ring-2 ring-offset-1 ring-accent shadow-sm"
-                        : picked
-                          ? "bg-accent/90 text-canvas hover:bg-accent shadow-sm"
-                          : "bg-surface border border-line text-ink-700 hover:bg-sunken hover:border-ink-400",
+                      !supported
+                        ? "bg-sunken/40 text-ink-300 border border-line/60 cursor-not-allowed"
+                        : isHome
+                          ? "bg-accent text-canvas ring-2 ring-offset-1 ring-accent shadow-sm"
+                          : picked
+                            ? "bg-accent/90 text-canvas hover:bg-accent shadow-sm"
+                            : "bg-surface border border-line text-ink-700 hover:bg-sunken hover:border-ink-400",
                     ].join(" ")}
                   >
                     {code}
