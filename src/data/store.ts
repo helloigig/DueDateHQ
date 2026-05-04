@@ -18,6 +18,7 @@ import type {
   ReminderTemplate,
   StateCode,
   Task,
+  TaskNote,
   TaskStatus,
 } from "../types";
 import { clients as seedClients } from "./mockClients";
@@ -51,6 +52,9 @@ interface State {
   importedFacts: ImportedFact[];
   aiInsights: AiInsight[];
   emailDrafts: EmailDraft[];
+  /** Per-task note feed — Phase-1 promotion of v0.7 stub. Distinct
+   *  from `clients.notes` and `clientNotes`. */
+  taskNotes: TaskNote[];
 }
 
 // v4 bump: hydrate now defaults to EMPTY state (was: full demo seeds). The
@@ -76,6 +80,7 @@ function emptyState(): State {
     importedFacts: [],
     aiInsights: [],
     emailDrafts: [],
+    taskNotes: [],
   };
 }
 
@@ -94,6 +99,7 @@ function seedState(): State {
     importedFacts: seedImportedFacts,
     aiInsights: seedAiInsights,
     emailDrafts: seedEmailDrafts,
+    taskNotes: [],
   };
 }
 
@@ -117,6 +123,7 @@ function hydrate(): State {
       importedFacts: parsed.importedFacts ?? fallback.importedFacts,
       aiInsights: parsed.aiInsights ?? fallback.aiInsights,
       emailDrafts: parsed.emailDrafts ?? fallback.emailDrafts,
+      taskNotes: parsed.taskNotes ?? fallback.taskNotes,
     };
   } catch {
     return emptyState();
@@ -136,6 +143,13 @@ let state: State = hydrate();
 
 function currentUserName(): string {
   return getSession()?.userName ?? "Sarah Chen";
+}
+
+// Mock-mode "user id" for provenance fields (e.g., addedByUserId on
+// custom checklist items). Real-mode uses the Supabase user id; mock
+// mode uses a stable string so equality checks still work.
+function currentUserId(): string {
+  return "user-mock";
 }
 
 type Listener = () => void;
@@ -1054,6 +1068,7 @@ export const actions = {
       state: "not_requested",
       order,
       custom: true,
+      addedByUserId: currentUserId(),
     };
     state = {
       ...state,
@@ -1067,6 +1082,198 @@ export const actions = {
     );
     emit();
     return newItem.id;
+  },
+
+  /** Delete a user-added checklist item. Template/system items (not custom)
+   *  are protected at app + DB layer — silently ignored here for parity. */
+  removeChecklistItem(itemId: string) {
+    const item = state.checklistItems.find((c) => c.id === itemId);
+    if (!item) return;
+    if (!item.custom && !item.addedByUserId) return;
+    const task = state.tasks.find((t) => t.id === item.taskId);
+    state = {
+      ...state,
+      checklistItems: state.checklistItems.filter((c) => c.id !== itemId),
+    };
+    if (task) {
+      appendActivity(
+        task.clientId,
+        "checklist_state_change",
+        `Removed: ${item.label}`,
+        task.deadlineId
+      );
+    }
+    emit();
+  },
+
+  /** Reassign preparer/reviewer (mock-mode parity for `tasks.assign`). */
+  assignTask(
+    taskId: string,
+    patch: { preparer?: string | null; reviewer?: string | null }
+  ) {
+    const t = state.tasks.find((x) => x.id === taskId);
+    if (!t) return;
+    state = {
+      ...state,
+      tasks: state.tasks.map((x) =>
+        x.id === taskId
+          ? {
+              ...x,
+              assignedUser:
+                patch.preparer === undefined
+                  ? x.assignedUser
+                  : (patch.preparer ?? "Unassigned"),
+              reviewerUser:
+                patch.reviewer === undefined
+                  ? x.reviewerUser
+                  : patch.reviewer,
+            }
+          : x
+      ),
+    };
+    const desc: string[] = [];
+    if (patch.preparer !== undefined) {
+      desc.push(
+        patch.preparer ? `Preparer → ${patch.preparer}` : "Preparer un-assigned"
+      );
+    }
+    if (patch.reviewer !== undefined) {
+      desc.push(
+        patch.reviewer ? `Reviewer → ${patch.reviewer}` : "Reviewer un-assigned"
+      );
+    }
+    if (desc.length > 0) {
+      appendActivity(t.clientId, "status_change", desc.join(" · "), t.deadlineId);
+    }
+    emit();
+  },
+
+  /** Defer a task (cascades to deadline). PRD §8.5 — official date is
+   *  immutable; only the working date moves. */
+  deferTask(taskId: string, newDate: string, reason?: string) {
+    const t = state.tasks.find((x) => x.id === taskId);
+    if (!t) return;
+    state = {
+      ...state,
+      tasks: state.tasks.map((x) =>
+        x.id === taskId
+          ? {
+              ...x,
+              status: "deferred" as TaskStatus,
+              notApplicableReason: undefined,
+              notApplicableAt: undefined,
+            }
+          : x
+      ),
+      deadlines: state.deadlines.map((d) =>
+        d.id === t.deadlineId
+          ? {
+              ...d,
+              status: "deferred" as DeadlineStatus,
+              adjustedDueDate: newDate,
+            }
+          : d
+      ),
+    };
+    appendActivity(
+      t.clientId,
+      "status_change",
+      `Deferred to ${newDate}${reason ? ` — ${reason}` : ""}`,
+      t.deadlineId
+    );
+    emit();
+  },
+
+  /** Mark extension filed (cascades to deadline). */
+  fileTaskExtension(taskId: string) {
+    const t = state.tasks.find((x) => x.id === taskId);
+    if (!t) return;
+    state = {
+      ...state,
+      tasks: state.tasks.map((x) =>
+        x.id === taskId
+          ? {
+              ...x,
+              status: "filed_extension" as TaskStatus,
+              notApplicableReason: undefined,
+              notApplicableAt: undefined,
+            }
+          : x
+      ),
+      deadlines: state.deadlines.map((d) =>
+        d.id === t.deadlineId
+          ? { ...d, status: "filed_extension" as DeadlineStatus }
+          : d
+      ),
+    };
+    appendActivity(t.clientId, "status_change", `Extension filed`, t.deadlineId);
+    emit();
+  },
+
+  /** Mark task not_applicable. Distinct from completed: we stopped working
+   *  it, the deadline didn't go away. Reason is required (audit). */
+  markTaskNotApplicable(taskId: string, reason: string) {
+    const t = state.tasks.find((x) => x.id === taskId);
+    if (!t) return;
+    state = {
+      ...state,
+      tasks: state.tasks.map((x) =>
+        x.id === taskId
+          ? {
+              ...x,
+              status: "not_applicable" as TaskStatus,
+              notApplicableReason: reason,
+              notApplicableAt: nowIso(),
+              completedAt: undefined,
+              completedBy: undefined,
+            }
+          : x
+      ),
+    };
+    appendActivity(
+      t.clientId,
+      "status_change",
+      `Marked not applicable — ${reason}`,
+      t.deadlineId
+    );
+    emit();
+  },
+
+  // -------- Task notes (Phase-1) --------
+
+  addTaskNote(taskId: string, body: string, pinned = false) {
+    const t = state.tasks.find((x) => x.id === taskId);
+    if (!t || !body.trim()) return;
+    const note: TaskNote = {
+      id: makeId("tn"),
+      taskId,
+      body: body.trim(),
+      pinned,
+      authorUserId: currentUserId(),
+      authorName: currentUserName(),
+      createdAt: nowIso(),
+    };
+    state = { ...state, taskNotes: [...state.taskNotes, note] };
+    emit();
+    return note.id;
+  },
+
+  toggleTaskNotePin(noteId: string) {
+    state = {
+      ...state,
+      taskNotes: state.taskNotes.map((n) =>
+        n.id === noteId ? { ...n, pinned: !n.pinned } : n
+      ),
+    };
+    emit();
+  },
+
+  deleteTaskNote(noteId: string) {
+    state = {
+      ...state,
+      taskNotes: state.taskNotes.filter((n) => n.id !== noteId),
+    };
+    emit();
   },
 
   /** Persist an email draft (status="draft"). */

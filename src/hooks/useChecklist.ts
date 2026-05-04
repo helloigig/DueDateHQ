@@ -65,7 +65,44 @@ export function useSetChecklistItemState() {
   };
 }
 
+/**
+ * Add a custom (user-authored) checklist item. The BE stamps
+ * `addedByUserId = ctx.dbUser.id` so the row is identifiably non-template
+ * and thus deletable via `useDeleteChecklistItem` below.
+ */
 export function useAddChecklistItem() {
-  return (taskId: string, label: string, itemType = "custom") =>
-    actions.addChecklistItem(taskId, label, itemType);
+  const utils = trpc.useUtils();
+  const mutation = trpc.checklists.addCustom.useMutation({
+    onSuccess: (_, vars) => {
+      void utils.checklists.listForTask.invalidate({ taskId: vars.taskId });
+      void utils.activity.listForTask.invalidate({ taskId: vars.taskId });
+    },
+  });
+  return (taskId: string, label: string, itemType = "custom") => {
+    if (env.useMockData) {
+      actions.addChecklistItem(taskId, label, itemType);
+    }
+    mutation.mutate({ taskId, label, itemType });
+  };
+}
+
+/**
+ * Delete a custom checklist item. Template/system items are protected
+ * server-side (FORBIDDEN); the FE should not surface the delete affordance
+ * for them in the first place.
+ */
+export function useDeleteChecklistItem() {
+  const utils = trpc.useUtils();
+  const mutation = trpc.checklists.deleteCustom.useMutation({
+    onSuccess: () => {
+      void utils.checklists.listForTask.invalidate();
+      void utils.activity.listForTask.invalidate();
+    },
+  });
+  return (itemId: string) => {
+    if (env.useMockData) {
+      actions.removeChecklistItem(itemId);
+    }
+    mutation.mutate({ id: itemId });
+  };
 }

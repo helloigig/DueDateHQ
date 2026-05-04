@@ -7,9 +7,13 @@ import {
   RotateCcw,
   Mail,
   MoreHorizontal,
+  Trash2,
 } from "lucide-react";
 import type { ChecklistItem, DocumentState } from "../types";
-import { useSetChecklistItemState } from "../hooks/useChecklist";
+import {
+  useDeleteChecklistItem,
+  useSetChecklistItemState,
+} from "../hooks/useChecklist";
 import { confirmWithUndo } from "../lib/confirmWithUndo";
 
 /**
@@ -84,6 +88,11 @@ export function ChecklistRow({ item, onOpenEmailDraft }: Props) {
   const [pulse, setPulse] = useState(false);
   const prevState = useRef<DocumentState>(item.state);
   const setState = useSetChecklistItemState();
+  const deleteItem = useDeleteChecklistItem();
+  // Provenance: only user-added items are deletable. Mock-mode marks them
+  // with `custom: true`; real-mode also exposes `addedByUserId`. Either
+  // signal is enough.
+  const isUserAdded = item.custom || !!item.addedByUserId;
   // Pulse when this row's state advances to received_confirmed — the §5.3
   // invariant moment. Honours prefers-reduced-motion via the keyframe rule.
   useEffect(() => {
@@ -206,6 +215,27 @@ export function ChecklistRow({ item, onOpenEmailDraft }: Props) {
                     Reset to "not requested"
                   </MenuButton>
                 )}
+                {isUserAdded && (
+                  <>
+                    <div className="border-t border-line my-1" />
+                    <MenuButton
+                      destructive
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `Remove "${item.label}" from this checklist?`,
+                          )
+                        ) {
+                          deleteItem(item.id);
+                        }
+                        setMenuOpen(false);
+                      }}
+                    >
+                      <Trash2 className="w-3 h-3 inline mr-1.5 -mt-0.5" aria-hidden />
+                      Remove item
+                    </MenuButton>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -218,14 +248,19 @@ export function ChecklistRow({ item, onOpenEmailDraft }: Props) {
 function MenuButton({
   children,
   onClick,
+  destructive = false,
 }: {
   children: React.ReactNode;
   onClick: () => void;
+  destructive?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className="w-full text-left text-sm px-3 py-1.5 hover:bg-sunken text-ink-700"
+      className={
+        "w-full text-left text-sm px-3 py-1.5 hover:bg-sunken " +
+        (destructive ? "text-danger-ink" : "text-ink-700")
+      }
     >
       {children}
     </button>
