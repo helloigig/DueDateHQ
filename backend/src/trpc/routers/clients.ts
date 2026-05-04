@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { firmProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
@@ -11,6 +11,7 @@ import {
   deadlines,
   servicePackages,
   tasks,
+  users,
 } from "../../db/schema.js";
 import { ALL_STATES } from "../../lib/states.js";
 import { seedClientWithPackage } from "../../lib/client-package-seeder.js";
@@ -167,7 +168,40 @@ export const clientsRouter = router({
       const row = await db.query.clients.findFirst({
         where: and(eq(clients.id, input.id), eq(clients.firmId, ctx.firmId)),
       });
-      return row ? rowToClient(row) : null;
+      if (!row) return null;
+      // Hydrate noteEntries — pinned-first then recency. Single LEFT JOIN
+      // for author display name (LEFT because note authors may have left
+      // the firm; we still want to show the body).
+      const noteRows = await db
+        .select({
+          id: clientNotes.id,
+          createdAt: clientNotes.createdAt,
+          body: clientNotes.body,
+          pinned: clientNotes.pinned,
+          relatedDeadlineId: clientNotes.relatedDeadlineId,
+          authorDisplayName: users.displayName,
+          authorEmail: users.email,
+        })
+        .from(clientNotes)
+        .leftJoin(users, eq(users.id, clientNotes.authorUserId))
+        .where(
+          and(
+            eq(clientNotes.clientId, row.id),
+            eq(clientNotes.firmId, ctx.firmId),
+          ),
+        )
+        .orderBy(desc(clientNotes.pinned), desc(clientNotes.createdAt));
+      return {
+        ...rowToClient(row),
+        noteEntries: noteRows.map((n) => ({
+          id: n.id,
+          createdAt: n.createdAt.toISOString(),
+          body: n.body,
+          pinned: n.pinned,
+          authorName: n.authorDisplayName ?? n.authorEmail ?? "",
+          relatedDeadlineId: n.relatedDeadlineId ?? undefined,
+        })),
+      };
     }),
 
   create: firmProcedure
