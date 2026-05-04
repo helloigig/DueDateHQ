@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useCommitImport } from "../hooks/useImports";
 import {
   DETECTED_ROWS,
@@ -545,30 +545,12 @@ function PreviewStep({
                       />
                     </td>
                   </tr>
-                  {editing === i && (
-                    <tr className="bg-amber-50">
-                      <td colSpan={6} className="px-4 py-3">
-                        <FixInline
-                          row={r}
-                          onPatch={(patch) => {
-                            onRowFix(i, patch);
-                            // close editor once row has zero issues
-                            const resolved = recomputeIssues({
-                              ...r,
-                              ...patch,
-                            });
-                            if (resolved.length === 0) setEditing(null);
-                          }}
-                        />
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
+                )}
+              </Fragment>
               );
             })}
           </tbody>
         </table>
-      </div>
 
       {/* Action bar — sticks to the viewport bottom while the user scrolls
           the table to fix flagged rows. Border-top + surface bg keeps it

@@ -4,7 +4,6 @@ import {
   Upload,
   UserPlus,
   Sparkles,
-  ArrowRight,
 } from "lucide-react";
 import { OnboardingShell } from "../../components/OnboardingShell";
 import { OAuthWireframeModal } from "../../components/OAuthWireframeModal";
@@ -50,7 +49,8 @@ export function OnboardingChoosePath() {
               Drag a roster from your existing tool. AI auto-maps the columns.
             </p>
           </div>
-        </Link>
+        </div>
+      </Link>
 
       {/* 3-tile row — QuickBooks, Xero, Add manually */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 max-w-5xl">
