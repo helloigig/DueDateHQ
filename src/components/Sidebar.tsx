@@ -13,6 +13,7 @@ import {
   UserPlus,
   LogOut,
   History,
+  Check,
 } from "lucide-react";
 import { useAnnouncements } from "../hooks/useAnnouncements";
 import { useSession, signOut } from "../data/session";
@@ -432,7 +433,7 @@ function WorkspaceHeader({
               <span className="text-sm font-medium text-ink-900 truncate flex-1">
                 {firmName}
               </span>
-              <span className="text-2xs text-ink-500">✓</span>
+              <Check className="w-3 h-3 text-ink-500" aria-hidden />
             </div>
 
             <div className="border-t border-line my-1.5" />

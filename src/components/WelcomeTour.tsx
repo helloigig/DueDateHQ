@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, ArrowLeft, X, Calendar, Bell, Sparkles } from "lucide-react";
+import { ArrowRight, ArrowLeft, X, Calendar, Bell, Sparkles, Check } from "lucide-react";
 
 const STORAGE_KEY = "duedatehq.welcomeTour.dismissed.v1";
 
@@ -213,7 +213,7 @@ const SLIDES: ReadonlyArray<Slide> = [
           <div className="space-y-1.5 mt-2.5">
             <div className="flex justify-between text-2xs">
               <span className="text-ink-500">2024 Form 1065 — filed</span>
-              <span className="text-ok-ink">✓</span>
+              <Check className="w-3 h-3 text-ok-ink" aria-hidden />
             </div>
             <div className="flex justify-between text-2xs">
               <span className="text-ink-500">PTET election — yes (CA)</span>

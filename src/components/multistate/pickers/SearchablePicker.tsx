@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, Check } from "lucide-react";
 import {
   PHASE_0_SEEDED_STATES,
   REGIONS,
@@ -169,12 +169,12 @@ function Row({
       }
     >
       <span
-        className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 text-2xs ${
+        className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
           checked ? "bg-accent border-accent text-canvas" : "border-line"
         }`}
         aria-hidden
       >
-        {checked ? "✓" : ""}
+        {checked ? <Check className="w-3 h-3" aria-hidden /> : null}
       </span>
       <span className="flex-1 min-w-0 truncate">
         <span className="font-mono font-medium">{state.code}</span>{" "}

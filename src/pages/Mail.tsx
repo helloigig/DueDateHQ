@@ -8,6 +8,7 @@ import {
   Mail as MailIcon,
   Check,
   Link2,
+  Siren,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -223,7 +224,7 @@ export function Mail() {
             id="reminders-out-heading"
             className="text-sm font-semibold text-ink-900 flex items-center gap-2"
           >
-            <span aria-hidden>🚨</span>
+            <Siren className="w-4 h-4 text-warn-ink" aria-hidden />
             Reminders out, awaiting reply
           </h2>
           <span className="text-2xs text-ink-500 tabular-nums">

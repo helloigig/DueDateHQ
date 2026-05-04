@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, X } from "lucide-react";
+import { ChevronDown, ChevronRight, X, Check } from "lucide-react";
 import {
   PHASE_0_SEEDED_STATES,
   REGIONS,
@@ -83,13 +83,13 @@ export function TwoPanePicker({
                           }`}
                         >
                           <span
-                            className={`w-3 h-3 rounded-sm border flex items-center justify-center text-2xs shrink-0 ${
+                            className={`w-3 h-3 rounded-sm border flex items-center justify-center shrink-0 ${
                               picked
                                 ? "bg-accent border-accent text-canvas"
                                 : "border-line"
                             }`}
                           >
-                            {picked ? "✓" : ""}
+                            {picked ? <Check className="w-2 h-2" aria-hidden /> : null}
                           </span>
                           <span className="font-mono">{s.code}</span>
                           <span className="truncate">{s.name}</span>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { X as XIcon } from "lucide-react";
 import { trpc } from "../../lib/api/client";
 import { useModalDialog } from "../../hooks/useModalDialog";
 import { findState, US_STATES } from "../../data/usStates";
@@ -181,9 +182,9 @@ export function MultiStateWizard({
           <button
             onClick={onClose}
             aria-label="Close"
-            className="text-ink-400 hover:text-ink-700 px-1"
+            className="inline-flex items-center text-ink-400 hover:text-ink-700 px-1"
           >
-            ✕
+            <XIcon className="w-4 h-4" aria-hidden />
           </button>
         </header>
 

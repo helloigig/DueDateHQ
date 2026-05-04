@@ -5,6 +5,34 @@ import {
   useParams,
   useSearchParams,
 } from "react-router-dom";
+import {
+  Handshake,
+  ClipboardList,
+  Brain,
+  Sparkles,
+  CircleCheck,
+  Mail,
+  Pin,
+  Siren,
+  Check,
+  CheckCircle2,
+  Plus,
+  Pencil,
+  Hourglass,
+  Star,
+  Archive,
+  ArrowLeftRight,
+  StickyNote,
+  Tag,
+  Send,
+  Inbox,
+  FileText,
+  AlertTriangle,
+  Bot,
+  Calendar,
+  Pause,
+  type LucideIcon,
+} from "lucide-react";
 import { actions, useStore } from "../data/store";
 import { trpc } from "../lib/api/client";
 import { env } from "../config";
@@ -221,23 +249,24 @@ export function ClientDetail() {
       <div className="mt-5 border-b border-line flex items-center gap-1 flex-wrap relative">
         {(
           [
-            ["engagement", "🤝 Engagement"],
-            ["filings", "📋 Filings"],
-            ["habits", "🧠 Habits"],
-            ["predictions", "🔮 Predictions"],
-            ["todo", "✅ To Do"],
-            ["mailbox", "✉️ Mailbox"],
+            ["engagement", "Engagement", Handshake],
+            ["filings", "Filings", ClipboardList],
+            ["habits", "Habits", Brain],
+            ["predictions", "Predictions", Sparkles],
+            ["todo", "To Do", CircleCheck],
+            ["mailbox", "Mailbox", Mail],
           ] as const
-        ).map(([key, label]) => (
+        ).map(([key, label, Icon]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`px-4 py-2 text-sm ${
+            className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm ${
               tab === key
                 ? "text-ink-900 border-b-2 border-ink-900 font-medium"
                 : "text-ink-500 hover:text-ink-700"
             }`}
           >
+            <Icon className="w-3.5 h-3.5" aria-hidden />
             {label}
           </button>
         ))}
@@ -668,7 +697,10 @@ function NoteItem({
     >
       <div className="flex items-center gap-2 text-xs text-ink-500 mb-1">
         {note.pinned && (
-          <span className="text-warn-ink font-medium">📌 Pinned</span>
+          <span className="inline-flex items-center gap-1 text-warn-ink font-medium">
+            <Pin className="w-3 h-3" aria-hidden />
+            Pinned
+          </span>
         )}
         <span>{ts.toLocaleString("en-US")}</span>
         <span>·</span>
@@ -716,24 +748,24 @@ function ContactsTab({ client }: { client: Client }) {
   );
 }
 
-const ACTIVITY_ICONS: Record<ActivityType, string> = {
-  status_change: "✓",
-  deadline_added: "➕",
-  deadline_updated: "✎",
-  extension_filed: "⏳",
-  client_created: "★",
-  client_edited: "✎",
-  client_archived: "📦",
-  batch_adjust: "⇄",
-  note_added: "📝",
-  bundle_assigned: "🏷",
-  email_sent: "📤",
-  email_received: "📥",
-  document_received: "📄",
-  document_confirmed: "✔",
-  document_flagged: "⚠",
-  ai_inferred: "🤖",
-  checklist_state_change: "•",
+const ACTIVITY_ICONS: Record<ActivityType, LucideIcon> = {
+  status_change: Check,
+  deadline_added: Plus,
+  deadline_updated: Pencil,
+  extension_filed: Hourglass,
+  client_created: Star,
+  client_edited: Pencil,
+  client_archived: Archive,
+  batch_adjust: ArrowLeftRight,
+  note_added: StickyNote,
+  bundle_assigned: Tag,
+  email_sent: Send,
+  email_received: Inbox,
+  document_received: FileText,
+  document_confirmed: CheckCircle2,
+  document_flagged: AlertTriangle,
+  ai_inferred: Bot,
+  checklist_state_change: CircleCheck,
 };
 
 function ActivityTab({ client }: { client: Client }) {
@@ -756,10 +788,12 @@ function ActivityTab({ client }: { client: Client }) {
 
 function ActivityItem({ entry }: { entry: ActivityEntry }) {
   const ts = new Date(entry.timestamp);
-  const icon = ACTIVITY_ICONS[entry.type] ?? "·";
+  const Icon = ACTIVITY_ICONS[entry.type] ?? CircleCheck;
   return (
     <li className="px-4 py-2.5 flex items-start gap-3">
-      <span className="w-5 text-center text-ink-400">{icon}</span>
+      <span className="w-5 flex items-center justify-center text-ink-400">
+        <Icon className="w-3.5 h-3.5" aria-hidden />
+      </span>
       <div className="flex-1 min-w-0 text-sm">
         <div className="text-ink-700">{entry.summary}</div>
         <div className="text-xs text-ink-500 mt-0.5">
@@ -911,7 +945,7 @@ function EngagementTab({
           <li className="text-sm flex items-baseline gap-2">
             {waiting.count > 0 ? (
               <>
-                <span className="shrink-0">🚨</span>
+                <Siren className="w-3.5 h-3.5 shrink-0 text-danger-ink translate-y-0.5" aria-hidden />
                 <span className="flex-1 min-w-0">
                   <strong className="text-ink-900">
                     Waiting on {client.name.split(" ")[0]}
@@ -928,7 +962,7 @@ function EngagementTab({
               </>
             ) : (
               <>
-                <span className="shrink-0 text-ok-ink">✓</span>
+                <Check className="w-3.5 h-3.5 shrink-0 text-ok-ink translate-y-0.5" aria-hidden />
                 <span className="flex-1 text-ink-500">
                   Nothing waiting on this client
                 </span>
@@ -945,7 +979,7 @@ function EngagementTab({
                   key={a.id}
                   className="text-sm flex items-baseline gap-2"
                 >
-                  <span className="shrink-0">📅</span>
+                  <Calendar className="w-3.5 h-3.5 shrink-0 text-ink-500 translate-y-0.5" aria-hidden />
                   <span className="flex-1 min-w-0">
                     <strong className="text-ink-900">
                       {a.stateCode}: {a.title}
@@ -974,7 +1008,7 @@ function EngagementTab({
           {/* Opportunity signal — only when non-empty (zero-state was noise) */}
           {openInsights.length > 0 && (
             <li className="text-sm flex items-baseline gap-2">
-              <span className="shrink-0">✨</span>
+              <Sparkles className="w-3.5 h-3.5 shrink-0 text-info-ink translate-y-0.5" aria-hidden />
               <span className="flex-1 min-w-0">
                 <strong className="text-ink-900">
                   {openInsights[0].title}
@@ -1116,7 +1150,8 @@ function HabitsTab({ client }: { client: Client }) {
             className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
             title="Mode E + Mode B — narrated from imported history."
           >
-            ✨ AI narrated
+            <Sparkles className="w-3 h-3" aria-hidden />
+            AI narrated
           </span>
         </header>
         {facts.length === 0 && insights.length === 0 ? (
@@ -1162,7 +1197,8 @@ function PredictionsTab({ client }: { client: Client }) {
           className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
           title="Mode B — per-client arrival timing prediction"
         >
-          ✨ Mode B prediction
+          <Sparkles className="w-3 h-3" aria-hidden />
+          Mode B prediction
         </span>
       </header>
       {facts.length === 0 ? (
@@ -1263,9 +1299,10 @@ function ToDoTab({
         <header className="flex items-baseline gap-2 px-4 py-3 border-b border-warn-border">
           <h3
             id="todo-still-waiting-heading"
-            className="text-sm font-semibold text-warn-ink"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-warn-ink"
           >
-            🚨 Still waiting on client
+            <Siren className="w-4 h-4" aria-hidden />
+            Still waiting on client
           </h3>
           <span className="text-2xs text-warn-ink/80 tabular-nums">
             {stillWaiting.length} item{stillWaiting.length === 1 ? "" : "s"}
@@ -1295,8 +1332,12 @@ function ToDoTab({
                   key={ci.id}
                   className="flex items-baseline gap-3 px-4 py-2.5"
                 >
-                  <span className="text-warn-ink shrink-0">
-                    {ci.state === "requested_waiting" ? "⏳" : "⏸"}
+                  <span className="text-warn-ink shrink-0 flex items-center">
+                    {ci.state === "requested_waiting" ? (
+                      <Hourglass className="w-3.5 h-3.5" aria-hidden />
+                    ) : (
+                      <Pause className="w-3.5 h-3.5" aria-hidden />
+                    )}
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-ink-900 truncate">
@@ -1327,8 +1368,9 @@ function ToDoTab({
       {needsReview.length > 0 && (
         <section className="bg-surface border border-line rounded-md overflow-hidden">
           <header className="flex items-baseline gap-2 px-4 py-3 border-b border-line">
-            <h3 className="text-sm font-semibold text-ink-900">
-              ⚠ Needs your review
+            <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-900">
+              <AlertTriangle className="w-4 h-4 text-warn-ink" aria-hidden />
+              Needs your review
             </h3>
             <span className="text-2xs text-ink-500 tabular-nums">
               {needsReview.length} item{needsReview.length === 1 ? "" : "s"}
@@ -1337,8 +1379,12 @@ function ToDoTab({
           <ul className="divide-y divide-line">
             {needsReview.map((ci) => (
               <li key={ci.id} className="flex items-baseline gap-3 px-4 py-2.5">
-                <span className="shrink-0">
-                  {ci.state === "received_issue" ? "⚠" : "📥"}
+                <span className="shrink-0 flex items-center">
+                  {ci.state === "received_issue" ? (
+                    <AlertTriangle className="w-3.5 h-3.5 text-warn-ink" aria-hidden />
+                  ) : (
+                    <Inbox className="w-3.5 h-3.5 text-ink-500" aria-hidden />
+                  )}
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-ink-900 truncate">{ci.label}</p>
@@ -1455,8 +1501,9 @@ function ToDoTab({
         )}
       </section>
 
-      <p className="text-2xs text-ink-400">
-        ✓ {completeCount} item{completeCount === 1 ? "" : "s"} complete this tax
+      <p className="inline-flex items-center gap-1 text-2xs text-ink-400">
+        <Check className="w-3 h-3" aria-hidden />
+        {completeCount} item{completeCount === 1 ? "" : "s"} complete this tax
         year (open the related task to see source attachments).
       </p>
     </div>
@@ -1481,7 +1528,10 @@ function MailboxTab({ client }: { client: Client }) {
     <div className="space-y-4">
       <section className="bg-surface border border-line rounded-md overflow-hidden">
         <header className="flex items-baseline gap-2 px-4 py-3 border-b border-line">
-          <h3 className="text-sm font-semibold text-ink-900">📥 Inbox</h3>
+          <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-900">
+            <Inbox className="w-4 h-4" aria-hidden />
+            Inbox
+          </h3>
           <span className="text-2xs text-ink-500">
             inbound replies from {client.name}
           </span>
@@ -1497,7 +1547,10 @@ function MailboxTab({ client }: { client: Client }) {
 
       <section className="bg-surface border border-line rounded-md overflow-hidden">
         <header className="flex items-baseline gap-2 px-4 py-3 border-b border-line">
-          <h3 className="text-sm font-semibold text-ink-900">📤 Outbox</h3>
+          <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-900">
+            <Send className="w-4 h-4" aria-hidden />
+            Outbox
+          </h3>
           <span className="text-2xs text-ink-500 tabular-nums">
             {sent.length} sent
           </span>
@@ -1522,12 +1575,16 @@ function MailboxTab({ client }: { client: Client }) {
 
       <section className="bg-surface border border-line rounded-md overflow-hidden">
         <header className="flex items-baseline gap-2 px-4 py-3 border-b border-line">
-          <h3 className="text-sm font-semibold text-ink-900">📝 Drafts</h3>
+          <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-900">
+            <StickyNote className="w-4 h-4" aria-hidden />
+            Drafts
+          </h3>
           <span
             className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
             title="Mode D — drafts wait for your review before send."
           >
-            ✨ AI drafted
+            <Sparkles className="w-3 h-3" aria-hidden />
+            AI drafted
           </span>
           <span className="text-2xs text-ink-500 tabular-nums">
             {pending.length} awaiting review

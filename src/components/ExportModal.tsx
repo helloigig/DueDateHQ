@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Check } from "lucide-react";
 import type { Client, Deadline } from "../types";
 import { formatLongDate } from "../data/dateHelpers";
 import { Modal, useModalLabelId } from "./Modal";
@@ -415,8 +416,9 @@ export function ExportModal({
         </div>
 
         {flash && (
-          <div className="rounded border border-ok-border bg-ok-bg text-ok-ink text-sm px-3 py-2">
-            ✓ {flash}
+          <div className="rounded border border-ok-border bg-ok-bg text-ok-ink text-sm px-3 py-2 inline-flex items-center gap-1.5">
+            <Check className="w-3.5 h-3.5" aria-hidden />
+            <span>{flash}</span>
           </div>
         )}
       </Modal.Body>

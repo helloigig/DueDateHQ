@@ -1,4 +1,4 @@
-import { Sparkles, Snowflake, Calendar, Bell, X, AlertTriangle, FileText } from "lucide-react";
+import { Sparkles, Snowflake, Calendar, Bell, X, AlertTriangle, FileText, Star } from "lucide-react";
 import type {
   AiInsight,
   ChecklistItem,
@@ -122,10 +122,10 @@ export function AiInsightsPanel({
                       )}
                       {confidence === "high" && (
                         <span
-                          className="text-2xs text-ok-ink"
+                          className="inline-flex items-center text-ok-ink"
                           title={reason}
                         >
-                          ★
+                          <Star className="w-3 h-3 fill-current" aria-hidden />
                         </span>
                       )}
                     </div>

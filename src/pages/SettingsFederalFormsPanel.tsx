@@ -113,8 +113,9 @@ export function SettingsFederalFormsPanel() {
       </div>
 
       {actionFlash && (
-        <div className="rounded border border-emerald-200 bg-emerald-50 text-emerald-800 text-sm px-4 py-2">
-          ✓ {actionFlash}
+        <div className="rounded border border-emerald-200 bg-emerald-50 text-emerald-800 text-sm px-4 py-2 inline-flex items-center gap-1.5">
+          <Check className="w-3.5 h-3.5" aria-hidden />
+          <span>{actionFlash}</span>
         </div>
       )}
 
@@ -190,8 +191,9 @@ export function SettingsFederalFormsPanel() {
                   </a>
                 </div>
                 {isResolved && (
-                  <p className="mt-2 text-xs text-ok-ink">
-                    ✓ Applied {new Date(event.appliedAt!).toLocaleDateString()}
+                  <p className="mt-2 inline-flex items-center gap-1 text-xs text-ok-ink">
+                    <Check className="w-3 h-3" aria-hidden />
+                    Applied {new Date(event.appliedAt!).toLocaleDateString()}
                   </p>
                 )}
                 {!isResolved && (
