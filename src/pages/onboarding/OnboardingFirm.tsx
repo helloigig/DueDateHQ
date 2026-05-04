@@ -6,7 +6,6 @@ import {
   AuthField,
   AuthInput,
   FormError,
-  InfoHint,
   PrimaryButton,
   authInputClass,
 } from "../auth/AuthShell";
@@ -109,7 +108,6 @@ export function OnboardingFirm() {
     <OnboardingShell
       step={1}
       totalSteps={3}
-      estimate="~20 seconds"
       title="Set up your firm workspace"
       subtitle="Your account is created. Now we set up the firm — the tenant where your clients, deadlines, and filings live."
       brandLine="One account, one firm at MVP. Multi-firm membership ships in Phase 2 (next quarter)."
@@ -131,8 +129,8 @@ export function OnboardingFirm() {
           label="Where do you file?"
           hint={
             filingStates.length === 1
-              ? "Pick every state you handle filings in. The first one is your home state — its address goes on outbound emails. Most firms file in 3–15 states; you can add more anytime in Settings."
-              : `Pick every state you handle filings in. The first one is your home state — its address goes on outbound emails. You've picked ${filingStates.length} state${filingStates.length === 1 ? "" : "s"}.`
+              ? undefined
+              : `${filingStates.length} states picked.`
           }
         >
           <StateMultiSelect
@@ -187,22 +185,13 @@ export function OnboardingFirm() {
 
         {submitError && <FormError>{submitError}</FormError>}
 
-        <div className="flex flex-col gap-4">
-          <PrimaryButton
-            onClick={() => void next()}
-            disabled={!firmName.trim() || filingStates.length === 0}
-            loading={bootstrap.isPending}
-          >
-            {bootstrap.isPending ? "Creating workspace" : "Continue"}
-          </PrimaryButton>
-
-          <InfoHint>
-            <span className="font-medium text-ink-900">Trial:</span> Pro tier
-            is free for 30 days — no card. After day 30 you pay or your data
-            goes read-only. Pick a plan in Settings → Billing whenever you're
-            ready.
-          </InfoHint>
-        </div>
+        <PrimaryButton
+          onClick={() => void next()}
+          disabled={!firmName.trim() || filingStates.length === 0}
+          loading={bootstrap.isPending}
+        >
+          {bootstrap.isPending ? "Creating workspace" : "Continue"}
+        </PrimaryButton>
       </div>
     </OnboardingShell>
   );
@@ -327,28 +316,18 @@ function StateMultiSelect({
         </div>
       </div>
 
-      <div className="flex items-center justify-between text-2xs flex-wrap gap-2">
-        <div className="text-ink-500 min-h-[1.25em]">
-          {hoveredState ? (
-            <>
-              <span className="font-mono font-semibold">
-                {hoveredState.code}
-              </span>{" "}
-              · {hoveredState.name}
-            </>
-          ) : (
-            "Click a state to add or remove it. Set one as your home."
-          )}
-        </div>
-        <div className="flex items-center gap-3 text-ink-500">
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm bg-indigo" /> picked
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm bg-surface border border-line" />{" "}
-            available
-          </span>
-        </div>
+      {/* Hover label only — legend and resting copy were intuitive enough
+          to drop per dogfooding feedback. The hover line keeps the
+          state-name affordance present without filling space at rest. */}
+      <div className="text-2xs text-ink-500 min-h-[1.25em]">
+        {hoveredState && (
+          <>
+            <span className="font-mono font-semibold">
+              {hoveredState.code}
+            </span>{" "}
+            · {hoveredState.name}
+          </>
+        )}
       </div>
     </div>
   );

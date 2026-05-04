@@ -88,14 +88,13 @@ export function OnboardingShell({
       <footer className="border-t border-line">
         <div
           className={[
-            "mx-auto px-6 py-4 flex items-center justify-between gap-4 text-2xs",
+            "mx-auto px-6 py-4 text-2xs",
             wide ? "max-w-5xl" : "max-w-2xl",
           ].join(" ")}
         >
           <p className="text-ink-500 italic leading-snug">
             {brandLine ?? DEFAULT_BRAND_LINE}
           </p>
-          <p className="text-ink-400 shrink-0">Total: under 5 minutes</p>
         </div>
       </footer>
       <HelpButton />

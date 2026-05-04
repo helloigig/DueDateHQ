@@ -14,10 +14,9 @@ export function OnboardingImport() {
     <OnboardingShell
       step={3}
       totalSteps={3}
-      estimate="~2 minutes"
       title="Upload your client roster"
-      subtitle="Drag a CSV from File In Time, TaxDome, Drake, ProConnect, QuickBooks, or plain Excel. AI maps the columns; you confirm. AI handles ambiguous rows by surfacing them inline."
-      brandLine="Import Tier 1 — the only mandatory upload. Tiers 2-4 are optional capability unlocks later."
+      subtitle="Drop a CSV. AI maps the columns; you confirm."
+      brandLine="Tier 1 covers the roster (clients + entity + state). Tiers 2-4 ship with prior-year returns, K-1 packets, and Gmail history later — they're capability unlocks, not gates."
       wide
     >
       <ImportWithContinue />
@@ -31,7 +30,10 @@ function ImportWithContinue() {
   const hasClients = clients.length > 0;
   return (
     <>
-      <div className="bg-canvas border border-line rounded-md p-3">
+      {/* Render Import inline — it has its own card chrome on the preview
+          region. Wrapping it in another card was double-bordering and
+          squeezing the preview-table width unnecessarily. */}
+      <div className="-mt-4">
         <Import />
       </div>
       {hasClients && (
