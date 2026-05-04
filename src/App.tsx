@@ -34,6 +34,9 @@ const Inbox = lazy(() =>
 const Insights = lazy(() =>
   import("./pages/Insights").then((m) => ({ default: m.Insights })),
 );
+const Activity = lazy(() =>
+  import("./pages/Activity").then((m) => ({ default: m.Activity })),
+);
 const Mail = lazy(() =>
   import("./pages/Mail").then((m) => ({ default: m.Mail })),
 );
@@ -220,6 +223,7 @@ export default function App() {
           <Route path="opportunities" element={<Insights />} />
           {/* Legacy /insights route — redirect to canonical /opportunities */}
           <Route path="insights" element={<Navigate to="/opportunities" replace />} />
+          <Route path="activity" element={<Activity />} />
           <Route path="clients" element={<Clients />} />
           <Route path="clients/:id" element={<ClientDetail />} />
           <Route path="clients/:id/tasks/:taskId" element={<TaskDetail />} />

@@ -1533,6 +1533,80 @@ export const mockAdapter = {
         (a) => !a.relatedDeadlineId || a.relatedDeadlineId === task.deadlineId,
       );
     },
+    list: async (
+      input?: {
+        limit?: number;
+        beforeCreatedAt?: string;
+        eventType?: string;
+        clientId?: string;
+      },
+    ) => {
+      await delay();
+      const { clients, tasks, deadlines } = getState();
+      const params = input ?? {};
+      const limit = params.limit ?? 100;
+      // Flatten every client's activity into one ordered feed, joining
+      // task formType + jurisdiction so the FE can render the "X · Y" line
+      // without follow-up lookups (mirrors the BE's join shape).
+      const all: Array<{
+        id: number;
+        firmId: string;
+        taskId: string;
+        eventType: string;
+        actorKind: "user" | "system" | "ai" | "client";
+        actorUserId: string | null;
+        description: string;
+        payload: unknown;
+        relatedChecklistItemId: string | null;
+        relatedEmailDraftId: string | null;
+        createdAt: Date;
+        clientId: string;
+        clientName: string;
+        taskFormType: string;
+        taskJurisdiction: string;
+      }> = [];
+      for (const c of clients) {
+        for (const a of c.activity ?? []) {
+          if (params.clientId && c.id !== params.clientId) continue;
+          if (params.eventType && a.type !== params.eventType) continue;
+          // Resolve task via the activity's relatedDeadlineId → deadline → task.
+          const dl = a.relatedDeadlineId
+            ? deadlines.find((d) => d.id === a.relatedDeadlineId)
+            : undefined;
+          const task = dl ? tasks.find((t) => t.deadlineId === dl.id) : undefined;
+          if (!task) continue;
+          all.push({
+            id: 0,
+            firmId: "mock-firm",
+            taskId: task.id,
+            eventType: a.type,
+            actorKind: "user",
+            actorUserId: null,
+            description: a.description,
+            payload: {},
+            relatedChecklistItemId: null,
+            relatedEmailDraftId: null,
+            createdAt: new Date(a.timestamp),
+            clientId: c.id,
+            clientName: c.name,
+            taskFormType: dl?.formType ?? "",
+            taskJurisdiction: dl?.jurisdiction ?? "",
+          });
+        }
+      }
+      all.sort((x, y) => y.createdAt.getTime() - x.createdAt.getTime());
+      let filtered = all;
+      if (params.beforeCreatedAt) {
+        const cutoff = new Date(params.beforeCreatedAt).getTime();
+        filtered = filtered.filter((r) => r.createdAt.getTime() < cutoff);
+      }
+      const items = filtered.slice(0, limit);
+      const hasMore = filtered.length > limit;
+      const nextCursor = hasMore
+        ? items[items.length - 1]?.createdAt.toISOString() ?? null
+        : null;
+      return { items, nextCursor };
+    },
   },
 
   emails: {

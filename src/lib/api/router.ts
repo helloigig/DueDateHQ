@@ -765,6 +765,30 @@ export const appRouter = t.router({
     listForTask: t.procedure
       .input(z.object({ taskId: z.string(), limit: z.number().optional() }))
       .query(async (): Promise<ActivityEntry[]> => NOT_IMPL()),
+    list: t.procedure
+      .input(
+        z
+          .object({
+            limit: z.number().int().min(1).max(200).optional(),
+            beforeCreatedAt: z.string().optional(),
+            eventType: z.string().optional(),
+            clientId: z.string().optional(),
+          })
+          .optional(),
+      )
+      .query(
+        async (): Promise<{
+          items: Array<
+            ActivityEntry & {
+              clientId: string;
+              clientName: string;
+              taskFormType: string;
+              taskJurisdiction: string;
+            }
+          >;
+          nextCursor: string | null;
+        }> => NOT_IMPL(),
+      ),
   }),
 
   emails: t.router({
