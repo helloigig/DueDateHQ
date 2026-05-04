@@ -57,6 +57,13 @@
       "when": 1777593000000,
       "tag": "0007_alert_action_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777594000000,
+      "tag": "0008_client_notes",
+      "breakpoints": true
     }
   ]
 }

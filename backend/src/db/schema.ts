@@ -138,6 +138,27 @@ export const clients = pgTable("clients", {
   archivedAt: timestamp("archived_at", { withTimezone: true }),
 });
 
+// Per-client note entries — distinct from `clients.notes` (which is a
+// freeform single text field for legacy/import notes). The note FEED
+// surfaced on Client Detail (PRD §4.6) is an append-only list with
+// pinning, author attribution, and optional deadline link.
+export const clientNotes = pgTable("client_notes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  firmId: uuid("firm_id")
+    .notNull()
+    .references(() => firms.id, { onDelete: "cascade" }),
+  clientId: uuid("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  authorUserId: uuid("author_user_id").references(() => users.id),
+  body: text("body").notNull(),
+  pinned: boolean("pinned").notNull().default(false),
+  relatedDeadlineId: uuid("related_deadline_id"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+});
+
 export const relatedClients = pgTable(
   "related_clients",
   {
