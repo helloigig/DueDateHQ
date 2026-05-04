@@ -72,15 +72,43 @@ import type {
 // v0.6; v0.7 demotes them to the overflow menu since the rich tabs cover
 // every primary daily flow.
 type Tab =
+  | "todo"
   | "engagement"
   | "filings"
-  | "habits"
-  | "predictions"
-  | "todo"
   | "mailbox"
+  | "notes"
+  // Held over from v0.7 §3.3 so existing deep links keep working —
+  // routed via the overflow menu rather than the primary strip.
   | "documents"
   | "contacts"
   | "audit";
+
+/**
+ * Pretty-print an entity_type enum value (`s_corp`, `c_corp`, `non_profit`)
+ * for the header badge. Mirrors the canonical display strings the seed
+ * data + the FE form dropdowns use ("S-Corp", "C-Corp", "Non-Profit"),
+ * so users see a familiar label rather than the SQL spelling.
+ */
+function entityTypeDisplay(et: string): string {
+  switch (et) {
+    case "individual":
+      return "Individual";
+    case "llc":
+      return "LLC";
+    case "s_corp":
+      return "S-Corp";
+    case "c_corp":
+      return "C-Corp";
+    case "partnership":
+      return "Partnership";
+    case "trust":
+      return "Trust";
+    case "non_profit":
+      return "Non-Profit";
+    default:
+      return et;
+  }
+}
 
 export function ClientDetail() {
   const { id } = useParams<{ id: string }>();
@@ -90,7 +118,7 @@ export function ClientDetail() {
   const deadlinesQuery = useDeadlinesForClient(id);
   const client = clientQuery.data ?? null;
   const deadlines = deadlinesQuery.data ?? [];
-  const [tab, setTab] = useState<Tab>("engagement");
+  const [tab, setTab] = useState<Tab>("todo");
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -173,10 +201,19 @@ export function ClientDetail() {
   }
 
   const addedAtLabel = formatLongDate(client.addedAt);
-  const primaryStateName = STATE_NAMES[client.primaryState];
   const activeDeadlineCount = clientDeadlines.filter(
     (d) => d.status !== "completed" && d.status !== "filed_extension"
   ).length;
+  // "Working on" — the distinct formTypes among active deadlines. Used
+  // to badge the client header so the CPA can read at-a-glance which
+  // filings the firm is in the middle of for this client.
+  const workingOnFormTypes = Array.from(
+    new Set(
+      clientDeadlines
+        .filter((d) => d.status !== "completed" && d.status !== "filed_extension")
+        .map((d) => d.form),
+    ),
+  );
 
   const onArchiveConfirm = () => {
     actions.archiveClient(client.id);
@@ -196,23 +233,48 @@ export function ClientDetail() {
             <h1 className="text-2xl font-semibold text-ink-900">
               {client.name}
             </h1>
+            {/* Entity-type badge — replaces the old comma-separated meta
+                line. The dot-separated `s_corp · Texas · active · Added —`
+                pattern was decorative noise; the data lives in the badge
+                row and AI summary below. */}
+            <span
+              className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line"
+              title="Entity type"
+            >
+              {entityTypeDisplay(client.entityType)}
+            </span>
             <StateChipGroup
               primary={client.primaryState}
               nexus={client.nexusStates}
             />
+            {/* "Working on" badge — the filings the firm is currently
+                executing for this client. Pulls from active (not-completed,
+                not-extended) deadlines, deduped by formType. Caps at 3 +
+                "+N more" so a packed roster doesn't break the line. */}
+            {workingOnFormTypes.length > 0 && (
+              <span
+                className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-info-bg text-info-ink border border-info-border"
+                title="Active filings the firm is currently executing"
+              >
+                Working on: {workingOnFormTypes.slice(0, 3).join(", ")}
+                {workingOnFormTypes.length > 3 && ` +${workingOnFormTypes.length - 3}`}
+              </span>
+            )}
             {client.status === "archived" && (
               <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-500">
                 Archived
               </span>
             )}
           </div>
-          <p className="text-sm text-ink-500 mt-1">
-            {client.entityType} · {primaryStateName}
-            {client.nexusStates.length > 0 && ` + ${client.nexusStates.length} nexus`} ·
-            <span className="capitalize"> {client.status}</span> · Added {addedAtLabel}
-          </p>
+          {/* AI behaviour summary — placeholder for now. Phase 2 wires
+              this to a server-side composer that derives the sentence
+              from activity_events: avg response time to chases, extension
+              history, mode A confidence rates, pushback frequency, etc.
+              The CPA can override the auto-text manually; the override
+              persists on `clients.ai_summary_override` (Phase 2 schema). */}
+          <ClientAiSummary client={client} />
           {client.servicePackages.length > 0 && (
-            <div className="mt-2 flex items-center flex-wrap gap-1.5">
+            <div className="mt-3 flex items-center flex-wrap gap-1.5">
               <span className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
                 Service package{client.servicePackages.length === 1 ? "" : "s"}:
               </span>
@@ -220,7 +282,7 @@ export function ClientDetail() {
                 <PackageChip key={p} packageName={p} client={client} />
               ))}
               <span className="text-2xs text-ink-400">
-                · {clientDeadlines.length} deadline{clientDeadlines.length === 1 ? "" : "s"} auto-generated
+                · {clientDeadlines.length} deadline{clientDeadlines.length === 1 ? "" : "s"} auto-generated · added {addedAtLabel}
               </span>
             </div>
           )}
@@ -247,14 +309,21 @@ export function ClientDetail() {
       <ClientAiInsightsCard clientId={client.id} />
 
       <div className="mt-5 border-b border-line flex items-center gap-1 flex-wrap relative">
+        {/* Tab order — IA v0.7 §3.3 amendment 2026-05-04: To Do leads
+            because it's the only tab the CPA actually opens during the
+            day (chase / confirm / send). Engagement = contract/scope
+            (what we're paid to do); Filings = past + current + projected
+            timeline; Habits + Predictions fold into Filings as the
+            "Multi-year patterns" section since they describe the same
+            history axis. Notes promoted from sub-section to a real tab
+            so firm-internal memory has its own destination. */}
         {(
           [
+            ["todo", "To Do", CircleCheck],
             ["engagement", "Engagement", Handshake],
             ["filings", "Filings", ClipboardList],
-            ["habits", "Habits", Brain],
-            ["predictions", "Predictions", Sparkles],
-            ["todo", "To Do", CircleCheck],
             ["mailbox", "Mailbox", Mail],
+            ["notes", "Notes", Brain],
           ] as const
         ).map(([key, label, Icon]) => (
           <button
@@ -318,13 +387,21 @@ export function ClientDetail() {
       </div>
 
       <div className="mt-5 space-y-5">
+        {tab === "todo" && (
+          <ToDoTab
+            client={client}
+            allDeadlines={clientDeadlines}
+            onAddDeadline={() => setAddDeadlineOpen(true)}
+            onOpenDocuments={() => setTab("documents")}
+          />
+        )}
         {tab === "engagement" && (
           <EngagementTab
             client={client}
             upcoming={upcoming}
             allDeadlines={clientDeadlines}
             onSwitchToToDo={() => setTab("todo")}
-            onSwitchToHabits={() => setTab("habits")}
+            onSwitchToNotes={() => setTab("notes")}
           />
         )}
         {tab === "filings" && (
@@ -337,17 +414,8 @@ export function ClientDetail() {
             }}
           />
         )}
-        {tab === "habits" && <HabitsTab client={client} />}
-        {tab === "predictions" && <PredictionsTab client={client} />}
-        {tab === "todo" && (
-          <ToDoTab
-            client={client}
-            allDeadlines={clientDeadlines}
-            onAddDeadline={() => setAddDeadlineOpen(true)}
-            onOpenDocuments={() => setTab("documents")}
-          />
-        )}
         {tab === "mailbox" && <MailboxTab client={client} />}
+        {tab === "notes" && <NotesTab client={client} />}
         {tab === "documents" && <DocumentsTab client={client} />}
         {tab === "contacts" && <ContactsTab client={client} />}
         {tab === "audit" && <ActivityTab client={client} />}
@@ -600,19 +668,18 @@ function PackageDetailsPopover({
 
 function NotesTab({ client }: { client: Client }) {
   const [draft, setDraft] = useState("");
-  const [query, setQuery] = useState("");
   const notes = client.noteEntries ?? [];
   const addNoteMutation = useAddNote();
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const sorted = [...notes].sort((a, b) => {
+  // Sort: pinned first, then newest. Search field removed per
+  // 2026-05-04 feedback — notes are short and few; the timeline is
+  // the search affordance. Cmd+F still works in-page if needed.
+  const sortedNotes = useMemo(() => {
+    return [...notes].sort((a, b) => {
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
       return b.createdAt.localeCompare(a.createdAt);
     });
-    if (!q) return sorted;
-    return sorted.filter((n) => n.body.toLowerCase().includes(q));
-  }, [notes, query]);
+  }, [notes]);
 
   const onAdd = () => {
     const body = draft.trim();
@@ -652,27 +719,13 @@ function NotesTab({ client }: { client: Client }) {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search notes…"
-          className="flex-1 text-sm px-3 py-1.5 rounded border border-line bg-surface"
-        />
-        <span className="text-xs text-ink-400">
-          {filtered.length} of {notes.length}
-        </span>
-      </div>
-
-      {filtered.length === 0 ? (
+      {sortedNotes.length === 0 ? (
         <div className="bg-surface border border-line rounded-lg p-6 text-center text-sm text-ink-500">
-          {notes.length === 0
-            ? "No notes yet. Add your first above."
-            : `No notes match "${query}".`}
+          No notes yet. Add your first above.
         </div>
       ) : (
         <ul className="space-y-2">
-          {filtered.map((n) => (
+          {sortedNotes.map((n) => (
             <NoteItem key={n.id} note={n} clientId={client.id} />
           ))}
         </ul>
@@ -816,7 +869,7 @@ type EngagementProps = {
   upcoming: Deadline[];
   allDeadlines: Deadline[];
   onSwitchToToDo: () => void;
-  onSwitchToHabits: () => void;
+  onSwitchToNotes: () => void;
 };
 
 function EngagementTab({
@@ -824,7 +877,7 @@ function EngagementTab({
   upcoming,
   allDeadlines,
   onSwitchToToDo,
-  onSwitchToHabits,
+  onSwitchToNotes,
 }: EngagementProps) {
   const { checklistItems, tasks } = useStore();
   const insights = useAiInsightsForClient(client.id);
@@ -1112,7 +1165,7 @@ function EngagementTab({
         </span>
       </section>
 
-      {/* Notes pointer — full editor lives in Habits. */}
+      {/* Notes pointer — full editor lives in the Notes tab. */}
       <section className="bg-surface border border-line rounded-md p-4 flex items-baseline gap-3">
         <div className="flex-1">
           <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
@@ -1120,122 +1173,28 @@ function EngagementTab({
           </h3>
           <p className="text-sm text-ink-700 mt-0.5">
             {noteCount > 0
-              ? `${noteCount} note${noteCount === 1 ? "" : "s"} — full editor in Habits.`
-              : "No notes yet. Use the Habits tab to capture firm memory about this client."}
+              ? `${noteCount} note${noteCount === 1 ? "" : "s"} — open the Notes tab to read or add.`
+              : "No notes yet. Use the Notes tab to capture firm memory about this client."}
           </p>
         </div>
         <button
-          onClick={onSwitchToHabits}
+          onClick={onSwitchToNotes}
           className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken"
         >
-          Open Habits →
+          Open Notes →
         </button>
       </section>
     </div>
   );
 }
 
-function HabitsTab({ client }: { client: Client }) {
-  const facts = useImportedFactsForClient(client.id);
-  const insights = useAiInsightsForClient(client.id);
-
-  return (
-    <div className="space-y-4">
-      <section className="bg-surface border border-line rounded-md p-4">
-        <header className="flex items-center gap-2 mb-2">
-          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
-            Multi-year patterns
-          </h3>
-          <span
-            className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
-            title="Mode E + Mode B — narrated from imported history."
-          >
-            <Sparkles className="w-3 h-3" aria-hidden />
-            AI narrated
-          </span>
-        </header>
-        {facts.length === 0 && insights.length === 0 ? (
-          <p className="text-xs text-ink-500">
-            <strong className="text-ink-700">Cold start:</strong> Personalized
-            memory unlocks once you import a prior-year return for this client.
-            Until then, AI uses substrate-based defaults (entity + state + cohort)
-            for predictions and reminders.
-          </p>
-        ) : (
-          <ul className="space-y-2 text-sm">
-            {facts.slice(0, 6).map((f) => (
-              <li key={f.id} className="text-ink-700">
-                <span className="text-ink-500">{f.itemType}:</span>{" "}
-                <span className="text-ink-900">
-                  {f.observedAmount != null
-                    ? `$${f.observedAmount.toLocaleString()}`
-                    : f.observedDate
-                      ? `arrived ${formatLongDate(f.observedDate)}`
-                      : (f.note ?? "—")}
-                </span>
-                <span className="text-ink-400 text-2xs ml-2">({f.year})</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <NotesTab client={client} />
-    </div>
-  );
-}
-
-function PredictionsTab({ client }: { client: Client }) {
-  const facts = useImportedFactsForClient(client.id);
-  return (
-    <section className="bg-surface border border-line rounded-md p-4">
-      <header className="flex items-center gap-2 mb-2">
-        <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
-          Per-client expected timeline
-        </h3>
-        <span
-          className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
-          title="Mode B — per-client arrival timing prediction"
-        >
-          <Sparkles className="w-3 h-3" aria-hidden />
-          Mode B prediction
-        </span>
-      </header>
-      {facts.length === 0 ? (
-        <div className="text-xs text-ink-500 space-y-2">
-          <p>
-            <strong className="text-ink-700">Cold start:</strong> Predictions
-            unlock once you import this client's prior-year history. Until
-            then, AI uses substrate-based generic timing ({client.entityType} ·{" "}
-            {client.primaryState}) so reminders still fire on a sensible
-            cadence.
-          </p>
-          <p>
-            What you'll see here once history lands: per-client expected
-            arrivals (W-2, K-1, 1099-DIV), Mode B reminder schedule, and Mode
-            E anomaly watch list.
-          </p>
-        </div>
-      ) : (
-        <ul className="space-y-2 text-sm">
-          {facts.map((f) => (
-            <li key={f.id} className="text-ink-700">
-              <span className="text-ink-500">{f.itemType}:</span>{" "}
-              <span className="text-ink-900">
-                {f.observedAmount != null
-                  ? `$${f.observedAmount.toLocaleString()}`
-                  : f.observedDate
-                    ? `arrived ${formatLongDate(f.observedDate)}`
-                    : (f.note ?? "—")}
-              </span>
-              <span className="text-ink-400 text-2xs ml-2">({f.year})</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
+// HabitsTab + PredictionsTab removed 2026-05-04 per IA amendment —
+// multi-year patterns + per-client expected timeline now live as
+// sub-sections inside FilingsTab (the "Multi-year patterns" block).
+// They described the same history axis and didn't earn separate tabs.
+// To restore historic-only deep-link compatibility, /clients/:id?tab=habits
+// would need to redirect to ?tab=filings#patterns, but the URL contract
+// was internal-only so we don't gate the change on it.
 
 function ToDoTab({
   client,
@@ -1868,6 +1827,103 @@ function DocumentsTab({ client }: { client: Client }) {
         </span>
       </div>
     </div>
+  );
+}
+
+/**
+ * AI-generated client behaviour summary. Phase 1 placeholder — Phase 2
+ * wires this to a server-side composer that derives 2-3 sentences from
+ * the firm's activity_events for this client:
+ *
+ *   • avg response time to chase emails (inbound_replies vs email_drafts)
+ *   • reminder-to-receipt ratio (how many chases per item received)
+ *   • Mode A confidence rate (avg aiConfidence on classified docs)
+ *   • extension history (count of tasks.status === "filed_extension")
+ *   • pushback frequency (replyIntent === "timeline_pushback" rate)
+ *   • mismatched-attachment rate (replyIntent === "mismatched_attachment")
+ *   • bounce rate on outbound to this client
+ *   • AI insight resolution rate (Mode E aiInferences.wasActedOn)
+ *
+ * The CPA can edit the auto-text manually; the override persists to
+ * `clients.ai_summary_override` (Phase 2 schema). Until the composer
+ * lands, this renders a static placeholder so the UI isn't empty —
+ * better than a hidden affordance the user can't discover.
+ */
+function ClientAiSummary({ client }: { client: Client }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  // Stub composer — picks a contextual placeholder based on tier so
+  // demos read naturally. Phase 2 replaces this with the real signal-
+  // composed sentence from the BE.
+  const placeholder =
+    client.tier === "premium"
+      ? "Premium engagement — fast responder, clean quarterly handoffs. Watch for K-1 lag in March."
+      : client.tier === "custom"
+        ? "Custom-scoped engagement — review the package details before kicking off the next filing."
+        : "Reliable filer — no recent flags. Insights will refine here as activity accumulates.";
+  const summary = client.aiSummaryOverride ?? placeholder;
+
+  if (editing) {
+    return (
+      <section className="mt-2 bg-info-bg border border-info-border rounded-md p-3">
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          rows={3}
+          maxLength={500}
+          className="w-full text-sm bg-surface border border-line rounded px-2 py-1.5 text-ink-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+        />
+        <div className="mt-2 flex items-center justify-end gap-2">
+          <button
+            onClick={() => setEditing(false)}
+            className="text-xs px-2.5 py-1 rounded text-ink-500 hover:text-ink-900"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              actions.updateClient(client.id, {
+                aiSummaryOverride: draft.trim() || null,
+              });
+              setEditing(false);
+            }}
+            className="text-xs px-2.5 py-1 rounded bg-accent text-canvas hover:bg-accent-hover"
+          >
+            Save
+          </button>
+        </div>
+        <p className="mt-1.5 text-2xs text-ink-500">
+          Manual override — replaces the auto-generated summary until you
+          clear it. Phase 2: regenerate from latest activity nightly.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="mt-2 bg-info-bg/40 border border-info-border/60 rounded-md p-3 flex items-start gap-2">
+      <Sparkles
+        className="w-3.5 h-3.5 text-info-ink shrink-0 translate-y-0.5"
+        aria-hidden
+      />
+      <p className="flex-1 text-sm text-ink-700 leading-relaxed italic">
+        {summary}
+      </p>
+      <button
+        onClick={() => {
+          setDraft(summary);
+          setEditing(true);
+        }}
+        className="text-2xs text-ink-500 hover:text-ink-900 underline shrink-0"
+        title={
+          client.aiSummaryOverride
+            ? "Edit your override"
+            : "Edit and override the AI-generated summary"
+        }
+      >
+        Edit
+      </button>
+    </section>
   );
 }
 

@@ -490,71 +490,6 @@ function PreviewStep({
         </div>
       </div>
 
-<<<<<<< claude/condescending-chaum-a724da
-      {/* Scrollable table region — actions live in a sticky footer below
-          so the user can scroll through long rosters and still see Back /
-          Commit at all times. Column widths bias toward Name + Email
-          which are the fields CPAs actually scan to spot wrong rows. */}
-      <div className="max-h-[480px] overflow-y-auto">
-        <table className="w-full text-sm table-fixed">
-          <colgroup>
-            <col className="w-[26%]" />
-            <col className="w-[11%]" />
-            <col className="w-[8%]" />
-            <col className="w-[22%]" />
-            <col className="w-[22%]" />
-            <col className="w-[11%]" />
-          </colgroup>
-          <thead className="text-xs uppercase tracking-wide text-ink-500 bg-canvas sticky top-0 z-10">
-            <tr>
-              <th className="text-left px-4 py-2 font-medium">Name</th>
-              <th className="text-left px-4 py-2 font-medium">Entity</th>
-              <th className="text-left px-4 py-2 font-medium">State</th>
-              <th className="text-left px-4 py-2 font-medium">Email</th>
-              <th className="text-left px-4 py-2 font-medium">Bundle</th>
-              <th className="text-right px-4 py-2 font-medium"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-line">
-            {rows.map((r, i) => {
-              const issue = r.issues.length > 0;
-              return (
-                <Fragment key={i}>
-                  <tr
-                    className={issue ? "bg-amber-50/50" : "hover:bg-canvas"}
-                  >
-                    <td className="px-4 py-2.5 text-ink-900 truncate">
-                      {issue && (
-                        <AlertTriangle className="w-3 h-3 inline text-amber-600 mr-1" aria-hidden />
-                      )}
-                      {r.name}
-                    </td>
-                    <td className="px-4 py-2.5 text-ink-700">
-                      {r.entityType ?? (
-                        <span className="text-amber-700">?</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-ink-700">
-                      {r.primaryState ?? (
-                        <span className="text-amber-700">?</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-ink-700 truncate">
-                      {r.email || <span className="text-amber-700">—</span>}
-                    </td>
-                    <td className="px-4 py-2.5 text-ink-700 truncate">
-                      {r.bundle ?? <span className="text-ink-400">—</span>}
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      {issue && (
-                        <button
-                          onClick={() => setEditing(editing === i ? null : i)}
-                          className="text-xs px-2 py-1 rounded bg-ink-900 text-white hover:bg-ink-900"
-                        >
-                          {editing === i ? "Cancel" : "Fix"}
-                        </button>
-                      )}
-=======
       <table className="w-full text-sm">
         <thead className="text-xs uppercase tracking-wide text-ink-500 bg-canvas">
           <tr>
@@ -575,7 +510,12 @@ function PreviewStep({
                   className={issue ? "bg-amber-50/50" : "hover:bg-canvas"}
                 >
                   <td className="px-4 py-2.5 text-ink-900">
-                    {issue && <span className="text-amber-600 mr-1">⚠</span>}
+                    {issue && (
+                      <AlertTriangle
+                        className="w-3 h-3 inline text-amber-600 mr-1"
+                        aria-hidden
+                      />
+                    )}
                     {r.name}
                   </td>
                   <td className="px-4 py-2.5 text-ink-700">
@@ -620,7 +560,6 @@ function PreviewStep({
                           if (resolved.length === 0) setEditing(null);
                         }}
                       />
->>>>>>> main
                     </td>
                   </tr>
                 )}
