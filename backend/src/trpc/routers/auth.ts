@@ -1,9 +1,9 @@
 import { TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { firmProcedure, publicProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
-import { firms, users } from "../../db/schema.js";
+import { firms, teamInvites, users } from "../../db/schema.js";
 import { ALL_STATES } from "../../lib/states.js";
 
 export const authRouter = router({
@@ -131,5 +131,66 @@ export const authRouter = router({
         return { firmId: firm.id };
       });
       return { firmId: result.firmId, alreadyProvisioned: false as const };
+    }),
+
+  /**
+   * Sibling of `team.acceptInvite` exposed under the `auth` namespace
+   * because the FE's invite-acceptance page lives in the auth flow
+   * (`/accept-invite`). Accepts the same token but also captures the
+   * invitee's chosen display name from the form.
+   *
+   * Assumes the invitee has already created a Supabase Auth account
+   * with the invite email (the FE handles signup before calling this).
+   * Password is accepted in the input but ignored here — Supabase has
+   * already stored it. Phase 1 may move to a server-side signup so
+   * the password becomes load-bearing.
+   */
+  acceptInvite: publicProcedure
+    .input(
+      z.object({
+        token: z.string().min(20).max(64),
+        password: z.string().min(8).max(128).optional(),
+        userName: z.string().min(1).max(120).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+      const invite = await db.query.teamInvites.findFirst({
+        where: and(
+          eq(teamInvites.token, input.token),
+          eq(teamInvites.status, "pending"),
+        ),
+      });
+      if (!invite) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "invalid_token" });
+      }
+      if (invite.expiresAt.getTime() < Date.now()) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "expired",
+        });
+      }
+      if (invite.email !== ctx.user.email.toLowerCase()) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "invite_email_mismatch",
+        });
+      }
+      await db.transaction(async (tx) => {
+        await tx.insert(users).values({
+          id: ctx.user!.id,
+          firmId: invite.firmId,
+          email: ctx.user!.email,
+          displayName: input.userName ?? null,
+          role: invite.role,
+        });
+        await tx
+          .update(teamInvites)
+          .set({ status: "accepted", acceptedAt: new Date() })
+          .where(eq(teamInvites.id, invite.id));
+      });
+      return { ok: true as const, firmId: invite.firmId };
     }),
 });
