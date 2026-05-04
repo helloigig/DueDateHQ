@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Inbox as InboxIcon, Send, FileEdit, AlertTriangle, Mail as MailIcon } from "lucide-react";
 import { trpc } from "../lib/api/client";
 import { env } from "../config";
@@ -39,7 +39,7 @@ const REMINDERS_OUT = [
   },
 ];
 
-const INBOX_MOCK = [
+const INBOX_MOCK: InboxRow[] = [
   {
     intent: "timeline_pushback",
     client: "Sarah Mitchell",
@@ -69,6 +69,8 @@ type InboxRow = {
   task: string;
   preview: string;
   receivedHoursAgo: number;
+  taskId?: string;
+  clientId?: string;
 };
 
 function hoursAgo(iso: string | Date): number {
@@ -77,6 +79,7 @@ function hoursAgo(iso: string | Date): number {
 }
 
 export function Mail() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("inbox");
   const inboxQuery = trpc.inboundReplies.list.useQuery({ limit: 50 });
   const issuesQuery = trpc.deliveryEvents.issues.useQuery({ limit: 50 });
@@ -85,13 +88,23 @@ export function Mail() {
   // tasks/clients (held off to keep the router stateless), best-effort
   // identifiers: from-address as client, subject (or short body) as task.
   // Polish: add joined fields in a router follow-up to surface real names.
-  const liveInbox: InboxRow[] = (inboxQuery.data ?? []).map((r) => ({
-    intent: r.replyIntent ?? r.topLevelClass ?? "unknown",
-    client: r.fromAddress.split("@")[0] ?? r.fromAddress,
-    task: r.subject?.slice(0, 40) ?? (r.taskId ? "(linked task)" : "(unmatched)"),
-    preview: (r.bodyText ?? r.subject ?? "(no body)").slice(0, 100),
-    receivedHoursAgo: hoursAgo(r.receivedAt),
-  }));
+  const liveInbox: InboxRow[] = (inboxQuery.data ?? []).map((r) => {
+    // Older FE router types may not yet declare `clientId` on the row;
+    // it's added by the BE join in the inboundReplies router. Read
+    // through index access so the build doesn't fail before the type
+    // sync.
+    const rWithClient = r as typeof r & { clientId?: string | null };
+    return {
+      intent: r.replyIntent ?? r.topLevelClass ?? "unknown",
+      client: r.fromAddress.split("@")[0] ?? r.fromAddress,
+      task:
+        r.subject?.slice(0, 40) ?? (r.taskId ? "(linked task)" : "(unmatched)"),
+      preview: (r.bodyText ?? r.subject ?? "(no body)").slice(0, 100),
+      receivedHoursAgo: hoursAgo(r.receivedAt),
+      taskId: r.taskId ?? undefined,
+      clientId: rWithClient.clientId ?? undefined,
+    };
+  });
   // Same rule as Timeline / ActionQueue: in real mode, an empty BE renders
   // an empty state — never substitute INBOX_MOCK, which produces fake
   // client names the user can't act on.
@@ -285,23 +298,55 @@ export function Mail() {
                       : "no inbound mail yet"}
             </span>
           </p>
-          {inbox.map((m, i) => (
-            <article
-              key={i}
-              className="rounded-md border border-line bg-surface p-3 hover:bg-sunken/40 cursor-pointer"
-            >
-              <header className="flex items-center gap-2 mb-1.5">
-                <IntentBadge intent={m.intent} />
-                <span className="font-medium text-ink-900 text-sm">{m.client}</span>
-                <span className="text-ink-300 text-xs">·</span>
-                <span className="text-ink-600 text-xs">{m.task}</span>
-                <span className="ml-auto text-2xs text-ink-400 tabular-nums">
-                  {m.receivedHoursAgo}h ago
-                </span>
-              </header>
-              <p className="text-sm text-ink-700 line-clamp-1">{m.preview}</p>
-            </article>
-          ))}
+          {inbox.map((m, i) => {
+            const canOpenTask = Boolean(m.taskId);
+            const onClick = () => {
+              if (m.taskId && m.clientId) {
+                navigate(`/clients/${m.clientId}/tasks/${m.taskId}`);
+              } else if (m.clientId) {
+                navigate(`/clients/${m.clientId}`);
+              } else {
+                // Unmatched inbound — no task / client linkage yet (Method
+                // A AI hasn't routed it). Best we can offer is the
+                // mailbox-wide context.
+              }
+            };
+            return (
+              <article
+                key={i}
+                role="button"
+                tabIndex={canOpenTask || m.clientId ? 0 : -1}
+                onClick={onClick}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onClick();
+                  }
+                }}
+                className={`rounded-md border border-line bg-surface p-3 hover:bg-sunken/40 ${
+                  canOpenTask || m.clientId
+                    ? "cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                    : "cursor-default opacity-90"
+                }`}
+                aria-label={
+                  canOpenTask
+                    ? `Open task for ${m.client}`
+                    : `Inbound from ${m.client} (unmatched)`
+                }
+              >
+                <header className="flex items-center gap-2 mb-1.5">
+                  <IntentBadge intent={m.intent} />
+                  <span className="font-medium text-ink-900 text-sm">{m.client}</span>
+                  <span className="text-ink-300 text-xs">·</span>
+                  <span className="text-ink-600 text-xs">{m.task}</span>
+                  <span className="ml-auto text-2xs text-ink-400 tabular-nums">
+                    {m.receivedHoursAgo}h ago
+                  </span>
+                </header>
+                <p className="text-sm text-ink-700 line-clamp-1">{m.preview}</p>
+              </article>
+            );
+          })}
         </div>
       )}
 

@@ -1,5 +1,4 @@
-import { CalendarClock, Check, Send } from "lucide-react";
-import { toast } from "sonner";
+import { CalendarClock, Check } from "lucide-react";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { StateBadge } from "@/components/ui/StateBadge";
 import { ClientChip } from "@/components/ui/ClientChip";
@@ -73,7 +72,8 @@ export interface StateAlertCardProps {
   handled?: boolean;
   /** Click handler — feed: select the card; preview: navigate to /alerts/:id. */
   onSelect: () => void;
-  /** Action complete callback — feed variant only. Wires the hover Send chip. */
+  /** Optional — kept for callers that still pass it; the feed-card hover
+   *  Send chip was retired in favor of the co-pilot pane's wired Send. */
   onComplete?: (id: string) => void;
 }
 
@@ -83,7 +83,7 @@ export function StateAlertCard({
   selected = false,
   handled = false,
   onSelect,
-  onComplete,
+  onComplete: _onComplete,
 }: StateAlertCardProps) {
   const tone = TYPE_TONE[a.type];
   const affected = affectedClientsFor(a);
@@ -183,27 +183,12 @@ export function StateAlertCard({
         </div>
       )}
 
-      {/* ── Zone 3 — single dominant action (feed variant only,
-              hover-revealed) ───────────────────────────────────── */}
-      {isFeed && !handled && onComplete && (
-        <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity border-t border-line px-region py-2 flex items-center justify-end bg-surface">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              toast.success(
-                `Sent draft to ${a.affectedClientIds.length} ${a.affectedClientIds.length === 1 ? "client" : "clients"}`,
-              );
-              onComplete(a.id);
-            }}
-            className="inline-flex items-center gap-1 text-xs font-medium text-white bg-indigo hover:bg-indigo-hover transition-colors px-2.5 py-1 rounded"
-            title="Send personalized email draft to each affected client"
-          >
-            <Send className="w-3 h-3" aria-hidden />
-            Send {a.affectedClientIds.length}
-          </button>
-        </div>
-      )}
+      {/* Zone 3 — primary action moved into the co-pilot pane on the
+          right where the per-client draft preview, recipient toggles,
+          and Edit/Refine controls live. The card itself is the entry
+          point: click to select, then act in the pane. Removing the
+          inline Send avoids two parallel send paths that were drifting
+          out of sync (the inline one was toast-only). */}
     </div>
   );
 }

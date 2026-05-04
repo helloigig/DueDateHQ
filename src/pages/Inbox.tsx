@@ -6,6 +6,7 @@ import { useSession } from "../data/session";
 import type { ChecklistItem } from "../types";
 import { EmailDraftModal, type EmailDraftIntent } from "../components/EmailDraftModal";
 import { confirmWithUndo, confirmAllWithUndo } from "../lib/confirmWithUndo";
+import { useSetChecklistItemState } from "../hooks/useChecklist";
 import { TODAY, toIso, parseDate, daysBetween } from "../data/dateHelpers";
 
 type Tab = "confirms" | "chases" | "all";
@@ -40,6 +41,7 @@ export function Inbox() {
   const { checklistItems, tasks, clients } = useStore();
   const session = useSession();
   const today = toIso(TODAY);
+  const setChecklistState = useSetChecklistItemState();
   const [tab, setTab] = useState<Tab>("confirms");
   const [emailIntent, setEmailIntent] = useState<EmailDraftIntent | null>(null);
   const [staffFilter, setStaffFilter] = useState<string | null>(null);
@@ -168,7 +170,7 @@ export function Inbox() {
 
   const onConfirm = (id: string) => {
     const item = checklistItems.find((c) => c.id === id);
-    if (item) confirmWithUndo(item);
+    if (item) confirmWithUndo(item, setChecklistState);
   };
 
   const onSend = (item: ChecklistItem) => {
@@ -179,7 +181,7 @@ export function Inbox() {
   };
 
   const onConfirmAll = () => {
-    confirmAllWithUndo(confirms);
+    confirmAllWithUndo(confirms, setChecklistState);
   };
 
   const hasActiveFilter =

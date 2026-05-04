@@ -19,7 +19,10 @@ import {
   useAnnouncements,
   useDismissAnnouncement,
 } from "@/hooks/useAnnouncements";
-import type { Announcement } from "@/types";
+import { useTriageDeadlines } from "@/hooks/useDeadlines";
+import { useClients } from "@/hooks/useClients";
+import { env } from "@/config";
+import type { Announcement, Deadline } from "@/types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -65,10 +68,17 @@ function jurisdictionLabel(j: string): string {
   return j;
 }
 
-function buildQueue(): QueueItem[] {
-  const clientById = new Map(MOCK_CLIENTS.map((c) => [c.id, c]));
+function buildQueue(
+  deadlines: ReadonlyArray<Deadline>,
+  clientList: ReadonlyArray<{
+    id: string;
+    name: string;
+    entityType: string;
+  }>,
+): QueueItem[] {
+  const clientById = new Map(clientList.map((c) => [c.id, c]));
   const queue: QueueItem[] = [];
-  for (const d of MOCK_DEADLINES) {
+  for (const d of deadlines) {
     const c = clientById.get(d.clientId);
     if (!c) continue;
     const due = parseDate(d.officialDueDate);
@@ -116,13 +126,13 @@ function buildQueue(): QueueItem[] {
     .slice(0, 12); // cap demo at 12 rows
 }
 
-function buildTimeline(): TimelineDay[] {
+function buildTimeline(deadlines: ReadonlyArray<Deadline>): TimelineDay[] {
   const byDate = new Map<string, { count: number; urgencies: Set<DotStackUrgency> }>();
   for (let offset = 1; offset <= 14; offset++) {
     const date = toIso(addDays(TODAY, offset));
     byDate.set(date, { count: 0, urgencies: new Set() });
   }
-  for (const d of MOCK_DEADLINES) {
+  for (const d of deadlines) {
     const slot = byDate.get(d.officialDueDate);
     if (!slot) continue;
     slot.count += 1;
@@ -171,8 +181,38 @@ function buildConfirmedToday(): ConfirmedItem[] {
 }
 
 export function Today() {
-  const queue = useMemo(buildQueue, []);
-  const timeline = useMemo(buildTimeline, []);
+  // Live data — `deadlines.listForTriage` is firm-scoped on real BE; mock
+  // mode falls through to the in-memory store. `clients.list` powers the
+  // entityType + name lookup. We fall back to MOCK_DEADLINES / MOCK_CLIENTS
+  // *only* in mock mode where the store is empty (e.g. design previews
+  // before seed). In real mode an empty firm renders an empty queue —
+  // never substitute mock rows the user can't act on.
+  const triageQuery = useTriageDeadlines();
+  const liveDeadlines = (triageQuery.data ?? []) as unknown as Deadline[];
+  const clientsQuery = useClients();
+  const liveClients = clientsQuery.data?.items ?? [];
+
+  const deadlinesForBuild =
+    liveDeadlines.length > 0
+      ? liveDeadlines
+      : env.useMockData
+        ? MOCK_DEADLINES
+        : [];
+  const clientsForBuild =
+    liveClients.length > 0
+      ? liveClients
+      : env.useMockData
+        ? MOCK_CLIENTS
+        : [];
+
+  const queue = useMemo(
+    () => buildQueue(deadlinesForBuild, clientsForBuild),
+    [deadlinesForBuild, clientsForBuild],
+  );
+  const timeline = useMemo(
+    () => buildTimeline(deadlinesForBuild),
+    [deadlinesForBuild],
+  );
   const confirmed = useMemo(buildConfirmedToday, []);
   const [confirmedExpanded, setConfirmedExpanded] = useState(false);
 
@@ -217,13 +257,18 @@ export function Today() {
   const dismissMutation = useDismissAnnouncement();
   const affectedFor = useMemo(() => {
     return (a: Announcement): AffectedClient[] => {
-      const map = new Map(MOCK_CLIENTS.map((c) => [c.id, c]));
+      const source = clientsForBuild;
+      const map = new Map(source.map((c) => [c.id, c]));
       return a.affectedClientIds
         .map((id) => map.get(id))
         .filter((c): c is NonNullable<typeof c> => Boolean(c))
-        .map((c) => ({ id: c.id, name: c.name, email: c.contactEmail }));
+        .map((c) => ({
+          id: c.id,
+          name: c.name,
+          email: c.contactEmail ?? undefined,
+        }));
     };
-  }, []);
+  }, [clientsForBuild]);
 
   return (
     <PageContainer>
@@ -344,23 +389,15 @@ export function Today() {
                 action={item.action}
                 focused={i === queueCursor}
                 onAction={() => {
-                  // Action button: opens the verb-specific flow (email
-                  // composer for Send, thread for Open, draft preview for
-                  // Review). Demo uses a toast — real app routes here.
-                  const verbCopy: Record<typeof item.action, string> = {
-                    send: `Compose chase email to ${item.clientName}`,
-                    open: `Open thread with ${item.clientName}`,
-                    review: `Review AI draft for ${item.clientName}`,
-                    mark_received: `Mark received for ${item.clientName}`,
-                    file: `File deadline for ${item.clientName}`,
-                  };
-                  toast.success(verbCopy[item.action]);
+                  // Action button: route to the relevant surface. Send +
+                  // Review open the task detail (which hosts the email
+                  // composer + checklist confirms). Open routes to the
+                  // client's mailbox. mark_received / file open the task.
+                  navigate(`/clients/${item.clientId}`);
                 }}
                 onRowClick={() => {
                   setQueueCursor(i);
-                  // Whole-row click: navigate to client detail. Real app
-                  // would `navigate('/clients/' + item.clientId)`.
-                  toast.info(`Open client detail: ${item.clientName}`);
+                  navigate(`/clients/${item.clientId}`);
                 }}
                 isLast={i === queue.length - 1}
               />
@@ -385,9 +422,7 @@ export function Today() {
                 count={d.count}
                 urgency={d.urgency}
                 label={d.label}
-                onClick={() =>
-                  toast.info(`Open Timeline filtered to ${d.date}`)
-                }
+                onClick={() => navigate(`/timeline?date=${d.date}`)}
                 isLast={i === timeline.length - 1}
               />
             ))}

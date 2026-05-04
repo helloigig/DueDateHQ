@@ -14,6 +14,8 @@ import {
 import { useStore, actions } from "../data/store";
 import { confirmWithUndo } from "../lib/confirmWithUndo";
 import { useAllOpenInsights } from "../hooks/useAiInsights";
+import { useUpdateTaskStatus } from "../hooks/useTasks";
+import { useSetChecklistItemState } from "../hooks/useChecklist";
 import { useSession } from "../data/session";
 import {
   TODAY,
@@ -105,6 +107,7 @@ export function TaskList() {
   const insights = useAllOpenInsights();
   const session = useSession();
   const today = toIso(TODAY);
+  const setChecklistState = useSetChecklistItemState();
   const [filter, setFilter] = useState<FilterKey>("needs_me");
   const [emailIntent, setEmailIntent] = useState<EmailDraftIntent | null>(null);
   // Pro / Team show assignee column. Solo hides it (only one user — useless).
@@ -393,7 +396,7 @@ export function TaskList() {
                 }
                 onConfirm={(itemId) => {
                   const item = checklistItems.find((c) => c.id === itemId);
-                  if (item) confirmWithUndo(item);
+                  if (item) confirmWithUndo(item, setChecklistState);
                 }}
                 onSendChase={(item) => openEmailFor(row, item)}
               />
@@ -630,6 +633,7 @@ function QuickMenu({ task }: { task: Task }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   const isTouch = useIsTouchViewport();
+  const updateStatus = useUpdateTaskStatus();
 
   const onMarkComplete = () => {
     if (
@@ -637,16 +641,16 @@ function QuickMenu({ task }: { task: Task }) {
         `Mark ${task.formType} complete? Closes the task.`
       )
     ) {
-      actions.updateTaskStatus(task.id, "completed");
+      updateStatus(task.id, "completed");
     }
     close();
   };
   const onDefer = () => {
-    actions.updateTaskStatus(task.id, "deferred");
+    updateStatus(task.id, "deferred");
     close();
   };
   const onFileExtension = () => {
-    actions.updateTaskStatus(task.id, "filed_extension");
+    updateStatus(task.id, "filed_extension");
     close();
   };
 

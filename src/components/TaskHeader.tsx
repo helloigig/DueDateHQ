@@ -9,10 +9,11 @@ import {
   Package,
 } from "lucide-react";
 import type { Client, Task, TaskStatus } from "../types";
-import { actions, useStore } from "../data/store";
+import { useStore } from "../data/store";
 import { bundleById } from "../data/bundles";
-import { exportAuditTrailJson, exportAuditTrailPdfStub } from "../lib/audit-trail";
+import { exportAuditTrailJson, exportAuditTrailPdf } from "../lib/audit-trail";
 import { useCoverSheet } from "../hooks/useFilesFromClients";
+import { useUpdateTaskStatus } from "../hooks/useTasks";
 import { env } from "../config";
 import { simulateInboundDocument } from "../lib/simulate-inbound";
 
@@ -35,6 +36,7 @@ interface Props {
 export function TaskHeader({ task, client, completionPct = 0 }: Props) {
   const [copied, setCopied] = useState(false);
   const { deadlines } = useStore();
+  const updateStatus = useUpdateTaskStatus();
   // Trace which service package generated this task — closes the loop
   // between Settings → Service Packages and the daily flow. Educates the CPA
   // on what's driving their workload without lecturing.
@@ -52,7 +54,7 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
   };
 
   const onStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    actions.updateTaskStatus(task.id, e.target.value as TaskStatus);
+    updateStatus(task.id, e.target.value as TaskStatus);
   };
 
   const onMarkComplete = () => {
@@ -60,7 +62,7 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
       task.status === "completed" ||
       window.confirm(`Mark ${task.formType} complete? This closes the task.`)
     ) {
-      actions.updateTaskStatus(task.id, "completed");
+      updateStatus(task.id, "completed");
     }
   };
 
@@ -209,7 +211,7 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
           <button
             onClick={() => {
               exportAuditTrailJson(task);
-              exportAuditTrailPdfStub(task);
+              exportAuditTrailPdf(task);
             }}
             className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken inline-flex items-center gap-1.5"
             title="IRS audit-trail compliant export"

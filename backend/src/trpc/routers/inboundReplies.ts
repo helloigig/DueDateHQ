@@ -11,7 +11,11 @@ import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { firmProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
-import { inboundReplies } from "../../db/schema.js";
+import {
+  deadlines,
+  inboundReplies,
+  tasks,
+} from "../../db/schema.js";
 
 const TOP_LEVEL_CLASS = [
   "client_document",
@@ -53,13 +57,25 @@ export const inboundRepliesRouter = router({
         conds.push(eq(inboundReplies.topLevelClass, input.topLevelClass));
       if (input?.replyIntent)
         conds.push(eq(inboundReplies.replyIntent, input.replyIntent));
+      // Left-join through tasks → deadlines so the FE Mail row can
+      // deep-link to /clients/:clientId/tasks/:taskId without an N+1
+      // resolution loop. Unmatched inbound (no taskId yet) returns
+      // clientId=null and the FE renders it as un-routable.
       const rows = await db
-        .select()
+        .select({
+          inbound: inboundReplies,
+          clientId: deadlines.clientId,
+        })
         .from(inboundReplies)
+        .leftJoin(tasks, eq(tasks.id, inboundReplies.taskId))
+        .leftJoin(deadlines, eq(deadlines.id, tasks.deadlineId))
         .where(and(...conds))
         .orderBy(desc(inboundReplies.receivedAt))
         .limit(input?.limit ?? 50);
-      return rows;
+      return rows.map((r) => ({
+        ...r.inbound,
+        clientId: r.clientId,
+      }));
     }),
 
   /** Acknowledge / mark CPA-actioned. */

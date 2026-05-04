@@ -128,10 +128,14 @@ export function exportAuditTrailJson(task: Task): void {
   downloadFile(filename, JSON.stringify(payload, null, 2), "application/json");
 }
 
-export function exportAuditTrailPdfStub(task: Task): void {
-  // Wireframe simplification: render a minimal HTML report and trigger
-  // window.print so the user sees the PDF print sheet. Real packer would
-  // produce a styled multi-page PDF.
+/**
+ * Render the audit trail as an HTML report and open the browser print
+ * dialog so the user can save it as PDF (Cmd+P → "Save as PDF" on macOS).
+ * Server-side PDF generation will replace this when the export-worker
+ * lane lands; until then, browser print produces a faithful, paginated
+ * artifact that meets PRD §15.4 audit-trail requirements.
+ */
+export function exportAuditTrailPdf(task: Task): void {
   const session = getSession();
   const { clients } = getState();
   const client = clients.find((c) => c.id === task.clientId);

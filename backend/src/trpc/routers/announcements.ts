@@ -1,15 +1,22 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { firmProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
 import {
+  activityEvents,
   announcementMatches,
   announcements,
+  clients,
   deadlines,
+  emailDrafts,
   firmAnnouncements,
+  firms,
   notifications,
+  tasks,
 } from "../../db/schema.js";
+import { sendEmail, fromAddressForFirm } from "../../lib/email-sender.js";
+import { captureException } from "../../lib/observability.js";
 
 const ESCALATION = ["normal", "dark", "blocking"] as const;
 
@@ -430,6 +437,180 @@ export const announcementsRouter = router({
     .mutation(async ({ input }) => {
       await db.delete(announcements).where(eq(announcements.id, input.id));
       return { ok: true as const };
+    }),
+
+  /**
+   * Send a bulletin email to each affected client. The Alerts co-pilot pane
+   * generates per-client subject + body in the FE; this procedure persists
+   * each as an email_drafts row tied to the client's earliest open task in
+   * the announcement's jurisdiction (FK requirement on email_drafts), then
+   * sends through the standard email pipeline. Clients without an
+   * applicable open task or email address are returned in `skipped`.
+   */
+  sendBulletinEmails: firmProcedure
+    .input(
+      z.object({
+        announcementId: z.string().uuid(),
+        recipients: z
+          .array(
+            z.object({
+              clientId: z.string().uuid(),
+              subject: z.string().min(1).max(300),
+              body: z.string().min(1).max(20_000),
+            }),
+          )
+          .min(1)
+          .max(500),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const ann = await db.query.announcements.findFirst({
+        where: eq(announcements.id, input.announcementId),
+      });
+      if (!ann) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const clientIds = input.recipients.map((r) => r.clientId);
+      const clientRows = await db
+        .select()
+        .from(clients)
+        .where(
+          and(eq(clients.firmId, ctx.firmId), inArray(clients.id, clientIds)),
+        );
+      const clientById = new Map(clientRows.map((c) => [c.id, c]));
+
+      const [firmRow] = await db
+        .select({ name: firms.name })
+        .from(firms)
+        .where(eq(firms.id, ctx.firmId));
+      const fromAddr = firmRow ? fromAddressForFirm(firmRow.name) : undefined;
+
+      const sent: Array<{ clientId: string; draftId: string }> = [];
+      const skipped: Array<{ clientId: string; reason: string }> = [];
+
+      for (const r of input.recipients) {
+        const c = clientById.get(r.clientId);
+        if (!c) {
+          skipped.push({ clientId: r.clientId, reason: "client_not_in_firm" });
+          continue;
+        }
+        if (!c.contactEmail) {
+          skipped.push({ clientId: r.clientId, reason: "no_email" });
+          continue;
+        }
+        // Pick this client's earliest open deadline in the announcement's
+        // jurisdiction; fall back to any open deadline. The email_drafts
+        // FK to tasks needs a real task — Mode F state alerts are firm-
+        // wide, but the bulletin still references each client's filing.
+        const jurisdiction = ann.stateCode.toLowerCase();
+        const dlRows = await db
+          .select({ taskId: tasks.id, dueDate: deadlines.adjustedDueDate })
+          .from(deadlines)
+          .innerJoin(tasks, eq(tasks.deadlineId, deadlines.id))
+          .where(
+            and(
+              eq(deadlines.firmId, ctx.firmId),
+              eq(deadlines.clientId, r.clientId),
+              eq(deadlines.jurisdiction, jurisdiction),
+            ),
+          )
+          .orderBy(asc(deadlines.adjustedDueDate))
+          .limit(1);
+        let taskId = dlRows[0]?.taskId;
+        if (!taskId) {
+          const fallback = await db
+            .select({ id: tasks.id })
+            .from(tasks)
+            .innerJoin(deadlines, eq(deadlines.id, tasks.deadlineId))
+            .where(
+              and(
+                eq(tasks.firmId, ctx.firmId),
+                eq(deadlines.clientId, r.clientId),
+              ),
+            )
+            .orderBy(asc(deadlines.adjustedDueDate))
+            .limit(1);
+          taskId = fallback[0]?.id;
+        }
+        if (!taskId) {
+          skipped.push({ clientId: r.clientId, reason: "no_task" });
+          continue;
+        }
+
+        const replyToRow = await db
+          .select({ forwardingLocal: tasks.forwardingEmailLocalPart })
+          .from(tasks)
+          .where(eq(tasks.id, taskId));
+        const replyTo = replyToRow[0]?.forwardingLocal
+          ? `${replyToRow[0].forwardingLocal}@duedatehq.space`
+          : undefined;
+
+        let providerId: string | null = null;
+        let skippedSend = false;
+        try {
+          const result = await sendEmail({
+            to: c.contactEmail,
+            cc: null,
+            subject: r.subject,
+            body: r.body,
+            replyTo,
+            from: fromAddr,
+          });
+          providerId = result.providerId ?? null;
+          skippedSend = !!result.skipped;
+        } catch (err) {
+          captureException(err, {
+            ctx: "announcements.sendBulletinEmails",
+            announcementId: input.announcementId,
+            clientId: r.clientId,
+            firmId: ctx.firmId,
+          });
+          skipped.push({ clientId: r.clientId, reason: "send_failed" });
+          continue;
+        }
+
+        const sentAt = new Date();
+        const [draft] = await db
+          .insert(emailDrafts)
+          .values({
+            firmId: ctx.firmId,
+            taskId,
+            toAddress: c.contactEmail,
+            ccAddress: null,
+            subject: r.subject,
+            body: r.body,
+            tone: "default",
+            aiSources: { announcementId: input.announcementId } as object,
+            status: "sent",
+            sendMethod: "cpa_send",
+            sentAt,
+            sentByUserId: ctx.dbUser.id,
+            recallWindowExpiresAt: new Date(sentAt.getTime() + 60_000),
+          })
+          .returning();
+        if (!draft) continue;
+        await db.insert(activityEvents).values({
+          firmId: ctx.firmId,
+          taskId,
+          eventType: "email_sent",
+          actorKind: "user",
+          actorUserId: ctx.dbUser.id,
+          description: `${ctx.dbUser.displayName ?? ctx.dbUser.email} sent bulletin: ${r.subject}`,
+          relatedEmailDraftId: draft.id,
+          payload: {
+            announcementId: input.announcementId,
+            providerSkipped: skippedSend,
+            providerId,
+          },
+        });
+        sent.push({ clientId: r.clientId, draftId: draft.id });
+      }
+
+      return {
+        sentCount: sent.length,
+        skippedCount: skipped.length,
+        sent,
+        skipped,
+      };
     }),
 });
 
