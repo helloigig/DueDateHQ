@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Sparkles, AlertOctagon } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Sparkles, AlertOctagon, Pencil, X } from "lucide-react";
 import type { Task, ChecklistItem } from "../types";
 import { trpc } from "../lib/api/client";
 
@@ -33,7 +33,19 @@ type Waypoint = {
   missingBadge?: number;
   // Mode E blocker reason — shown in tooltip + tinted dot when status=blocked
   blockerReason?: string;
+  // Persisted milestone id — present only for live BE rows (not heuristic).
+  // Drives the edit affordance: when id is set, the waypoint is clickable
+  // and opens an inline edit popover that calls taskMilestones.update.
+  id?: string;
 };
+
+const STATUS_OPTIONS: Array<{ value: Status; label: string }> = [
+  { value: "not_started", label: "Not started" },
+  { value: "in_progress", label: "In progress" },
+  { value: "blocked", label: "Blocked" },
+  { value: "done", label: "Done" },
+  { value: "overdue", label: "Overdue" },
+];
 
 interface Props {
   task: Task;
@@ -54,9 +66,15 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
       void milestonesQuery.refetch();
     },
   });
+  const updateMilestone = trpc.taskMilestones.update.useMutation({
+    onSuccess: () => {
+      void milestonesQuery.refetch();
+    },
+  });
   const [lastBlockerSummary, setLastBlockerSummary] = useState<string | null>(
     null,
   );
+  const [editing, setEditing] = useState<Waypoint | null>(null);
   const liveMilestones = milestonesQuery.data ?? [];
   const hasLive = liveMilestones.length > 0;
   const blockedCount = liveMilestones.filter((m) => m.status === "blocked").length;
@@ -149,14 +167,37 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
             wp={wp}
             isFirst={i === 0}
             isLast={i === waypoints.length - 1}
+            onEdit={wp.id ? () => setEditing(wp) : undefined}
           />
         ))}
       </div>
+
+      {editing && (
+        <MilestoneEditPopover
+          waypoint={editing}
+          onClose={() => setEditing(null)}
+          onSave={async (input) => {
+            if (!editing.id) return;
+            try {
+              await updateMilestone.mutateAsync({
+                id: editing.id,
+                ...input,
+              });
+              setEditing(null);
+            } catch {
+              // Error surfaced by tRPC error UI; keep popover open so the
+              // CPA can retry without re-entering values.
+            }
+          }}
+          isSaving={updateMilestone.isPending}
+        />
+      )}
     </section>
   );
 }
 
 type LiveMilestone = {
+  id: string;
   milestoneType: string;
   targetDate: string | null;
   completedDate: string | null;
@@ -219,6 +260,7 @@ function milestonesToWaypoints(
       status,
       missingBadge,
       blockerReason: row?.blockerReason ?? undefined,
+      id: row?.id,
     };
   });
 }
@@ -235,10 +277,12 @@ function Waypoint({
   wp,
   isFirst,
   isLast,
+  onEdit,
 }: {
   wp: Waypoint;
   isFirst: boolean;
   isLast: boolean;
+  onEdit?: () => void;
 }) {
   const dotClasses = (() => {
     switch (wp.status) {
@@ -255,13 +299,16 @@ function Waypoint({
     }
   })();
   const tooltipText = wp.blockerReason
-    ? `${wp.label} — BLOCKED: ${wp.blockerReason}${wp.targetDate ? ` · target ${wp.targetDate}` : ""}`
-    : `${wp.label} — ${wp.status.replace("_", " ")}${wp.targetDate ? ` · target ${wp.targetDate}` : ""}`;
+    ? `${wp.label} — BLOCKED: ${wp.blockerReason}${wp.targetDate ? ` · target ${wp.targetDate}` : ""}${onEdit ? " · click to edit" : ""}`
+    : `${wp.label} — ${wp.status.replace("_", " ")}${wp.targetDate ? ` · target ${wp.targetDate}` : ""}${onEdit ? " · click to edit" : ""}`;
 
-  return (
-    <div className="flex-1 flex flex-col items-center min-w-0 relative">
+  // When onEdit is provided (live BE-backed milestone), wrap the waypoint
+  // in a button so the whole stack — dot + label + date — is the click
+  // target. Heuristic-derived rows render as a plain div.
+  const inner = (
+    <>
       {/* Connector line on left and right (skipped at edges) */}
-      <div className="absolute top-2.5 left-0 right-0 flex items-center">
+      <div className="absolute top-2.5 left-0 right-0 flex items-center pointer-events-none">
         {!isFirst && (
           <div className="flex-1 h-px bg-line" style={{ marginRight: "50%" }} />
         )}
@@ -285,19 +332,172 @@ function Waypoint({
       {/* Dot */}
       <div
         className={`relative z-10 w-3 h-3 rounded-full shrink-0 ${dotClasses}`}
-        title={tooltipText}
       />
 
       {/* Label + date */}
       <div className="mt-2 text-center min-w-0 w-full">
-        <div className="text-2xs font-medium text-ink-700 truncate">
+        <div className="text-2xs font-medium text-ink-700 truncate inline-flex items-center gap-1 justify-center">
           {wp.label}
+          {onEdit && (
+            <Pencil
+              className="w-2.5 h-2.5 text-ink-300 group-hover:text-ink-500 transition-colors shrink-0"
+              aria-hidden
+            />
+          )}
         </div>
         {wp.targetDate && (
           <div className="text-2xs text-ink-400 tabular-nums truncate">
             {formatShort(wp.targetDate)}
           </div>
         )}
+      </div>
+    </>
+  );
+
+  if (onEdit) {
+    return (
+      <button
+        type="button"
+        onClick={onEdit}
+        title={tooltipText}
+        aria-label={`Edit ${wp.label} milestone`}
+        className="group flex-1 flex flex-col items-center min-w-0 relative bg-transparent border-0 p-0 cursor-pointer rounded hover:bg-sunken/30 focus:outline-none focus:ring-2 focus:ring-info-border focus:ring-offset-1 focus:ring-offset-surface transition-colors"
+      >
+        {inner}
+      </button>
+    );
+  }
+
+  return (
+    <div
+      className="flex-1 flex flex-col items-center min-w-0 relative"
+      title={tooltipText}
+    >
+      {inner}
+    </div>
+  );
+}
+
+/**
+ * Inline popover for editing a milestone's target date + status. Anchored
+ * below the timeline section. Closes on Escape, click outside, or after a
+ * successful save. Yellow-zone — CPA edits land directly via
+ * taskMilestones.update; the BE writes a TaskMilestoneEvent for any status
+ * transition (PRD §9.4.1).
+ */
+function MilestoneEditPopover({
+  waypoint,
+  onClose,
+  onSave,
+  isSaving,
+}: {
+  waypoint: Waypoint;
+  onClose: () => void;
+  onSave: (input: { targetDate?: string; status?: Status }) => void;
+  isSaving: boolean;
+}) {
+  const [targetDate, setTargetDate] = useState(waypoint.targetDate ?? "");
+  const [status, setStatus] = useState<Status>(waypoint.status);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    // defer one tick so the click that opened the popover doesn't immediately close it
+    const t = setTimeout(
+      () => document.addEventListener("mousedown", onClick),
+      0,
+    );
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("mousedown", onClick);
+    };
+  }, [onClose]);
+
+  const dirty =
+    targetDate !== (waypoint.targetDate ?? "") || status !== waypoint.status;
+
+  return (
+    <div
+      ref={ref}
+      role="dialog"
+      aria-label={`Edit ${waypoint.label} milestone`}
+      className="mt-3 bg-surface border border-line rounded-md p-3 shadow-overlay"
+    >
+      <div className="flex items-baseline gap-2 mb-2">
+        <h4 className="text-xs font-semibold text-ink-900">
+          Edit {waypoint.label}
+        </h4>
+        <span className="text-2xs text-ink-400">
+          changes save directly · audit-trailed
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="ml-auto text-ink-400 hover:text-ink-700"
+          aria-label="Close"
+        >
+          <X className="w-3.5 h-3.5" aria-hidden />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <label className="text-2xs text-ink-500 flex flex-col gap-1">
+          Target date
+          <input
+            type="date"
+            value={targetDate}
+            onChange={(e) => setTargetDate(e.target.value)}
+            className="border border-line rounded px-2 py-1 text-xs text-ink-900 bg-surface tabular-nums"
+          />
+        </label>
+        <label className="text-2xs text-ink-500 flex flex-col gap-1">
+          Status
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value as Status)}
+            className="border border-line rounded px-2 py-1 text-xs text-ink-900 bg-surface"
+          >
+            {STATUS_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="mt-3 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            const patch: { targetDate?: string; status?: Status } = {};
+            if (targetDate !== (waypoint.targetDate ?? ""))
+              patch.targetDate = targetDate || undefined;
+            if (status !== waypoint.status) patch.status = status;
+            onSave(patch);
+          }}
+          disabled={!dirty || isSaving}
+          className="px-3 py-1 rounded bg-ink-900 text-white text-xs font-medium hover:bg-ink-800 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {isSaving ? "Saving…" : "Save"}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-3 py-1 rounded text-xs text-ink-700 hover:bg-sunken"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   );

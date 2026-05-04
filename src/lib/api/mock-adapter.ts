@@ -16,6 +16,7 @@ import {
 import { BUNDLES, bundleById } from "../../data/bundles";
 import { getSession } from "../../data/session";
 import type {
+  ActivityEntry,
   Client,
   Deadline,
   Firm,
@@ -46,6 +47,96 @@ type MockMilestoneRow = {
   proposedBy: "user" | "ai" | "system";
 };
 const mockMilestoneStore = new Map<string, MockMilestoneRow[]>();
+
+// Mutable mock inbound-replies store. Lets the mock-mode UI exercise the
+// real linkToTask + markActioned flows: actioned rows are removed from
+// list output (mirrors the BE filter on cpaActionedAt). Seeded with three
+// rows that match the static demo INBOX_MOCK in Mail.tsx so the row text
+// is consistent.
+type MockInboundReply = {
+  id: string;
+  firmId: string;
+  taskId: string | null;
+  clientId: string | null;
+  gmailMessageId: string;
+  fromAddress: string;
+  toAddress: string;
+  subject: string | null;
+  bodyText: string | null;
+  attachmentMetadata: unknown[];
+  topLevelClass: string | null;
+  replyIntent: string | null;
+  intentConfidence: string | null;
+  suggestedAction: unknown;
+  receivedAt: string;
+  classifiedAt: string | null;
+  cpaActionedAt: string | null;
+};
+const mockInboundReplies: MockInboundReply[] = (() => {
+  const now = Date.now();
+  const ago = (h: number) => new Date(now - h * 60 * 60 * 1000).toISOString();
+  return [
+    {
+      id: "reply-mock-1",
+      firmId: "firm-mock",
+      taskId: null,
+      clientId: null,
+      gmailMessageId: "gmail-mock-1",
+      fromAddress: "sarah.mitchell@example.com",
+      toAddress: "intake@duedatehq.space",
+      subject: "1040 NY — K-1 timing",
+      bodyText:
+        "Hi! K-1 from my fund won't be ready until late July...",
+      attachmentMetadata: [],
+      topLevelClass: "client_reply",
+      replyIntent: "timeline_pushback",
+      intentConfidence: "0.91",
+      suggestedAction: null,
+      receivedAt: ago(3),
+      classifiedAt: ago(3),
+      cpaActionedAt: null,
+    },
+    {
+      id: "reply-mock-2",
+      firmId: "firm-mock",
+      taskId: null,
+      clientId: null,
+      gmailMessageId: "gmail-mock-2",
+      fromAddress: "jordan.lee@example.com",
+      toAddress: "intake@duedatehq.space",
+      subject: "S-Corp CA — IRA limit",
+      bodyText:
+        "Quick question — what's the IRA contribution limit this year?",
+      attachmentMetadata: [],
+      topLevelClass: "client_reply",
+      replyIntent: "question_asked",
+      intentConfidence: "0.88",
+      suggestedAction: null,
+      receivedAt: ago(7),
+      classifiedAt: ago(7),
+      cpaActionedAt: null,
+    },
+    {
+      id: "reply-mock-3",
+      firmId: "firm-mock",
+      taskId: null,
+      clientId: null,
+      gmailMessageId: "gmail-mock-3",
+      fromAddress: "emily.hartfield@example.com",
+      toAddress: "intake@duedatehq.space",
+      subject: "1040 NY — W-2",
+      bodyText: "Attached: W-2 for 2025 (ADP via Acme Corp)",
+      attachmentMetadata: [{ filename: "W2-2025.pdf", size: 12834 }],
+      topLevelClass: "client_doc",
+      replyIntent: "document_provided",
+      intentConfidence: "0.96",
+      suggestedAction: null,
+      receivedAt: ago(14),
+      classifiedAt: ago(14),
+      cpaActionedAt: null,
+    },
+  ];
+})();
 
 function nextApril15(): string {
   const now = new Date();
@@ -730,7 +821,7 @@ export const mockAdapter = {
   // backend traffic flows.
   inboundReplies: {
     list: async (
-      _input?: {
+      input?: {
         taskId?: string;
         topLevelClass?: string;
         replyIntent?: string;
@@ -738,15 +829,31 @@ export const mockAdapter = {
       },
     ) => {
       await delay();
-      return [] as unknown[];
+      const params = input ?? {};
+      const rows = mockInboundReplies.filter((r) => {
+        if (r.cpaActionedAt) return false;
+        if (params.taskId && r.taskId !== params.taskId) return false;
+        if (params.topLevelClass && r.topLevelClass !== params.topLevelClass)
+          return false;
+        if (params.replyIntent && r.replyIntent !== params.replyIntent)
+          return false;
+        return true;
+      });
+      return params.limit ? rows.slice(0, params.limit) : rows;
     },
-    markActioned: async (_input: { id: string }) => {
+    markActioned: async (input: { id: string }) => {
       await delay();
-      return {} as unknown;
+      const row = mockInboundReplies.find((r) => r.id === input.id);
+      if (!row) throw new Error("not_found");
+      row.cpaActionedAt = new Date().toISOString();
+      return row as unknown;
     },
-    linkToTask: async (_input: { id: string; taskId: string }) => {
+    linkToTask: async (input: { id: string; taskId: string }) => {
       await delay();
-      return {} as unknown;
+      const row = mockInboundReplies.find((r) => r.id === input.id);
+      if (!row) throw new Error("not_found");
+      row.taskId = input.taskId;
+      return row as unknown;
     },
   },
 
@@ -1422,6 +1529,35 @@ export const mockAdapter = {
       await delay();
       return { status: "ready" as const };
     },
+    list: async () => {
+      await delay();
+      // Mock past-exports for design preview. Real BE reads from
+      // export_runs table — see backend/src/trpc/routers/exports.ts.
+      const now = Date.now();
+      const mk = (offsetHours: number, kind: string, status: "queued" | "ready" | "failed") => ({
+        id: `mock-exp-${offsetHours}`,
+        kind,
+        status,
+        downloadUrl:
+          status === "ready"
+            ? `data:text/csv;base64,bW9jay1leHBvcnQ=`
+            : null,
+        errorMessage:
+          status === "failed" ? "Mock failure: simulated network error" : null,
+        requestedAt: new Date(now - offsetHours * 60 * 60 * 1000).toISOString(),
+        completedAt:
+          status === "ready"
+            ? new Date(now - offsetHours * 60 * 60 * 1000 + 5_000).toISOString()
+            : null,
+        createdAt: new Date(now - offsetHours * 60 * 60 * 1000).toISOString(),
+      });
+      return [
+        mk(0.5, "clients_csv", "ready"),
+        mk(8, "audit_trail_pdf", "ready"),
+        mk(72, "clients_csv", "ready"),
+        mk(168, "deadlines_csv", "failed"),
+      ];
+    },
   },
 
   uploads: {
@@ -1663,6 +1799,85 @@ export const mockAdapter = {
       return (client?.activity ?? []).filter(
         (a) => !a.relatedDeadlineId || a.relatedDeadlineId === task.deadlineId,
       );
+    },
+    list: async (
+      input?: {
+        limit?: number;
+        beforeCreatedAt?: string;
+        eventType?: string;
+        clientId?: string;
+      },
+    ) => {
+      await delay();
+      const { clients, tasks, deadlines } = getState();
+      const params = input ?? {};
+      const limit = params.limit ?? 100;
+      // Flatten every client's activity into one ordered feed, joining
+      // task formType + jurisdiction so the FE can render the "X · Y" line
+      // without follow-up lookups (mirrors the BE's join shape).
+      const all: Array<{
+        id: number;
+        firmId: string;
+        taskId: string;
+        eventType: string;
+        actorKind: "user" | "system" | "ai" | "client";
+        actorUserId: string | null;
+        description: string;
+        payload: unknown;
+        relatedChecklistItemId: string | null;
+        relatedEmailDraftId: string | null;
+        createdAt: Date;
+        clientId: string;
+        clientName: string;
+        taskFormType: string;
+        taskJurisdiction: string;
+      }> = [];
+      for (const c of clients) {
+        // ActivityEntry on the FE store is keyed differently from the BE
+        // row. Map: type → eventType, summary → description, timestamp →
+        // createdAt. The store doesn't carry payload / actor metadata so
+        // those fall back to neutral defaults.
+        const activity = (c as unknown as { activity?: ActivityEntry[] }).activity;
+        if (!activity) continue;
+        for (const a of activity) {
+          if (params.clientId && c.id !== params.clientId) continue;
+          if (params.eventType && a.type !== params.eventType) continue;
+          const dl = a.relatedDeadlineId
+            ? deadlines.find((d) => d.id === a.relatedDeadlineId)
+            : undefined;
+          const task = dl ? tasks.find((t) => t.deadlineId === dl.id) : undefined;
+          if (!task) continue;
+          all.push({
+            id: 0,
+            firmId: "mock-firm",
+            taskId: task.id,
+            eventType: a.type,
+            actorKind: "user",
+            actorUserId: null,
+            description: a.summary,
+            payload: {},
+            relatedChecklistItemId: null,
+            relatedEmailDraftId: null,
+            createdAt: new Date(a.timestamp),
+            clientId: c.id,
+            clientName: c.name,
+            taskFormType: dl?.form ?? "",
+            taskJurisdiction: dl?.jurisdiction ?? "",
+          });
+        }
+      }
+      all.sort((x, y) => y.createdAt.getTime() - x.createdAt.getTime());
+      let filtered = all;
+      if (params.beforeCreatedAt) {
+        const cutoff = new Date(params.beforeCreatedAt).getTime();
+        filtered = filtered.filter((r) => r.createdAt.getTime() < cutoff);
+      }
+      const items = filtered.slice(0, limit);
+      const hasMore = filtered.length > limit;
+      const nextCursor = hasMore
+        ? items[items.length - 1]?.createdAt.toISOString() ?? null
+        : null;
+      return { items, nextCursor };
     },
   },
 

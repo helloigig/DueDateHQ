@@ -23,6 +23,7 @@ import {
 import { actions, useStore } from "../data/store";
 import { useImportHistory } from "../hooks/useImports";
 import { signOut, updateSession, useSession } from "../data/session";
+import { trpc } from "../lib/api/client";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ErrorState } from "../components/ErrorState";
 import { UpgradePrompt } from "../components/UpgradePrompt";
@@ -1129,6 +1130,9 @@ function DataPanel() {
           Download JSON
         </button>
       </Card>
+
+      <ExportHistoryCard />
+
       <Card
         title="Reset local data"
         description="Wipes your browser state and restores the demo seeds. Your firm profile stays."
@@ -1159,6 +1163,107 @@ function DataPanel() {
       />
     </>
   );
+}
+
+/**
+ * Export history — past export_runs row from the BE, ordered newest-first.
+ * Surfaces async exports (CSV / PDF / etc.) initiated elsewhere in the
+ * app so the CPA can re-download recent results instead of re-running.
+ *
+ * Wired to live BE: trpc.exports.list. Mock mode returns 4 example rows.
+ */
+function ExportHistoryCard() {
+  const query = trpc.exports.list.useQuery();
+  const rows = query.data ?? [];
+  return (
+    <Card
+      title="Export history"
+      description="Past async exports — CSV downloads, audit trails, etc. Click to re-download."
+    >
+      {query.isLoading ? (
+        <p className="text-xs text-ink-500">Loading…</p>
+      ) : query.error ? (
+        <p className="text-xs text-danger-ink">
+          Couldn't load — {query.error.message.slice(0, 80)}
+        </p>
+      ) : rows.length === 0 ? (
+        <p className="text-xs text-ink-500">
+          No async exports yet. CSV downloads from Clients pages will appear
+          here once they complete.
+        </p>
+      ) : (
+        <ul className="divide-y divide-line text-xs">
+          {rows.map((r) => (
+            <li
+              key={r.id}
+              className="flex items-baseline gap-3 py-2 first:pt-0 last:pb-0"
+            >
+              <span className="text-ink-500 tabular-nums w-32 shrink-0">
+                {formatExportDate(r.requestedAt)}
+              </span>
+              <span className="font-mono text-2xs uppercase tracking-wide text-ink-700 shrink-0">
+                {r.kind.replace(/_/g, " ")}
+              </span>
+              <ExportStatusChip status={r.status} />
+              <span className="ml-auto shrink-0">
+                {r.status === "ready" && r.downloadUrl ? (
+                  <a
+                    href={r.downloadUrl}
+                    download
+                    className="text-info-ink hover:underline"
+                  >
+                    Download
+                  </a>
+                ) : r.status === "failed" ? (
+                  <span
+                    className="text-danger-ink"
+                    title={r.errorMessage ?? undefined}
+                  >
+                    Failed
+                  </span>
+                ) : (
+                  <span className="text-ink-400">Queued</span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+function ExportStatusChip({
+  status,
+}: {
+  status: "queued" | "ready" | "failed";
+}) {
+  const tones = {
+    ready: "bg-ok-bg text-ok-ink",
+    queued: "bg-sunken text-ink-500",
+    failed: "bg-danger-bg text-danger-ink",
+  } as const;
+  return (
+    <span
+      className={`text-2xs px-1.5 py-0.5 rounded ${tones[status]} font-medium`}
+    >
+      {status}
+    </span>
+  );
+}
+
+function formatExportDate(iso: string | Date): string {
+  const d = typeof iso === "string" ? new Date(iso) : iso;
+  const ageMs = Date.now() - d.getTime();
+  const hours = Math.floor(ageMs / 3_600_000);
+  if (hours < 24) return hours < 1 ? "just now" : `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: d.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+  });
 }
 
 function snapshot() {

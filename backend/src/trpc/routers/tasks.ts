@@ -624,4 +624,77 @@ export const activityRouter = router({
         .limit(input.limit);
       return rows;
     }),
+
+  /**
+   * Firm-wide activity feed — every event across every task in the firm,
+   * ordered newest-first. Joins client + task labels so the FE renders
+   * "Sarah Mitchell · 1040 NY · email_sent" without follow-up lookups.
+   *
+   * Powers the /activity page (Audit-trail surface, IA v0.7 §3.x). Cursor-
+   * paginated by createdAt to keep response sizes bounded.
+   */
+  list: firmProcedure
+    .input(
+      z
+        .object({
+          limit: z.number().int().min(1).max(200).default(100),
+          // Pagination cursor — pass the createdAt of the last row from the
+          // previous page to fetch older events.
+          beforeCreatedAt: z.string().optional(),
+          // Optional filters — narrow by event type (e.g. "email_sent")
+          // or by client.
+          eventType: z.string().optional(),
+          clientId: z.string().uuid().optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 100;
+      const beforeCreatedAt = input?.beforeCreatedAt;
+      const eventType = input?.eventType;
+      const clientId = input?.clientId;
+      const conditions = [eq(activityEvents.firmId, ctx.firmId)];
+      if (beforeCreatedAt) {
+        conditions.push(
+          sql`${activityEvents.createdAt} < ${new Date(beforeCreatedAt)}`,
+        );
+      }
+      if (eventType) {
+        conditions.push(eq(activityEvents.eventType, eventType));
+      }
+      if (clientId) {
+        conditions.push(eq(deadlines.clientId, clientId));
+      }
+      const rows = await db
+        .select({
+          id: activityEvents.id,
+          firmId: activityEvents.firmId,
+          taskId: activityEvents.taskId,
+          eventType: activityEvents.eventType,
+          actorKind: activityEvents.actorKind,
+          actorUserId: activityEvents.actorUserId,
+          description: activityEvents.description,
+          payload: activityEvents.payload,
+          relatedChecklistItemId: activityEvents.relatedChecklistItemId,
+          relatedEmailDraftId: activityEvents.relatedEmailDraftId,
+          createdAt: activityEvents.createdAt,
+          clientId: clients.id,
+          clientName: clients.name,
+          taskFormType: deadlines.formType,
+          taskJurisdiction: deadlines.jurisdiction,
+        })
+        .from(activityEvents)
+        .innerJoin(tasks, eq(tasks.id, activityEvents.taskId))
+        .innerJoin(deadlines, eq(deadlines.id, tasks.deadlineId))
+        .innerJoin(clients, eq(clients.id, deadlines.clientId))
+        .where(and(...conditions))
+        .orderBy(desc(activityEvents.createdAt))
+        .limit(limit + 1);
+      const hasMore = rows.length > limit;
+      const items = hasMore ? rows.slice(0, limit) : rows;
+      const nextCursor = hasMore
+        ? items[items.length - 1]?.createdAt.toISOString()
+        : null;
+      return { items, nextCursor };
+    }),
 });
