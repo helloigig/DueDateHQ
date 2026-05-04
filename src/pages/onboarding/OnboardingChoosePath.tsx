@@ -25,13 +25,11 @@ export function OnboardingChoosePath() {
     <OnboardingShell
       step={2}
       totalSteps={3}
-      estimate="~60 seconds"
       title="Bring your roster in"
       subtitle="The fastest way is a CSV. No CSV? Connect QuickBooks or Xero instead — same outcome."
-      brandLine="Customer-visible language: 'upload' for files, 'connect' for OAuth. Never 'import.'"
     >
-      <div className="space-y-7">
-        {/* Primary affordance — CSV upload, big and obvious */}
+      <div className="space-y-6">
+        {/* Primary affordance — upload CSV, big and obvious */}
         <Link
           to="/onboarding/import"
           className="block bg-canvas border border-indigo/30 rounded-md p-5 hover:bg-indigo-soft/40 hover:border-indigo transition-colors group"
@@ -43,15 +41,15 @@ export function OnboardingChoosePath() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-base font-semibold text-ink-900">
-                  Upload a CSV
+                  Upload your client roster
                 </h3>
                 <span className="text-2xs uppercase tracking-wide px-2 py-0.5 rounded-pill bg-indigo text-white font-semibold">
                   Recommended
                 </span>
               </div>
               <p className="text-sm text-ink-500 mt-1 leading-relaxed">
-                Drag a roster from File In Time, TaxDome, Drake, ProConnect,
-                QuickBooks export, or plain Excel. AI auto-maps the columns. ~2 minutes.
+                Drag a CSV from File In Time, TaxDome, Drake, ProConnect, or
+                Excel. AI auto-maps the columns. ~2 minutes.
               </p>
             </div>
             <ArrowRight
@@ -61,68 +59,47 @@ export function OnboardingChoosePath() {
           </div>
         </Link>
 
-        {/* Secondary: connect existing software */}
-        <div>
-          <p className="text-2xs uppercase tracking-[0.18em] text-ink-500 font-semibold mb-3">
-            No CSV at hand?
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <ConnectChoice
-              provider="quickbooks"
-              title="Connect QuickBooks"
-              detail="Pulls your client list with entity types in one OAuth click. Tier 0 two-way sync."
-              onClick={() => setOauthProvider("quickbooks")}
-            />
-            <ConnectChoice
-              provider="xero"
-              title="Connect Xero"
-              detail="Same as QuickBooks for international firms. Tier 0 two-way sync."
-              onClick={() => setOauthProvider("xero")}
-            />
-          </div>
-          <p className="text-2xs text-ink-400 mt-2 leading-relaxed">
-            Both unlock financial profiles and Mode B/C/E anchors immediately.
-            Phase 2 OAuth in this build.
-          </p>
+        {/* Three peers on one row — Connect QuickBooks, Connect Xero,
+            Add 5 manually. All three are valid alternatives to CSV; surfacing
+            them at equal weight matches how the user actually thinks. */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <ConnectChoice
+            provider="quickbooks"
+            title="Connect QuickBooks"
+            detail="Pulls clients + entity types in one click."
+            onClick={() => setOauthProvider("quickbooks")}
+          />
+          <ConnectChoice
+            provider="xero"
+            title="Connect Xero"
+            detail="Same one-click sync for Xero firms."
+            onClick={() => setOauthProvider("xero")}
+          />
+          <ManualChoice />
         </div>
 
-        {/* Tertiary: small books or kicking the tires */}
-        <div>
-          <p className="text-2xs uppercase tracking-[0.18em] text-ink-500 font-semibold mb-3">
-            Or — start small
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <SecondaryChoice
-              to="/onboarding/manual"
-              icon={<UserPlus className="w-4 h-4" aria-hidden />}
-              title="Add 5 manually"
-              detail="For small books or skeptics. ~60s per client."
-            />
-            <SecondaryChoice
-              to="/onboarding/demo"
-              icon={<Sparkles className="w-4 h-4" aria-hidden />}
-              title="Try the demo workspace"
-              detail="49 fake clients + a live state alert. Wipeable anytime."
-            />
-          </div>
-        </div>
-
-        {/* Skip-for-now footer */}
-        <div className="pt-6 border-t border-line">
+        {/* Demo + skip on a single subdued line — both are escape hatches,
+            neither deserves a card. Demo seeds 49 fake clients; skip lands
+            you on an empty dashboard with the same options surfaced later. */}
+        <div className="flex items-center gap-3 text-xs text-ink-500">
+          <Link
+            to="/onboarding/demo"
+            className="inline-flex items-center gap-1.5 hover:text-indigo underline"
+          >
+            <Sparkles className="w-3.5 h-3.5" aria-hidden />
+            Try the demo workspace
+          </Link>
+          <span className="text-ink-300" aria-hidden>·</span>
           <button
             type="button"
             onClick={() => {
               updateSession({ onboardingComplete: true });
               navigate("/", { replace: true });
             }}
-            className="text-xs text-ink-500 hover:text-indigo underline"
+            className="hover:text-indigo underline"
           >
-            Skip for now — I'll add clients later
+            Skip for now
           </button>
-          <p className="text-2xs text-ink-400 mt-1.5 leading-relaxed">
-            Your dashboard works empty. You can connect a source from Settings
-            → Integrations whenever you're ready.
-          </p>
         </div>
       </div>
 
@@ -162,28 +139,20 @@ function ConnectChoice({
   );
 }
 
-function SecondaryChoice({
-  to,
-  icon,
-  title,
-  detail,
-}: {
-  to: string;
-  icon: React.ReactNode;
-  title: string;
-  detail: string;
-}) {
+function ManualChoice() {
   return (
     <Link
-      to={to}
+      to="/onboarding/manual"
       className="bg-canvas border border-line rounded-md p-4 hover:border-indigo/40 hover:bg-surface transition-colors flex items-start gap-3"
     >
       <span className="w-9 h-9 rounded-md bg-indigo-soft/60 flex items-center justify-center text-indigo shrink-0">
-        {icon}
+        <UserPlus className="w-4 h-4" aria-hidden />
       </span>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-ink-900">{title}</p>
-        <p className="text-xs text-ink-500 mt-0.5 leading-relaxed">{detail}</p>
+        <p className="text-sm font-medium text-ink-900">Add 5 manually</p>
+        <p className="text-xs text-ink-500 mt-0.5 leading-relaxed">
+          For small books or skeptics.
+        </p>
       </div>
     </Link>
   );

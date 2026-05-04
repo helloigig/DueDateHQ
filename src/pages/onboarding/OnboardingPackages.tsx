@@ -3,9 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { Sparkles, Check } from "lucide-react";
 import { OnboardingShell } from "../../components/OnboardingShell";
 import { PrimaryButton, SecondaryButton, authInputClass } from "../auth/AuthShell";
-import { useStore } from "../../data/store";
+import { actions, useStore } from "../../data/store";
 import { BUNDLES } from "../../data/bundles";
 import { suggestBundleForEntity } from "../../data/bundles";
+import { trpc } from "../../lib/api/client";
+import { env } from "../../config";
 import type { Client } from "../../types";
 
 /**
@@ -17,6 +19,13 @@ export function OnboardingPackages() {
   const navigate = useNavigate();
   const { clients } = useStore();
   const activeClients = clients.filter((c) => c.status === "active");
+  const utils = trpc.useUtils();
+  const beAssignMut = trpc.servicePackages.assignToClient.useMutation();
+  const bePackagesQuery = trpc.servicePackages.list.useQuery(undefined, {
+    enabled: !env.useMockData,
+    staleTime: 60_000,
+  });
+  const [submitting, setSubmitting] = useState(false);
 
   const initial = useMemo(() => {
     const out: Record<string, string> = {};
@@ -43,7 +52,49 @@ export function OnboardingPackages() {
     setConfirmedFor(new Set(activeClients.map((c) => c.id)));
   };
 
-  const next = () => {
+  const next = async () => {
+    // Materialize each confirmed (client × package) mapping. assignBundle
+    // is idempotent on both substrates — re-assigning the same bundle a
+    // client already carries is a no-op, so calling it for every active
+    // client is safe even when most rows weren't changed in the dropdown.
+    setSubmitting(true);
+    try {
+      if (env.useMockData) {
+        for (const c of activeClients) {
+          const bundle = BUNDLES.find((b) => b.name === assignments[c.id]);
+          if (!bundle) continue;
+          actions.assignBundle(c.id, bundle.id);
+        }
+      } else {
+        // Real mode — match assignment by package name against the firm's
+        // visible packages, then dispatch assignToClient (which runs the
+        // full chain: deadlines → tasks → checklists → milestones).
+        const beById = new Map(
+          (bePackagesQuery.data ?? []).map((p) => [p.name, p.id]),
+        );
+        const calls: Promise<unknown>[] = [];
+        for (const c of activeClients) {
+          const packageId = beById.get(assignments[c.id] ?? "");
+          if (!packageId) continue;
+          calls.push(
+            beAssignMut.mutateAsync({
+              clientId: c.id,
+              packageId,
+              year: new Date().getFullYear(),
+            }),
+          );
+        }
+        await Promise.all(calls);
+        // Refresh caches so /today + /clients show the freshly-spawned work.
+        void utils.clients.list.invalidate();
+        void utils.deadlines.listForTriage.invalidate();
+        void utils.deadlines.listForClient.invalidate();
+        void utils.tasks.list.invalidate();
+        void utils.todoItems.list.invalidate();
+      }
+    } finally {
+      setSubmitting(false);
+    }
     navigate("/onboarding/done");
   };
 
@@ -63,7 +114,6 @@ export function OnboardingPackages() {
     <OnboardingShell
       step={3}
       totalSteps={3}
-      estimate="~1 minute"
       title="Confirm service packages"
       subtitle="AI suggested a package for each client based on entity type and state. Glance, click 'Accept all' if they look right, or change individually."
       brandLine="Mode A substrate-driven. Entity + State + Industry + Cohort make this useful Day 1 — no 'AI is learning' here."
@@ -126,8 +176,16 @@ export function OnboardingPackages() {
           </div>
 
           <div className="mt-6 flex items-center gap-4 flex-wrap">
-            <PrimaryButton onClick={next}>
-              {allConfirmed ? "Continue" : "Apply suggestions and continue"}
+            <PrimaryButton
+              onClick={() => void next()}
+              loading={submitting}
+              disabled={submitting}
+            >
+              {submitting
+                ? "Assigning packages"
+                : allConfirmed
+                  ? "Continue"
+                  : "Apply suggestions and continue"}
             </PrimaryButton>
             <p className="text-xs text-ink-500 flex-1">
               You can clone or customize any package later in Settings →

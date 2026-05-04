@@ -21,7 +21,6 @@ export function OnboardingDemo() {
     <OnboardingShell
       step={3}
       totalSteps={3}
-      estimate="instant"
       title="Try the demo data"
       subtitle="We'll load 49 fake clients with realistic deadlines, alerts, and prior-year history. Wipeable from Settings → Data anytime."
       brandLine="The demo workspace is the wedge. Yan Jing said 'no more SaaS pivots' — let prospects kick the tires without commitment."

@@ -65,7 +65,7 @@ export function Import() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 md:px-6 py-6">
+    <div className="max-w-4xl mx-auto px-4 md:px-6 py-6">
       <Link to="/clients" className="text-sm text-ink-500 hover:underline">
         ‹ Clients
       </Link>
@@ -278,27 +278,32 @@ function UploadStep({
         </div>
       )}
 
-      <div className="mt-5 text-xs text-ink-500">
-        <div className="font-medium text-ink-700 mb-1">Supported sources</div>
-        <div className="flex flex-wrap gap-1.5">
-          {[
-            "File In Time",
-            "TaxDome",
-            "Drake",
-            "ProConnect",
-            "QuickBooks",
-            "Plain Excel",
-          ].map((s) => (
-            <span
-              key={s}
-              className="px-2 py-0.5 rounded bg-sunken text-ink-700"
-            >
-              {s}
-            </span>
-          ))}
-        </div>
+      <div className="mt-5 text-xs text-ink-500 leading-relaxed">
+        <div className="font-medium text-ink-700 mb-1">Where to export from</div>
+        <ul className="space-y-0.5 text-ink-500 list-disc pl-5">
+          <li>
+            <span className="text-ink-700">File In Time</span> — Reports →
+            Client List → Export to CSV
+          </li>
+          <li>
+            <span className="text-ink-700">TaxDome</span> — Clients → ⋯ → Export
+            to CSV
+          </li>
+          <li>
+            <span className="text-ink-700">Drake</span> — Tools → Export Client
+            List
+          </li>
+          <li>
+            <span className="text-ink-700">ProConnect</span> — Settings → Export
+            Client Information
+          </li>
+          <li>
+            <span className="text-ink-700">QuickBooks Online</span> — Sales →
+            Customers → Export to Excel
+          </li>
+        </ul>
         <p className="mt-2">
-          Don't see yours? Any CSV with client data works — you'll confirm the
+          Any other CSV with name + entity + state works — you'll confirm the
           column mapping in the next step.
         </p>
       </div>
@@ -470,81 +475,97 @@ function PreviewStep({
         </div>
       </div>
 
-      <table className="w-full text-sm">
-        <thead className="text-xs uppercase tracking-wide text-ink-500 bg-canvas">
-          <tr>
-            <th className="text-left px-4 py-2 font-medium">Name</th>
-            <th className="text-left px-4 py-2 font-medium">Entity</th>
-            <th className="text-left px-4 py-2 font-medium">State</th>
-            <th className="text-left px-4 py-2 font-medium">Email</th>
-            <th className="text-left px-4 py-2 font-medium">Bundle</th>
-            <th className="text-right px-4 py-2 font-medium"></th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-line">
-          {rows.map((r, i) => {
-            const issue = r.issues.length > 0;
-            return (
-              <Fragment key={i}>
-                <tr
-                  className={issue ? "bg-amber-50/50" : "hover:bg-canvas"}
-                >
-                  <td className="px-4 py-2.5 text-ink-900">
-                    {issue && <span className="text-amber-600 mr-1">⚠</span>}
-                    {r.name}
-                  </td>
-                  <td className="px-4 py-2.5 text-ink-700">
-                    {r.entityType ?? (
-                      <span className="text-amber-700">?</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2.5 text-ink-700">
-                    {r.primaryState ?? (
-                      <span className="text-amber-700">?</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2.5 text-ink-700 truncate max-w-[180px]">
-                    {r.email || <span className="text-amber-700">—</span>}
-                  </td>
-                  <td className="px-4 py-2.5 text-ink-700">
-                    {r.bundle ?? <span className="text-ink-400">—</span>}
-                  </td>
-                  <td className="px-4 py-2.5 text-right">
-                    {issue && (
-                      <button
-                        onClick={() => setEditing(editing === i ? null : i)}
-                        className="text-xs px-2 py-1 rounded bg-ink-900 text-white hover:bg-ink-900"
-                      >
-                        {editing === i ? "Cancel" : "Fix inline"}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-                {editing === i && (
-                  <tr className="bg-amber-50">
-                    <td colSpan={6} className="px-4 py-3">
-                      <FixInline
-                        row={r}
-                        onPatch={(patch) => {
-                          onRowFix(i, patch);
-                          // close editor once row has zero issues
-                          const resolved = recomputeIssues({
-                            ...r,
-                            ...patch,
-                          });
-                          if (resolved.length === 0) setEditing(null);
-                        }}
-                      />
+      {/* Scrollable table region — actions live in a sticky footer below
+          so the user can scroll through long rosters and still see Back /
+          Commit at all times. Column widths bias toward Name + Email
+          which are the fields CPAs actually scan to spot wrong rows. */}
+      <div className="max-h-[480px] overflow-y-auto">
+        <table className="w-full text-sm table-fixed">
+          <colgroup>
+            <col className="w-[28%]" />
+            <col className="w-[12%]" />
+            <col className="w-[10%]" />
+            <col className="w-[26%]" />
+            <col className="w-[16%]" />
+            <col className="w-[8%]" />
+          </colgroup>
+          <thead className="text-xs uppercase tracking-wide text-ink-500 bg-canvas sticky top-0 z-10">
+            <tr>
+              <th className="text-left px-4 py-2 font-medium">Name</th>
+              <th className="text-left px-4 py-2 font-medium">Entity</th>
+              <th className="text-left px-4 py-2 font-medium">State</th>
+              <th className="text-left px-4 py-2 font-medium">Email</th>
+              <th className="text-left px-4 py-2 font-medium">Bundle</th>
+              <th className="text-right px-4 py-2 font-medium"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {rows.map((r, i) => {
+              const issue = r.issues.length > 0;
+              return (
+                <Fragment key={i}>
+                  <tr
+                    className={issue ? "bg-amber-50/50" : "hover:bg-canvas"}
+                  >
+                    <td className="px-4 py-2.5 text-ink-900 truncate">
+                      {issue && (
+                        <span className="text-amber-600 mr-1">⚠</span>
+                      )}
+                      {r.name}
+                    </td>
+                    <td className="px-4 py-2.5 text-ink-700">
+                      {r.entityType ?? (
+                        <span className="text-amber-700">?</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-ink-700">
+                      {r.primaryState ?? (
+                        <span className="text-amber-700">?</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-ink-700 truncate">
+                      {r.email || <span className="text-amber-700">—</span>}
+                    </td>
+                    <td className="px-4 py-2.5 text-ink-700 truncate">
+                      {r.bundle ?? <span className="text-ink-400">—</span>}
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      {issue && (
+                        <button
+                          onClick={() => setEditing(editing === i ? null : i)}
+                          className="text-xs px-2 py-1 rounded bg-ink-900 text-white hover:bg-ink-900"
+                        >
+                          {editing === i ? "Cancel" : "Fix"}
+                        </button>
+                      )}
                     </td>
                   </tr>
-                )}
-              </Fragment>
-            );
-          })}
-        </tbody>
-      </table>
+                  {editing === i && (
+                    <tr className="bg-amber-50">
+                      <td colSpan={6} className="px-4 py-3">
+                        <FixInline
+                          row={r}
+                          onPatch={(patch) => {
+                            onRowFix(i, patch);
+                            // close editor once row has zero issues
+                            const resolved = recomputeIssues({
+                              ...r,
+                              ...patch,
+                            });
+                            if (resolved.length === 0) setEditing(null);
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
-      <div className="px-5 py-3 bg-canvas rounded-b-lg flex items-center justify-between">
+      <div className="sticky bottom-0 px-5 py-3 bg-surface border-t border-line rounded-b-lg flex items-center justify-between">
         <button
           onClick={onBack}
           className="text-sm px-3 py-1.5 rounded border border-line bg-surface hover:bg-canvas"
