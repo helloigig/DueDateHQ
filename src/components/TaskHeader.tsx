@@ -16,6 +16,8 @@ import { useCoverSheet } from "../hooks/useFilesFromClients";
 import { useUpdateTaskStatus } from "../hooks/useTasks";
 import { env } from "../config";
 import { simulateInboundDocument } from "../lib/simulate-inbound";
+import { DeadlineChip, defaultActionsForState } from "./ui/DeadlineChip";
+import { classifyDeadlineState } from "../data/dateHelpers";
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
   not_started: "Not started",
@@ -90,28 +92,58 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
           <h1 className="text-xl font-semibold text-ink-900">
             {task.formType}
           </h1>
-          <div className="text-sm text-ink-500 mt-1 flex items-center flex-wrap gap-x-3 gap-y-1">
-            <span>
-              <span className="text-ink-400">Due:</span>{" "}
-              <span className="text-ink-900 font-medium">
-                {task.officialDueDate}
-              </span>
-            </span>
-            <span className="text-ink-300">·</span>
-            <span>
-              <span className="text-ink-400">Internal target:</span>{" "}
-              {task.internalTargetDate}
-            </span>
-            {task.clientPrepDate && (
-              <>
-                <span className="text-ink-300">·</span>
-                <span>
-                  <span className="text-ink-400">Client prep:</span>{" "}
-                  {task.clientPrepDate}
-                </span>
-              </>
-            )}
-            <span className="text-ink-300">·</span>
+          {/* Deadline state chip — replaces the parallel "Due / Internal target /
+              Client prep" labels. The mini-timeline below already shows every
+              milestone date as a waypoint, so re-rendering them as inline
+              comma-separated text was duplicate information at equal weight.
+              The chip carries the operational state (active milestone, slip,
+              IRS runway when relevant) and exposes state-appropriate actions
+              on click. Internal vs official semantics: chip's primary text is
+              milestone-driven; official date enters the visible band only
+              once the back-plan has slipped past internal target. */}
+          <div className="mt-2 flex items-center flex-wrap gap-2">
+            <DeadlineChip
+              officialDueDate={task.officialDueDate}
+              internalTargetDate={task.internalTargetDate}
+              currentMilestoneTargetDate={
+                task.clientPrepDate ?? task.internalTargetDate
+              }
+              currentMilestoneLabel={
+                task.clientPrepDate ? "Collect" : "File"
+              }
+              status={task.status}
+              actions={defaultActionsForState(
+                classifyDeadlineState({
+                  officialDueDate: task.officialDueDate,
+                  internalTargetDate: task.internalTargetDate,
+                  currentMilestoneTargetDate:
+                    task.clientPrepDate ?? task.internalTargetDate,
+                  currentMilestoneLabel: task.clientPrepDate
+                    ? "Collect"
+                    : "File",
+                  status: task.status,
+                }).recommendedAction,
+                {
+                  onChase: () =>
+                    alert(
+                      "Chase flow opens Mode D draft — wired to existing QuickActionModal in P1",
+                    ),
+                  onSubmit: () => updateStatus(task.id, "completed"),
+                  onFileExtension: () =>
+                    updateStatus(task.id, "filed_extension"),
+                  onAdjustTarget: () =>
+                    alert(
+                      "Adjust target opens TaskMilestone editor — drag the waypoint in the mini-timeline below",
+                    ),
+                  onViewExtension: () =>
+                    alert(
+                      `Extension filed — new IRS deadline ${task.officialDueDate}`,
+                    ),
+                },
+              )}
+            />
+          </div>
+          <div className="text-xs text-ink-500 mt-2 flex items-center flex-wrap gap-x-3 gap-y-1">
             <span>
               <span className="text-ink-400">Preparer:</span>{" "}
               <span className="text-ink-900">{task.assignedUser}</span>

@@ -123,3 +123,187 @@ export function weekOfLabel(iso: string): string {
     day: "numeric",
   })}`;
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// Deadline state classifier — drives the <DeadlineChip> surface.
+//
+// CPAs work to a buffer between an internal target date (firm-set, the date
+// they plan to file by) and the official IRS / state deadline. The product's
+// central "are we behind?" question deserves one canonical answer so every
+// surface (TaskHeader, list rows, Today queue, Timeline) inherits the same
+// framing. Two integers + the active milestone label = the entire CPA-facing
+// state — no qualitative verbs needed (locked policy:
+// `feedback_deadlines_dates_only.md` — dates only, never times; whole-day
+// integers, no clock).
+//
+// State machine:
+//   on_track        — no slip; current milestone target still in the future
+//   behind          — non-File milestone has slipped past target
+//   past_file_safe  — File target slipped, runway to IRS > half original buffer
+//   past_file_tight — File target slipped, runway ≤ half original buffer
+//   critical        — ≤ 3 days to official deadline, not yet filed
+//   overdue         — past official deadline, not filed
+//   extension       — extension was filed (status flag)
+//   completed       — task closed
+// ──────────────────────────────────────────────────────────────────────────
+
+export type DeadlineState =
+  | "on_track"
+  | "behind"
+  | "past_file_safe"
+  | "past_file_tight"
+  | "critical"
+  | "overdue"
+  | "extension"
+  | "completed";
+
+export type RecommendedAction =
+  | "chase"
+  | "submit"
+  | "extension"
+  | "extension_now"
+  | "view_extension"
+  | null;
+
+export interface DeadlineStateInput {
+  officialDueDate: string;
+  /** Firm-set internal target (the File milestone target). */
+  internalTargetDate?: string;
+  /** Earliest non-done milestone target — drives "behind on Collect" framing. */
+  currentMilestoneTargetDate?: string;
+  currentMilestoneLabel?: string;
+  status?:
+    | "not_started"
+    | "in_progress"
+    | "completed"
+    | "deferred"
+    | "filed_extension"
+    | "overdue";
+  /** Original buffer used to compute the "tight" threshold. Defaults to 7d (annual). */
+  originalBufferDays?: number;
+}
+
+export interface DeadlineStateResult {
+  state: DeadlineState;
+  /** Signed integer days late on the operative milestone. Always whole days. */
+  daysBehind: number;
+  /** Days remaining to official deadline. Negative = past it. Always whole days. */
+  daysToOfficial: number;
+  /** Active milestone driving the framing — null when on track and nothing is set. */
+  activeMilestone: { label: string; targetDate: string } | null;
+  /** True once the back-plan has slipped — official date should louden. */
+  showOfficialReference: boolean;
+  recommendedAction: RecommendedAction;
+}
+
+export function classifyDeadlineState(
+  input: DeadlineStateInput,
+): DeadlineStateResult {
+  const {
+    officialDueDate,
+    internalTargetDate,
+    currentMilestoneTargetDate,
+    currentMilestoneLabel,
+    status,
+    originalBufferDays = 7,
+  } = input;
+
+  const official = parseDate(officialDueDate);
+  const daysToOfficial = daysBetween(TODAY, official);
+
+  if (status === "completed") {
+    return {
+      state: "completed",
+      daysBehind: 0,
+      daysToOfficial,
+      activeMilestone: null,
+      showOfficialReference: false,
+      recommendedAction: null,
+    };
+  }
+  if (status === "filed_extension") {
+    return {
+      state: "extension",
+      daysBehind: 0,
+      daysToOfficial,
+      activeMilestone: null,
+      showOfficialReference: true,
+      recommendedAction: "view_extension",
+    };
+  }
+
+  if (daysToOfficial < 0) {
+    return {
+      state: "overdue",
+      daysBehind: -daysToOfficial,
+      daysToOfficial,
+      activeMilestone: null,
+      showOfficialReference: true,
+      recommendedAction: "extension_now",
+    };
+  }
+
+  if (daysToOfficial <= 3) {
+    return {
+      state: "critical",
+      daysBehind: 0,
+      daysToOfficial,
+      activeMilestone: null,
+      showOfficialReference: true,
+      recommendedAction: "extension_now",
+    };
+  }
+
+  // Grey zone: today > internalTargetDate but legal deadline still reachable.
+  // Tight vs safe split by how much of the original buffer has been eaten.
+  if (internalTargetDate) {
+    const internal = parseDate(internalTargetDate);
+    const fileSlip = daysBetween(internal, TODAY);
+    if (fileSlip > 0) {
+      const tightThreshold = Math.max(1, Math.floor(originalBufferDays / 2));
+      const isTight = daysToOfficial <= tightThreshold;
+      return {
+        state: isTight ? "past_file_tight" : "past_file_safe",
+        daysBehind: fileSlip,
+        daysToOfficial,
+        activeMilestone: { label: "File", targetDate: internalTargetDate },
+        showOfficialReference: true,
+        recommendedAction: isTight ? "extension" : "submit",
+      };
+    }
+  }
+
+  // Behind on a non-File milestone (Collect, Prepare, Review).
+  if (currentMilestoneTargetDate && currentMilestoneLabel) {
+    const ms = parseDate(currentMilestoneTargetDate);
+    const slip = daysBetween(ms, TODAY);
+    if (slip > 0) {
+      return {
+        state: "behind",
+        daysBehind: slip,
+        daysToOfficial,
+        activeMilestone: {
+          label: currentMilestoneLabel,
+          targetDate: currentMilestoneTargetDate,
+        },
+        showOfficialReference: false,
+        recommendedAction: "chase",
+      };
+    }
+  }
+
+  return {
+    state: "on_track",
+    daysBehind: 0,
+    daysToOfficial,
+    activeMilestone:
+      currentMilestoneTargetDate && currentMilestoneLabel
+        ? {
+            label: currentMilestoneLabel,
+            targetDate: currentMilestoneTargetDate,
+          }
+        : null,
+    showOfficialReference: false,
+    recommendedAction: null,
+  };
+}
