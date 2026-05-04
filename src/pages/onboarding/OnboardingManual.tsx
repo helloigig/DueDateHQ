@@ -112,7 +112,20 @@ export function OnboardingManual() {
                 }
                 className={authInputClass}
               >
-                {(["CA", "NY", "TX", "FL", "LA"] as StateCode[]).map((s) => (
+                {(
+                  [
+                    "CA",
+                    "FL",
+                    "GA",
+                    "IL",
+                    "LA",
+                    "MA",
+                    "NJ",
+                    "NY",
+                    "PA",
+                    "TX",
+                  ] as StateCode[]
+                ).map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>
