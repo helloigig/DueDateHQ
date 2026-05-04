@@ -383,7 +383,11 @@ export type TaskStatus =
   | "completed"
   | "deferred"
   | "filed_extension"
-  | "overdue";
+  | "overdue"
+  // Distinct from `deferred` — this is a kill, not a push. Used when the
+  // deadline becomes irrelevant mid-season (client fired, entity dissolved,
+  // switched filing status). Always carries a reason (audit).
+  | "not_applicable";
 
 /**
  * The six PRD §5.2 document states. Critical: AI never auto-promotes to
@@ -432,6 +436,10 @@ export interface ChecklistItem {
   receivedFilename?: string;
   /** Optional source link (CPA's existing system, e.g., SharePoint). */
   sourceUrl?: string;
+  /** Provenance — null = template/system, set = user added it post-creation.
+   *  Only the latter is deletable. Mock-mode also carries `custom: boolean`
+   *  for the same signal; real-mode reads this id directly. */
+  addedByUserId?: string | null;
 }
 
 /**
@@ -450,9 +458,31 @@ export interface Task {
   status: TaskStatus;
   /** Per-task forwarding address — `firstname-form-{4charToken}@duedatehq.com`. */
   forwardingEmail: string;
+  /** Display name of the preparer. Real-mode joins also resolve `assignedUserId`. */
   assignedUser: string;
+  /** Preparer user id — mirrors `tasks.assigned_user_id`. */
+  assignedUserId?: string | null;
+  /** Reviewer user id — Phase-1 promotion of the v0.7 stub. */
+  reviewerUserId?: string | null;
+  /** Display name of the reviewer (resolved server-side or by mock). */
+  reviewerUser?: string | null;
   completedAt?: string;
   completedBy?: string;
+  /** Set when status moves to `not_applicable`. */
+  notApplicableReason?: string | null;
+  notApplicableAt?: string | null;
+}
+
+/** Per-task note feed — judgment scoped to a single filing. Distinct from
+ *  client notes (cross-engagement context). */
+export interface TaskNote {
+  id: string;
+  taskId: string;
+  body: string;
+  pinned: boolean;
+  authorUserId: string | null;
+  authorName: string;
+  createdAt: string;
 }
 
 export type EmailTone = "formal" | "casual" | "urgent" | "apologetic";

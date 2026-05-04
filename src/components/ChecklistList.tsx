@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Plus, ChevronRight, AlertTriangle } from "lucide-react";
 import { ChecklistRow } from "./ChecklistRow";
 import type { ChecklistItem } from "../types";
-import { actions } from "../data/store";
+import { useAddChecklistItem } from "../hooks/useChecklist";
 
 interface Props {
   taskId: string;
@@ -34,6 +34,7 @@ export function ChecklistList({ taskId, items, onOpenEmailDraft }: Props) {
   const [adding, setAdding] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [completeOpen, setCompleteOpen] = useState(false);
+  const addItem = useAddChecklistItem();
 
   const groups = useMemo(() => {
     const waiting = items.filter(
@@ -74,8 +75,9 @@ export function ChecklistList({ taskId, items, onOpenEmailDraft }: Props) {
   }, [groups.waiting]);
 
   const submit = () => {
-    if (!newLabel.trim()) return;
-    actions.addChecklistItem(taskId, newLabel.trim(), "custom");
+    const label = newLabel.trim();
+    if (!label) return;
+    addItem(taskId, label, "custom");
     setNewLabel("");
     setAdding(false);
   };

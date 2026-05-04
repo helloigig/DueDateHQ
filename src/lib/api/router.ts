@@ -26,6 +26,7 @@ import type {
   ReminderTemplate,
   ServicePackage,
   Task,
+  TaskNote,
   User,
 } from "../../types";
 
@@ -731,10 +732,30 @@ export const appRouter = t.router({
   }),
 
   team: t.router({
-    list: t.procedure.query(async (): Promise<User[]> => NOT_IMPL()),
+    list: t.procedure.query(
+      async (): Promise<{
+        members: Array<{
+          id: string;
+          email: string;
+          displayName: string | null;
+          role: "owner" | "member";
+          timezone: string;
+          lastActiveAt: string | null;
+        }>;
+        invites: Array<{
+          id: string;
+          email: string;
+          role: "owner" | "member";
+          invitedAt: string;
+          expiresAt: string;
+        }>;
+      }> => NOT_IMPL(),
+    ),
     invite: t.procedure
       .input(jsonPassthrough)
-      .mutation(async (): Promise<{ inviteId: string }> => NOT_IMPL()),
+      .mutation(
+        async (): Promise<{ inviteId: string; token?: string }> => NOT_IMPL(),
+      ),
     updateRole: t.procedure
       .input(jsonPassthrough)
       .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
@@ -759,6 +780,19 @@ export const appRouter = t.router({
         async (): Promise<{ id: string; alreadyExists: boolean }> =>
           NOT_IMPL()
       ),
+    // Phase-1 task action surface (canonical 8-action set).
+    assign: t.procedure
+      .input(jsonPassthrough)
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    defer: t.procedure
+      .input(jsonPassthrough)
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    fileExtension: t.procedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    markNotApplicable: t.procedure
+      .input(jsonPassthrough)
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
   }),
 
   checklists: t.router({
@@ -772,6 +806,15 @@ export const appRouter = t.router({
           state: z.string() as z.ZodType<DocumentState>,
         })
       )
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    // Phase-1 add/delete for ad-hoc (user-authored) items. Template
+    // items remain protected — `deleteCustom` rejects FORBIDDEN if the
+    // item has no `addedByUserId`.
+    addCustom: t.procedure
+      .input(jsonPassthrough)
+      .mutation(async (): Promise<{ id: string }> => NOT_IMPL()),
+    deleteCustom: t.procedure
+      .input(z.object({ id: z.string() }))
       .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
   }),
 
@@ -812,6 +855,23 @@ export const appRouter = t.router({
           nextCursor: string | null;
         }> => NOT_IMPL(),
       ),
+  }),
+
+  // Per-task note feed — Phase-1 promotion of the v0.7 stub. Distinct
+  // from `clients.*` notes which capture cross-engagement context.
+  taskNotes: t.router({
+    listForTask: t.procedure
+      .input(z.object({ taskId: z.string() }))
+      .query(async (): Promise<TaskNote[]> => NOT_IMPL()),
+    add: t.procedure
+      .input(jsonPassthrough)
+      .mutation(async (): Promise<{ id: string }> => NOT_IMPL()),
+    togglePin: t.procedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async (): Promise<{ ok: true; pinned: boolean }> => NOT_IMPL()),
+    delete: t.procedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
   }),
 
   emails: t.router({

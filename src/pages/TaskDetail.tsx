@@ -7,6 +7,7 @@ import { ChecklistList } from "../components/ChecklistList";
 import { ActivityTimeline } from "../components/ActivityTimeline";
 import { AiInsightsPanel } from "../components/AiInsightsPanel";
 import { TaskAlertContext } from "../components/TaskAlertContext";
+import { TaskNotesPanel } from "../components/TaskNotesPanel";
 import { EmailDraftModal, type EmailDraftIntent } from "../components/EmailDraftModal";
 import { TaskAuditPackModal } from "../components/TaskAuditPackModal";
 import { useTask, useUpdateTaskStatus } from "../hooks/useTasks";
@@ -190,7 +191,7 @@ export function TaskDetail() {
             title="Activity timeline"
           />
         </div>
-        <div>
+        <div className="space-y-5">
           <AiInsightsPanel
             task={task}
             client={client}
@@ -199,6 +200,7 @@ export function TaskDetail() {
             insights={insights}
             onAskClient={onAskClientFromInsight}
           />
+          <TaskNotesPanel taskId={task.id} />
         </div>
       </div>
 

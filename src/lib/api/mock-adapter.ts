@@ -1586,13 +1586,34 @@ export const mockAdapter = {
   },
 
   team: {
-    list: async (): Promise<User[]> => {
+    list: async () => {
       await delay();
-      return [currentUser()];
+      const u = currentUser();
+      // Mirror the BE shape `{ members, invites }`. Mock-mode firm has
+      // exactly one member (the signed-in user); no pending invites.
+      return {
+        members: [
+          {
+            id: u.id,
+            email: u.email,
+            displayName: u.displayName,
+            role: u.role,
+            timezone: u.timezone,
+            lastActiveAt: u.lastActiveAt ?? null,
+          },
+        ],
+        invites: [] as Array<{
+          id: string;
+          email: string;
+          role: "owner" | "member";
+          invitedAt: string;
+          expiresAt: string;
+        }>,
+      };
     },
     invite: async () => {
       await delay();
-      return { inviteId: `inv-${Date.now()}` };
+      return { inviteId: `inv-${Date.now()}`, token: "mock-token" };
     },
     updateRole: async () => {
       await delay();
@@ -1624,6 +1645,11 @@ export const mockAdapter = {
       status: import("../../types").TaskStatus;
     }) => {
       await delay();
+      if (status === "not_applicable") {
+        // Parity with BE — generic updateStatus rejects this; callers
+        // must use the dedicated mutation.
+        throw new Error("use_mark_not_applicable");
+      }
       actions.updateTaskStatus(id, status);
       return { ok: true as const };
     },
@@ -1632,6 +1658,58 @@ export const mockAdapter = {
       // procedure is a no-op for parity with the BE contract.
       await delay();
       return { id: _.deadlineId, alreadyExists: true as const };
+    },
+    assign: async ({
+      id,
+      preparerUserId,
+      reviewerUserId,
+    }: {
+      id: string;
+      preparerUserId?: string | null;
+      reviewerUserId?: string | null;
+    }) => {
+      await delay();
+      // Mock store keeps display names; map back via the team list.
+      const session = sessionOrDefault();
+      const resolveName = (uid: string | null | undefined) => {
+        if (uid === undefined) return undefined;
+        if (uid === null) return null;
+        return uid === session.userId ? session.userName : uid;
+      };
+      actions.assignTask(id, {
+        preparer: resolveName(preparerUserId),
+        reviewer: resolveName(reviewerUserId),
+      });
+      return { ok: true as const };
+    },
+    defer: async ({
+      id,
+      newDate,
+      reason,
+    }: {
+      id: string;
+      newDate: string;
+      reason?: string;
+    }) => {
+      await delay();
+      actions.deferTask(id, newDate, reason);
+      return { ok: true as const };
+    },
+    fileExtension: async ({ id }: { id: string }) => {
+      await delay();
+      actions.fileTaskExtension(id);
+      return { ok: true as const };
+    },
+    markNotApplicable: async ({
+      id,
+      reason,
+    }: {
+      id: string;
+      reason: string;
+    }) => {
+      await delay();
+      actions.markTaskNotApplicable(id, reason);
+      return { ok: true as const };
     },
   },
 
@@ -1652,6 +1730,59 @@ export const mockAdapter = {
     }) => {
       await delay();
       actions.setChecklistItemState(id, state, "cpa");
+      return { ok: true as const };
+    },
+    addCustom: async ({
+      taskId,
+      label,
+      itemType = "custom",
+    }: {
+      taskId: string;
+      label: string;
+      itemType?: string;
+    }) => {
+      await delay();
+      const id = actions.addChecklistItem(taskId, label, itemType);
+      return { id: id ?? "" };
+    },
+    deleteCustom: async ({ id }: { id: string }) => {
+      await delay();
+      actions.removeChecklistItem(id);
+      return { ok: true as const };
+    },
+  },
+
+  taskNotes: {
+    listForTask: async ({ taskId }: { taskId: string }) => {
+      await delay();
+      const notes = getState().taskNotes.filter((n) => n.taskId === taskId);
+      return [...notes].sort((a, b) => {
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+        return a.createdAt.localeCompare(b.createdAt);
+      });
+    },
+    add: async ({
+      taskId,
+      body,
+      pinned = false,
+    }: {
+      taskId: string;
+      body: string;
+      pinned?: boolean;
+    }) => {
+      await delay();
+      const id = actions.addTaskNote(taskId, body, pinned);
+      return { id: id ?? "" };
+    },
+    togglePin: async ({ id }: { id: string }) => {
+      await delay();
+      actions.toggleTaskNotePin(id);
+      const note = getState().taskNotes.find((n) => n.id === id);
+      return { ok: true as const, pinned: note?.pinned ?? false };
+    },
+    delete: async ({ id }: { id: string }) => {
+      await delay();
+      actions.deleteTaskNote(id);
       return { ok: true as const };
     },
   },

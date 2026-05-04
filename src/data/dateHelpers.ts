@@ -178,7 +178,8 @@ export interface DeadlineStateInput {
     | "completed"
     | "deferred"
     | "filed_extension"
-    | "overdue";
+    | "overdue"
+    | "not_applicable";
   /** Original buffer used to compute the "tight" threshold. Defaults to 7d (annual). */
   originalBufferDays?: number;
 }

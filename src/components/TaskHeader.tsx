@@ -7,26 +7,22 @@ import {
   Inbox,
   FileDown,
   Package,
+  Slash,
 } from "lucide-react";
-import type { Client, Task, TaskStatus } from "../types";
+import type { Client, Task } from "../types";
 import { useStore } from "../data/store";
 import { bundleById } from "../data/bundles";
 import { exportAuditTrailJson, exportAuditTrailPdf } from "../lib/audit-trail";
 import { useCoverSheet } from "../hooks/useFilesFromClients";
-import { useUpdateTaskStatus } from "../hooks/useTasks";
+import {
+  useFileExtensionForTask,
+  useUpdateTaskStatus,
+} from "../hooks/useTasks";
 import { env } from "../config";
 import { simulateInboundDocument } from "../lib/simulate-inbound";
 import { DeadlineChip, defaultActionsForState } from "./ui/DeadlineChip";
 import { classifyDeadlineState } from "../data/dateHelpers";
-
-const STATUS_LABELS: Record<TaskStatus, string> = {
-  not_started: "Not started",
-  in_progress: "In progress",
-  completed: "Completed",
-  deferred: "Deferred",
-  filed_extension: "Extension filed",
-  overdue: "Overdue",
-};
+import { TaskActions } from "./TaskActions";
 
 interface Props {
   task: Task;
@@ -39,6 +35,7 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
   const [copied, setCopied] = useState(false);
   const { deadlines } = useStore();
   const updateStatus = useUpdateTaskStatus();
+  const fileExtension = useFileExtensionForTask();
   // Trace which service package generated this task — closes the loop
   // between Settings → Service Packages and the daily flow. Educates the CPA
   // on what's driving their workload without lecturing.
@@ -52,19 +49,6 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
       setTimeout(() => setCopied(false), 1400);
     } catch {
       /* clipboard denied — silent in wireframe */
-    }
-  };
-
-  const onStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    updateStatus(task.id, e.target.value as TaskStatus);
-  };
-
-  const onMarkComplete = () => {
-    if (
-      task.status === "completed" ||
-      window.confirm(`Mark ${task.formType} complete? This closes the task.`)
-    ) {
-      updateStatus(task.id, "completed");
     }
   };
 
@@ -129,8 +113,9 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
                       "Chase flow opens Mode D draft — wired to existing QuickActionModal in P1",
                     ),
                   onSubmit: () => updateStatus(task.id, "completed"),
-                  onFileExtension: () =>
-                    updateStatus(task.id, "filed_extension"),
+                  // Phase-1: file-extension routes through the dedicated mutation
+                  // (cascades to deadline) instead of a free-form status write.
+                  onFileExtension: () => fileExtension(task.id),
                   onAdjustTarget: () =>
                     alert(
                       "Adjust target opens TaskMilestone editor — drag the waypoint in the mini-timeline below",
@@ -146,25 +131,27 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
           <div className="text-xs text-ink-500 mt-2 flex items-center flex-wrap gap-x-3 gap-y-1">
             <span>
               <span className="text-ink-400">Preparer:</span>{" "}
-              <span className="text-ink-900">{task.assignedUser}</span>
+              <span className="text-ink-900">
+                {task.assignedUser || "Unassigned"}
+              </span>
             </span>
             <span className="text-ink-300">·</span>
             <span>
               <span className="text-ink-400">Reviewer:</span>{" "}
-              <span className="text-ink-700">
-                {/* Phase 2 stub — wireframe shows the field; real assignment
-                    UI ships with the role-aware permissions update. */}
-                Unassigned
+              <span className={task.reviewerUser ? "text-ink-900" : "text-ink-500"}>
+                {task.reviewerUser ?? "Unassigned"}
               </span>
-              <button
-                type="button"
-                className="ml-1 text-2xs text-ink-500 underline hover:text-ink-900"
-                onClick={() => alert("Reviewer assignment ships in Phase 2 alongside Admin/Viewer roles")}
-              >
-                assign
-              </button>
             </span>
           </div>
+          {task.status === "not_applicable" && task.notApplicableReason && (
+            <div className="mt-2 inline-flex items-start gap-1.5 text-xs text-danger-ink bg-danger-bg/40 border border-danger-border rounded px-2 py-1">
+              <Slash className="w-3 h-3 shrink-0 mt-0.5 text-danger-solid" aria-hidden />
+              <span>
+                <span className="font-semibold">Not applicable:</span>{" "}
+                {task.notApplicableReason}
+              </span>
+            </div>
+          )}
           {sourceBundle && (
             <div className="text-xs text-ink-500 mt-2 flex items-center gap-1.5">
               <Package className="w-3 h-3 text-ink-400" aria-hidden />
@@ -182,26 +169,7 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <select
-            value={task.status}
-            onChange={onStatusChange}
-            className="text-sm border border-line rounded px-2 py-1.5 bg-surface text-ink-900"
-          >
-            {(Object.keys(STATUS_LABELS) as TaskStatus[]).map((s) => (
-              <option key={s} value={s}>
-                {STATUS_LABELS[s]}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={onMarkComplete}
-            disabled={task.status === "completed"}
-            className="text-sm px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {task.status === "completed" ? "Completed" : "Mark complete"}
-          </button>
-        </div>
+        <TaskActions task={task} />
       </div>
 
       {/* Forwarding email — Method A per PRD §7.4 */}

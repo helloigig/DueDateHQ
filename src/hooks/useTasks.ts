@@ -43,16 +43,28 @@ export function useTasksForClient(clientId: string | undefined): Task[] {
 }
 
 /**
- * Returns a function that updates a task's status. tRPC handles both modes
- * via the mock adapter / real BE. After mutation, invalidates the relevant
- * `tasks.list` queries so the UI refreshes.
+ * Common invalidator for any task mutation — refreshes the task row,
+ * the per-client list, the cross-client list, and the activity feed.
+ * Hooks below all share this so the UI feels coherent post-mutation.
+ */
+function useInvalidateTask() {
+  const utils = trpc.useUtils();
+  return () => {
+    void utils.tasks.list.invalidate();
+    void utils.tasks.get.invalidate();
+    void utils.activity.listForTask.invalidate();
+  };
+}
+
+/**
+ * Returns a function that updates a task's status. Used by the simple
+ * progress verbs (Not started / In progress) that don't carry payload.
+ * Defer / FileExtension / MarkNotApplicable have dedicated hooks below.
  */
 export function useUpdateTaskStatus() {
-  const utils = trpc.useUtils();
+  const invalidate = useInvalidateTask();
   const mutation = trpc.tasks.updateStatus.useMutation({
-    onSuccess: () => {
-      void utils.tasks.list.invalidate();
-    },
+    onSuccess: invalidate,
   });
   return (taskId: string, status: TaskStatus) => {
     if (env.useMockData) {
@@ -60,5 +72,84 @@ export function useUpdateTaskStatus() {
       actions.updateTaskStatus(taskId, status);
     }
     mutation.mutate({ id: taskId, status });
+  };
+}
+
+/** Reassign preparer / reviewer. Pass `undefined` to leave a field
+ *  unchanged; `null` to un-assign; uuid to set. */
+export function useReassignTask() {
+  const invalidate = useInvalidateTask();
+  const mutation = trpc.tasks.assign.useMutation({ onSuccess: invalidate });
+  return (
+    taskId: string,
+    patch: {
+      preparerUserId?: string | null;
+      reviewerUserId?: string | null;
+    },
+  ) => {
+    if (env.useMockData) {
+      // Mock store keeps display names; pass through the id strings so
+      // the demo works without a real team. The mock adapter resolves
+      // these via session for the signed-in user.
+      actions.assignTask(taskId, {
+        preparer:
+          patch.preparerUserId === undefined ? undefined : patch.preparerUserId,
+        reviewer:
+          patch.reviewerUserId === undefined ? undefined : patch.reviewerUserId,
+      });
+    }
+    mutation.mutate({ id: taskId, ...patch });
+  };
+}
+
+/** Defer the working date. Cascades to deadline. */
+export function useDeferTask() {
+  const invalidate = useInvalidateTask();
+  const utils = trpc.useUtils();
+  const mutation = trpc.tasks.defer.useMutation({
+    onSuccess: () => {
+      invalidate();
+      void utils.deadlines.listForTriage.invalidate();
+      void utils.deadlines.listForClient.invalidate();
+    },
+  });
+  return (taskId: string, newDate: string, reason?: string) => {
+    if (env.useMockData) {
+      actions.deferTask(taskId, newDate, reason);
+    }
+    mutation.mutate({ id: taskId, newDate, reason });
+  };
+}
+
+/** Mark extension filed. Cascades to deadline. */
+export function useFileExtensionForTask() {
+  const invalidate = useInvalidateTask();
+  const utils = trpc.useUtils();
+  const mutation = trpc.tasks.fileExtension.useMutation({
+    onSuccess: () => {
+      invalidate();
+      void utils.deadlines.listForTriage.invalidate();
+      void utils.deadlines.listForClient.invalidate();
+    },
+  });
+  return (taskId: string) => {
+    if (env.useMockData) {
+      actions.fileTaskExtension(taskId);
+    }
+    mutation.mutate({ id: taskId });
+  };
+}
+
+/** Mark the task not applicable. Reason is required (audit). */
+export function useMarkTaskNotApplicable() {
+  const invalidate = useInvalidateTask();
+  const mutation = trpc.tasks.markNotApplicable.useMutation({
+    onSuccess: invalidate,
+  });
+  return (taskId: string, reason: string) => {
+    if (env.useMockData) {
+      actions.markTaskNotApplicable(taskId, reason);
+    }
+    mutation.mutate({ id: taskId, reason });
   };
 }

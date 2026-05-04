@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, max, sql } from "drizzle-orm";
 import { z } from "zod";
 import { firmProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
@@ -10,6 +10,7 @@ import {
   clients,
   deadlines,
   tasks,
+  users,
 } from "../../db/schema.js";
 import { trySeedMilestonesForTask } from "../../lib/milestone-seeder.js";
 
@@ -20,6 +21,7 @@ const TASK_STATUS = [
   "deferred",
   "filed_extension",
   "overdue",
+  "not_applicable",
 ] as const;
 
 const CHECKLIST_STATE = [
@@ -78,6 +80,7 @@ export const tasksRouter = router({
         completionPercentage: r.task.completionPercentage,
         forwardingEmail: `${r.task.forwardingEmailLocalPart}@duedatehq.com`,
         assignedUserId: r.task.assignedUserId,
+        reviewerUserId: r.task.reviewerUserId,
       }));
     }),
 
@@ -109,6 +112,10 @@ export const tasksRouter = router({
         status: r.task.status,
         completionPercentage: r.task.completionPercentage,
         forwardingEmail: `${r.task.forwardingEmailLocalPart}@duedatehq.com`,
+        assignedUserId: r.task.assignedUserId,
+        reviewerUserId: r.task.reviewerUserId,
+        notApplicableReason: r.task.notApplicableReason,
+        notApplicableAt: r.task.notApplicableAt?.toISOString() ?? null,
       };
     }),
 
@@ -189,16 +196,248 @@ export const tasksRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      // not_applicable has its own dedicated mutation (carries a reason).
+      // Block the generic path so we never write the status without one.
+      if (input.status === "not_applicable") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "use_mark_not_applicable",
+        });
+      }
       const result = await db
         .update(tasks)
         .set({
           status: input.status,
           completedAt: input.status === "completed" ? new Date() : null,
           completedByUserId: input.status === "completed" ? ctx.dbUser.id : null,
+          // Clear NA bookkeeping if we transition out of it.
+          notApplicableReason: null,
+          notApplicableAt: null,
           updatedAt: sql`now()`,
         })
         .where(and(eq(tasks.id, input.id), eq(tasks.firmId, ctx.firmId)));
       if (result.count === 0) throw new TRPCError({ code: "NOT_FOUND" });
+      return { ok: true as const };
+    }),
+
+  /**
+   * Reassign preparer / reviewer. Either field is optional; passing
+   * `null` un-assigns. Promotes the v0.7 "assign reviewer" stub to a
+   * real Phase-1 mutation. Anyone in the firm is allowed for either
+   * role — admin-only roles ship with the role-aware UI.
+   */
+  assign: firmProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        // `undefined` = leave unchanged; `null` = un-assign; uuid = set.
+        preparerUserId: z.string().uuid().nullable().optional(),
+        reviewerUserId: z.string().uuid().nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const task = await db.query.tasks.findFirst({
+        where: and(eq(tasks.id, input.id), eq(tasks.firmId, ctx.firmId)),
+      });
+      if (!task) throw new TRPCError({ code: "NOT_FOUND" });
+
+      // Validate any non-null assignment targets are in this firm.
+      const targets = [
+        input.preparerUserId,
+        input.reviewerUserId,
+      ].filter((v): v is string => typeof v === "string");
+      if (targets.length > 0) {
+        const found = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.firmId, ctx.firmId));
+        const allowed = new Set(found.map((r) => r.id));
+        for (const t of targets) {
+          if (!allowed.has(t)) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "user_not_in_firm",
+            });
+          }
+        }
+      }
+
+      const patch: {
+        assignedUserId?: string | null;
+        reviewerUserId?: string | null;
+        updatedAt: ReturnType<typeof sql>;
+      } = { updatedAt: sql`now()` };
+      if (input.preparerUserId !== undefined) {
+        patch.assignedUserId = input.preparerUserId;
+      }
+      if (input.reviewerUserId !== undefined) {
+        patch.reviewerUserId = input.reviewerUserId;
+      }
+
+      await db.transaction(async (tx) => {
+        await tx
+          .update(tasks)
+          .set(patch)
+          .where(eq(tasks.id, input.id));
+        const desc: string[] = [];
+        if (input.preparerUserId !== undefined) {
+          desc.push(
+            input.preparerUserId
+              ? `Preparer reassigned`
+              : `Preparer un-assigned`,
+          );
+        }
+        if (input.reviewerUserId !== undefined) {
+          desc.push(
+            input.reviewerUserId
+              ? `Reviewer assigned`
+              : `Reviewer un-assigned`,
+          );
+        }
+        if (desc.length > 0) {
+          await tx.insert(activityEvents).values({
+            firmId: ctx.firmId,
+            taskId: input.id,
+            eventType: "task_reassigned",
+            actorKind: "user",
+            actorUserId: ctx.dbUser.id,
+            description: `${ctx.dbUser.displayName ?? ctx.dbUser.email}: ${desc.join(", ")}`,
+          });
+        }
+      });
+      return { ok: true as const };
+    }),
+
+  /**
+   * Defer the working date — Task-level wrapper that cascades to the
+   * underlying deadline (deadline-as-field per v0.8 §1.5 collapse).
+   * `officialDueDate` stays put: the jurisdiction's hard date is
+   * immutable; only the firm's working date moves.
+   */
+  defer: firmProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        newDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        reason: z.string().max(500).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const task = await db.query.tasks.findFirst({
+        where: and(eq(tasks.id, input.id), eq(tasks.firmId, ctx.firmId)),
+      });
+      if (!task) throw new TRPCError({ code: "NOT_FOUND" });
+
+      await db.transaction(async (tx) => {
+        await tx
+          .update(deadlines)
+          .set({
+            status: "deferred",
+            adjustedDueDate: input.newDate,
+            updatedAt: sql`now()`,
+          })
+          .where(eq(deadlines.id, task.deadlineId));
+        await tx
+          .update(tasks)
+          .set({
+            status: "deferred",
+            notApplicableReason: null,
+            notApplicableAt: null,
+            updatedAt: sql`now()`,
+          })
+          .where(eq(tasks.id, input.id));
+        await tx.insert(activityEvents).values({
+          firmId: ctx.firmId,
+          taskId: input.id,
+          eventType: "task_deferred",
+          actorKind: "user",
+          actorUserId: ctx.dbUser.id,
+          description: `${ctx.dbUser.displayName ?? ctx.dbUser.email}: deferred to ${input.newDate}${input.reason ? ` — ${input.reason}` : ""}`,
+        });
+      });
+      return { ok: true as const };
+    }),
+
+  /**
+   * Mark an extension filed at the Task level. Cascades to the deadline.
+   * Phase-1 promotion of `deadlines.fileExtension`.
+   */
+  fileExtension: firmProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const task = await db.query.tasks.findFirst({
+        where: and(eq(tasks.id, input.id), eq(tasks.firmId, ctx.firmId)),
+      });
+      if (!task) throw new TRPCError({ code: "NOT_FOUND" });
+
+      await db.transaction(async (tx) => {
+        await tx
+          .update(deadlines)
+          .set({ status: "filed_extension", updatedAt: sql`now()` })
+          .where(eq(deadlines.id, task.deadlineId));
+        await tx
+          .update(tasks)
+          .set({
+            status: "filed_extension",
+            notApplicableReason: null,
+            notApplicableAt: null,
+            updatedAt: sql`now()`,
+          })
+          .where(eq(tasks.id, input.id));
+        await tx.insert(activityEvents).values({
+          firmId: ctx.firmId,
+          taskId: input.id,
+          eventType: "task_extension_filed",
+          actorKind: "user",
+          actorUserId: ctx.dbUser.id,
+          description: `${ctx.dbUser.displayName ?? ctx.dbUser.email}: extension filed`,
+        });
+      });
+      return { ok: true as const };
+    }),
+
+  /**
+   * Mark the task not applicable. Distinct from `deferred` (push) — this
+   * is a kill: client fired, entity dissolved, switched filing status.
+   * Reason is required (audit trail). The underlying deadline is NOT
+   * cascaded — the official date is still real for any future picture
+   * of "what was due"; the task layer just records that we stopped
+   * working it.
+   */
+  markNotApplicable: firmProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        reason: z.string().min(1).max(500),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const task = await db.query.tasks.findFirst({
+        where: and(eq(tasks.id, input.id), eq(tasks.firmId, ctx.firmId)),
+      });
+      if (!task) throw new TRPCError({ code: "NOT_FOUND" });
+
+      await db.transaction(async (tx) => {
+        await tx
+          .update(tasks)
+          .set({
+            status: "not_applicable",
+            notApplicableReason: input.reason,
+            notApplicableAt: new Date(),
+            completedAt: null,
+            completedByUserId: null,
+            updatedAt: sql`now()`,
+          })
+          .where(eq(tasks.id, input.id));
+        await tx.insert(activityEvents).values({
+          firmId: ctx.firmId,
+          taskId: input.id,
+          eventType: "task_not_applicable",
+          actorKind: "user",
+          actorUserId: ctx.dbUser.id,
+          description: `${ctx.dbUser.displayName ?? ctx.dbUser.email}: marked not applicable — ${input.reason}`,
+        });
+      });
       return { ok: true as const };
     }),
 });
@@ -272,6 +511,96 @@ export const checklistsRouter = router({
           actorUserId: ctx.dbUser.id,
           description: `${ctx.dbUser.displayName ?? ctx.dbUser.email} set "${item.label}" to ${input.state}`,
           relatedChecklistItemId: input.id,
+        });
+      });
+      return { ok: true as const };
+    }),
+
+  /**
+   * Add a custom checklist item to a task. Records the author in
+   * `addedByUserId` so the row is identifiably user-added (and thus
+   * deletable via `deleteCustom`). Sort order goes to the end.
+   */
+  addCustom: firmProcedure
+    .input(
+      z.object({
+        taskId: z.string().uuid(),
+        label: z.string().min(1).max(200),
+        itemType: z.string().min(1).max(60).default("custom"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const task = await db.query.tasks.findFirst({
+        where: and(eq(tasks.id, input.taskId), eq(tasks.firmId, ctx.firmId)),
+      });
+      if (!task) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const [{ next } = { next: 0 }] = await db
+        .select({ next: max(checklistItems.sortOrder) })
+        .from(checklistItems)
+        .where(eq(checklistItems.taskId, input.taskId));
+      const nextOrder = (next ?? 0) + 1;
+
+      const [row] = await db
+        .insert(checklistItems)
+        .values({
+          firmId: ctx.firmId,
+          taskId: input.taskId,
+          label: input.label,
+          itemType: input.itemType,
+          sortOrder: nextOrder,
+          state: "not_requested",
+          stateChangedByKind: "user",
+          stateChangedByUserId: ctx.dbUser.id,
+          addedByUserId: ctx.dbUser.id,
+        })
+        .returning();
+      if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      await db.insert(activityEvents).values({
+        firmId: ctx.firmId,
+        taskId: input.taskId,
+        eventType: "checklist_item_added",
+        actorKind: "user",
+        actorUserId: ctx.dbUser.id,
+        description: `${ctx.dbUser.displayName ?? ctx.dbUser.email}: added "${input.label}"`,
+        relatedChecklistItemId: row.id,
+      });
+      return { id: row.id };
+    }),
+
+  /**
+   * Delete a checklist item. Only user-added rows are deletable
+   * (`addedByUserId IS NOT NULL`) — template/system items must stay so
+   * the audit trail of "what we asked for" is intact.
+   */
+  deleteCustom: firmProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const item = await db.query.checklistItems.findFirst({
+        where: and(
+          eq(checklistItems.id, input.id),
+          eq(checklistItems.firmId, ctx.firmId),
+        ),
+      });
+      if (!item) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!item.addedByUserId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "template_items_not_deletable",
+        });
+      }
+      await db.transaction(async (tx) => {
+        await tx
+          .delete(checklistItems)
+          .where(eq(checklistItems.id, input.id));
+        await tx.insert(activityEvents).values({
+          firmId: ctx.firmId,
+          taskId: item.taskId,
+          eventType: "checklist_item_removed",
+          actorKind: "user",
+          actorUserId: ctx.dbUser.id,
+          description: `${ctx.dbUser.displayName ?? ctx.dbUser.email}: removed "${item.label}"`,
         });
       });
       return { ok: true as const };
