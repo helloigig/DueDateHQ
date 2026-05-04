@@ -12,6 +12,7 @@ import { draftEmail } from "../lib/ai-stub";
 import { actions, useStore } from "../data/store";
 import { AuthorityChip } from "./AuthorityChip";
 import { useSession } from "../data/session";
+import { useSendEmail } from "../hooks/useEmailDrafts";
 
 /**
  * The Email draft modal — IA §3.7. Mode D's primary surface. Triggered from
@@ -42,6 +43,7 @@ const TONE_OPTIONS: EmailTone[] = ["formal", "casual", "urgent", "apologetic"];
 
 export function EmailDraftModal({ open, intent, onClose }: Props) {
   const session = useSession();
+  const sendEmail = useSendEmail();
   const [tone, setTone] = useState<EmailTone>("casual");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -178,7 +180,10 @@ export function EmailDraftModal({ open, intent, onClose }: Props) {
       status: scheduledFor ? "scheduled" : "draft",
     });
     if (!scheduledFor) {
-      actions.sendEmail(id);
+      // Wraps actions.sendEmail with the 60s "Sent · Undo" toast that
+      // backs the soft-recall affordance (emails.recall on real, store
+      // recallEmail in mock).
+      sendEmail(id);
     }
     onClose();
   };
@@ -373,7 +378,7 @@ export function EmailDraftModal({ open, intent, onClose }: Props) {
           <button
             onClick={send}
             disabled={generating || !subject.trim() || !body.trim()}
-            className="text-sm px-4 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+            className="text-sm px-4 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
           >
             <Send className="w-3.5 h-3.5" aria-hidden />
             {scheduledFor ? "Schedule send" : "Send"}
