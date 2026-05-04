@@ -26,81 +26,77 @@ export function OnboardingChoosePath() {
       step={2}
       totalSteps={3}
       title="Bring your roster in"
-      subtitle="The fastest way is a CSV. No CSV? Connect QuickBooks or Xero instead — same outcome."
+      subtitle="Drop a CSV, connect your accounting tool, or start with a few clients."
     >
-      <div className="space-y-6">
-        {/* Primary affordance — upload CSV, big and obvious */}
-        <Link
-          to="/onboarding/import"
-          className="block bg-canvas border border-indigo/30 rounded-md p-5 hover:bg-indigo-soft/40 hover:border-indigo transition-colors group"
-        >
-          <div className="flex items-start gap-4">
-            <span className="w-11 h-11 rounded-md bg-indigo-soft text-indigo flex items-center justify-center shrink-0">
-              <Upload className="w-5 h-5" aria-hidden />
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-base font-semibold text-ink-900">
-                  Upload your client roster
-                </h3>
-                <span className="text-2xs uppercase tracking-wide px-2 py-0.5 rounded-pill bg-indigo text-white font-semibold">
-                  Recommended
-                </span>
-              </div>
-              <p className="text-sm text-ink-500 mt-1 leading-relaxed">
-                Drag a CSV from File In Time, TaxDome, Drake, ProConnect, or
-                Excel. AI auto-maps the columns. ~2 minutes.
-              </p>
+      {/* Primary — CSV upload */}
+      <Link
+        to="/onboarding/import"
+        className="block bg-surface border-2 border-line rounded-md p-6 hover:border-accent hover:shadow-pop transition-all group max-w-5xl"
+      >
+        <div className="flex items-start gap-4">
+          <span className="w-12 h-12 rounded-md bg-sunken border border-line flex items-center justify-center text-ink-700 shrink-0">
+            <Upload className="w-5 h-5" aria-hidden />
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-base font-semibold text-ink-900">
+                Upload a CSV
+              </h3>
+              <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-warn-bg text-warn-ink border border-warn-border">
+                Recommended
+              </span>
             </div>
-            <ArrowRight
-              className="w-4 h-4 text-ink-400 mt-2 group-hover:text-indigo transition-colors shrink-0"
-              aria-hidden
-            />
+            <p className="text-sm text-ink-500 mt-1">
+              Drag a roster from your existing tool. AI auto-maps the columns.
+            </p>
           </div>
         </Link>
 
-        {/* Three peers on one row — Connect QuickBooks, Connect Xero,
-            Add 5 manually. All three are valid alternatives to CSV; surfacing
-            them at equal weight matches how the user actually thinks. */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <ConnectChoice
-            provider="quickbooks"
-            title="Connect QuickBooks"
-            detail="Pulls clients + entity types in one click."
-            onClick={() => setOauthProvider("quickbooks")}
-          />
-          <ConnectChoice
-            provider="xero"
-            title="Connect Xero"
-            detail="Same one-click sync for Xero firms."
-            onClick={() => setOauthProvider("xero")}
-          />
-          <ManualChoice />
-        </div>
+      {/* 3-tile row — QuickBooks, Xero, Add manually */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 max-w-5xl">
+        <ConnectTile
+          icon={<QboLogo />}
+          title="Connect QuickBooks"
+          detail="One OAuth click — pulls your client list."
+          onClick={() => setOauthProvider("quickbooks")}
+        />
+        <ConnectTile
+          icon={<XeroLogo />}
+          title="Connect Xero"
+          detail="Same as QuickBooks for international firms."
+          onClick={() => setOauthProvider("xero")}
+        />
+        <ConnectTile
+          icon={
+            <span className="w-7 h-7 rounded-md bg-sunken border border-line flex items-center justify-center text-ink-700">
+              <UserPlus className="w-4 h-4" aria-hidden />
+            </span>
+          }
+          title="Add 5 manually"
+          detail="For small books or kicking the tires."
+          to="/onboarding/manual"
+        />
+      </div>
 
-        {/* Demo + skip on a single subdued line — both are escape hatches,
-            neither deserves a card. Demo seeds 49 fake clients; skip lands
-            you on an empty dashboard with the same options surfaced later. */}
-        <div className="flex items-center gap-3 text-xs text-ink-500">
-          <Link
-            to="/onboarding/demo"
-            className="inline-flex items-center gap-1.5 hover:text-indigo underline"
-          >
-            <Sparkles className="w-3.5 h-3.5" aria-hidden />
-            Try the demo workspace
-          </Link>
-          <span className="text-ink-300" aria-hidden>·</span>
-          <button
-            type="button"
-            onClick={() => {
-              updateSession({ onboardingComplete: true });
-              navigate("/", { replace: true });
-            }}
-            className="hover:text-indigo underline"
-          >
-            Skip for now
-          </button>
-        </div>
+      {/* Demo + Skip on the same line */}
+      <div className="mt-8 pt-6 border-t border-line max-w-5xl flex items-center gap-6 text-xs">
+        <Link
+          to="/onboarding/demo"
+          className="inline-flex items-center gap-1.5 text-ink-700 hover:text-ink-900"
+        >
+          <Sparkles className="w-3.5 h-3.5" aria-hidden />
+          Try the demo workspace
+        </Link>
+        <button
+          type="button"
+          onClick={() => {
+            updateSession({ onboardingComplete: true });
+            navigate("/", { replace: true });
+          }}
+          className="text-ink-500 hover:text-ink-900 underline"
+        >
+          Skip for now
+        </button>
       </div>
 
       <OAuthWireframeModal
@@ -111,50 +107,44 @@ export function OnboardingChoosePath() {
   );
 }
 
-function ConnectChoice({
-  provider,
+/** Unified tile — handles both router link (manual) and OAuth modal trigger (QBO/Xero). */
+function ConnectTile({
+  icon,
   title,
   detail,
+  to,
   onClick,
 }: {
-  provider: "quickbooks" | "xero";
+  icon: React.ReactNode;
   title: string;
   detail: string;
-  onClick: () => void;
+  to?: string;
+  onClick?: () => void;
 }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="text-left bg-canvas border border-line rounded-md p-4 hover:border-indigo/40 hover:bg-surface transition-colors flex items-start gap-3"
-    >
+  const className =
+    "text-left bg-surface border border-line rounded-md p-4 hover:border-accent hover:shadow-pop transition-all flex items-start gap-3";
+  const inner = (
+    <>
       <span className="w-9 h-9 rounded-md flex items-center justify-center shrink-0">
-        {provider === "quickbooks" ? <QboLogo /> : <XeroLogo />}
+        {icon}
       </span>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-ink-900">{title}</p>
         <p className="text-xs text-ink-500 mt-0.5 leading-relaxed">{detail}</p>
       </div>
-    </button>
+    </>
   );
-}
-
-function ManualChoice() {
+  if (to) {
+    return (
+      <Link to={to} className={className}>
+        {inner}
+      </Link>
+    );
+  }
   return (
-    <Link
-      to="/onboarding/manual"
-      className="bg-canvas border border-line rounded-md p-4 hover:border-indigo/40 hover:bg-surface transition-colors flex items-start gap-3"
-    >
-      <span className="w-9 h-9 rounded-md bg-indigo-soft/60 flex items-center justify-center text-indigo shrink-0">
-        <UserPlus className="w-4 h-4" aria-hidden />
-      </span>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-ink-900">Add 5 manually</p>
-        <p className="text-xs text-ink-500 mt-0.5 leading-relaxed">
-          For small books or skeptics.
-        </p>
-      </div>
-    </Link>
+    <button type="button" onClick={onClick} className={className}>
+      {inner}
+    </button>
   );
 }
 

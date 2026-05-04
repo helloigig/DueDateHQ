@@ -82,7 +82,7 @@ export function OnboardingFirm() {
   // "Connect calendar" affordance contextually.
   const [calendarProvider, setCalendarProvider] = useState<
     "google" | "outlook" | "apple" | "none"
-  >(session?.calendarProvider ?? "none");
+  >(session?.calendarProvider ?? "google");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Real mode: provision the firm + public.users row in the backend.
@@ -151,11 +151,8 @@ export function OnboardingFirm() {
       title="Set up your firm workspace"
       subtitle="Your account is created. Now we set up the firm — the tenant where your clients, deadlines, and filings live."
     >
-      <div className="space-y-6">
-        <Field
-          label="Firm name"
-          hint="Goes on outbound client emails, audit-trail exports, and the forwarding-address prefix."
-        >
+      <div className="space-y-6 max-w-md">
+        <Field label="Firm name">
           <input
             value={firmName}
             onChange={(e) => setFirmName(e.target.value)}
@@ -165,14 +162,7 @@ export function OnboardingFirm() {
           />
         </Field>
 
-        <Field
-          label="Where do you file?"
-          hint={
-            filingStates.length === 1
-              ? undefined
-              : `${filingStates.length} states picked.`
-          }
-        >
+        <Field label="Where do you file?">
           <StateMultiSelect
             selected={filingStates}
             home={homeState}
@@ -181,15 +171,8 @@ export function OnboardingFirm() {
           />
         </Field>
 
-        {/* Time zone + calendar in a 2-column grid — both affect daily flow.
-            Time zone drives "due today" math; calendar push gets deadlines
-            into the partner's existing planning surface. Everything else
-            (logo, EIN, address) lives in Settings → Firm. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field
-            label="Time zone"
-            hint="Used for 'due today' and 'this week' calculations."
-          >
+          <Field label="Time zone">
             <select
               value={timeZone}
               onChange={(e) => setTimeZone(e.target.value)}
@@ -200,18 +183,13 @@ export function OnboardingFirm() {
                   {tz.label}
                 </option>
               ))}
-              {/* If the auto-detected zone isn't in the common list, show it
-                  too so we don't silently overwrite */}
               {!COMMON_TIMEZONES.some((tz) => tz.value === timeZone) && (
                 <option value={timeZone}>{timeZone}</option>
               )}
             </select>
           </Field>
 
-          <Field
-            label="Push deadlines to your calendar"
-            hint="We'll add a 'Connect' button on your dashboard. Optional, change anytime."
-          >
+          <Field label="Push deadlines to your calendar">
             <select
               value={calendarProvider}
               onChange={(e) =>
@@ -221,10 +199,10 @@ export function OnboardingFirm() {
               }
               className="w-full border border-line rounded px-3 py-2 text-sm bg-surface"
             >
-              <option value="none">No — just keep them here</option>
               <option value="google">Google Calendar</option>
               <option value="outlook">Outlook / Microsoft 365</option>
               <option value="apple">Apple Calendar (iCloud)</option>
+              <option value="none">Don't push</option>
             </select>
           </Field>
         </div>
@@ -383,29 +361,16 @@ function StateMultiSelect({
         </div>
       </div>
 
-      {/* Hover hint + legend */}
-      <div className="flex items-center justify-between text-2xs flex-wrap gap-2">
-        <div className="text-ink-500 min-h-[1.25em]">
-          {hoveredState ? (
-            <>
-              <span className="font-mono font-semibold">
-                {hoveredState.code}
-              </span>{" "}
-              · {hoveredState.name}
-            </>
-          ) : (
-            "Click a state to add or remove it. Set one as your home."
-          )}
-        </div>
-        <div className="flex items-center gap-3 text-ink-500">
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-accent" /> picked
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded bg-surface border border-line" />{" "}
-            available
-          </span>
-        </div>
+      {/* Hover hint — only when hovering, no resting copy */}
+      <div className="text-2xs text-ink-500 min-h-[1.25em]">
+        {hoveredState && (
+          <>
+            <span className="font-mono font-semibold">
+              {hoveredState.code}
+            </span>{" "}
+            · {hoveredState.name}
+          </>
+        )}
       </div>
     </div>
   );
