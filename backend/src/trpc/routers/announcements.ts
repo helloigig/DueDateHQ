@@ -497,15 +497,22 @@ export const announcementsRouter = router({
           skipped.push({ clientId: r.clientId, reason: "no_email" });
           continue;
         }
-        // Pick this client's earliest open deadline in the announcement's
-        // jurisdiction; fall back to any open deadline. The email_drafts
+        // Pick this client's earliest deadline in the announcement's
+        // jurisdiction; fall back to any deadline. The email_drafts
         // FK to tasks needs a real task — Mode F state alerts are firm-
         // wide, but the bulletin still references each client's filing.
+        //
+        // Lazy materialization: if the chosen deadline doesn't yet have
+        // a Task row, create one inline. Tasks materialize on first
+        // touch (TaskDetail load, createForDeadline, etc.); a fresh
+        // firm with imported clients + assigned packages typically has
+        // deadlines but zero tasks until someone opens one. Without
+        // this fallback, every bulletin send would skip every client
+        // with reason `no_task` even though the data is fine.
         const jurisdiction = ann.stateCode.toLowerCase();
-        const dlRows = await db
-          .select({ taskId: tasks.id, dueDate: deadlines.adjustedDueDate })
+        const candidates = await db
+          .select({ id: deadlines.id, formType: deadlines.formType })
           .from(deadlines)
-          .innerJoin(tasks, eq(tasks.deadlineId, deadlines.id))
           .where(
             and(
               eq(deadlines.firmId, ctx.firmId),
@@ -515,25 +522,52 @@ export const announcementsRouter = router({
           )
           .orderBy(asc(deadlines.adjustedDueDate))
           .limit(1);
-        let taskId = dlRows[0]?.taskId;
-        if (!taskId) {
+        let chosenDeadline = candidates[0];
+        if (!chosenDeadline) {
           const fallback = await db
-            .select({ id: tasks.id })
-            .from(tasks)
-            .innerJoin(deadlines, eq(deadlines.id, tasks.deadlineId))
+            .select({ id: deadlines.id, formType: deadlines.formType })
+            .from(deadlines)
             .where(
               and(
-                eq(tasks.firmId, ctx.firmId),
+                eq(deadlines.firmId, ctx.firmId),
                 eq(deadlines.clientId, r.clientId),
               ),
             )
             .orderBy(asc(deadlines.adjustedDueDate))
             .limit(1);
-          taskId = fallback[0]?.id;
+          chosenDeadline = fallback[0];
         }
-        if (!taskId) {
+        if (!chosenDeadline) {
+          // Genuine no-deadline case — client has no filings on the books.
           skipped.push({ clientId: r.clientId, reason: "no_task" });
           continue;
+        }
+        // Find existing task for this deadline; lazy-create if missing.
+        const existingTask = await db.query.tasks.findFirst({
+          where: eq(tasks.deadlineId, chosenDeadline.id),
+        });
+        let taskId: string;
+        if (existingTask) {
+          taskId = existingTask.id;
+        } else {
+          const slug = (s: string) =>
+            s.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 16) || "task";
+          const token = Math.random().toString(36).slice(2, 6);
+          const localPart = `${slug(c.name.split(" ")[0] ?? "task")}-${slug(chosenDeadline.formType)}-${token}`;
+          const [newTask] = await db
+            .insert(tasks)
+            .values({
+              firmId: ctx.firmId,
+              deadlineId: chosenDeadline.id,
+              forwardingEmailLocalPart: localPart,
+              status: "not_started",
+            })
+            .returning();
+          if (!newTask) {
+            skipped.push({ clientId: r.clientId, reason: "no_task" });
+            continue;
+          }
+          taskId = newTask.id;
         }
 
         const replyToRow = await db
