@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useStore } from "../data/store";
 import { useAllOpenInsights, useResolveInsight } from "../hooks/useAiInsights";
+import { PageContainer } from "../components/ui/PageContainer";
 
 /**
  * Opportunities — Layer C firm-intelligence destination (PRD §4.4 Layer C),
@@ -93,19 +94,19 @@ export function Insights() {
   }, [clients, deadlines, tasks, insights]);
 
   return (
-    <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 space-y-6">
+    <PageContainer variant="wide" className="space-y-card">
       <header>
-        <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold flex items-center gap-2">
+        <p className="text-micro text-ink-500 flex items-center gap-2">
           Opportunities
           <span className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink normal-case tracking-normal">
             <Sparkles className="w-3 h-3" aria-hidden />
             AI surfaced
           </span>
         </p>
-        <h1 className="text-2xl font-semibold text-ink-900 mt-1">
+        <h1 className="text-display font-semibold text-ink-900 mt-1 leading-7 tracking-[-0.01em]">
           Revenue and risk the AI noticed
         </h1>
-        <p className="text-sm text-ink-500 mt-2 max-w-2xl">
+        <p className="text-caption text-ink-500 mt-2 max-w-2xl">
           Things you'd catch if you had time to read every prior return and
           benchmark every fee against the market. Pricing, capacity, and your
           own institutional knowledge — surfaced from your roster, your prior
@@ -331,7 +332,7 @@ export function Insights() {
 
           <div className="pt-3 border-t border-line">
             <p className="text-xs text-ink-700">
-              <span className="font-medium">Two clients underbilled by combined ~$1,400.</span>{" "}
+              <span className="font-medium tabular-nums">Two clients underbilled by combined ~$1,400.</span>{" "}
               Worth a pricing conversation at next year's engagement letter.
             </p>
           </div>
@@ -362,7 +363,7 @@ export function Insights() {
                 Q1 2027 forecast: 18 days over capacity
               </h3>
             </div>
-            <p className="text-xs text-warn-ink/90">
+            <p className="text-xs text-warn-ink/90 tabular-nums">
               Based on your {stats.activeClients} active clients' historical
               March workload + this year's pipeline, you'll be ~22% over your
               available billable capacity.
@@ -379,7 +380,7 @@ export function Insights() {
               </li>
               <li>
                 Decline the bottom-10% margin clients (~5 clients,{" "}
-                <span className="font-medium">~$8K revenue / ~110 hours</span>{" "}
+                <span className="font-medium tabular-nums">~$8K revenue / ~110 hours</span>{" "}
                 — we'll surface candidates).
               </li>
             </ul>
@@ -490,7 +491,7 @@ export function Insights() {
           Read the data-sharing posture <ArrowUpRight className="w-3 h-3" />
         </Link>
       </section>
-    </div>
+    </PageContainer>
   );
 }
 
@@ -561,8 +562,8 @@ function CapacityCard({
           {label}
         </span>
       </div>
-      <p className="text-base font-semibold text-ink-900">{value}</p>
-      <p className="text-2xs text-ink-500 mt-1">{detail}</p>
+      <p className="text-base font-semibold text-ink-900 tabular-nums">{value}</p>
+      <p className="text-2xs text-ink-500 mt-1 tabular-nums">{detail}</p>
     </div>
   );
 }

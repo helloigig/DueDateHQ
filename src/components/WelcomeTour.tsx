@@ -217,7 +217,7 @@ const SLIDES: ReadonlyArray<Slide> = [
             </div>
             <div className="flex justify-between text-2xs">
               <span className="text-ink-500">PTET election — yes (CA)</span>
-              <span className="text-ink-700 font-mono">$24K</span>
+              <span className="text-ink-700 tabular-nums">$24K</span>
             </div>
             <div className="flex justify-between text-2xs">
               <span className="text-ink-500">K-1 from Apex Fund — PFIC</span>

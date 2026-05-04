@@ -56,6 +56,8 @@ import {
   type PhaseEligibility,
 } from "../lib/phase2Eligibility";
 import { SettingsFederalFormsPanel } from "./SettingsFederalFormsPanel";
+import { PageContainer } from "../components/ui/PageContainer";
+import { PageHeader } from "../components/ui/PageHeader";
 
 const NAV = [
   { to: "/settings", label: "Account", icon: User, end: true },
@@ -75,9 +77,10 @@ const NAV = [
 
 export function Settings() {
   return (
-    <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 flex flex-col md:flex-row gap-6">
+    <PageContainer variant="wide">
+      <PageHeader title="Settings" />
+      <div className="flex flex-col md:flex-row gap-card">
       <aside className="md:w-56 shrink-0">
-        <h1 className="text-lg font-semibold text-ink-900 mb-3">Settings</h1>
         <nav className="flex md:flex-col gap-0.5 overflow-x-auto md:overflow-visible -mx-4 md:mx-0 px-4 md:px-0 pb-1 md:pb-0">
           {NAV.map(({ to, label, icon: Icon, end }) => (
             <NavLink
@@ -115,7 +118,8 @@ export function Settings() {
           <Route path="data" element={<DataPanel />} />
         </Routes>
       </div>
-    </div>
+      </div>
+    </PageContainer>
   );
 }
 
@@ -129,7 +133,7 @@ function Card({
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-surface border border-line rounded-md overflow-hidden mb-5">
+    <section className="bg-surface border border-line rounded-md overflow-hidden mb-card">
       <header className="px-5 py-3 border-b border-line">
         <h2 className="text-sm font-semibold text-ink-900">{title}</h2>
         {description && (

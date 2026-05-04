@@ -616,7 +616,7 @@ function NotesTab({ client }: { client: Client }) {
           <button
             onClick={onAdd}
             disabled={!draft.trim()}
-            className="text-xs px-3 py-1.5 rounded bg-ink-900 text-white hover:bg-ink-900 disabled:opacity-40"
+            className="text-xs px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40"
           >
             Add note
           </button>
@@ -1001,7 +1001,7 @@ function EngagementTab({
           {primaryAction.kind === "chase" && (
             <button
               onClick={onSwitchToToDo}
-              className="px-3 py-1.5 rounded bg-ink-900 text-canvas text-sm font-medium hover:bg-ink-700"
+              className="px-3 py-1.5 rounded bg-indigo text-white text-sm font-medium hover:bg-indigo-hover"
             >
               Send {waiting.count} reminder{waiting.count === 1 ? "" : "s"}
             </button>
@@ -1009,7 +1009,7 @@ function EngagementTab({
           {primaryAction.kind === "alert" && primaryAction.href && (
             <Link
               to={primaryAction.href}
-              className="px-3 py-1.5 rounded bg-ink-900 text-canvas text-sm font-medium hover:bg-ink-700"
+              className="px-3 py-1.5 rounded bg-indigo text-white text-sm font-medium hover:bg-indigo-hover"
             >
               Review {activeAlerts[0].stateCode} alert
             </Link>

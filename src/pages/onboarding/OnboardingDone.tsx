@@ -215,7 +215,7 @@ function Stat({
 }) {
   return (
     <div className="bg-surface px-5 py-4">
-      <p className="text-3xl font-semibold text-ink-900 tabular-nums">{n}</p>
+      <p className="text-numeric-lg text-ink-900 tabular-nums">{n}</p>
       <p className="text-xs uppercase tracking-wider text-ink-500 font-semibold mt-1">
         {label}
       </p>

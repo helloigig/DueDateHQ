@@ -222,7 +222,7 @@ export function EditClientModal({
           <button
             onClick={onSave}
             disabled={!canSave}
-            className="text-sm px-3 py-1.5 rounded font-medium text-white bg-ink-900 hover:bg-ink-900 disabled:opacity-40"
+            className="text-sm px-3 py-1.5 rounded font-medium text-white bg-indigo hover:bg-indigo-hover disabled:opacity-40"
           >
             {stateOrEntityChanged ? "Review changes" : "Save changes"}
           </button>
