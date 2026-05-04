@@ -84,9 +84,9 @@ export const ALERT_TONE_CLASSES: Record<
     border: "border-info-border",
   },
   neutral: {
-    chip: "bg-slate-100 text-slate-700 border-slate-200",
-    accent: "bg-slate-50",
-    border: "border-slate-200",
+    chip: "bg-sunken text-ink-700 border-line",
+    accent: "bg-canvas",
+    border: "border-line",
   },
   danger: {
     chip: "bg-danger-bg text-danger-ink border-danger-border",

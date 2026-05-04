@@ -73,9 +73,9 @@ export function ModeFHealth() {
 
   const tone =
     overall === "green"
-      ? "text-success-solid"
+      ? "text-ok-solid"
       : overall === "amber"
-        ? "text-warning-solid"
+        ? "text-warn-solid"
         : "text-danger-solid";
 
   return (

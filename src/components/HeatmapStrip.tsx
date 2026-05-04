@@ -98,7 +98,7 @@ export function HeatmapStrip({
                       cell.deadline_count
                     } deadline${cell.deadline_count === 1 ? "" : "s"}`}
                     className={`w-2.5 h-2.5 rounded-sm ${colorClass(cell)} ${
-                      cell.is_today ? "ring-2 ring-accent ring-offset-1" : ""
+                      cell.is_today ? "ring-2 ring-indigo ring-offset-1" : ""
                     } ${
                       selected ? "ring-2 ring-info-solid ring-offset-1" : ""
                     } hover:brightness-90`}

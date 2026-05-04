@@ -302,14 +302,14 @@ export function ExportModal({
                 type="date"
                 value={rangeStart}
                 onChange={(e) => setRangeStart(e.target.value)}
-                className="flex-1 px-2 py-1 rounded border border-line text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                className="flex-1 px-2 py-1 rounded border border-line text-sm focus:outline-none focus:ring-2 focus:ring-indigo"
               />
               <span className="text-ink-400">→</span>
               <input
                 type="date"
                 value={rangeEnd}
                 onChange={(e) => setRangeEnd(e.target.value)}
-                className="flex-1 px-2 py-1 rounded border border-line text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                className="flex-1 px-2 py-1 rounded border border-line text-sm focus:outline-none focus:ring-2 focus:ring-indigo"
               />
             </div>
           )}

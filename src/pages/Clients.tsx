@@ -1,12 +1,15 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Search, Upload, X } from "lucide-react";
 import { AddClientModal } from "../components/AddClientModal";
 import { ExportClientsButton } from "../components/ExportClientsButton";
 import { PageHeader } from "../components/ui/PageHeader";
+import { PageContainer } from "../components/ui/PageContainer";
+import { MetricTile } from "../components/ui/MetricTile";
+import { IconButton } from "../components/ui/IconButton";
+import { Button } from "../components/ui/button";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { MultiSelectChip } from "../components/MultiSelectChip";
-import { SpotlightStrip, type SpotlightCard } from "../components/SpotlightStrip";
 import { PageSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
 import { useClients } from "../hooks/useClients";
@@ -71,20 +74,25 @@ const EMPTY_FILTERS: Filters = {
   servicePackage: [],
 };
 
-// Gap-over-fill smart filters per IA v0.7 §3.2 — boolean predicates over
-// computed roster state. "Has waiting" is on by default so the painpoint
-// surface is the first thing the CPA sees on the fleet view.
-type SmartFilter = "hasWaiting" | "stuck" | "hasAlert" | "hasOpportunity";
+// Gap-over-fill smart filters per IA v0.7 §3.2 — predicates over computed
+// roster state. Each predicate has a corresponding KPI tile at the top of
+// the page; clicking a tile toggles the matching filter, so the page has
+// ONE filter mechanism for "what needs attention" instead of two.
+type SmartFilter = "hasWaiting" | "stuck";
 const STUCK_THRESHOLD_DAYS = 14;
 
 export function Clients() {
   const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-  // "Has waiting" defaults ON per IA v0.7 §3.2 + feedback_gap_over_fill.
-  // The fleet view should privilege the painpoint (clients still owe me
-  // something) every time the CPA opens it.
+  // Default = no smart-filter preset. The KPI tiles at the top show the
+  // gap-loud signals (waiting / stuck) and toggle the filter on click —
+  // that mechanism replaces the previous default-on "Has waiting" behavior
+  // so opening /clients shows the full roster first, then the user picks
+  // a slice via tile-as-filter.
   const [smartFilters, setSmartFilters] = useState<Set<SmartFilter>>(
-    new Set<SmartFilter>(["hasWaiting"]),
+    new Set<SmartFilter>(),
   );
   const [sortCol, setSortCol] = useState<SortColumn>("open");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -113,8 +121,6 @@ export function Clients() {
     if (!t) return [];
     return [...t.overdue, ...t.thisWeek, ...t.thisMonth, ...t.longTerm];
   }, [triageQuery.data]);
-  const overdueDeadlines = triageQuery.data?.overdue ?? [];
-
   const announcementsQuery = useAnnouncements({ activeOnly: true });
   const announcements = announcementsQuery.data ?? [];
 
@@ -161,84 +167,6 @@ export function Clients() {
     }
     return s;
   }, [announcements]);
-
-  const spotlightCards = useMemo<SpotlightCard[]>(() => {
-    const cards: SpotlightCard[] = [];
-
-    // 1) Needs attention now — clients with at least one overdue deadline.
-    const overdueClientIds = new Set(overdueDeadlines.map((d) => d.clientId));
-    const overdueClients = allClients.filter((c) => overdueClientIds.has(c.id));
-    if (overdueClients.length > 0) {
-      cards.push({
-        key: "overdue",
-        icon: "overdue",
-        title: "Needs attention now",
-        reason: `${overdueClients.length === 1 ? "1 client has" : `${overdueClients.length} clients have`} an overdue deadline.`,
-        clients: overdueClients
-          .slice(0, 3)
-          .map((c) => ({ id: c.id, name: c.name })),
-        totalCount: overdueClients.length,
-      });
-    }
-
-    // 2) Premium, quiet — premium tier with no deadline in the next 30 days
-    //    (drifting / under-served — worth a proactive check-in).
-    const horizonIso = new Date(TODAY.getTime() + 30 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 10);
-    const nextDueByClient = new Map<string, string>();
-    for (const d of deadlines) {
-      if (d.status === "completed" || d.status === "filed_extension") continue;
-      const prev = nextDueByClient.get(d.clientId);
-      if (!prev || d.officialDueDate < prev) {
-        nextDueByClient.set(d.clientId, d.officialDueDate);
-      }
-    }
-    const quietPremium = allClients.filter((c) => {
-      if (c.tier !== "premium" || c.status !== "active") return false;
-      const next = nextDueByClient.get(c.id);
-      return !next || next > horizonIso;
-    });
-    if (quietPremium.length > 0) {
-      cards.push({
-        key: "premium-quiet",
-        icon: "quiet",
-        title: "Premium, quiet",
-        reason: `Premium clients with no deadline in the next 30 days — worth a proactive check-in.`,
-        clients: quietPremium
-          .slice(0, 3)
-          .map((c) => ({ id: c.id, name: c.name })),
-        totalCount: quietPremium.length,
-        action: {
-          label: "Filter to Premium",
-          onClick: () =>
-            setFilters((f) => ({ ...f, tier: ["premium"] })),
-        },
-      });
-    }
-
-    // 3) State alerts active — clients matched to a recent unread announcement.
-    const alertClientIds = new Set<string>();
-    for (const a of announcements) {
-      if (a.dismissed) continue;
-      for (const id of a.affectedClientIds) alertClientIds.add(id);
-    }
-    const alertClients = allClients.filter((c) => alertClientIds.has(c.id));
-    if (alertClients.length > 0 && announcements.length > 0) {
-      cards.push({
-        key: "state-alert",
-        icon: "alert",
-        title: "State alert active",
-        reason: `${announcements.length === 1 ? "1 announcement matches" : `${announcements.length} announcements match`} clients in your book.`,
-        clients: alertClients
-          .slice(0, 3)
-          .map((c) => ({ id: c.id, name: c.name })),
-        totalCount: alertClients.length,
-      });
-    }
-
-    return cards;
-  }, [allClients, overdueDeadlines, deadlines, announcements]);
 
   const atLimit =
     flags.hasClientLimit &&
@@ -290,14 +218,6 @@ export function Clients() {
           (!fc || (fc.oldestReminderDays ?? 0) < STUCK_THRESHOLD_DAYS)
         ) {
           return false;
-        }
-        if (smartFilters.has("hasAlert") && !alertedClientIds.has(c.id)) {
-          return false;
-        }
-        if (smartFilters.has("hasOpportunity")) {
-          const hasOpp =
-            c.tier === "premium" && ((fc?.waiting ?? 0) > 3 || (fc?.review ?? 0) > 0);
-          if (!hasOpp) return false;
         }
         return true;
       });
@@ -363,7 +283,7 @@ export function Clients() {
 
   if (allClients.length === 0) {
     return (
-      <div className="max-w-[840px] mx-auto px-4 md:px-6 lg:px-8 py-section">
+      <PageContainer>
         {/* Single-purpose direct empty state. The user came to /clients
             deliberately to manage clients — give them one strong action,
             not a re-onboarding menu. */}
@@ -393,148 +313,134 @@ export function Clients() {
           </p>
         </div>
         <AddClientModal open={addOpen} onClose={() => setAddOpen(false)} />
-      </div>
+      </PageContainer>
     );
   }
 
   const activeCount = clients.filter((c) => c.status === "active").length;
-  const openTaskCount = deadlines.filter(
-    (d) => d.status !== "completed" && d.status !== "filed_extension"
-  ).length;
   const dueSoonCount = deadlines.filter((d) => {
     const diff = daysBetween(TODAY, parseDate(d.officialDueDate));
     return diff >= 0 && diff <= 7 && d.status !== "completed" && d.status !== "filed_extension";
   }).length;
+  // Roster-level signals — surface what needs attention vs. what's volume.
+  let waitingFleetCount = 0;
+  let stuckFleetCount = 0;
+  for (const fc of fleetCounts.values()) {
+    if (fc.waiting > 0) waitingFleetCount++;
+    if ((fc.oldestReminderDays ?? 0) >= STUCK_THRESHOLD_DAYS) stuckFleetCount++;
+  }
+
+  const toggleSmart = (key: SmartFilter) => {
+    setSmartFilters((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
 
   return (
-    <div className="max-w-[840px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8 space-y-card">
+    <PageContainer variant="wide" className="space-y-section">
+      {/* Header — title meta carries the active-count, actions live inline so
+          "Add client" + "Import CSV" sit on the same row as the page name. */}
       <PageHeader
         title="Clients"
         meta={`${activeCount} active`}
+        actions={
+          <>
+            {searchOpen ? (
+              <div className="flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-line-strong bg-surface focus-within:border-ink-900 transition-colors w-64">
+                <Search className="w-4 h-4 text-ink-500 shrink-0" aria-hidden />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search clients…"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className="flex-1 min-w-0 text-sm bg-transparent text-ink-900 placeholder:text-ink-400 focus:outline-none"
+                  autoFocus
+                />
+                <IconButton
+                  label="Close search"
+                  size="sm"
+                  onClick={() => {
+                    setQuery("");
+                    setSearchOpen(false);
+                  }}
+                >
+                  <X className="w-3.5 h-3.5" aria-hidden />
+                </IconButton>
+              </div>
+            ) : (
+              <IconButton
+                label="Search clients"
+                onClick={() => {
+                  setSearchOpen(true);
+                  setTimeout(() => searchInputRef.current?.focus(), 0);
+                }}
+              >
+                <Search className="w-4 h-4" aria-hidden />
+              </IconButton>
+            )}
+            <ExportClientsButton
+              filters={{
+                search: query || undefined,
+                entityType: filters.entity.length ? filters.entity : undefined,
+                state: filters.state.length ? filters.state : undefined,
+                status: filters.status.length ? filters.status : undefined,
+                tier: filters.tier.length ? filters.tier : undefined,
+              }}
+              visibleCount={clients.length}
+            />
+            <Button
+              variant="outline"
+              onClick={() => navigate("/import")}
+              className="hidden md:inline-flex"
+            >
+              <Upload aria-hidden />
+              Import CSV
+            </Button>
+            <Button
+              onClick={() => setAddOpen(true)}
+              disabled={atLimit}
+              title={atLimit ? `Solo plan limit (${flags.clientLimit}) reached` : undefined}
+            >
+              <Plus aria-hidden />
+              Add client
+            </Button>
+          </>
+        }
       />
-      <header>
-        <p className="text-sm text-ink-500 max-w-2xl">
-          Each client carries entity, jurisdictions, service packages, and a
-          per-task forwarding address. Click a row to open the client view; the
-          open-task count tells you what's still moving.
-        </p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <StatCard label="Active clients" value={activeCount} helper="Excludes archived and inactive" />
-          <StatCard label="Open tasks" value={openTaskCount} helper="Across the entire roster" />
-          <StatCard label="Due in 7 days" value={dueSoonCount} helper="Urgency window" />
-        </div>
-      </header>
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <input
-          type="text"
-          placeholder="Search by name, email, state, or entity…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="flex-1 md:w-80 text-sm px-3 py-2 rounded-md border border-line bg-surface text-ink-900 placeholder:text-ink-400"
-        />
-        <span className="text-xs text-ink-500 ml-auto">
-          {clients.length} of {allClients.length}
-        </span>
-        <ExportClientsButton
-          filters={{
-            search: query || undefined,
-            entityType: filters.entity.length ? filters.entity : undefined,
-            state: filters.state.length ? filters.state : undefined,
-            status: filters.status.length ? filters.status : undefined,
-            tier: filters.tier.length ? filters.tier : undefined,
-          }}
-          visibleCount={clients.length}
-        />
-        <button
-          onClick={() => navigate("/import")}
-          className="hidden md:inline-flex text-sm px-3 py-1.5 rounded-md border border-line text-ink-700 hover:bg-sunken"
-        >
-          Import CSV
-        </button>
-        <button
-          onClick={() => setAddOpen(true)}
-          disabled={atLimit}
-          title={atLimit ? `Solo plan limit (${flags.clientLimit}) reached` : undefined}
-          className="text-sm px-3 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          + Add client
-        </button>
-      </div>
-
-      <SpotlightStrip cards={spotlightCards} />
-
-      {/* Smart filter chips per IA v0.7 §3.2 — boolean predicates over
-          computed roster state. "Has waiting" is the gap-over-fill default
-          (`feedback_gap_over_fill`); the rest stack as additional refinements. */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-2xs uppercase tracking-wider text-ink-500 font-semibold mr-1">
-          Show
-        </span>
-        <SmartFilterChip
-          active={smartFilters.size === 0}
-          onClick={() => setSmartFilters(new Set())}
-          tooltip="Show every client (clears the gap-over-fill default)"
-        >
-          All
-        </SmartFilterChip>
-        <SmartFilterChip
+      {/* KPI tiles — each clickable doubles as a smart-filter trigger.
+          Order: highest-priority gap-loud signal first → time-window last. */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-card">
+        <MetricTile
+          label="Awaiting reply"
+          value={waitingFleetCount}
+          tone={waitingFleetCount > 0 ? "warn" : "neutral"}
+          helper="Client hasn't sent something"
           active={smartFilters.has("hasWaiting")}
-          onClick={() =>
-            setSmartFilters((prev) => {
-              const next = new Set(prev);
-              next.has("hasWaiting") ? next.delete("hasWaiting") : next.add("hasWaiting");
-              return next;
-            })
-          }
-          tooltip="Clients with at least one item the client hasn't sent yet"
-          accent="warning"
-        >
-          🚨 Has waiting
-        </SmartFilterChip>
-        <SmartFilterChip
+          onClick={() => toggleSmart("hasWaiting")}
+        />
+        <MetricTile
+          label={`Awaiting >${STUCK_THRESHOLD_DAYS}d`}
+          value={stuckFleetCount}
+          tone={stuckFleetCount > 0 ? "danger" : "neutral"}
+          helper="Past reminder cadence — call them"
           active={smartFilters.has("stuck")}
-          onClick={() =>
-            setSmartFilters((prev) => {
-              const next = new Set(prev);
-              next.has("stuck") ? next.delete("stuck") : next.add("stuck");
-              return next;
-            })
-          }
-          tooltip={`Reminder out >${STUCK_THRESHOLD_DAYS} days with no reply`}
-        >
-          Stuck
-        </SmartFilterChip>
-        <SmartFilterChip
-          active={smartFilters.has("hasAlert")}
-          onClick={() =>
-            setSmartFilters((prev) => {
-              const next = new Set(prev);
-              next.has("hasAlert") ? next.delete("hasAlert") : next.add("hasAlert");
-              return next;
-            })
-          }
-          tooltip="At least one active state alert affects this client"
-        >
-          Has alert
-        </SmartFilterChip>
-        <SmartFilterChip
-          active={smartFilters.has("hasOpportunity")}
-          onClick={() =>
-            setSmartFilters((prev) => {
-              const next = new Set(prev);
-              next.has("hasOpportunity")
-                ? next.delete("hasOpportunity")
-                : next.add("hasOpportunity");
-              return next;
-            })
-          }
-          tooltip="AI surfaced a churn or pricing opportunity (Mode E)"
-        >
-          💎 Has opportunity
-        </SmartFilterChip>
+          onClick={() => toggleSmart("stuck")}
+        />
+        <MetricTile
+          label="Due in 7 days"
+          value={dueSoonCount}
+          tone={dueSoonCount > 0 ? "warn" : "neutral"}
+          helper="Filings approaching"
+        />
       </div>
 
+      {/* Attribute filters — separate from the KPI-tile signal filters.
+          Hierarchy: tiles answer "what needs attention", these answer
+          "what slice of the roster". */}
       <div className="flex items-center gap-2 flex-wrap">
         <MultiSelectChip
           label="Entity"
@@ -589,8 +495,8 @@ export function Clients() {
 
       <AddClientModal open={addOpen} onClose={() => setAddOpen(false)} />
 
-      <div className="bg-surface border border-line rounded-md overflow-x-auto">
-        <table className="w-full min-w-[720px] text-sm">
+      <div className="bg-surface border border-line rounded-md">
+        <table className="w-full text-sm">
           <thead className="bg-sunken text-2xs uppercase tracking-wider text-ink-700">
             <tr>
               <SortableTh col="name" sortCol={sortCol} sortDir={sortDir} onClick={toggleSort} align="left">
@@ -601,9 +507,7 @@ export function Clients() {
                   + Review (secondary). Waiting cell tinted by reminder
                   staleness per `feedback_gap_over_fill`. */}
               <th className="text-right px-4 py-2 font-semibold" title="Items the client hasn't sent yet (requested_waiting + not_requested)">
-                <span className="inline-flex items-center gap-1">
-                  <span aria-hidden>🚨</span> Waiting
-                </span>
+                Waiting
               </th>
               <th className="text-right px-4 py-2 font-semibold" title="Items received but waiting on CPA action (received_unreviewed + received_issue)">
                 Review
@@ -615,8 +519,8 @@ export function Clients() {
               <SortableTh col="entity" sortCol={sortCol} sortDir={sortDir} onClick={toggleSort} align="left">
                 Entity
               </SortableTh>
-              <th className="text-center px-2 py-2 font-semibold w-10" title="💎 Opportunity flag — Mode E + Layer B/C signals">
-                <span aria-hidden>💎</span>
+              <th className="text-center px-2 py-2 font-semibold w-10" title="Opportunity flag — Mode E + Layer B/C signals">
+                Opp
               </th>
             </tr>
           </thead>
@@ -648,12 +552,12 @@ export function Clients() {
                 fc.oldestReminderDays != null && fc.oldestReminderDays > 14
                   ? "text-danger-solid font-semibold"
                   : fc.oldestReminderDays != null && fc.oldestReminderDays > 7
-                    ? "text-warning-solid font-semibold"
+                    ? "text-warn-solid font-semibold"
                     : fc.waiting > 0
                       ? "text-ink-900 font-medium"
                       : "text-ink-400";
               const rowTint = hasAlert
-                ? "bg-warning-bg/30 hover:bg-warning-bg/50"
+                ? "bg-warn-bg/30 hover:bg-warn-bg/50"
                 : "hover:bg-sunken";
               // Phase 2 mock — Mode E opportunity badge (real wiring Phase 5).
               // Surface a tag on premium clients with overdue items as a stand-in
@@ -731,7 +635,7 @@ export function Clients() {
                             : "Pricing opportunity: review-pending items signal advisory uplift"
                         }
                       >
-                        💎{opportunity}
+                        {opportunity}
                       </span>
                     )}
                   </td>
@@ -760,7 +664,7 @@ export function Clients() {
           </tbody>
         </table>
       </div>
-    </div>
+    </PageContainer>
   );
 }
 
@@ -769,30 +673,6 @@ const TIER_LABEL: Record<ClientTier, string> = {
   standard: "Standard",
   custom: "Custom",
 };
-
-function StatCard({
-  label,
-  value,
-  helper,
-}: {
-  label: string;
-  value: number;
-  helper?: string;
-}) {
-  return (
-    <div className="border border-line rounded-md p-3 bg-surface">
-      <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
-        {label}
-      </p>
-      <p className="text-xl font-semibold text-ink-900 mt-1 tabular-nums">
-        {value}
-      </p>
-      {helper && (
-        <p className="text-2xs text-ink-500 mt-0.5">{helper}</p>
-      )}
-    </div>
-  );
-}
 
 function SortableTh({
   col,
@@ -848,37 +728,6 @@ function TierPill({ tier }: { tier: ClientTier | undefined }) {
     >
       {TIER_LABEL[tier]}
     </span>
-  );
-}
-
-function SmartFilterChip({
-  active,
-  onClick,
-  tooltip,
-  accent,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  tooltip?: string;
-  accent?: "warning";
-  children: React.ReactNode;
-}) {
-  const baseTone = active
-    ? accent === "warning"
-      ? "bg-warning-bg border-warning-border text-warning-ink"
-      : "bg-ink-900 border-ink-900 text-canvas"
-    : "bg-surface border-line text-ink-700 hover:bg-sunken";
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={tooltip}
-      aria-pressed={active}
-      className={`inline-flex items-center gap-1 text-2xs font-medium px-2.5 py-1 rounded-full border transition-colors ${baseTone}`}
-    >
-      {children}
-    </button>
   );
 }
 

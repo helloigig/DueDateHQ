@@ -30,7 +30,7 @@ import { useSession } from "../data/session";
 
 const CONFIDENCE_TONE = {
   high: "bg-emerald-50 text-emerald-700",
-  medium: "bg-slate-100 text-slate-700",
+  medium: "bg-sunken text-ink-700",
   low: "bg-amber-50 text-amber-700",
 } as const;
 
@@ -184,10 +184,10 @@ export function AnnouncementDetail() {
   if (!ann) {
     return (
       <div className="max-w-4xl mx-auto px-4 md:px-6 py-10">
-        <Link to="/alerts" className="text-sm text-slate-500 hover:underline">
+        <Link to="/alerts" className="text-sm text-ink-500 hover:underline">
           ‹ Alerts
         </Link>
-        <p className="mt-6 text-slate-600">Announcement not found.</p>
+        <p className="mt-6 text-ink-700">Announcement not found.</p>
       </div>
     );
   }
@@ -287,39 +287,39 @@ export function AnnouncementDetail() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 md:px-6 py-6">
-      <Link to="/alerts" className="text-sm text-slate-500 hover:underline">
+      <Link to="/alerts" className="text-sm text-ink-500 hover:underline">
         ‹ Alerts
       </Link>
 
-      <div className="mt-4 border border-slate-200 bg-white rounded-lg p-5">
+      <div className="mt-4 border border-line bg-surface rounded-lg p-5">
         <div className="flex items-start gap-3">
-          <span className="inline-flex items-center justify-center px-2.5 py-1 rounded text-sm font-semibold bg-slate-100 text-slate-900 border border-slate-200 shrink-0">
+          <span className="inline-flex items-center justify-center px-2.5 py-1 rounded text-sm font-semibold bg-sunken text-ink-900 border border-line shrink-0">
             {ann.stateCode}
           </span>
           <div className="flex-1 min-w-0">
             <div className="flex items-start gap-3">
-              <h1 className="flex-1 text-2xl font-semibold text-slate-900">
+              <h1 className="flex-1 text-2xl font-semibold text-ink-900">
                 {ann.title}
               </h1>
-              <span className="text-xs text-slate-500 text-right shrink-0 max-w-[40%]">
+              <span className="text-xs text-ink-500 text-right shrink-0 max-w-[40%]">
                 {ann.authority}
               </span>
             </div>
 
             <div className="flex flex-wrap gap-1.5 mt-2">
               <AlertTypeChip type={ann.type} />
-              <span className="inline-flex items-center text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+              <span className="inline-flex items-center text-xs px-2 py-0.5 rounded bg-sunken text-ink-700 border border-line">
                 {TAX_TYPE_LABEL[ann.taxType]}
               </span>
               {ann.retroactive && (
-                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-sunken text-ink-700 border border-line">
                   <History className="w-3 h-3" aria-hidden />
                   Retroactive
                 </span>
               )}
             </div>
 
-            <div className="text-sm text-slate-600 mt-3">
+            <div className="text-sm text-ink-700 mt-3">
               Issued {formatLongDate(ann.issuanceDate)}
               {ann.effectiveDate &&
                 ` · Effective ${formatLongDate(ann.effectiveDate)}`}{" "}
@@ -335,9 +335,9 @@ export function AnnouncementDetail() {
               >
                 View official source ↗
               </a>
-              <span className="text-slate-400">·</span>
+              <span className="text-ink-400">·</span>
               <span
-                className="text-slate-600"
+                className="text-ink-700"
                 title={SOURCE_AUTHORITY_TOOLTIP[ann.sourceAuthority]}
               >
                 Source: {SOURCE_AUTHORITY_LABEL[ann.sourceAuthority]}
@@ -446,9 +446,9 @@ export function AnnouncementDetail() {
           uncertain) "let me audit the parse." Evidence sits below in collapsed
           <details> blocks. Headline + empty-state copy vary by alertType
           (sourced from alertTypeConfig). */}
-      <section className="mt-5 bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="flex items-center px-4 py-3 border-b border-slate-100">
-          <h2 className="text-sm font-semibold text-slate-700">
+      <section className="mt-5 bg-surface border border-line rounded-lg overflow-hidden">
+        <div className="flex items-center px-4 py-3 border-b border-line">
+          <h2 className="text-sm font-semibold text-ink-700">
             🎯 {alertCfg.verdictHeadline(ann.affectedClientIds.length, clients.length)}
           </h2>
           {ann.affectedClientIds.length > 0 && !alertCfg.isAdminGated && (
@@ -466,32 +466,32 @@ export function AnnouncementDetail() {
           // Empty state — type-specific copy. Page stays reachable so CPA can
           // read evidence + dismiss with reason.
           <div className="px-4 py-10 text-center">
-            <div className="w-10 h-10 rounded-full bg-slate-100 mx-auto flex items-center justify-center text-lg">
+            <div className="w-10 h-10 rounded-full bg-sunken mx-auto flex items-center justify-center text-lg">
               ✓
             </div>
-            <p className="text-sm font-medium text-slate-900 mt-3">
+            <p className="text-sm font-medium text-ink-900 mt-3">
               {alertCfg.emptyStateCopy(ann)}
             </p>
-            <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+            <p className="text-xs text-ink-500 mt-1 max-w-xs mx-auto">
               No deadlines need to move, and no notifications are queued.
             </p>
             <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
               <Link
                 to="/clients"
-                className="text-xs px-3 py-1.5 rounded border border-slate-200 text-slate-700 hover:bg-slate-50"
+                className="text-xs px-3 py-1.5 rounded border border-line text-ink-700 hover:bg-canvas"
               >
                 Review your client list
               </Link>
               <button
                 onClick={() => setDismissOpen(true)}
-                className="text-xs px-3 py-1.5 rounded text-slate-500 hover:bg-slate-50"
+                className="text-xs px-3 py-1.5 rounded text-ink-500 hover:bg-canvas"
               >
                 Dismiss this alert
               </button>
             </div>
           </div>
         ) : null}
-        <ul className="divide-y divide-slate-100">
+        <ul className="divide-y divide-line">
           {(ann.affectedClientIds ?? []).map((cid) => {
             const c = clientsById.get(cid);
             if (!c) return null;
@@ -514,23 +514,23 @@ export function AnnouncementDetail() {
                 />
                 <Link
                   to={`/clients/${cid}`}
-                  className="text-sm text-slate-900 font-medium hover:underline w-52 truncate"
+                  className="text-sm text-ink-900 font-medium hover:underline w-52 truncate"
                 >
                   {c.name}
                 </Link>
-                <span className="text-xs text-slate-500 w-44 truncate">
+                <span className="text-xs text-ink-500 w-44 truncate">
                   {alertCfg.perClientRowChip
                     ? alertCfg.perClientRowChip(c, ann)
                     : c.county
                       ? `${c.county}, ${c.primaryState}`
                       : c.primaryState}
                 </span>
-                <span className="text-xs text-slate-500 flex-1 truncate">
+                <span className="text-xs text-ink-500 flex-1 truncate">
                   {c.entityType}
                 </span>
                 <Link
                   to={`/clients/${cid}?${addParams.toString()}`}
-                  className="text-xs px-2 py-1 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 shrink-0"
+                  className="text-xs px-2 py-1 rounded border border-line text-ink-700 hover:bg-canvas shrink-0"
                   title="Open client and pre-fill a deadline from this alert"
                 >
                   + Deadline
@@ -564,11 +564,11 @@ export function AnnouncementDetail() {
           audit, not gating. We expand parsed-impact automatically when
           confidence is low so a sketchy parse can't hide. */}
       <details
-        className="mt-5 bg-white border border-slate-200 rounded-lg group"
+        className="mt-5 bg-surface border border-line rounded-lg group"
         open={ann.parseConfidence === "low" || ann.matchConfidence === "low"}
       >
-        <summary className="cursor-pointer list-none flex items-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 rounded-t-lg group-open:border-b group-open:border-slate-100">
-          <span className="text-xs text-slate-400 group-open:rotate-90 transition-transform">▶</span>
+        <summary className="cursor-pointer list-none flex items-center gap-2 px-4 py-3 text-sm font-semibold text-ink-700 hover:bg-canvas rounded-t-lg group-open:border-b group-open:border-line">
+          <span className="text-xs text-ink-400 group-open:rotate-90 transition-transform">▶</span>
           📄 What the alert says
           <span
             className={`ml-auto text-xs px-2 py-0.5 rounded ${CONFIDENCE_TONE[ann.parseConfidence]}`}
@@ -581,7 +581,7 @@ export function AnnouncementDetail() {
             AI match: {CONFIDENCE_LABEL[ann.matchConfidence]}
           </span>
         </summary>
-        <dl className="divide-y divide-slate-100 text-sm">
+        <dl className="divide-y divide-line text-sm">
           <Row label="Summary">{ann.summary}</Row>
           {(ann.counties ?? []).length > 0 && (
             <Row label="Counties">{(ann.counties ?? []).join(", ")}</Row>
@@ -597,7 +597,7 @@ export function AnnouncementDetail() {
           )}
           {ann.newDeadline && (
             <Row label="New deadline">
-              <span className="font-medium text-slate-900">
+              <span className="font-medium text-ink-900">
                 {formatLongDate(ann.newDeadline)}
               </span>
             </Row>
@@ -612,29 +612,29 @@ export function AnnouncementDetail() {
       </details>
 
       {(relatedAlerts.length > 0 || ann.relatedAnnouncementIds.length > 0) && (
-        <details className="mt-3 bg-white border border-slate-200 rounded-lg group">
-          <summary className="cursor-pointer list-none flex items-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 rounded-t-lg group-open:border-b group-open:border-slate-100">
-            <span className="text-xs text-slate-400 group-open:rotate-90 transition-transform">▶</span>
+        <details className="mt-3 bg-surface border border-line rounded-lg group">
+          <summary className="cursor-pointer list-none flex items-center gap-2 px-4 py-3 text-sm font-semibold text-ink-700 hover:bg-canvas rounded-t-lg group-open:border-b group-open:border-line">
+            <span className="text-xs text-ink-400 group-open:rotate-90 transition-transform">▶</span>
             <Link2 className="w-3.5 h-3.5" aria-hidden />
             Related alerts
-            <span className="ml-2 text-xs text-slate-500 font-normal">
+            <span className="ml-2 text-xs text-ink-500 font-normal">
               {ann.relatedAnnouncementIds.length} cross-reference
               {ann.relatedAnnouncementIds.length === 1 ? "" : "s"}
             </span>
           </summary>
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-line">
             {relatedAlerts.map((rel) => (
               <li key={rel.id} className="px-4 py-2.5">
                 <Link
                   to={`/alerts/${rel.id}`}
                   className="flex items-start gap-2 hover:underline"
                 >
-                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-slate-100 text-slate-900 border border-slate-200 shrink-0 mt-0.5">
+                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-sunken text-ink-900 border border-line shrink-0 mt-0.5">
                     {rel.stateCode}
                   </span>
-                  <span className="text-sm text-slate-900">
+                  <span className="text-sm text-ink-900">
                     {rel.title}
-                    <span className="text-xs text-slate-500 ml-2">
+                    <span className="text-xs text-ink-500 ml-2">
                       · {rel.authority}
                     </span>
                   </span>
@@ -644,13 +644,13 @@ export function AnnouncementDetail() {
             {ann.relatedAnnouncementIds
               .filter((rid) => !allAnnouncements.some((a) => a.id === rid))
               .map((rid) => (
-                <li key={rid} className="px-4 py-2.5 text-xs text-slate-500">
+                <li key={rid} className="px-4 py-2.5 text-xs text-ink-500">
                   <span className="font-mono">{rid}</span> — referenced but not
                   yet in your feed
                 </li>
               ))}
           </ul>
-          <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 text-xs text-slate-500">
+          <div className="px-4 py-2 bg-canvas border-t border-line text-xs text-ink-500">
             Disaster declarations are often dual-source (IRS §7508A + state
             DOR). Cross-references help you reconcile overlapping postponement
             dates.
@@ -881,10 +881,10 @@ function Row({
 }) {
   return (
     <div className="flex gap-6 px-4 py-3">
-      <dt className="w-32 shrink-0 text-xs uppercase tracking-wide text-slate-500 mt-0.5">
+      <dt className="w-32 shrink-0 text-xs uppercase tracking-wide text-ink-500 mt-0.5">
         {label}
       </dt>
-      <dd className="text-slate-700">{children}</dd>
+      <dd className="text-ink-700">{children}</dd>
     </div>
   );
 }

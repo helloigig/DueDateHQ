@@ -110,6 +110,13 @@ export default {
         section: "48px",  // section → section
       },
 
+      width: {
+        // The "co-pilot pane" width — used by /alerts (right pane) and
+        // anywhere else a side workspace pane lives. One named token so
+        // visual rebalancing is a single edit.
+        pane: "440px",
+      },
+
       keyframes: {
         "accordion-down": {
           from: { height: "0" },

@@ -295,7 +295,7 @@ function FormRow({
           onAdd && (
             <button
               onClick={onAdd}
-              className="text-xs px-2 py-1 rounded border border-line bg-white text-ink-700 hover:bg-sunken"
+              className="text-xs px-2 py-1 rounded border border-line bg-surface text-ink-700 hover:bg-sunken"
             >
               Add deadline
             </button>
