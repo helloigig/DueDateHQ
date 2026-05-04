@@ -298,7 +298,7 @@ export function Clients() {
           </p>
           <button
             onClick={() => setAddOpen(true)}
-            className="mt-5 text-sm font-medium px-4 py-2 rounded-md bg-accent text-canvas hover:bg-accent-hover"
+            className="mt-card text-sm font-medium px-4 py-2 rounded-md bg-indigo text-white hover:bg-indigo-hover"
           >
             + Add a client
           </button>

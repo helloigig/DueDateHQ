@@ -240,7 +240,7 @@ export function Signup() {
             <button
               type="submit"
               disabled={pending || !email}
-              className="w-full text-sm px-3 py-2 rounded-md bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 mt-2"
+              className="w-full text-sm px-3 py-2 rounded-md bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40 mt-2"
             >
               {pending
                 ? "Sending link…"

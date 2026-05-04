@@ -103,7 +103,20 @@ export function OnboardingManual() {
                 }
                 className="w-full border border-line rounded px-2 py-1.5 text-sm bg-surface"
               >
-                {(["CA", "NY", "TX", "FL", "LA"] as StateCode[]).map((s) => (
+                {(
+                  [
+                    "CA",
+                    "FL",
+                    "GA",
+                    "IL",
+                    "LA",
+                    "MA",
+                    "NJ",
+                    "NY",
+                    "PA",
+                    "TX",
+                  ] as StateCode[]
+                ).map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>
@@ -140,7 +153,7 @@ export function OnboardingManual() {
           <button
             onClick={submit}
             disabled={valid.length === 0 || submitting}
-            className="text-sm px-4 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed"
+            className="text-sm px-4 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {submitting ? "Adding…" : `Add ${valid.length} & continue`}
           </button>

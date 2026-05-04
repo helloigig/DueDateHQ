@@ -51,10 +51,8 @@ export function OnboardingDone() {
     <OnboardingShell
       step={3}
       totalSteps={3}
-      estimate="done"
       title="You're set up."
       subtitle="Here's what just lit up — every number below is real, not a promise."
-      brandLine="Connecting one more source (QuickBooks, Gmail, or a prior return) compounds the value. Never required, always optional."
     >
       <div className="space-y-5">
         {/* What's working */}
@@ -190,7 +188,7 @@ export function OnboardingDone() {
         <div className="flex items-center gap-3 pt-2">
           <button
             onClick={finish}
-            className="text-sm px-5 py-2 rounded-md bg-accent text-canvas hover:bg-accent-hover"
+            className="text-sm px-5 py-2 rounded-md bg-indigo text-white hover:bg-indigo-hover"
           >
             Open dashboard
           </button>
@@ -215,7 +213,7 @@ function Stat({
 }) {
   return (
     <div className="bg-surface px-5 py-4">
-      <p className="text-3xl font-semibold text-ink-900 tabular-nums">{n}</p>
+      <p className="text-numeric-lg text-ink-900 tabular-nums">{n}</p>
       <p className="text-xs uppercase tracking-wider text-ink-500 font-semibold mt-1">
         {label}
       </p>

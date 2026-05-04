@@ -240,7 +240,7 @@ export function Login() {
             <button
               type="submit"
               disabled={pending || !email}
-              className="w-full text-sm px-3 py-2 rounded-md bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40"
+              className="w-full text-sm px-3 py-2 rounded-md bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40"
             >
               {pending ? "Sending link…" : "Send sign-in link"}
             </button>

@@ -272,6 +272,10 @@ export const taskStatus = pgEnum("task_status", [
   "deferred",
   "filed_extension",
   "overdue",
+  // `not_applicable` is distinct from `deferred` — kill, not push.
+  // Used when a deadline becomes irrelevant mid-season (client fired,
+  // entity dissolved, switched filing status). Requires a reason.
+  "not_applicable",
 ]);
 
 export const tasks = pgTable("tasks", {
@@ -282,7 +286,11 @@ export const tasks = pgTable("tasks", {
   deadlineId: uuid("deadline_id")
     .notNull()
     .references(() => deadlines.id, { onDelete: "cascade" }),
+  // Layer-1 preparer assignment.
   assignedUserId: uuid("assigned_user_id").references(() => users.id),
+  // Layer-1 reviewer assignment. Phase 1 promotion of the v0.7 stub.
+  // Reviewer can be different from preparer; both fields are nullable.
+  reviewerUserId: uuid("reviewer_user_id").references(() => users.id),
   // Per-task forwarding-email local part. Method A — PRD §7.4. Globally
   // unique because a single inbound mailbox is fanned out by local-part.
   forwardingEmailLocalPart: text("forwarding_email_local_part")
@@ -297,6 +305,10 @@ export const tasks = pgTable("tasks", {
   status: taskStatus("status").notNull().default("not_started"),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   completedByUserId: uuid("completed_by_user_id").references(() => users.id),
+  // Set when status moves to `not_applicable`. Reason is required
+  // (enforced at app layer) for audit + downstream review.
+  notApplicableReason: text("not_applicable_reason"),
+  notApplicableAt: timestamp("not_applicable_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .default(sql`now()`),
@@ -352,6 +364,10 @@ export const checklistItems = pgTable(
     receivedFilename: text("received_filename"),
     lastReminderAt: timestamp("last_reminder_at", { withTimezone: true }),
     nextReminderAt: timestamp("next_reminder_at", { withTimezone: true }),
+    // Provenance — null = system/template (Mode A baseline or seed); set =
+    // user added it post-creation. Only user-added rows are deletable
+    // (`checklists.deleteCustom` enforces this).
+    addedByUserId: uuid("added_by_user_id").references(() => users.id),
     // v0.8 amendment additions per `feedback_no_manual_file_shuffle` Path E.
     // These hold AI-derived intelligence; original bytes stay in Gmail/Outlook.
     // sourceReferences: JSON list of {gmail_message_id, attachment_index,
@@ -399,6 +415,27 @@ export const checklistItemEvents = pgTable("checklist_item_events", {
   actorKind: actorKind("actor_kind").notNull(),
   actorUserId: uuid("actor_user_id").references(() => users.id),
   payload: jsonb("payload"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+});
+
+// Per-task note feed — distinct from `clientNotes` (which lives on the
+// client spine). A task note captures judgment on a specific filing
+// ("client says K-1 will arrive late; OK to extend"); a client note
+// captures cross-engagement context ("prefers PDFs"). Same shape as
+// clientNotes, deliberately — pinning + author + free-form body.
+export const taskNotes = pgTable("task_notes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  firmId: uuid("firm_id")
+    .notNull()
+    .references(() => firms.id, { onDelete: "cascade" }),
+  taskId: uuid("task_id")
+    .notNull()
+    .references(() => tasks.id, { onDelete: "cascade" }),
+  authorUserId: uuid("author_user_id").references(() => users.id),
+  body: text("body").notNull(),
+  pinned: boolean("pinned").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .default(sql`now()`),

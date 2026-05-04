@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useCommitImport } from "../hooks/useImports";
 import {
   DETECTED_ROWS,
@@ -10,6 +10,10 @@ import {
 } from "../data/mockImportData";
 import type { EntityType, StateCode } from "../types";
 import { STATE_NAMES } from "../types";
+import {
+  isSupportedState,
+  UNSUPPORTED_STATE_HINT,
+} from "../data/supportedStates";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import {
   parseCsv,
@@ -178,6 +182,12 @@ function recomputeIssues(r: DetectedRow): string[] {
   const issues: string[] = [];
   if (!r.entityType) issues.push("entity_missing");
   if (!r.primaryState) issues.push("state_unknown");
+  // CSV rows can carry any 2-letter state. Flag unsupported ones the
+  // same way we flag missing data — if we accept the row, no deadlines
+  // will spawn for it and the dashboard will lie.
+  if (r.primaryState && !isSupportedState(r.primaryState)) {
+    issues.push("state_unsupported");
+  }
   if (!r.email) issues.push("email_missing");
   return issues;
 }
@@ -299,7 +309,7 @@ function UploadStep({
         <button
           disabled={!hasFile}
           onClick={onNext}
-          className="text-sm px-4 py-2 rounded font-medium text-white bg-ink-900 hover:bg-ink-900 disabled:opacity-40"
+          className="text-sm px-4 py-2 rounded font-medium text-white bg-indigo hover:bg-indigo-hover disabled:opacity-40"
         >
           Continue →
         </button>
@@ -388,7 +398,7 @@ function MapStep({
         </button>
         <button
           onClick={onNext}
-          className="text-sm px-4 py-2 rounded font-medium text-white bg-ink-900 hover:bg-ink-900"
+          className="text-sm px-4 py-2 rounded font-medium text-white bg-indigo hover:bg-indigo-hover"
         >
           Continue →
         </button>
@@ -418,7 +428,19 @@ const ENTITY_OPTIONS: EntityType[] = [
   "Partnership",
   "Trust",
 ];
-const STATE_OPTIONS: StateCode[] = ["CA", "NY", "TX", "LA", "FL"];
+// 10 states with seeded service templates. See `data/supportedStates.ts`.
+const STATE_OPTIONS: StateCode[] = [
+  "CA",
+  "FL",
+  "GA",
+  "IL",
+  "LA",
+  "MA",
+  "NJ",
+  "NY",
+  "PA",
+  "TX",
+];
 
 function PreviewStep({
   rows,
@@ -523,12 +545,30 @@ function PreviewStep({
                       />
                     </td>
                   </tr>
-                )}
-              </Fragment>
-            );
-          })}
-        </tbody>
-      </table>
+                  {editing === i && (
+                    <tr className="bg-amber-50">
+                      <td colSpan={6} className="px-4 py-3">
+                        <FixInline
+                          row={r}
+                          onPatch={(patch) => {
+                            onRowFix(i, patch);
+                            // close editor once row has zero issues
+                            const resolved = recomputeIssues({
+                              ...r,
+                              ...patch,
+                            });
+                            if (resolved.length === 0) setEditing(null);
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
       {/* Action bar — sticks to the viewport bottom while the user scrolls
           the table to fix flagged rows. Border-top + surface bg keeps it
@@ -550,7 +590,7 @@ function PreviewStep({
           <button
             onClick={() => setConfirmOpen(true)}
             disabled={readyCount === 0}
-            className="text-sm px-4 py-2 rounded font-medium text-white bg-ink-900 hover:bg-ink-900 disabled:opacity-40"
+            className="text-sm px-4 py-2 rounded font-medium text-white bg-indigo hover:bg-indigo-hover disabled:opacity-40"
           >
             Commit {readyCount} client{readyCount === 1 ? "" : "s"} →
           </button>
@@ -630,9 +670,17 @@ function FixInline({
         </label>
       ) : null}
 
-      {row.issues.includes("state_unknown") && (
+      {(row.issues.includes("state_unknown") ||
+        row.issues.includes("state_unsupported")) && (
         <label className="text-xs text-ink-700">
-          <span className="block mb-1">Primary state</span>
+          <span className="block mb-1">
+            Primary state
+            {row.issues.includes("state_unsupported") && (
+              <span className="ml-1.5 text-2xs text-warn-ink">
+                ({row.primaryState} — {UNSUPPORTED_STATE_HINT})
+              </span>
+            )}
+          </span>
           <select
             value={state}
             onChange={(e) => setState(e.target.value as StateCode)}
@@ -663,7 +711,7 @@ function FixInline({
 
       <button
         onClick={save}
-        className="text-xs px-3 py-1.5 rounded bg-ink-900 text-white hover:bg-ink-900"
+        className="text-xs px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover"
       >
         Save row
       </button>
@@ -877,7 +925,7 @@ function DoneStep({
       <div className="mt-6 flex items-center justify-center gap-3">
         <button
           onClick={onDashboard}
-          className="text-sm px-4 py-2 rounded font-medium text-white bg-ink-900 hover:bg-ink-900"
+          className="text-sm px-4 py-2 rounded font-medium text-white bg-indigo hover:bg-indigo-hover"
         >
           Go to dashboard →
         </button>

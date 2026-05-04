@@ -7,7 +7,8 @@ import {
 } from "react-router-dom";
 import { actions, useStore } from "../data/store";
 import { trpc } from "../lib/api/client";
-import { useClient } from "../hooks/useClients";
+import { env } from "../config";
+import { useClient, useAddNote } from "../hooks/useClients";
 import { useDeadlinesForClient } from "../hooks/useDeadlines";
 import { useTasksForClient } from "../hooks/useTasks";
 import {
@@ -572,6 +573,7 @@ function NotesTab({ client }: { client: Client }) {
   const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
   const notes = client.noteEntries ?? [];
+  const addNoteMutation = useAddNote();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -586,7 +588,11 @@ function NotesTab({ client }: { client: Client }) {
   const onAdd = () => {
     const body = draft.trim();
     if (!body) return;
-    actions.addNote(client.id, body);
+    if (env.useMockData) {
+      actions.addNote(client.id, body);
+    } else {
+      addNoteMutation.mutate({ clientId: client.id, body });
+    }
     setDraft("");
   };
 
@@ -601,7 +607,7 @@ function NotesTab({ client }: { client: Client }) {
           onChange={(e) => setDraft(e.target.value)}
           rows={3}
           placeholder="e.g. Called client; waiting on W-2 copies by Friday."
-          className="w-full px-3 py-2 rounded border border-line focus:outline-none focus:ring-2 focus:ring-ink-900 text-sm resize-none"
+          className="w-full px-3 py-2 rounded border border-line focus:outline-none focus:ring-2 focus:ring-indigo text-sm resize-none"
         />
         <div className="flex items-center justify-between mt-2">
           <span className="text-xs text-ink-400">
@@ -610,7 +616,7 @@ function NotesTab({ client }: { client: Client }) {
           <button
             onClick={onAdd}
             disabled={!draft.trim()}
-            className="text-xs px-3 py-1.5 rounded bg-ink-900 text-white hover:bg-ink-900 disabled:opacity-40"
+            className="text-xs px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40"
           >
             Add note
           </button>
@@ -995,7 +1001,7 @@ function EngagementTab({
           {primaryAction.kind === "chase" && (
             <button
               onClick={onSwitchToToDo}
-              className="px-3 py-1.5 rounded bg-ink-900 text-canvas text-sm font-medium hover:bg-ink-700"
+              className="px-3 py-1.5 rounded bg-indigo text-white text-sm font-medium hover:bg-indigo-hover"
             >
               Send {waiting.count} reminder{waiting.count === 1 ? "" : "s"}
             </button>
@@ -1003,7 +1009,7 @@ function EngagementTab({
           {primaryAction.kind === "alert" && primaryAction.href && (
             <Link
               to={primaryAction.href}
-              className="px-3 py-1.5 rounded bg-ink-900 text-canvas text-sm font-medium hover:bg-ink-700"
+              className="px-3 py-1.5 rounded bg-indigo text-white text-sm font-medium hover:bg-indigo-hover"
             >
               Review {activeAlerts[0].stateCode} alert
             </Link>

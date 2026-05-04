@@ -118,7 +118,7 @@ export function AcceptInvite() {
         <button
           type="submit"
           disabled={accept.isPending}
-          className="w-full text-sm px-3 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40"
+          className="w-full text-sm px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40"
         >
           {accept.isPending ? "Joining…" : "Accept and join"}
         </button>

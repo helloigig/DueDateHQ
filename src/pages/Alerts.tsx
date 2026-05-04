@@ -4,13 +4,13 @@ import {
   CalendarClock,
   ChevronLeft,
   ChevronRight,
-  Forward,
   Mail,
   Megaphone,
   MoonStar,
   Pencil,
   RefreshCw,
   Send,
+  ShieldCheck,
   Sparkles,
   X,
 } from "lucide-react";
@@ -25,10 +25,17 @@ import { formatLongDate } from "@/data/dateHelpers";
 import {
   useAnnouncements,
   useDismissAnnouncement,
+  useBatchAdjustFromAnnouncement,
 } from "@/hooks/useAnnouncements";
+import { useClients } from "@/hooks/useClients";
+import { trpc } from "@/lib/api/client";
 import { clients as MOCK_CLIENTS } from "@/data/mockClients";
+import { useStore } from "@/data/store";
+import { env } from "@/config";
 import type { Announcement } from "@/types";
 import { cn } from "@/lib/utils";
+import { EmailBulletinEditModal } from "@/components/EmailBulletinEditModal";
+import { NexusCheckModal } from "@/components/NexusCheckModal";
 
 /**
  * /alerts — the v0u differentiator surface, rendered exact to spec:
@@ -71,12 +78,19 @@ interface AffectedClient {
   email?: string;
 }
 
-function affectedClientsFor(a: Announcement): AffectedClient[] {
-  const map = new Map(MOCK_CLIENTS.map((c) => [c.id, c]));
+function affectedClientsFor(
+  a: Announcement,
+  source: ReadonlyArray<{ id: string; name: string; contactEmail?: string | null }>,
+): AffectedClient[] {
+  const map = new Map(source.map((c) => [c.id, c]));
   return a.affectedClientIds
     .map((id) => map.get(id))
     .filter((c): c is NonNullable<typeof c> => Boolean(c))
-    .map((c) => ({ id: c.id, name: c.name, email: c.contactEmail }));
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      email: c.contactEmail ?? undefined,
+    }));
 }
 
 function draftSubject(a: Announcement, client: AffectedClient): string {
@@ -152,18 +166,52 @@ function ActionRow({
   );
 }
 
+interface DraftOverride {
+  subject: string;
+  body: string;
+}
+
 function CopilotPane({
   announcement,
   excludedClientIds,
+  draftOverrides,
   onToggleExclusion,
-  onComplete,
   onClose,
+  onEditDraft,
+  onSendBulletin,
+  onApplyDeadline,
+  onRunNexusCheck,
+  onSnooze,
+  onMarkNotApplicable,
+  isSending,
+  isApplying,
+  clientSource,
 }: {
   announcement: Announcement | null;
   excludedClientIds: Set<string>;
+  draftOverrides: Map<string, DraftOverride>;
   onToggleExclusion: (clientId: string) => void;
-  onComplete: (id: string) => void;
   onClose: () => void;
+  onEditDraft: (
+    announcement: Announcement,
+    client: AffectedClient,
+    initial: { subject: string; body: string },
+  ) => void;
+  onSendBulletin: (
+    announcement: Announcement,
+    recipients: Array<{ clientId: string; subject: string; body: string }>,
+  ) => void;
+  onApplyDeadline: (announcement: Announcement) => void;
+  onRunNexusCheck: (announcement: Announcement) => void;
+  onSnooze: (announcement: Announcement) => void;
+  onMarkNotApplicable: (announcement: Announcement) => void;
+  isSending: boolean;
+  isApplying: boolean;
+  clientSource: ReadonlyArray<{
+    id: string;
+    name: string;
+    contactEmail?: string | null;
+  }>;
 }) {
   const [draftIndex, setDraftIndex] = useState(0);
 
@@ -187,14 +235,25 @@ function CopilotPane({
   }
 
   const a = announcement;
-  const allAffected = affectedClientsFor(a);
+  const allAffected = affectedClientsFor(a, clientSource);
   const includedClients = allAffected.filter((c) => !excludedClientIds.has(c.id));
   const includedCount = includedClients.length;
   const excludedCount = allAffected.length - includedCount;
   const safeIdx = Math.min(draftIndex, Math.max(0, includedCount - 1));
   const currentClient = includedClients[safeIdx];
-  const subject = currentClient ? draftSubject(a, currentClient) : "";
-  const body = currentClient ? draftBody(a, currentClient) : "";
+  const overrideKey = (clientId: string) => `${a.id}:${clientId}`;
+  const resolveDraft = (
+    client: AffectedClient,
+  ): { subject: string; body: string } => {
+    const ov = draftOverrides.get(overrideKey(client.id));
+    if (ov) return ov;
+    return { subject: draftSubject(a, client), body: draftBody(a, client) };
+  };
+  const currentDraft = currentClient
+    ? resolveDraft(currentClient)
+    : { subject: "", body: "" };
+  const subject = currentDraft.subject;
+  const body = currentDraft.body;
 
   return (
     <aside className="w-pane shrink-0 bg-canvas border-l border-line flex flex-col overflow-hidden">
@@ -257,16 +316,22 @@ function CopilotPane({
               </div>
               <Button
                 onClick={() => {
-                  toast.success(
-                    `Sent draft to ${includedCount} ${includedCount === 1 ? "client" : "clients"}`,
-                  );
-                  onComplete(a.id);
+                  if (includedCount === 0) return;
+                  const recipients = includedClients.map((c) => {
+                    const d = resolveDraft(c);
+                    return {
+                      clientId: c.id,
+                      subject: d.subject,
+                      body: d.body,
+                    };
+                  });
+                  onSendBulletin(a, recipients);
                 }}
-                disabled={includedCount === 0}
+                disabled={includedCount === 0 || isSending}
                 className="shrink-0 bg-indigo hover:bg-indigo-hover text-surface disabled:opacity-40"
               >
                 <Send aria-hidden />
-                Send {includedCount}
+                {isSending ? "Sending…" : `Send ${includedCount}`}
               </Button>
             </div>
 
@@ -344,7 +409,10 @@ function CopilotPane({
                   <button
                     type="button"
                     onClick={() =>
-                      toast.info(`Open editor for ${currentClient.name}`)
+                      onEditDraft(a, currentClient, {
+                        subject,
+                        body,
+                      })
                     }
                     className="inline-flex items-center gap-1 h-6 px-2 rounded text-xs text-ink-700 hover:bg-surface transition-colors"
                   >
@@ -353,8 +421,9 @@ function CopilotPane({
                   </button>
                   <button
                     type="button"
-                    onClick={() => toast.info("AI is refining the draft…")}
-                    className="inline-flex items-center gap-1 h-6 px-2 rounded text-xs text-ink-700 hover:bg-surface transition-colors"
+                    disabled
+                    title="AI refinement ships with the AI Service in Phase 1.5"
+                    className="inline-flex items-center gap-1 h-6 px-2 rounded text-xs text-ink-400 cursor-not-allowed"
                   >
                     <RefreshCw className="w-3 h-3" aria-hidden />
                     Refine
@@ -394,25 +463,23 @@ function CopilotPane({
               icon={<CalendarClock className="w-3.5 h-3.5" aria-hidden />}
               title={`Apply new ${formatLongDate(a.newDeadline)} deadline`}
               description={`Move ${includedCount} affected ${includedCount === 1 ? "filing" : "filings"} · audit-trailed with the announcement source`}
-              cta="Preview"
+              cta={isApplying ? "Applying…" : "Apply"}
               onClick={() => {
-                toast.success(
-                  `${includedCount} deadlines moved to ${formatLongDate(a.newDeadline!)}`,
-                );
-                onComplete(a.id);
+                if (isApplying) return;
+                onApplyDeadline(a);
               }}
             />
           )}
-          <ActionRow
-            icon={<Forward className="w-3.5 h-3.5" aria-hidden />}
-            title={`Forward ${a.authority} bulletin`}
-            description={`Attaches the official URL · short cover note · ${includedCount} recipients`}
-            cta="Preview"
-            onClick={() => {
-              toast.info(`Bulletin forward staged for ${includedCount} clients`);
-              onComplete(a.id);
-            }}
-          />
+
+          {a.type === "nexus_change" && includedCount > 0 && (
+            <ActionRow
+              icon={<ShieldCheck className="w-3.5 h-3.5" aria-hidden />}
+              title="Run nexus check"
+              description={`Per-state questionnaire for ${includedCount} ${includedCount === 1 ? "client" : "clients"} · adds suggested filings on established`}
+              cta="Open"
+              onClick={() => onRunNexusCheck(a)}
+            />
+          )}
         </div>
       </div>
 
@@ -428,10 +495,7 @@ function CopilotPane({
         <div className="flex items-center gap-1 flex-wrap">
           <button
             type="button"
-            onClick={() => {
-              toast.success("Snoozed until tomorrow");
-              onComplete(a.id);
-            }}
+            onClick={() => onSnooze(a)}
             className="inline-flex items-center gap-1.5 text-xs text-ink-700 hover:text-ink-900 hover:bg-sunken transition-colors px-2 py-1 rounded"
           >
             <MoonStar className="w-3.5 h-3.5 text-ink-500" aria-hidden />
@@ -440,10 +504,7 @@ function CopilotPane({
           <span className="text-ink-300 mx-1" aria-hidden>·</span>
           <button
             type="button"
-            onClick={() => {
-              toast.info("Marked not applicable to your clients");
-              onComplete(a.id);
-            }}
+            onClick={() => onMarkNotApplicable(a)}
             className="inline-flex items-center gap-1.5 text-xs text-ink-700 hover:text-ink-900 hover:bg-sunken transition-colors px-2 py-1 rounded"
           >
             Mark not applicable
@@ -467,6 +528,82 @@ export function Alerts() {
   const announcementsQuery = useAnnouncements();
   const announcements = announcementsQuery.data ?? [];
   const dismissMutation = useDismissAnnouncement();
+  const batchAdjustMutation = useBatchAdjustFromAnnouncement();
+  const utils = trpc.useUtils();
+  const snoozeMutation = trpc.announcements.snooze.useMutation({
+    onSuccess: () => {
+      void utils.announcements.list.invalidate();
+    },
+  });
+  const runNexusCheckMutation = trpc.alertActions.runNexusCheck.useMutation();
+  const addNexusFilingsMutation = trpc.alertActions.addNexusFilings.useMutation({
+    onSuccess: () => {
+      void utils.deadlines.listForTriage.invalidate();
+    },
+  });
+  // sendBulletinEmails is a recently-added BE procedure — the FE router
+  // type may lag behind. Cast through proxy access to keep the build
+  // green until the next router type sync.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sendBulletinMutation = (trpc.announcements as any).sendBulletinEmails.useMutation(
+    {
+      onSuccess: () => {
+        void utils.announcements.list.invalidate();
+      },
+    },
+  ) as {
+    mutate: (input: {
+      announcementId: string;
+      recipients: Array<{ clientId: string; subject: string; body: string }>;
+    }) => void;
+    mutateAsync: (input: {
+      announcementId: string;
+      recipients: Array<{ clientId: string; subject: string; body: string }>;
+    }) => Promise<{
+      sentCount: number;
+      skippedCount: number;
+      sent: Array<{ clientId: string; draftId: string }>;
+      skipped: Array<{ clientId: string; reason: string }>;
+    }>;
+    isPending: boolean;
+  };
+
+  // Live clients — real mode hits the BE clients router; mock mode reads
+  // from the in-memory store (which is seeded from MOCK_CLIENTS at boot).
+  // affectedClientsFor() prefers live data so the recipient chips reflect
+  // the firm's actual roster, not a static demo set.
+  const liveClientsQuery = useClients();
+  const liveClients = liveClientsQuery.data?.items ?? [];
+  const storeClients = useStore().clients;
+  const clientSource = useMemo(
+    () =>
+      env.useMockData
+        ? storeClients.length > 0
+          ? storeClients
+          : MOCK_CLIENTS
+        : liveClients.length > 0
+          ? liveClients
+          : MOCK_CLIENTS,
+    [liveClients, storeClients],
+  );
+
+  // Per-(announcementId × clientId) draft override — populated by the
+  // Email edit modal so the user's edits persist between drafts and
+  // through to the send call.
+  const [draftOverrides, setDraftOverrides] = useState<
+    Map<string, DraftOverride>
+  >(new Map());
+  const [editing, setEditing] = useState<{
+    announcement: Announcement;
+    client: AffectedClient;
+    subject: string;
+    body: string;
+  } | null>(null);
+  // Nexus modal state — set when the CopilotPane "Run nexus check" action
+  // is fired. Carries the announcement so the modal can derive state +
+  // affected clients itself.
+  const [nexusForAnnouncement, setNexusForAnnouncement] =
+    useState<Announcement | null>(null);
 
   // Session-scoped state.
   // - handledIds: alerts the CPA has acted on this session (Send all,
@@ -568,10 +705,204 @@ export function Alerts() {
     [],
   );
 
-  // Keep dismissMutation referenced — wired to be available when the
-  // disposition's Mark-not-applicable graduates from session-only to
-  // a real backend dismissal.
-  void dismissMutation;
+  const handleEditDraft = useCallback(
+    (
+      a: Announcement,
+      client: AffectedClient,
+      initial: { subject: string; body: string },
+    ) => {
+      setEditing({
+        announcement: a,
+        client,
+        subject: initial.subject,
+        body: initial.body,
+      });
+    },
+    [],
+  );
+
+  const handleSaveEdit = useCallback(
+    (subject: string, body: string) => {
+      setEditing((current) => {
+        if (!current) return null;
+        const key = `${current.announcement.id}:${current.client.id}`;
+        setDraftOverrides((prev) => {
+          const next = new Map(prev);
+          next.set(key, { subject, body });
+          return next;
+        });
+        return null;
+      });
+    },
+    [],
+  );
+
+  const handleSendBulletin = useCallback(
+    (
+      a: Announcement,
+      recipients: Array<{ clientId: string; subject: string; body: string }>,
+    ) => {
+      sendBulletinMutation
+        .mutateAsync({ announcementId: a.id, recipients })
+        .then((result) => {
+          if (result.sentCount > 0) {
+            toast.success(
+              `Sent to ${result.sentCount} ${result.sentCount === 1 ? "client" : "clients"}` +
+                (result.skippedCount > 0
+                  ? ` · ${result.skippedCount} skipped`
+                  : ""),
+            );
+          } else {
+            toast.error(
+              result.skippedCount > 0
+                ? `All ${result.skippedCount} skipped (no email or no open task)`
+                : "Nothing to send",
+            );
+          }
+          handleComplete(a.id);
+        })
+        .catch((err: { message?: string }) => {
+          toast.error(`Send failed: ${err.message ?? "unknown"}`);
+        });
+    },
+    [sendBulletinMutation, handleComplete],
+  );
+
+  const handleApplyDeadline = useCallback(
+    (a: Announcement) => {
+      batchAdjustMutation.mutate(
+        // BE expects { id }; FE router stub lets the shape pass through.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { id: a.id } as any,
+        {
+          onSuccess: (res: unknown) => {
+            const r = res as { deadlinesUpdated?: number } | null;
+            const n = r?.deadlinesUpdated ?? 0;
+            toast.success(
+              `${n} ${n === 1 ? "deadline" : "deadlines"} moved to ${a.newDeadline ? formatLongDate(a.newDeadline) : "the new date"}`,
+            );
+            handleComplete(a.id);
+          },
+          onError: (err) => {
+            toast.error(`Apply failed: ${err.message}`);
+          },
+        },
+      );
+    },
+    [batchAdjustMutation, handleComplete],
+  );
+
+  const handleSnooze = useCallback(
+    (a: Announcement) => {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(8, 0, 0, 0);
+      snoozeMutation.mutate(
+        { id: a.id, until: tomorrow.toISOString() },
+        {
+          onSuccess: () => {
+            toast.success("Snoozed until tomorrow");
+            handleComplete(a.id);
+          },
+          onError: (err) => {
+            toast.error(`Snooze failed: ${err.message}`);
+          },
+        },
+      );
+    },
+    [snoozeMutation, handleComplete],
+  );
+
+  const handleMarkNotApplicable = useCallback(
+    (a: Announcement) => {
+      dismissMutation.mutate(
+        { id: a.id, reason: "not_applicable" },
+        {
+          onSuccess: () => {
+            toast.success("Marked not applicable");
+            handleComplete(a.id);
+          },
+          onError: (err) => {
+            toast.error(`Failed: ${err.message}`);
+          },
+        },
+      );
+    },
+    [dismissMutation, handleComplete],
+  );
+
+  const handleRunNexusCheck = useCallback(
+    (a: Announcement) => {
+      setNexusForAnnouncement(a);
+    },
+    [],
+  );
+
+  // Per-client confirm callback fired by NexusCheckModal as the CPA cycles
+  // through affected clients. Each call writes a nexus_questionnaire_run +
+  // upserts client_state_nexus.status. When filings are selected, also
+  // batch-adds them as deadlines (yellow-zone — CPA-initiated). The modal
+  // advances itself client-by-client; we only flip the alert to handled
+  // when it closes (handleNexusClose below).
+  const handleNexusConfirm = useCallback(
+    async (input: {
+      clientId: string;
+      answers: Record<string, boolean>;
+      selectedFilings: string[];
+      notifyOnly: boolean;
+    }) => {
+      const a = nexusForAnnouncement;
+      if (!a) return;
+      if (input.notifyOnly) {
+        toast.info("Notification queued · no filings added");
+        return;
+      }
+      try {
+        const checkResult = await runNexusCheckMutation.mutateAsync({
+          announcementId: a.id,
+          clientId: input.clientId,
+          state: a.stateCode,
+          // V1 maps every nexus_change alert to "sales" — when the BE
+          // surfaces nexusKind on the announcement payload, thread it
+          // through here.
+          nexusKind: "sales" as const,
+          answers: input.answers,
+        });
+        if (
+          checkResult.status === "established" &&
+          input.selectedFilings.length > 0
+        ) {
+          const addResult = await addNexusFilingsMutation.mutateAsync({
+            announcementId: a.id,
+            clientId: input.clientId,
+            state: a.stateCode,
+            filings: input.selectedFilings.map((formCode) => ({
+              formCode,
+              formName: formCode,
+            })),
+          });
+          toast.success(
+            `${addResult.filingsAdded} ${addResult.filingsAdded === 1 ? "filing" : "filings"} added · Undo (24h)`,
+          );
+        } else {
+          toast.success(
+            `Nexus check saved — ${checkResult.status.replace(/_/g, " ")}`,
+          );
+        }
+      } catch (err) {
+        toast.error(
+          `Couldn't run nexus check — ${err instanceof Error ? err.message : "try again"}`,
+        );
+      }
+    },
+    [nexusForAnnouncement, runNexusCheckMutation, addNexusFilingsMutation],
+  );
+
+  const handleNexusClose = useCallback(() => {
+    const a = nexusForAnnouncement;
+    setNexusForAnnouncement(null);
+    if (a) handleComplete(a.id);
+  }, [nexusForAnnouncement, handleComplete]);
 
   return (
     <PageContainer variant="workshop">
@@ -651,6 +982,7 @@ export function Alerts() {
                 handled={handledIds.has(a.id)}
                 onSelect={() => handleSelect(a.id)}
                 onComplete={handleComplete}
+                clientSource={clientSource}
               />
             ))
           )}
@@ -663,11 +995,46 @@ export function Alerts() {
         excludedClientIds={
           selected ? excludedByAlert.get(selected.id) ?? new Set() : new Set()
         }
+        draftOverrides={draftOverrides}
         onToggleExclusion={(clientId) =>
           selected && toggleClientExclusion(selected.id, clientId)
         }
-        onComplete={handleComplete}
         onClose={handleClearSelection}
+        onEditDraft={handleEditDraft}
+        onSendBulletin={handleSendBulletin}
+        onApplyDeadline={handleApplyDeadline}
+        onRunNexusCheck={handleRunNexusCheck}
+        onSnooze={handleSnooze}
+        onMarkNotApplicable={handleMarkNotApplicable}
+        isSending={sendBulletinMutation.isPending}
+        isApplying={batchAdjustMutation.isPending}
+        clientSource={clientSource}
+      />
+      {editing && (
+        <EmailBulletinEditModal
+          open
+          subject={editing.subject}
+          body={editing.body}
+          recipientName={editing.client.name}
+          recipientEmail={editing.client.email}
+          onSave={handleSaveEdit}
+          onClose={() => setEditing(null)}
+        />
+      )}
+      <NexusCheckModal
+        open={nexusForAnnouncement !== null}
+        announcement={nexusForAnnouncement}
+        recipients={
+          nexusForAnnouncement
+            ? affectedClientsFor(nexusForAnnouncement, clientSource).filter(
+                (c) =>
+                  !(excludedByAlert.get(nexusForAnnouncement.id) ?? new Set())
+                    .has(c.id),
+              )
+            : []
+        }
+        onClose={handleNexusClose}
+        onConfirm={handleNexusConfirm}
       />
     </PageContainer>
   );

@@ -30,7 +30,10 @@ function ImportWithContinue() {
   const hasClients = clients.length > 0;
   return (
     <>
-      <div className="bg-surface border border-line rounded-md p-2">
+      {/* Render Import inline. The standalone Import page renders its own
+          card chrome on the preview region; wrapping it again here was
+          double-bordering the table and squeezing column widths. */}
+      <div className="-mt-4">
         <Import />
       </div>
       {hasClients && (
@@ -41,7 +44,7 @@ function ImportWithContinue() {
           </p>
           <Link
             to="/onboarding/packages"
-            className="text-sm px-4 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover whitespace-nowrap"
+            className="text-sm px-4 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover whitespace-nowrap"
           >
             Continue →
           </Link>

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useStore, actions } from "../data/store";
 import { confirmWithUndo } from "../lib/confirmWithUndo";
+import { useSetChecklistItemState } from "../hooks/useChecklist";
 import type {
   Announcement,
   ChecklistItem,
@@ -90,6 +91,7 @@ export function TriageQueue({ onCountChange }: Props) {
   const navigate = useNavigate();
   const { checklistItems, tasks, clients, announcements } = useStore();
   const insights = useAllOpenInsights();
+  const setChecklistState = useSetChecklistItemState();
   const [emailIntent, setEmailIntent] = useState<EmailDraftIntent | null>(null);
   const [activeIdx, setActiveIdx] = useState(0);
   const [expanded, setExpanded] = useState<Set<SectionKey>>(new Set());
@@ -208,7 +210,7 @@ export function TriageQueue({ onCountChange }: Props) {
       } else if (e.key.toLowerCase() === "c") {
         const it = items[activeIdx];
         if (it && it.kind === "decision_confirm") {
-          confirmWithUndo(it.checklist);
+          confirmWithUndo(it.checklist, setChecklistState);
         }
       }
     };
@@ -220,7 +222,7 @@ export function TriageQueue({ onCountChange }: Props) {
   function primaryAction(it: QueueItem) {
     switch (it.kind) {
       case "decision_confirm":
-        confirmWithUndo(it.checklist);
+        confirmWithUndo(it.checklist, setChecklistState);
         break;
       case "decision_flag":
         navigate(`/clients/${it.client.id}/tasks/${it.task.id}`);
@@ -581,10 +583,11 @@ function PrimaryAction({
   onPrimary: () => void;
   onOpenEmail: (intent: EmailDraftIntent) => void;
 }) {
+  const setChecklistState = useSetChecklistItemState();
   const yellowBtn =
     "text-xs px-3 py-1.5 rounded bg-warn-solid text-canvas hover:bg-warn-ink transition-colors flex items-center gap-1";
   const accentBtn =
-    "text-xs px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover transition-colors flex items-center gap-1";
+    "text-xs px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover transition-colors flex items-center gap-1";
   const ghost =
     "text-xs px-2 py-1.5 rounded text-ink-500 hover:bg-sunken hover:text-ink-900";
 
@@ -605,7 +608,7 @@ function PrimaryAction({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              actions.setChecklistItemState(
+              setChecklistState(
                 item.checklist.id,
                 "requested_waiting",
                 "cpa"
@@ -623,7 +626,7 @@ function PrimaryAction({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              confirmWithUndo(item.checklist);
+              confirmWithUndo(item.checklist, setChecklistState);
             }}
             className={yellowBtn}
           >

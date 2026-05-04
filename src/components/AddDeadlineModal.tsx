@@ -298,7 +298,7 @@ export function AddDeadlineModal({
                 value={customForm}
                 onChange={(e) => setCustomForm(e.target.value)}
                 placeholder="e.g. NYC UBT, 5471, 8606…"
-                className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-ink-900"
+                className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-indigo"
                 autoFocus
               />
               <p className="mt-1 text-2xs text-ink-500">
@@ -334,7 +334,7 @@ export function AddDeadlineModal({
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-ink-900"
+                className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-indigo"
               />
             </label>
           </div>
@@ -350,7 +350,7 @@ export function AddDeadlineModal({
           <button
             onClick={onSave}
             disabled={!canSave}
-            className="text-sm px-3 py-1.5 rounded font-medium text-white bg-ink-900 hover:bg-ink-900 disabled:opacity-40"
+            className="text-sm px-3 py-1.5 rounded font-medium text-white bg-indigo hover:bg-indigo-hover disabled:opacity-40"
           >
             Add deadline
           </button>

@@ -5,7 +5,10 @@ import { useStore } from "../data/store";
 import { useSession } from "../data/session";
 import type { ChecklistItem } from "../types";
 import { EmailDraftModal, type EmailDraftIntent } from "../components/EmailDraftModal";
+import { PageContainer } from "../components/ui/PageContainer";
+import { PageHeader } from "../components/ui/PageHeader";
 import { confirmWithUndo, confirmAllWithUndo } from "../lib/confirmWithUndo";
+import { useSetChecklistItemState } from "../hooks/useChecklist";
 import { TODAY, toIso, parseDate, daysBetween } from "../data/dateHelpers";
 
 type Tab = "confirms" | "chases" | "all";
@@ -40,6 +43,7 @@ export function Inbox() {
   const { checklistItems, tasks, clients } = useStore();
   const session = useSession();
   const today = toIso(TODAY);
+  const setChecklistState = useSetChecklistItemState();
   const [tab, setTab] = useState<Tab>("confirms");
   const [emailIntent, setEmailIntent] = useState<EmailDraftIntent | null>(null);
   const [staffFilter, setStaffFilter] = useState<string | null>(null);
@@ -168,7 +172,7 @@ export function Inbox() {
 
   const onConfirm = (id: string) => {
     const item = checklistItems.find((c) => c.id === id);
-    if (item) confirmWithUndo(item);
+    if (item) confirmWithUndo(item, setChecklistState);
   };
 
   const onSend = (item: ChecklistItem) => {
@@ -179,7 +183,7 @@ export function Inbox() {
   };
 
   const onConfirmAll = () => {
-    confirmAllWithUndo(confirms);
+    confirmAllWithUndo(confirms, setChecklistState);
   };
 
   const hasActiveFilter =
@@ -191,16 +195,14 @@ export function Inbox() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-5">
-      <header>
-        <h1 className="text-2xl font-semibold text-ink-900">To review</h1>
-        <p className="text-sm text-ink-500 mt-2 max-w-2xl">
-          Routine decisions you can clear in 5 seconds each — AI is confident
-          about every item here. Anything ambiguous (low confidence, flagged,
-          custom items) waits for you on its task page where you can see the
-          context.
-        </p>
-      </header>
+    <PageContainer variant="wide" className="space-y-card">
+      <PageHeader title="To review" className="mb-region" />
+      <p className="text-caption text-ink-500 max-w-2xl -mt-region">
+        Routine decisions you can clear in 5 seconds each — AI is confident
+        about every item here. Anything ambiguous (low confidence, flagged,
+        custom items) waits for you on its task page where you can see the
+        context.
+      </p>
 
       {(needsContextCount > 0 || quietClientCount > 0) && (
         <div className="text-2xs text-ink-500 space-y-0.5">
@@ -403,7 +405,7 @@ export function Inbox() {
                   ) : (
                     <button
                       onClick={() => onSend(c)}
-                      className="text-xs px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover inline-flex items-center gap-1"
+                      className="text-xs px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover inline-flex items-center gap-1"
                     >
                       <Mail className="w-3 h-3" aria-hidden /> Send
                     </button>
@@ -420,7 +422,7 @@ export function Inbox() {
         intent={emailIntent}
         onClose={() => setEmailIntent(null)}
       />
-    </div>
+    </PageContainer>
   );
 }
 
@@ -496,7 +498,7 @@ function FilterBar({
             className={[
               "px-2 py-0.5 rounded uppercase tracking-wide font-medium",
               windowFilter === w.key
-                ? "bg-accent text-canvas"
+                ? "bg-ink-900 text-surface"
                 : "text-ink-500 hover:bg-sunken hover:text-ink-900",
             ].join(" ")}
           >

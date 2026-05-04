@@ -19,10 +19,8 @@ export function OnboardingDemo() {
     <OnboardingShell
       step={3}
       totalSteps={3}
-      estimate="instant"
       title="Try the demo data"
       subtitle="We'll load 49 fake clients with realistic deadlines, alerts, and prior-year history. Wipeable from Settings → Data anytime."
-      brandLine="The demo workspace is the wedge. Yan Jing said 'no more SaaS pivots' — let prospects kick the tires without commitment."
     >
       <div className="bg-surface border border-line rounded-md p-5 max-w-xl">
         <p className="text-sm text-ink-700">What's included:</p>
@@ -38,7 +36,7 @@ export function OnboardingDemo() {
         </p>
         <button
           onClick={tryIt}
-          className="mt-5 text-sm px-4 py-2 rounded bg-accent text-canvas hover:bg-accent-hover"
+          className="mt-5 text-sm px-4 py-2 rounded bg-indigo text-white hover:bg-indigo-hover"
         >
           Load demo data and continue
         </button>

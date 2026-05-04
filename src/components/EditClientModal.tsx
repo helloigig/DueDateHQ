@@ -13,7 +13,19 @@ const ENTITY_OPTIONS: EntityType[] = [
   "Partnership",
   "Trust",
 ];
-const STATE_OPTIONS: StateCode[] = ["CA", "NY", "TX", "LA", "FL"];
+// 10 states with seeded service templates. See `data/supportedStates.ts`.
+const STATE_OPTIONS: StateCode[] = [
+  "CA",
+  "FL",
+  "GA",
+  "IL",
+  "LA",
+  "MA",
+  "NJ",
+  "NY",
+  "PA",
+  "TX",
+];
 
 export function EditClientModal({
   open,
@@ -101,7 +113,7 @@ export function EditClientModal({
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-ink-900"
+              className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-indigo"
             />
           </label>
 
@@ -177,7 +189,7 @@ export function EditClientModal({
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-ink-900"
+              className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-indigo"
             />
           </label>
 
@@ -188,7 +200,7 @@ export function EditClientModal({
             <input
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-ink-900"
+              className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-indigo"
             />
           </label>
 
@@ -210,7 +222,7 @@ export function EditClientModal({
           <button
             onClick={onSave}
             disabled={!canSave}
-            className="text-sm px-3 py-1.5 rounded font-medium text-white bg-ink-900 hover:bg-ink-900 disabled:opacity-40"
+            className="text-sm px-3 py-1.5 rounded font-medium text-white bg-indigo hover:bg-indigo-hover disabled:opacity-40"
           >
             {stateOrEntityChanged ? "Review changes" : "Save changes"}
           </button>

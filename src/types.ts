@@ -7,29 +7,41 @@ export type EntityType =
   | "Trust";
 
 export type StateCode =
+  // The 10 states with seeded service templates in
+  // backend/src/db/seed-data.ts. Picking one of these spawns deadlines
+  // when the client's package is assigned. See `data/supportedStates.ts`
+  // for the runtime gating; this union should stay aligned.
   | "CA"
-  | "NY"
-  | "TX"
-  | "LA"
   | "FL"
-  // Added 2026-05-04 for non-affecting mock announcements (OR PTE,
-  // MI corporate rate, WA B&O, IL-1040). Keeping the type narrow but
-  // honest about the states the demo references.
+  | "GA"
+  | "IL"
+  | "LA"
+  | "MA"
+  | "NJ"
+  | "NY"
+  | "PA"
+  | "TX"
+  // Decorative-only — referenced by mock announcements (OR PTE, MI
+  // corporate rate, WA B&O). The product won't generate filings here
+  // until seed-data.ts grows templates for them.
   | "OR"
   | "MI"
-  | "WA"
-  | "IL";
+  | "WA";
 
 export const STATE_NAMES: Record<StateCode, string> = {
   CA: "California",
-  NY: "New York",
-  TX: "Texas",
-  LA: "Louisiana",
   FL: "Florida",
+  GA: "Georgia",
+  IL: "Illinois",
+  LA: "Louisiana",
+  MA: "Massachusetts",
+  NJ: "New Jersey",
+  NY: "New York",
+  PA: "Pennsylvania",
+  TX: "Texas",
   OR: "Oregon",
   MI: "Michigan",
   WA: "Washington",
-  IL: "Illinois",
 };
 
 export type ClientStatus = "active" | "inactive" | "prospect" | "archived";
@@ -371,7 +383,11 @@ export type TaskStatus =
   | "completed"
   | "deferred"
   | "filed_extension"
-  | "overdue";
+  | "overdue"
+  // Distinct from `deferred` — this is a kill, not a push. Used when the
+  // deadline becomes irrelevant mid-season (client fired, entity dissolved,
+  // switched filing status). Always carries a reason (audit).
+  | "not_applicable";
 
 /**
  * The six PRD §5.2 document states. Critical: AI never auto-promotes to
@@ -420,6 +436,10 @@ export interface ChecklistItem {
   receivedFilename?: string;
   /** Optional source link (CPA's existing system, e.g., SharePoint). */
   sourceUrl?: string;
+  /** Provenance — null = template/system, set = user added it post-creation.
+   *  Only the latter is deletable. Mock-mode also carries `custom: boolean`
+   *  for the same signal; real-mode reads this id directly. */
+  addedByUserId?: string | null;
 }
 
 /**
@@ -438,9 +458,31 @@ export interface Task {
   status: TaskStatus;
   /** Per-task forwarding address — `firstname-form-{4charToken}@duedatehq.com`. */
   forwardingEmail: string;
+  /** Display name of the preparer. Real-mode joins also resolve `assignedUserId`. */
   assignedUser: string;
+  /** Preparer user id — mirrors `tasks.assigned_user_id`. */
+  assignedUserId?: string | null;
+  /** Reviewer user id — Phase-1 promotion of the v0.7 stub. */
+  reviewerUserId?: string | null;
+  /** Display name of the reviewer (resolved server-side or by mock). */
+  reviewerUser?: string | null;
   completedAt?: string;
   completedBy?: string;
+  /** Set when status moves to `not_applicable`. */
+  notApplicableReason?: string | null;
+  notApplicableAt?: string | null;
+}
+
+/** Per-task note feed — judgment scoped to a single filing. Distinct from
+ *  client notes (cross-engagement context). */
+export interface TaskNote {
+  id: string;
+  taskId: string;
+  body: string;
+  pinned: boolean;
+  authorUserId: string | null;
+  authorName: string;
+  createdAt: string;
 }
 
 export type EmailTone = "formal" | "casual" | "urgent" | "apologetic";

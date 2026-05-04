@@ -52,7 +52,7 @@ export function InstallPrompt() {
       </div>
       <button
         onClick={onInstall}
-        className="text-xs font-medium px-3 py-1.5 rounded bg-ink-900 text-canvas hover:bg-ink-700 shrink-0"
+        className="text-xs font-medium px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover shrink-0"
       >
         Install
       </button>

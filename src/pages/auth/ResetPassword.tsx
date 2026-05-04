@@ -144,7 +144,7 @@ export function ResetPassword() {
         <button
           type="submit"
           disabled={mockReset.isPending || pending}
-          className="w-full text-sm px-3 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40"
+          className="w-full text-sm px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40"
         >
           {mockReset.isPending || pending ? "Saving…" : "Update password"}
         </button>

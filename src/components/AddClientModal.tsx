@@ -15,7 +15,21 @@ const ENTITY_OPTIONS: EntityType[] = [
   "Partnership",
   "Trust",
 ];
-const STATE_OPTIONS: StateCode[] = ["CA", "NY", "TX", "LA", "FL"];
+// 10 states with seeded service templates. Picking any other state
+// produces no deadlines today, so we don't expose them in the UI.
+// See `data/supportedStates.ts` for the gating rule.
+const STATE_OPTIONS: StateCode[] = [
+  "CA",
+  "FL",
+  "GA",
+  "IL",
+  "LA",
+  "MA",
+  "NJ",
+  "NY",
+  "PA",
+  "TX",
+];
 
 // Mock-mode local fallback. Real mode pulls from BE via servicePackages.suggestForClient.
 function localSuggestBundle(entity: EntityType, state: StateCode): string {
@@ -255,7 +269,7 @@ export function AddClientModal({
               </button>
               <button
                 onClick={onContinue}
-                className="text-sm px-3 py-1.5 rounded font-medium text-white bg-ink-900 hover:bg-ink-900"
+                className="text-sm px-3 py-1.5 rounded font-medium text-white bg-indigo hover:bg-indigo-hover"
               >
                 Continue → review
               </button>
@@ -272,7 +286,7 @@ export function AddClientModal({
               <button
                 onClick={() => void onConfirm()}
                 disabled={submitting}
-                className="text-sm px-3 py-1.5 rounded font-medium text-white bg-ink-900 hover:bg-ink-900 disabled:opacity-40"
+                className="text-sm px-3 py-1.5 rounded font-medium text-white bg-indigo hover:bg-indigo-hover disabled:opacity-40"
               >
                 {submitting ? "Saving…" : "Confirm and create"}
               </button>
@@ -330,7 +344,7 @@ function FormStep(props: {
           className={`w-full px-2.5 py-1.5 rounded border focus:outline-none focus:ring-2 ${
             errors.name
               ? "border-red-300 focus:ring-red-500"
-              : "border-line focus:ring-ink-900"
+              : "border-line focus:ring-indigo"
           }`}
           data-autofocus
         />
@@ -400,7 +414,7 @@ function FormStep(props: {
           className={`w-full px-2.5 py-1.5 rounded border focus:outline-none focus:ring-2 ${
             errors.email
               ? "border-red-300 focus:ring-red-500"
-              : "border-line focus:ring-ink-900"
+              : "border-line focus:ring-indigo"
           }`}
         />
       </Field>
@@ -410,7 +424,7 @@ function FormStep(props: {
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           placeholder="(555) 555-0100"
-          className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-ink-900"
+          className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-indigo"
         />
       </Field>
 

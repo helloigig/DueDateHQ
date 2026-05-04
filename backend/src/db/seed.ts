@@ -14,6 +14,8 @@ import { reminderTemplates, servicePackages, serviceTemplates } from "./schema.j
 import { PACKAGES, TEMPLATES } from "./seed-data.js";
 import { REMINDER_TEMPLATES } from "./seed-templates.js";
 import { seedFederalForms } from "./seed-federal-forms.js";
+import { seedAnnouncements } from "./seed-announcements.js";
+import { seedAnnouncementSources } from "./seed-announcement-sources.js";
 
 async function seed() {
   // Index existing system packages by name for idempotency.
@@ -108,9 +110,20 @@ async function seed() {
   // (packages + reminder templates + federal forms).
   const federalFormsResult = await seedFederalForms();
 
+  // Demo state announcements — keeps `/alerts` populated until the
+  // first scraper cycle has produced real announcements. Idempotent on
+  // sourceUrl.
+  const announcementsResult = await seedAnnouncements();
+
+  // Source registry baseline — populates state_announcement_sources for
+  // the 10 supported states so /settings/alerts health UI has rows from
+  // boot. The scraper's recordSourceFreshness updates these within the
+  // first hour of the in-process scheduler running.
+  const sourcesResult = await seedAnnouncementSources();
+
   // eslint-disable-next-line no-console
   console.log(
-    `[ddhq-backend] seed complete — packages: +${createdPackages}, service templates: +${createdTemplates}, reminder templates: +${createdReminderTemplates}, federal forms: +${federalFormsResult.inserted} inserted, ${federalFormsResult.updated} updated, ${federalFormsResult.unchanged} unchanged`,
+    `[ddhq-backend] seed complete — packages: +${createdPackages}, service templates: +${createdTemplates}, reminder templates: +${createdReminderTemplates}, federal forms: +${federalFormsResult.inserted} inserted, ${federalFormsResult.updated} updated, ${federalFormsResult.unchanged} unchanged, announcements: +${announcementsResult.inserted} (skipped ${announcementsResult.skipped}), announcement sources: +${sourcesResult.inserted} (skipped ${sourcesResult.skipped})`,
   );
 }
 

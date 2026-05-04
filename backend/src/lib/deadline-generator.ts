@@ -9,6 +9,26 @@ import {
 import { computeDueDate, type DueDateRule } from "./due-date-rules.js";
 
 /**
+ * Default firm-internal buffer days by rule type — keeps the BE in sync
+ * with FE `<DueDate>` derivation (annual: -7d, quarterly: -3d). Until the
+ * firm-settings sheet ships an override, every firm gets these defaults
+ * written at deadline-generation time. The FE then no longer has to
+ * derive from formClass when `internalTargetDate` is null.
+ */
+const DEFAULT_BUFFER_BY_RULE: Record<DueDateRule["type"], number> = {
+  annual_fixed: 7,
+  quarterly_fixed: 3,
+};
+
+function shiftIsoBackwards(iso: string, days: number): string {
+  if (days <= 0) return iso;
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y!, m! - 1, d!));
+  dt.setUTCDate(dt.getUTCDate() - days);
+  return dt.toISOString().slice(0, 10);
+}
+
+/**
  * Materializes deadline rows for a (client × package × year) tuple. Pulls
  * the package's templates, computes due dates from each template's
  * `dueDateRule`, and inserts. Idempotent on (client_id, service_template_id,
@@ -51,6 +71,7 @@ export async function generateDeadlinesForClient(args: {
         skippedPreServiceStart++;
         continue;
       }
+      const bufferDays = DEFAULT_BUFFER_BY_RULE[rule.type] ?? 0;
       inserts.push({
         firmId: args.firmId,
         clientId: args.clientId,
@@ -60,6 +81,7 @@ export async function generateDeadlinesForClient(args: {
         jurisdiction: tmpl.jurisdiction,
         officialDueDate: c.officialDueDate,
         adjustedDueDate: c.adjustedDueDate,
+        internalTargetDate: shiftIsoBackwards(c.adjustedDueDate, bufferDays),
         status: "not_started",
       });
     }

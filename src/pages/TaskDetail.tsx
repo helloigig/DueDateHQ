@@ -7,16 +7,17 @@ import { ChecklistList } from "../components/ChecklistList";
 import { ActivityTimeline } from "../components/ActivityTimeline";
 import { AiInsightsPanel } from "../components/AiInsightsPanel";
 import { TaskAlertContext } from "../components/TaskAlertContext";
+import { TaskNotesPanel } from "../components/TaskNotesPanel";
 import { EmailDraftModal, type EmailDraftIntent } from "../components/EmailDraftModal";
 import { TaskAuditPackModal } from "../components/TaskAuditPackModal";
-import { useTask } from "../hooks/useTasks";
+import { useTask, useUpdateTaskStatus } from "../hooks/useTasks";
 import { useChecklist } from "../hooks/useChecklist";
 import { useClient } from "../hooks/useClients";
 import {
   useAiInsightsForClient,
   useImportedFactsForClient,
 } from "../hooks/useAiInsights";
-import { useStore, actions } from "../data/store";
+import { useStore } from "../data/store";
 import { useSession } from "../data/session";
 import { env } from "../config";
 import type { ChecklistItem, Client } from "../types";
@@ -42,6 +43,7 @@ export function TaskDetail() {
   const insights = useAiInsightsForClient(clientId);
 
   const session = useSession();
+  const updateStatus = useUpdateTaskStatus();
   const [emailIntent, setEmailIntent] = useState<EmailDraftIntent | null>(null);
   const [auditPackOpen, setAuditPackOpen] = useState(false);
   // Auto-suggest "ready to file" the moment the last checklist item flips
@@ -135,10 +137,10 @@ export function TaskDetail() {
           </div>
           <button
             onClick={() => {
-              actions.updateTaskStatus(task.id, "completed");
+              updateStatus(task.id, "completed");
               setSuggestDismissed(true);
             }}
-            className="text-xs px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover shrink-0"
+            className="text-xs px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover shrink-0"
           >
             Mark complete
           </button>
@@ -189,7 +191,7 @@ export function TaskDetail() {
             title="Activity timeline"
           />
         </div>
-        <div>
+        <div className="space-y-5">
           <AiInsightsPanel
             task={task}
             client={client}
@@ -198,6 +200,7 @@ export function TaskDetail() {
             insights={insights}
             onAskClient={onAskClientFromInsight}
           />
+          <TaskNotesPanel taskId={task.id} />
         </div>
       </div>
 

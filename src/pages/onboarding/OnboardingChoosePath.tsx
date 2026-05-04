@@ -11,17 +11,9 @@ import { OAuthWireframeModal } from "../../components/OAuthWireframeModal";
 import { updateSession } from "../../data/session";
 
 /**
- * Step 2 — bring your roster in. Restructured to make CSV the primary
- * affordance, with QBO/Xero (Tier 0 integrations) as the killer alternative
- * for CPAs who don't have a clean CSV at hand.
- *
- * Why QBO/Xero on the same screen as CSV: Yan Jing's "no CSV at hand"
- * scenario is the most common one. Forcing them through manual or demo when
- * QBO is one OAuth click away is wrong. PRD §6.4 Tier 0.
- *
- * Always-visible "Skip for now" footer: accountants want to poke around
- * before committing to a roster. The dashboard handles empty state cleanly,
- * and they can come back via the Onboarding-Layer-2 widget any time.
+ * Step 2 — bring your roster in. CSV is the primary affordance; QBO/Xero
+ * (Tier 0 integrations) cover the "no CSV at hand" case; manual + demo are
+ * the small-book / tire-kicker fallbacks. PRD §6.4 Tier 0.
  */
 export function OnboardingChoosePath() {
   const navigate = useNavigate();
@@ -58,12 +50,7 @@ export function OnboardingChoosePath() {
               Drag a roster from your existing tool. AI auto-maps the columns.
             </p>
           </div>
-          <ArrowRight
-            className="w-4 h-4 text-ink-400 mt-2 group-hover:text-ink-900 transition-colors"
-            aria-hidden
-          />
-        </div>
-      </Link>
+        </Link>
 
       {/* 3-tile row — QuickBooks, Xero, Add manually */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 max-w-5xl">
@@ -143,7 +130,7 @@ function ConnectTile({
       </span>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-ink-900">{title}</p>
-        <p className="text-xs text-ink-500 mt-0.5">{detail}</p>
+        <p className="text-xs text-ink-500 mt-0.5 leading-relaxed">{detail}</p>
       </div>
     </>
   );

@@ -404,6 +404,7 @@ function StateAlertsPreview({
   announcements: Announcement[];
 }) {
   const navigate = useNavigate();
+  const clientsQuery = useClients();
 
   // Empty: monitoring assurance, calm.
   if (announcements.length === 0) {
@@ -510,6 +511,7 @@ function StateAlertsPreview({
             a={a}
             variant="preview"
             onSelect={() => navigate(`/alerts/${a.id}`)}
+            clientSource={clientsQuery.data?.items}
           />
         ))}
       </div>
@@ -632,7 +634,7 @@ function EmptyStateButton({
   children: React.ReactNode;
 }) {
   const cls = primary
-    ? "text-sm px-3 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover"
+    ? "text-sm px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover"
     : "text-sm px-3 py-1.5 rounded-md border border-line text-ink-700 hover:bg-sunken";
   return (
     <a href={to} className={cls}>

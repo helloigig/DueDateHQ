@@ -4,31 +4,46 @@ name: DueDateHQ
 description: CPA client-intelligence layer. Calm, dense, scan-first work surface. The differentiator is "state notification + suggested action" — every layout privileges the gap (what's missing), not the fill.
 
 colors:
-  canvas: "#FAFAF7"
+  # Surfaces — Mercury-aligned cool neutral (refreshed 2026-05-03 from warm cream).
+  canvas: "#F8F9FB"
   surface: "#FFFFFF"
-  sunken: "#F5F4EF"
+  sunken: "#F2F3F5"
+  # Text
   ink-900: "#0F172A"
   ink-700: "#334155"
   ink-500: "#64748B"
   ink-400: "#94A3B8"
   ink-300: "#CBD5E1"
+  # Border
   line: "#E2E8F0"
   line-strong: "#CBD5E1"
-  primary: "#0F172A"
-  primary-hover: "#1E293B"
-  on-primary: "#FFFFFF"
+  # Indigo — the next-action accent (T2). New design-system surfaces use this.
+  indigo: "#5B5BD6"
+  indigo-hover: "#4A4AC9"
+  indigo-soft: "#ECECFE"
+  indigo-ink: "#3D3DAF"
+  # Slate accent — legacy back-compat (user-avatar circle, user-menu trigger).
+  # Do NOT use on new surfaces; the next-action color is `indigo`, not slate.
+  accent: "#0F172A"
+  accent-hover: "#1E293B"
+  on-accent: "#FFFFFF"
+  # Status families
   danger-bg: "#FEF2F2"
   danger-border: "#FCA5A5"
   danger-ink: "#B91C1C"
+  danger-solid: "#DC2626"
   warn-bg: "#FFFBEB"
   warn-border: "#FCD34D"
   warn-ink: "#92400E"
+  warn-solid: "#D97706"
   ok-bg: "#ECFDF5"
   ok-border: "#86EFAC"
   ok-ink: "#047857"
+  ok-solid: "#059669"
   info-bg: "#EFF6FF"
   info-border: "#93C5FD"
   info-ink: "#1D4ED8"
+  info-solid: "#2563EB"
 
 typography:
   display:
@@ -42,7 +57,7 @@ typography:
     fontSize: 18px
     fontWeight: "600"
     lineHeight: 26px
-  body-strong:
+  body-lg:
     fontFamily: -apple-system, sans-serif
     fontSize: 14px
     fontWeight: "500"
@@ -68,21 +83,36 @@ typography:
     fontWeight: "600"
     lineHeight: 16px
     letterSpacing: 0.05em
+  numeric-lg:
+    # Mercury-style headline numeric — page-level KPIs only.
+    fontFamily: -apple-system, sans-serif
+    fontSize: 26px
+    fontWeight: "600"
+    lineHeight: 32px
+    letterSpacing: -0.01em
 
 rounded:
   sm: 4px
   DEFAULT: 6px
   md: 8px
   lg: 10px
-  full: 9999px
+  xl: 12px
+  pill: 9999px   # T3: indicators (status pills, count badges, jurisdiction tags). Buttons stay rounded-md.
+  full: 9999px   # alias of pill — Tailwind default
 
 spacing:
+  # The 4-step rhythm. Anything outside is a bug. (8/16/24/48 — see "Layout & Spacing".)
   inline: 8px
   region: 16px
   card: 24px
   section: 48px
-  page-x: 32px
-  page-y: 24px
+
+width:
+  pane: 440px    # co-pilot / detail pane (used by /alerts workshop)
+
+shadows:
+  pop: "0 2px 8px rgba(15, 23, 42, 0.06)"        # popovers, dropdowns
+  overlay: "0 8px 24px rgba(15, 23, 42, 0.12)"   # modals, drawers
 
 components:
   page-header:
@@ -135,14 +165,20 @@ components:
     rounded: "{rounded.md}"
     padding: "{spacing.region}"
   button-primary:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.on-primary}"
+    # Next-action CTA — indigo per T2 (Mercury inheritance). NOT slate.
+    backgroundColor: "{colors.indigo}"
+    textColor: "#FFFFFF"
     typography: "{typography.label}"
     rounded: "{rounded.md}"
     padding: 12px
     height: 32px
   button-primary-hover:
-    backgroundColor: "{colors.primary-hover}"
+    backgroundColor: "{colors.indigo-hover}"
+  button-primary-focus:
+    # Focus ring on the next-action CTA — indigo, matches §Element states.
+    outlineColor: "{colors.indigo}"
+    outlineWidth: 2px
+    outlineOffset: 2px
   link:
     backgroundColor: transparent
     textColor: "{colors.ink-700}"
@@ -383,19 +419,20 @@ Composed from shadcn `<DropdownMenu>` (`src/components/ui/dropdown-menu.tsx`). A
 | Section eyebrow | `text-2xs uppercase tracking-wider text-ink-400 px-3 pt-2 pb-1` |
 | Helper line (non-interactive) | `text-2xs text-ink-400 px-3 py-1.5` (no hover bg) |
 
-### Sidebar (floating shell + nav items)
+### Sidebar (flush rail + nav items)
 
-The sidebar is a **floating card**, not a flush rail. It sits as a flex sibling of the main column (so wayfinding stays reliable — the menu is always exactly where the eye expects it), but visually offsets from the viewport edge with margin + rounded corners + soft shadow. Reads as a card hovering above the canvas, Mercury / Mac-OS aligned.
+The sidebar is a **flush rail with a single hairline right border** — both modes. It sits as a flex sibling of the main column (so wayfinding stays reliable — the menu is always exactly where the eye expects it). Mercury references all flush their sidebars; we align with that.
 
-**Shell — two modes by collapse state.** The floating treatment is *only* for the expanded sidebar. When collapsed, the sidebar flushes against the edge with a hairline right border — a 56px floating card is decoration, and the user collapsed it precisely to maximize canvas.
+**Why not floating** (the original spec was a floating card with `my-3 ml-3 rounded-lg shadow-pop`): the floating treatment leaked canvas behind the sidebar AND created a visual seam where the rounded top-right corner met the topbar's straight left edge. The visual lift the rail needs comes from the topbar's `border-b` + the hairline right border, not from sidebar elevation. Resolution rule (per §Archive): when references disagree with the doc, references win.
 
 | Property | Expanded (`w-56`) | Collapsed (`w-14`) |
 |:---------|:------------------|:--------------------|
 | Background | `bg-surface` | `bg-surface` |
-| Radius | `rounded-lg` (10px) — discrete object floating above canvas | none (flush rectangle) |
-| Elevation | `shadow-pop` | none |
-| Right edge | none (shadow separates) | `border-r border-line` (hairline) |
-| Offset from viewport | `my-3 ml-3` (12px top / bottom / left) | none (flush) |
+| Radius | none (flush rectangle) | none (flush rectangle) |
+| Elevation | none (border separates) | none (border separates) |
+| Right edge | `border-r border-line` (hairline) | `border-r border-line` (hairline) |
+| Offset from viewport | none (flush) | none (flush) |
+| Transition | `transition-[width] duration-150` between modes | (same) |
 | Width | `w-56` (224px) | `w-14` (56px); persists in `localStorage` |
 
 **Nav items inside the shell**
@@ -798,7 +835,7 @@ The barely-audible voices that compound. These are easy to forget and easy to sp
 | Tooltip delay | first hover: 400 ms · subsequent (within 300 ms): instant + no animation |
 | Smooth scroll | `scroll-behavior: smooth` on `<html>` |
 | Anchor scroll-margin | `scroll-margin-top: var(--nav-height) + 12px` on every scroll target |
-| Focus-visible ring | only on `:focus-visible`, never on `:focus` · never `outline: none` · 2 px solid `primary` + 2 px offset |
+| Focus-visible ring | only on `:focus-visible`, never on `:focus` · never `outline: none` · 2 px solid `indigo` + 2 px offset (matches §Element states — slate is legacy and only the user-avatar / user-menu trigger keep it) |
 | Broken image fallback | `bg sunken` + alt text in `caption` ink-500 + 16 px lucide `<ImageOff>` |
 | Font smoothing | `-webkit-font-smoothing: antialiased` on dark-canvas surfaces only (toasts) |
 | `select-none` on chrome | sidebar items, button labels, status pills — prevent accidental drag-select |

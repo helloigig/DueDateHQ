@@ -73,10 +73,8 @@ export function OnboardingPackages() {
     <OnboardingShell
       step={3}
       totalSteps={3}
-      estimate="~1 minute"
       title="Confirm service packages"
       subtitle="AI suggested a package for each client based on entity type and state. Glance, click 'Accept all' if they look right, or change individually."
-      brandLine="Mode A substrate-driven. Entity + State + Industry + Cohort make this useful Day 1 — no 'AI is learning' here."
     >
       {activeClients.length === 0 ? (
         <div className="bg-surface border border-line rounded-md p-6 text-center text-sm text-ink-500">
@@ -98,7 +96,7 @@ export function OnboardingPackages() {
               </span>
               <button
                 onClick={acceptAll}
-                className="ml-auto text-xs px-3 py-1 rounded bg-accent text-canvas hover:bg-accent-hover"
+                className="ml-auto text-xs px-3 py-1 rounded bg-indigo text-white hover:bg-indigo-hover"
               >
                 Accept all suggestions
               </button>
@@ -135,7 +133,7 @@ export function OnboardingPackages() {
           <div className="mt-5 flex items-center gap-3">
             <button
               onClick={next}
-              className="text-sm px-5 py-2 rounded bg-accent text-canvas hover:bg-accent-hover"
+              className="text-sm px-5 py-2 rounded bg-indigo text-white hover:bg-indigo-hover"
             >
               {allConfirmed ? "Continue" : "Apply suggestions and continue"}
             </button>

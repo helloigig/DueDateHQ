@@ -1,5 +1,4 @@
-import { CalendarClock, Check, Send } from "lucide-react";
-import { toast } from "sonner";
+import { CalendarClock, Check } from "lucide-react";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { StateBadge } from "@/components/ui/StateBadge";
 import { ClientChip } from "@/components/ui/ClientChip";
@@ -7,6 +6,12 @@ import { formatLongDate, hoursSince } from "@/data/dateHelpers";
 import { clients as MOCK_CLIENTS } from "@/data/mockClients";
 import type { Announcement } from "@/types";
 import { cn } from "@/lib/utils";
+
+type ClientLike = {
+  id: string;
+  name: string;
+  contactEmail?: string | null;
+};
 
 /**
  * StateAlertCard — the canonical alert presentation. Single source of
@@ -56,12 +61,27 @@ export interface AffectedClient {
   email?: string;
 }
 
-export function affectedClientsFor(a: Announcement): AffectedClient[] {
-  const map = new Map(MOCK_CLIENTS.map((c) => [c.id, c]));
+/**
+ * Resolve `affectedClientIds` to display chips. Caller passes the live
+ * client roster (real-mode tRPC `clients.list`, mock-mode store) so chips
+ * reflect the firm's actual roster — not a frozen MOCK_CLIENTS lookup.
+ * Falls back to MOCK_CLIENTS only when the caller didn't pass a source
+ * (legacy callers / design previews).
+ */
+export function affectedClientsFor(
+  a: Announcement,
+  source?: ReadonlyArray<ClientLike>,
+): AffectedClient[] {
+  const list = source ?? MOCK_CLIENTS;
+  const map = new Map(list.map((c) => [c.id, c]));
   return a.affectedClientIds
     .map((id) => map.get(id))
     .filter((c): c is NonNullable<typeof c> => Boolean(c))
-    .map((c) => ({ id: c.id, name: c.name, email: c.contactEmail }));
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      email: c.contactEmail ?? undefined,
+    }));
 }
 
 export interface StateAlertCardProps {
@@ -73,7 +93,13 @@ export interface StateAlertCardProps {
   handled?: boolean;
   /** Click handler — feed: select the card; preview: navigate to /alerts/:id. */
   onSelect: () => void;
-  /** Action complete callback — feed variant only. Wires the hover Send chip. */
+  /** Live client roster used to resolve recipient chips. When omitted,
+   *  falls back to MOCK_CLIENTS (legacy callers / design previews).
+   *  Real-mode callers pass tRPC `clients.list().items` so chips reflect
+   *  the firm's actual roster. */
+  clientSource?: ReadonlyArray<ClientLike>;
+  /** Optional — kept for callers that still pass it; the feed-card hover
+   *  Send chip was retired in favor of the co-pilot pane's wired Send. */
   onComplete?: (id: string) => void;
 }
 
@@ -83,10 +109,11 @@ export function StateAlertCard({
   selected = false,
   handled = false,
   onSelect,
-  onComplete,
+  clientSource,
+  onComplete: _onComplete,
 }: StateAlertCardProps) {
   const tone = TYPE_TONE[a.type];
-  const affected = affectedClientsFor(a);
+  const affected = affectedClientsFor(a, clientSource);
   const visibleChips = affected.slice(0, 5);
   const overflow = Math.max(0, affected.length - visibleChips.length);
   const isFeed = variant === "feed";
@@ -183,27 +210,12 @@ export function StateAlertCard({
         </div>
       )}
 
-      {/* ── Zone 3 — single dominant action (feed variant only,
-              hover-revealed) ───────────────────────────────────── */}
-      {isFeed && !handled && onComplete && (
-        <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity border-t border-line px-region py-2 flex items-center justify-end bg-surface">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              toast.success(
-                `Sent draft to ${a.affectedClientIds.length} ${a.affectedClientIds.length === 1 ? "client" : "clients"}`,
-              );
-              onComplete(a.id);
-            }}
-            className="inline-flex items-center gap-1 text-xs font-medium text-white bg-indigo hover:bg-indigo-hover transition-colors px-2.5 py-1 rounded"
-            title="Send personalized email draft to each affected client"
-          >
-            <Send className="w-3 h-3" aria-hidden />
-            Send {a.affectedClientIds.length}
-          </button>
-        </div>
-      )}
+      {/* Zone 3 — primary action moved into the co-pilot pane on the
+          right where the per-client draft preview, recipient toggles,
+          and Edit/Refine controls live. The card itself is the entry
+          point: click to select, then act in the pane. Removing the
+          inline Send avoids two parallel send paths that were drifting
+          out of sync (the inline one was toast-only). */}
     </div>
   );
 }

@@ -21,6 +21,7 @@ import {
   checklistsRouter,
   tasksRouter,
 } from "./routers/tasks.js";
+import { taskNotesRouter } from "./routers/taskNotes.js";
 import { teamRouter } from "./routers/team.js";
 import { todoItemsRouter } from "./routers/todoItems.js";
 import { modeFHealthRouter } from "./routers/modeFHealth.js";
@@ -39,6 +40,7 @@ export const appRouter = router({
   tasks: tasksRouter,
   checklists: checklistsRouter,
   activity: activityRouter,
+  taskNotes: taskNotesRouter,
   announcements: announcementsRouter,
   notifications: notificationsRouter,
   emails: emailsRouter,
