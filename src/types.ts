@@ -109,6 +109,15 @@ export interface Client {
   relatedClientIds?: string[];
   noteEntries?: ClientNote[];
   activity?: ActivityEntry[];
+  /**
+   * CPA-authored override for the AI behaviour summary on the client
+   * detail header. When null/undefined the FE displays the auto-composed
+   * placeholder; when set, this string takes precedence and the
+   * regenerator skips this client until cleared. Phase 2: persists to
+   * `clients.ai_summary_override` server-side; Phase 1 keeps it in the
+   * mock store via actions.updateClient.
+   */
+  aiSummaryOverride?: string | null;
 }
 
 export interface Deadline {

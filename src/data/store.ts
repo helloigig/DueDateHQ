@@ -500,6 +500,10 @@ export const actions = {
       nexusStates?: StateCode[];
       contactEmail?: string;
       contactPhone?: string;
+      // CPA override for the AI behaviour summary on the client detail
+      // header. Pass `null` to clear an existing override and revert to
+      // the auto-composed placeholder.
+      aiSummaryOverride?: string | null;
     }
   ) {
     const before = state.clients.find((c) => c.id === clientId);
