@@ -419,19 +419,20 @@ Composed from shadcn `<DropdownMenu>` (`src/components/ui/dropdown-menu.tsx`). A
 | Section eyebrow | `text-2xs uppercase tracking-wider text-ink-400 px-3 pt-2 pb-1` |
 | Helper line (non-interactive) | `text-2xs text-ink-400 px-3 py-1.5` (no hover bg) |
 
-### Sidebar (floating shell + nav items)
+### Sidebar (flush rail + nav items)
 
-The sidebar is a **floating card**, not a flush rail. It sits as a flex sibling of the main column (so wayfinding stays reliable — the menu is always exactly where the eye expects it), but visually offsets from the viewport edge with margin + rounded corners + soft shadow. Reads as a card hovering above the canvas, Mercury / Mac-OS aligned.
+The sidebar is a **flush rail with a single hairline right border** — both modes. It sits as a flex sibling of the main column (so wayfinding stays reliable — the menu is always exactly where the eye expects it). Mercury references all flush their sidebars; we align with that.
 
-**Shell — two modes by collapse state.** The floating treatment is *only* for the expanded sidebar. When collapsed, the sidebar flushes against the edge with a hairline right border — a 56px floating card is decoration, and the user collapsed it precisely to maximize canvas.
+**Why not floating** (the original spec was a floating card with `my-3 ml-3 rounded-lg shadow-pop`): the floating treatment leaked canvas behind the sidebar AND created a visual seam where the rounded top-right corner met the topbar's straight left edge. The visual lift the rail needs comes from the topbar's `border-b` + the hairline right border, not from sidebar elevation. Resolution rule (per §Archive): when references disagree with the doc, references win.
 
 | Property | Expanded (`w-56`) | Collapsed (`w-14`) |
 |:---------|:------------------|:--------------------|
 | Background | `bg-surface` | `bg-surface` |
-| Radius | `rounded-lg` (10px) — discrete object floating above canvas | none (flush rectangle) |
-| Elevation | `shadow-pop` | none |
-| Right edge | none (shadow separates) | `border-r border-line` (hairline) |
-| Offset from viewport | `my-3 ml-3` (12px top / bottom / left) | none (flush) |
+| Radius | none (flush rectangle) | none (flush rectangle) |
+| Elevation | none (border separates) | none (border separates) |
+| Right edge | `border-r border-line` (hairline) | `border-r border-line` (hairline) |
+| Offset from viewport | none (flush) | none (flush) |
+| Transition | `transition-[width] duration-150` between modes | (same) |
 | Width | `w-56` (224px) | `w-14` (56px); persists in `localStorage` |
 
 **Nav items inside the shell**

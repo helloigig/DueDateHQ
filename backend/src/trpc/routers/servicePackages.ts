@@ -9,15 +9,11 @@ import {
   servicePackages,
 } from "../../db/schema.js";
 import { seedClientWithPackage } from "../../lib/client-package-seeder.js";
-
-const ENTITY_TYPES = [
-  "LLC",
-  "S-Corp",
-  "C-Corp",
-  "Individual",
-  "Partnership",
-  "Trust",
-] as const;
+import {
+  ENTITY_TYPES,
+  entityTypeMatches,
+  normalizeEntityType,
+} from "../../lib/entity-type.js";
 
 export type PackageDTO = {
   id: string;
@@ -65,7 +61,12 @@ export const servicePackagesRouter = router({
   suggestForClient: firmProcedure
     .input(
       z.object({
-        entityType: z.enum(ENTITY_TYPES),
+        // Accept either display-case ("Individual", "S-Corp") or
+        // canonical snake_case ("individual", "s_corp"). Internal
+        // matching always works in canonical form via entityTypeMatches,
+        // so callers can pass whatever spelling their UI uses without
+        // a transformation layer in the middle.
+        entityType: z.preprocess(normalizeEntityType, z.enum(ENTITY_TYPES)),
         primaryState: z.string().length(2),
       }),
     )
@@ -78,7 +79,7 @@ export const servicePackagesRouter = router({
         );
       const matches = all.filter(
         (p) =>
-          p.applicableEntityTypes.includes(input.entityType) &&
+          entityTypeMatches(p.applicableEntityTypes, input.entityType) &&
           (p.applicableStates === null ||
             p.applicableStates.includes(input.primaryState)),
       );

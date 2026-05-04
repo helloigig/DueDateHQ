@@ -12,6 +12,11 @@ import {
   type ImportedFactInsert,
 } from "../../db/schema.js";
 import { seedClientWithPackage } from "../../lib/client-package-seeder.js";
+import {
+  ENTITY_TYPES,
+  entityTypeMatches,
+  normalizeEntityType,
+} from "../../lib/entity-type.js";
 import { findFactInconsistencies } from "../../lib/fact-consistency.js";
 import { log } from "../../lib/observability.js";
 
@@ -25,9 +30,14 @@ function pickSuggestedPackage(
   entityType: string,
   primaryState: string,
 ): (typeof servicePackages.$inferSelect) | null {
+  // entityTypeMatches handles the legacy display-case-vs-snake-case
+  // mismatch — seed-data.ts uses "Individual" / "S-Corp" / "C-Corp"
+  // while clients.entity_type stores "individual" / "s_corp" / "c_corp".
+  // Without normalisation `["Individual"].includes("individual")` is
+  // false and every CSV row falls through with no package match.
   const matches = all.filter(
     (p) =>
-      p.applicableEntityTypes.includes(entityType) &&
+      entityTypeMatches(p.applicableEntityTypes, entityType) &&
       (p.applicableStates === null ||
         p.applicableStates.includes(primaryState)),
   );
@@ -51,46 +61,6 @@ function pickSuggestedPackage(
  * the server-side detector matches the client-side one for now so
  * behavior is consistent if the FE switches to BE detection.
  */
-
-const ENTITY_TYPES = [
-  "individual",
-  "llc",
-  "s_corp",
-  "c_corp",
-  "partnership",
-  "trust",
-  "non_profit",
-] as const;
-type EntityType = (typeof ENTITY_TYPES)[number];
-
-/**
- * Map display-format entity types to the canonical snake_case enum.
- * The FE persists user-facing strings like "LLC", "S-Corp", "Individual"
- * (per src/types.ts EntityType union); the BE schema stores them as
- * snake_case for SQL friendliness. This normalizer bridges the two.
- *
- * Returns the input unchanged if already canonical, lower-snake-cases
- * otherwise. Unmapped values fall through and Zod rejects them — keeps
- * the surface tight while supporting the variants the FE actually sends.
- */
-function normalizeEntityType(input: unknown): unknown {
-  if (typeof input !== "string") return input;
-  const lowered = input.toLowerCase().replace(/-/g, "_").replace(/\s+/g, "_");
-  // Aliases for common variations
-  const map: Record<string, EntityType> = {
-    individual: "individual",
-    llc: "llc",
-    s_corp: "s_corp",
-    scorp: "s_corp",
-    c_corp: "c_corp",
-    ccorp: "c_corp",
-    partnership: "partnership",
-    trust: "trust",
-    non_profit: "non_profit",
-    nonprofit: "non_profit",
-  };
-  return map[lowered] ?? input;
-}
 
 const RowSchema = z.object({
   name: z.string().min(1),

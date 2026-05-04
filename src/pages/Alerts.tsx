@@ -36,6 +36,7 @@ import type { Announcement } from "@/types";
 import { cn } from "@/lib/utils";
 import { EmailBulletinEditModal } from "@/components/EmailBulletinEditModal";
 import { NexusCheckModal } from "@/components/NexusCheckModal";
+import { ALERT_TYPE_CONFIG } from "@/data/alertTypeConfig";
 
 /**
  * /alerts — the v0u differentiator surface, rendered exact to spec:
@@ -214,6 +215,7 @@ function CopilotPane({
   }>;
 }) {
   const [draftIndex, setDraftIndex] = useState(0);
+  const navigate = useNavigate();
 
   useEffect(() => {
     setDraftIndex(0);
@@ -235,6 +237,14 @@ function CopilotPane({
   }
 
   const a = announcement;
+  // Per-type config drives which action surface the pane shows. The
+  // bulletin Send card (lines below) is suppressed for `isAdminGated`
+  // types — form_change updates the firm's catalog via the admin
+  // reviewer queue, not via client emails. Showing Send there was a
+  // dead button: BE always skipped because form-change emails have
+  // no per-client task to FK to.
+  const cfg = ALERT_TYPE_CONFIG[a.type];
+  const showBulletinSend = !cfg?.isAdminGated;
   const allAffected = affectedClientsFor(a, clientSource);
   const includedClients = allAffected.filter((c) => !excludedClientIds.has(c.id));
   const includedCount = includedClients.length;
@@ -288,12 +298,27 @@ function CopilotPane({
         </div>
 
         <div className="px-region pb-region flex flex-col gap-2">
+          {/* Admin-gated alerts (form_change) don't email clients —
+              the canonical action is "Open admin reviewer queue" which
+              updates the firm's catalog. Surface that as the primary
+              card instead of the bulletin Send card. */}
+          {!showBulletinSend && (
+            <ActionRow
+              icon={<Sparkles className="w-3.5 h-3.5" aria-hidden />}
+              title={cfg.primaryVerb(includedCount, a)}
+              description={`${cfg.label} alerts update the firm's form catalog. Clients aren't notified.`}
+              cta="Open"
+              onClick={() => navigate("/settings/federal-forms")}
+            />
+          )}
+
           {/* Action 1 — primary. Three sub-zones in ONE card,
               separated by hairline dividers (no nested cards per
               DESIGN.md §Cards):
                 (a) header — icon + title + Send CTA with live count
                 (b) recipient list — chip list with X-to-exclude
                 (c) email preview — subject + body + nav controls */}
+          {showBulletinSend && (
           <article className="bg-surface border border-indigo-soft rounded-md overflow-hidden">
             <div className="flex items-start gap-3 p-region">
               <span
@@ -457,6 +482,7 @@ function CopilotPane({
               </div>
             )}
           </article>
+          )}
 
           {a.newDeadline && (
             <ActionRow
@@ -658,16 +684,26 @@ export function Alerts() {
   //   1) mark this alert handled so the feed card fades to opacity-60
   //      with a "Handled this session" chip — gap-loud is preserved
   //      (the CPA can re-open) but visually demoted on next scan.
-  //   2) auto-advance to the next un-handled alert in the active tab
+  //   2) for resolving actions (Send / Apply / Tag / Plan / Recompute /
+  //      Nexus / route-to-admin), also flip `dismissed` so the alert
+  //      moves to the Resolved tab. Snooze passes `resolve: false` —
+  //      snooze means "come back tomorrow", not done.
+  //   3) auto-advance to the next un-handled alert in the active tab
   //      so triage feels queue-like (forward, then loop back to before
   //      the current cursor if all "after" are done).
   const handleComplete = useCallback(
-    (id: string) => {
+    (id: string, opts: { resolve?: boolean } = { resolve: true }) => {
+      const resolve = opts.resolve ?? true;
       setHandledIds((prev) => {
         const next = new Set(prev);
         next.add(id);
         return next;
       });
+      // Move to Resolved tab on resolving actions. Idempotent — re-firing
+      // dismiss on an already-dismissed alert is a no-op on the BE.
+      if (resolve) {
+        dismissMutation.mutate({ id });
+      }
       const idx = filtered.findIndex((a) => a.id === id);
       if (idx < 0) return;
       const after = filtered
@@ -684,7 +720,7 @@ export function Alerts() {
         navigate(`/alerts`, { replace: true });
       }
     },
-    [filtered, handledIds, navigate],
+    [dismissMutation, filtered, handledIds, navigate],
   );
 
   const handleClearSelection = () => {
@@ -802,7 +838,9 @@ export function Alerts() {
         {
           onSuccess: () => {
             toast.success("Snoozed until tomorrow");
-            handleComplete(a.id);
+            // Snooze does NOT resolve — alert stays in Active tab and
+            // re-surfaces tomorrow morning.
+            handleComplete(a.id, { resolve: false });
           },
           onError: (err) => {
             toast.error(`Snooze failed: ${err.message}`);
@@ -815,12 +853,15 @@ export function Alerts() {
 
   const handleMarkNotApplicable = useCallback(
     (a: Announcement) => {
+      // Explicitly dismiss with the audit reason. Pass `resolve: false`
+      // to handleComplete so we don't fire a second (reason-less)
+      // dismiss that would overwrite the "not_applicable" reason.
       dismissMutation.mutate(
         { id: a.id, reason: "not_applicable" },
         {
           onSuccess: () => {
             toast.success("Marked not applicable");
-            handleComplete(a.id);
+            handleComplete(a.id, { resolve: false });
           },
           onError: (err) => {
             toast.error(`Failed: ${err.message}`);

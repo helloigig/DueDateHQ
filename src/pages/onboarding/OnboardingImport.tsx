@@ -15,7 +15,6 @@ export function OnboardingImport() {
       totalSteps={3}
       title="Upload your client roster"
       subtitle="Drop a CSV. AI maps the columns; you confirm."
-      wide
     >
       <ImportWithContinue />
     </OnboardingShell>

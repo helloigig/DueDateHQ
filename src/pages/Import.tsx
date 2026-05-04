@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useCommitImport } from "../hooks/useImports";
 import {
   DETECTED_ROWS,
@@ -71,8 +71,11 @@ export function Import() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 md:px-6 py-6">
-      <h1 className="text-xl font-semibold text-ink-900">
-        Import clients from CSV
+      <Link to="/clients" className="text-sm text-ink-500 hover:underline">
+        ‹ Clients
+      </Link>
+      <h1 className="mt-3 text-xl font-semibold text-ink-900">
+        Upload clients from CSV
       </h1>
 
       <ol className="mt-5 mb-6 flex items-center gap-2 text-sm">
@@ -292,11 +295,16 @@ function UploadStep({
         </div>
       )}
 
-      <p className="mt-5 text-xs text-ink-500 leading-relaxed">
-        Export clients as CSV from File In Time, TaxDome, Drake, ProConnect,
-        or QuickBooks Online — or any spreadsheet with name + entity + state.
-        You'll confirm the column mapping in the next step.
-      </p>
+      <div className="mt-5 text-xs text-ink-500">
+        <p>
+          You can export client lists as CSV from File In Time, TaxDome, Drake,
+          ProConnect, QuickBooks — or save a plain Excel sheet as CSV.
+        </p>
+        <p className="mt-2">
+          Don't see yours? Any CSV with client data works — you'll confirm the
+          column mapping in the next step.
+        </p>
+      </div>
 
       <div className="mt-6 flex items-center justify-between">
         <button
@@ -308,7 +316,7 @@ function UploadStep({
         <button
           disabled={!hasFile}
           onClick={onNext}
-          className="text-sm px-4 py-2 rounded font-medium text-white bg-ink-900 hover:bg-ink-900 disabled:opacity-40"
+          className="text-sm px-4 py-2 rounded font-medium text-white bg-indigo hover:bg-indigo-hover disabled:opacity-40"
         >
           Continue →
         </button>
@@ -401,7 +409,7 @@ function MapStep({
         </button>
         <button
           onClick={onNext}
-          className="text-sm px-4 py-2 rounded font-medium text-white bg-ink-900 hover:bg-ink-900"
+          className="text-sm px-4 py-2 rounded font-medium text-white bg-indigo hover:bg-indigo-hover"
         >
           Continue →
         </button>
@@ -482,6 +490,7 @@ function PreviewStep({
         </div>
       </div>
 
+<<<<<<< claude/condescending-chaum-a724da
       {/* Scrollable table region — actions live in a sticky footer below
           so the user can scroll through long rosters and still see Back /
           Commit at all times. Column widths bias toward Name + Email
@@ -545,34 +554,86 @@ function PreviewStep({
                           {editing === i ? "Cancel" : "Fix"}
                         </button>
                       )}
+=======
+      <table className="w-full text-sm">
+        <thead className="text-xs uppercase tracking-wide text-ink-500 bg-canvas">
+          <tr>
+            <th className="text-left px-4 py-2 font-medium">Name</th>
+            <th className="text-left px-4 py-2 font-medium">Entity</th>
+            <th className="text-left px-4 py-2 font-medium">State</th>
+            <th className="text-left px-4 py-2 font-medium">Email</th>
+            <th className="text-left px-4 py-2 font-medium">Bundle</th>
+            <th className="text-right px-4 py-2 font-medium"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line">
+          {rows.map((r, i) => {
+            const issue = r.issues.length > 0;
+            return (
+              <Fragment key={i}>
+                <tr
+                  className={issue ? "bg-amber-50/50" : "hover:bg-canvas"}
+                >
+                  <td className="px-4 py-2.5 text-ink-900">
+                    {issue && <span className="text-amber-600 mr-1">⚠</span>}
+                    {r.name}
+                  </td>
+                  <td className="px-4 py-2.5 text-ink-700">
+                    {r.entityType ?? (
+                      <span className="text-amber-700">?</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 text-ink-700">
+                    {r.primaryState ?? (
+                      <span className="text-amber-700">?</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 text-ink-700">
+                    {r.email || <span className="text-amber-700">—</span>}
+                  </td>
+                  <td className="px-4 py-2.5 text-ink-700">
+                    {r.bundle ?? <span className="text-ink-400">—</span>}
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    {issue && (
+                      <button
+                        onClick={() => setEditing(editing === i ? null : i)}
+                        className="text-xs px-2 py-1 rounded bg-ink-900 text-white hover:bg-ink-900"
+                      >
+                        {editing === i ? "Cancel" : "Fix inline"}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+                {editing === i && (
+                  <tr className="bg-amber-50">
+                    <td colSpan={6} className="px-4 py-3">
+                      <FixInline
+                        row={r}
+                        onPatch={(patch) => {
+                          onRowFix(i, patch);
+                          // close editor once row has zero issues
+                          const resolved = recomputeIssues({
+                            ...r,
+                            ...patch,
+                          });
+                          if (resolved.length === 0) setEditing(null);
+                        }}
+                      />
+>>>>>>> main
                     </td>
                   </tr>
-                  {editing === i && (
-                    <tr className="bg-amber-50">
-                      <td colSpan={6} className="px-4 py-3">
-                        <FixInline
-                          row={r}
-                          onPatch={(patch) => {
-                            onRowFix(i, patch);
-                            // close editor once row has zero issues
-                            const resolved = recomputeIssues({
-                              ...r,
-                              ...patch,
-                            });
-                            if (resolved.length === 0) setEditing(null);
-                          }}
-                        />
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
+                )}
+              </Fragment>
               );
             })}
           </tbody>
         </table>
-      </div>
 
-      <div className="sticky bottom-0 px-5 py-3 bg-surface border-t border-line rounded-b-lg flex items-center justify-between">
+      {/* Action bar — sticks to the viewport bottom while the user scrolls
+          the table to fix flagged rows. Border-top + surface bg keeps it
+          legible against scrolled content underneath. */}
+      <div className="sticky bottom-0 px-5 py-3 bg-surface border-t border-line rounded-b-lg flex items-center justify-between z-10">
         <button
           onClick={onBack}
           className="text-sm px-3 py-1.5 rounded border border-line bg-surface hover:bg-canvas"
@@ -589,7 +650,7 @@ function PreviewStep({
           <button
             onClick={() => setConfirmOpen(true)}
             disabled={readyCount === 0}
-            className="text-sm px-4 py-2 rounded font-medium text-white bg-ink-900 hover:bg-ink-900 disabled:opacity-40"
+            className="text-sm px-4 py-2 rounded font-medium text-white bg-indigo hover:bg-indigo-hover disabled:opacity-40"
           >
             Commit {readyCount} client{readyCount === 1 ? "" : "s"} →
           </button>
@@ -710,7 +771,7 @@ function FixInline({
 
       <button
         onClick={save}
-        className="text-xs px-3 py-1.5 rounded bg-ink-900 text-white hover:bg-ink-900"
+        className="text-xs px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover"
       >
         Save row
       </button>
@@ -924,7 +985,7 @@ function DoneStep({
       <div className="mt-6 flex items-center justify-center gap-3">
         <button
           onClick={onDashboard}
-          className="text-sm px-4 py-2 rounded font-medium text-white bg-ink-900 hover:bg-ink-900"
+          className="text-sm px-4 py-2 rounded font-medium text-white bg-indigo hover:bg-indigo-hover"
         >
           Go to dashboard →
         </button>

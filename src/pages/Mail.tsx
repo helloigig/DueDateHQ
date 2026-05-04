@@ -253,7 +253,7 @@ export function Mail() {
                 key={r.id}
                 className="flex items-center gap-3 px-2 py-1.5 rounded hover:bg-surface text-sm"
               >
-                <span className="font-mono tabular-nums text-2xs w-10 text-danger-solid font-semibold">
+                <span className="tabular-nums text-2xs w-10 text-danger-solid font-semibold">
                   {r.daysSent != null ? `${r.daysSent}d` : "—"}
                 </span>
                 <span className="font-medium text-ink-900 truncate">
