@@ -320,19 +320,21 @@ export const activityRouter = router({
         .optional(),
     )
     .query(async ({ ctx, input }) => {
-      const params = input ?? {};
-      const limit = params.limit ?? 100;
+      const limit = input?.limit ?? 100;
+      const beforeCreatedAt = input?.beforeCreatedAt;
+      const eventType = input?.eventType;
+      const clientId = input?.clientId;
       const conditions = [eq(activityEvents.firmId, ctx.firmId)];
-      if (params.beforeCreatedAt) {
+      if (beforeCreatedAt) {
         conditions.push(
-          sql`${activityEvents.createdAt} < ${new Date(params.beforeCreatedAt)}`,
+          sql`${activityEvents.createdAt} < ${new Date(beforeCreatedAt)}`,
         );
       }
-      if (params.eventType) {
-        conditions.push(eq(activityEvents.eventType, params.eventType));
+      if (eventType) {
+        conditions.push(eq(activityEvents.eventType, eventType));
       }
-      if (params.clientId) {
-        conditions.push(eq(deadlines.clientId, params.clientId));
+      if (clientId) {
+        conditions.push(eq(deadlines.clientId, clientId));
       }
       const rows = await db
         .select({
