@@ -1,5 +1,5 @@
-import { ChevronDown } from "lucide-react";
-import { Link } from "react-router-dom";
+import { ChevronDown, ArrowLeft } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { signOut, useSession } from "../data/session";
 import {
   DropdownMenu,
@@ -12,11 +12,14 @@ import { BrandBar, HelpButton } from "../pages/auth/AuthShell";
 interface Props {
   step: number; // 1-based
   totalSteps: number;
-  /** Estimated time for this step, e.g. "30s", "60s". Shown next to the step counter. */
-  estimate?: string;
   title: string;
   subtitle?: string;
-  /** Single brand-line that lives below the content — what this product is. */
+  /**
+   * Optional brand-line that lives below the content. Only shown when
+   * passed in by the step page — the shell no longer ships a default
+   * (the previous "We integrate, we don't replace…" copy was preachy
+   * and crowded the funnel without earning its weight).
+   */
   brandLine?: string;
   /**
    * When true, the page renders edge-to-edge (no max-width gutter on the
@@ -24,31 +27,36 @@ interface Props {
    * like the import grid or the package-confirmation table.
    */
   wide?: boolean;
+  /**
+   * Path to navigate to when the user clicks the back arrow in the brand
+   * bar. Defaults to browser back via `navigate(-1)` when omitted. Suppress
+   * the back affordance entirely on step 1 by passing `false`.
+   */
+  back?: string | false;
   children: React.ReactNode;
 }
-
-const DEFAULT_BRAND_LINE =
-  'We integrate, we don\'t replace. Useful Day 1 — no "AI is learning" copy here.';
 
 /**
  * Wizard chrome for the /onboarding/* funnel — Mercury-aligned. Slim brand
  * bar with logo + user dropdown, thin indigo progress under the bar, then a
  * single centered content column. No surrounding card; the page itself is
- * the canvas. Footer is a quiet brand-line + total-time line — kept because
- * the strategic posture matters during the most-vulnerable funnel step.
+ * the canvas. Footer is suppressed when no brand-line is provided.
  */
 export function OnboardingShell({
   step,
   totalSteps,
-  estimate,
   title,
   subtitle,
   brandLine,
   wide,
+  back,
   children,
 }: Props) {
   const session = useSession();
+  const navigate = useNavigate();
   const progress = step / totalSteps;
+  // Show back arrow on step 2+ unless explicitly suppressed.
+  const showBack = back !== false && step > 1;
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
@@ -63,16 +71,24 @@ export function OnboardingShell({
             wide ? "max-w-5xl" : "max-w-2xl",
           ].join(" ")}
         >
-          <div className="flex items-center gap-2 text-2xs uppercase tracking-[0.18em] text-indigo font-semibold">
+          <div className="flex items-center gap-3 text-2xs uppercase tracking-[0.18em] text-indigo font-semibold">
+            {showBack && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof back === "string") navigate(back);
+                  else navigate(-1);
+                }}
+                className="inline-flex items-center gap-1 text-ink-500 hover:text-ink-900 transition-colors normal-case tracking-normal font-medium"
+                aria-label="Back to previous step"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" aria-hidden />
+                <span>Back</span>
+              </button>
+            )}
             <span>
               Step {step} of {totalSteps}
             </span>
-            {estimate && (
-              <>
-                <span className="text-ink-300">·</span>
-                <span className="text-ink-500 font-medium">{estimate}</span>
-              </>
-            )}
           </div>
           <h1 className="text-display font-semibold text-ink-900 mt-3">
             {title}
@@ -85,18 +101,18 @@ export function OnboardingShell({
           <div className="mt-8">{children}</div>
         </div>
       </main>
-      <footer className="border-t border-line">
-        <div
-          className={[
-            "mx-auto px-6 py-4 text-2xs",
-            wide ? "max-w-5xl" : "max-w-2xl",
-          ].join(" ")}
-        >
-          <p className="text-ink-500 italic leading-snug">
-            {brandLine ?? DEFAULT_BRAND_LINE}
-          </p>
-        </div>
-      </footer>
+      {brandLine && (
+        <footer className="border-t border-line">
+          <div
+            className={[
+              "mx-auto px-6 py-4 text-2xs",
+              wide ? "max-w-5xl" : "max-w-2xl",
+            ].join(" ")}
+          >
+            <p className="text-ink-500 italic leading-snug">{brandLine}</p>
+          </div>
+        </footer>
+      )}
       <HelpButton />
     </div>
   );

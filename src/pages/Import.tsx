@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useCommitImport } from "../hooks/useImports";
 import {
   DETECTED_ROWS,
@@ -69,11 +69,8 @@ export function Import() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 md:px-6 py-6">
-      <Link to="/clients" className="text-sm text-ink-500 hover:underline">
-        ‹ Clients
-      </Link>
-      <h1 className="mt-3 text-xl font-semibold text-ink-900">
+    <div className="max-w-5xl mx-auto px-4 md:px-6 py-6">
+      <h1 className="text-xl font-semibold text-ink-900">
         Import clients from CSV
       </h1>
 
@@ -288,35 +285,11 @@ function UploadStep({
         </div>
       )}
 
-      <div className="mt-5 text-xs text-ink-500 leading-relaxed">
-        <div className="font-medium text-ink-700 mb-1">Where to export from</div>
-        <ul className="space-y-0.5 text-ink-500 list-disc pl-5">
-          <li>
-            <span className="text-ink-700">File In Time</span> — Reports →
-            Client List → Export to CSV
-          </li>
-          <li>
-            <span className="text-ink-700">TaxDome</span> — Clients → ⋯ → Export
-            to CSV
-          </li>
-          <li>
-            <span className="text-ink-700">Drake</span> — Tools → Export Client
-            List
-          </li>
-          <li>
-            <span className="text-ink-700">ProConnect</span> — Settings → Export
-            Client Information
-          </li>
-          <li>
-            <span className="text-ink-700">QuickBooks Online</span> — Sales →
-            Customers → Export to Excel
-          </li>
-        </ul>
-        <p className="mt-2">
-          Any other CSV with name + entity + state works — you'll confirm the
-          column mapping in the next step.
-        </p>
-      </div>
+      <p className="mt-5 text-xs text-ink-500 leading-relaxed">
+        Export clients as CSV from File In Time, TaxDome, Drake, ProConnect,
+        or QuickBooks Online — or any spreadsheet with name + entity + state.
+        You'll confirm the column mapping in the next step.
+      </p>
 
       <div className="mt-6 flex items-center justify-between">
         <button
@@ -504,12 +477,12 @@ function PreviewStep({
       <div className="max-h-[480px] overflow-y-auto">
         <table className="w-full text-sm table-fixed">
           <colgroup>
-            <col className="w-[28%]" />
-            <col className="w-[12%]" />
-            <col className="w-[10%]" />
             <col className="w-[26%]" />
-            <col className="w-[16%]" />
+            <col className="w-[11%]" />
             <col className="w-[8%]" />
+            <col className="w-[22%]" />
+            <col className="w-[22%]" />
+            <col className="w-[11%]" />
           </colgroup>
           <thead className="text-xs uppercase tracking-wide text-ink-500 bg-canvas sticky top-0 z-10">
             <tr>

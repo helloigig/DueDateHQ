@@ -51,10 +51,8 @@ export function OnboardingDone() {
     <OnboardingShell
       step={3}
       totalSteps={3}
-      estimate="done"
       title="You're set up."
       subtitle="Here's what just lit up — every number below is real, not a promise."
-      brandLine="Connecting one more source (QuickBooks, Gmail, or a prior return) compounds the value. Never required, always optional."
     >
       <div className="space-y-5">
         {/* What's working */}
