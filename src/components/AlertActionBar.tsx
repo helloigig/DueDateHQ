@@ -50,7 +50,7 @@ export function AlertActionBar({
       <button
         onClick={() => onAction(cfg.primaryAction)}
         disabled={primaryDisabled}
-        className="px-4 py-2 rounded bg-ink-900 text-white text-sm font-medium hover:bg-ink-900 disabled:opacity-40 disabled:cursor-not-allowed"
+        className="px-4 py-2 rounded bg-indigo text-white text-sm font-medium hover:bg-indigo-hover disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {primaryLabel}
       </button>

@@ -301,7 +301,7 @@ function UploadStep({
         <button
           disabled={!hasFile}
           onClick={onNext}
-          className="text-sm px-4 py-2 rounded font-medium text-white bg-ink-900 hover:bg-ink-900 disabled:opacity-40"
+          className="text-sm px-4 py-2 rounded font-medium text-white bg-indigo hover:bg-indigo-hover disabled:opacity-40"
         >
           Continue →
         </button>
@@ -390,7 +390,7 @@ function MapStep({
         </button>
         <button
           onClick={onNext}
-          className="text-sm px-4 py-2 rounded font-medium text-white bg-ink-900 hover:bg-ink-900"
+          className="text-sm px-4 py-2 rounded font-medium text-white bg-indigo hover:bg-indigo-hover"
         >
           Continue →
         </button>
@@ -528,7 +528,7 @@ function PreviewStep({
                       {issue && (
                         <button
                           onClick={() => setEditing(editing === i ? null : i)}
-                          className="text-xs px-2 py-1 rounded bg-ink-900 text-white hover:bg-ink-900"
+                          className="text-xs px-2 py-1 rounded bg-indigo text-white hover:bg-indigo-hover"
                         >
                           {editing === i ? "Cancel" : "Fix"}
                         </button>
@@ -577,7 +577,7 @@ function PreviewStep({
           <button
             onClick={() => setConfirmOpen(true)}
             disabled={readyCount === 0}
-            className="text-sm px-4 py-2 rounded font-medium text-white bg-ink-900 hover:bg-ink-900 disabled:opacity-40"
+            className="text-sm px-4 py-2 rounded font-medium text-white bg-indigo hover:bg-indigo-hover disabled:opacity-40"
           >
             Commit {readyCount} client{readyCount === 1 ? "" : "s"} →
           </button>
@@ -698,7 +698,7 @@ function FixInline({
 
       <button
         onClick={save}
-        className="text-xs px-3 py-1.5 rounded bg-ink-900 text-white hover:bg-ink-900"
+        className="text-xs px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover"
       >
         Save row
       </button>
@@ -912,7 +912,7 @@ function DoneStep({
       <div className="mt-6 flex items-center justify-center gap-3">
         <button
           onClick={onDashboard}
-          className="text-sm px-4 py-2 rounded font-medium text-white bg-ink-900 hover:bg-ink-900"
+          className="text-sm px-4 py-2 rounded font-medium text-white bg-indigo hover:bg-indigo-hover"
         >
           Go to dashboard →
         </button>

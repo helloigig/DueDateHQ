@@ -100,7 +100,7 @@ export function AiUsageInfo() {
         <Modal.Footer>
           <button
             onClick={() => setOpen(false)}
-            className="px-4 py-2 rounded bg-ink-900 text-canvas text-sm hover:bg-ink-700"
+            className="px-4 py-2 rounded bg-indigo text-white text-sm hover:bg-indigo-hover"
           >
             Got it
           </button>

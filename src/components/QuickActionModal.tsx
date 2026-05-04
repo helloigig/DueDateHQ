@@ -169,7 +169,7 @@ export function QuickActionModal({
               </button>
               <button
                 onClick={onDeferSubmit}
-                className="text-sm px-3 py-1.5 rounded bg-ink-900 text-white hover:bg-ink-900"
+                className="text-sm px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover"
               >
                 Defer
               </button>
@@ -200,7 +200,7 @@ export function QuickActionModal({
               <button
                 onClick={onNoteSubmit}
                 disabled={!note.trim()}
-                className="text-sm px-3 py-1.5 rounded bg-ink-900 text-white hover:bg-ink-900 disabled:opacity-40"
+                className="text-sm px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40"
               >
                 Save note
               </button>
