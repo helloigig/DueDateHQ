@@ -10,6 +10,7 @@ import {
   Pencil,
   RefreshCw,
   Send,
+  ShieldCheck,
   Sparkles,
   X,
 } from "lucide-react";
@@ -34,6 +35,7 @@ import { env } from "@/config";
 import type { Announcement } from "@/types";
 import { cn } from "@/lib/utils";
 import { EmailBulletinEditModal } from "@/components/EmailBulletinEditModal";
+import { NexusCheckModal } from "@/components/NexusCheckModal";
 
 /**
  * /alerts — the v0u differentiator surface, rendered exact to spec:
@@ -178,6 +180,7 @@ function CopilotPane({
   onEditDraft,
   onSendBulletin,
   onApplyDeadline,
+  onRunNexusCheck,
   onSnooze,
   onMarkNotApplicable,
   isSending,
@@ -199,6 +202,7 @@ function CopilotPane({
     recipients: Array<{ clientId: string; subject: string; body: string }>,
   ) => void;
   onApplyDeadline: (announcement: Announcement) => void;
+  onRunNexusCheck: (announcement: Announcement) => void;
   onSnooze: (announcement: Announcement) => void;
   onMarkNotApplicable: (announcement: Announcement) => void;
   isSending: boolean;
@@ -466,6 +470,16 @@ function CopilotPane({
               }}
             />
           )}
+
+          {a.type === "nexus_change" && includedCount > 0 && (
+            <ActionRow
+              icon={<ShieldCheck className="w-3.5 h-3.5" aria-hidden />}
+              title="Run nexus check"
+              description={`Per-state questionnaire for ${includedCount} ${includedCount === 1 ? "client" : "clients"} · adds suggested filings on established`}
+              cta="Open"
+              onClick={() => onRunNexusCheck(a)}
+            />
+          )}
         </div>
       </div>
 
@@ -519,6 +533,12 @@ export function Alerts() {
   const snoozeMutation = trpc.announcements.snooze.useMutation({
     onSuccess: () => {
       void utils.announcements.list.invalidate();
+    },
+  });
+  const runNexusCheckMutation = trpc.alertActions.runNexusCheck.useMutation();
+  const addNexusFilingsMutation = trpc.alertActions.addNexusFilings.useMutation({
+    onSuccess: () => {
+      void utils.deadlines.listForTriage.invalidate();
     },
   });
   // sendBulletinEmails is a recently-added BE procedure — the FE router
@@ -579,6 +599,11 @@ export function Alerts() {
     subject: string;
     body: string;
   } | null>(null);
+  // Nexus modal state — set when the CopilotPane "Run nexus check" action
+  // is fired. Carries the announcement so the modal can derive state +
+  // affected clients itself.
+  const [nexusForAnnouncement, setNexusForAnnouncement] =
+    useState<Announcement | null>(null);
 
   // Session-scoped state.
   // - handledIds: alerts the CPA has acted on this session (Send all,
@@ -806,6 +831,79 @@ export function Alerts() {
     [dismissMutation, handleComplete],
   );
 
+  const handleRunNexusCheck = useCallback(
+    (a: Announcement) => {
+      setNexusForAnnouncement(a);
+    },
+    [],
+  );
+
+  // Per-client confirm callback fired by NexusCheckModal as the CPA cycles
+  // through affected clients. Each call writes a nexus_questionnaire_run +
+  // upserts client_state_nexus.status. When filings are selected, also
+  // batch-adds them as deadlines (yellow-zone — CPA-initiated). The modal
+  // advances itself client-by-client; we only flip the alert to handled
+  // when it closes (handleNexusClose below).
+  const handleNexusConfirm = useCallback(
+    async (input: {
+      clientId: string;
+      answers: Record<string, boolean>;
+      selectedFilings: string[];
+      notifyOnly: boolean;
+    }) => {
+      const a = nexusForAnnouncement;
+      if (!a) return;
+      if (input.notifyOnly) {
+        toast.info("Notification queued · no filings added");
+        return;
+      }
+      try {
+        const checkResult = await runNexusCheckMutation.mutateAsync({
+          announcementId: a.id,
+          clientId: input.clientId,
+          state: a.stateCode,
+          // V1 maps every nexus_change alert to "sales" — when the BE
+          // surfaces nexusKind on the announcement payload, thread it
+          // through here.
+          nexusKind: "sales" as const,
+          answers: input.answers,
+        });
+        if (
+          checkResult.status === "established" &&
+          input.selectedFilings.length > 0
+        ) {
+          const addResult = await addNexusFilingsMutation.mutateAsync({
+            announcementId: a.id,
+            clientId: input.clientId,
+            state: a.stateCode,
+            filings: input.selectedFilings.map((formCode) => ({
+              formCode,
+              formName: formCode,
+            })),
+          });
+          toast.success(
+            `${addResult.filingsAdded} ${addResult.filingsAdded === 1 ? "filing" : "filings"} added · Undo (24h)`,
+          );
+        } else {
+          toast.success(
+            `Nexus check saved — ${checkResult.status.replace(/_/g, " ")}`,
+          );
+        }
+      } catch (err) {
+        toast.error(
+          `Couldn't run nexus check — ${err instanceof Error ? err.message : "try again"}`,
+        );
+      }
+    },
+    [nexusForAnnouncement, runNexusCheckMutation, addNexusFilingsMutation],
+  );
+
+  const handleNexusClose = useCallback(() => {
+    const a = nexusForAnnouncement;
+    setNexusForAnnouncement(null);
+    if (a) handleComplete(a.id);
+  }, [nexusForAnnouncement, handleComplete]);
+
   return (
     <PageContainer variant="workshop">
       {/* ── Center feed ──────────────────────────────────────────────── */}
@@ -904,6 +1002,7 @@ export function Alerts() {
         onEditDraft={handleEditDraft}
         onSendBulletin={handleSendBulletin}
         onApplyDeadline={handleApplyDeadline}
+        onRunNexusCheck={handleRunNexusCheck}
         onSnooze={handleSnooze}
         onMarkNotApplicable={handleMarkNotApplicable}
         isSending={sendBulletinMutation.isPending}
@@ -921,6 +1020,21 @@ export function Alerts() {
           onClose={() => setEditing(null)}
         />
       )}
+      <NexusCheckModal
+        open={nexusForAnnouncement !== null}
+        announcement={nexusForAnnouncement}
+        recipients={
+          nexusForAnnouncement
+            ? affectedClientsFor(nexusForAnnouncement, clientSource).filter(
+                (c) =>
+                  !(excludedByAlert.get(nexusForAnnouncement.id) ?? new Set())
+                    .has(c.id),
+              )
+            : []
+        }
+        onClose={handleNexusClose}
+        onConfirm={handleNexusConfirm}
+      />
     </PageContainer>
   );
 }
