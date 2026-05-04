@@ -1,6 +1,11 @@
-import { actions } from "../data/store";
 import { toaster } from "./toasts";
-import type { ChecklistItem } from "../types";
+import type { ChecklistItem, DocumentState } from "../types";
+
+type SetState = (
+  itemId: string,
+  next: DocumentState,
+  actor?: "cpa" | "ai" | "system",
+) => void;
 
 /**
  * Wrap a Confirm action with a 5-second undo window. Captures the prior
@@ -9,15 +14,15 @@ import type { ChecklistItem } from "../types";
  * §5.3 invariant audit trail records both events honestly — confirmation
  * + reversal — rather than papering over the original action).
  */
-export function confirmWithUndo(item: ChecklistItem) {
+export function confirmWithUndo(item: ChecklistItem, setState: SetState) {
   const prevState = item.state;
-  actions.setChecklistItemState(item.id, "received_confirmed", "cpa");
+  setState(item.id, "received_confirmed", "cpa");
 
   toaster.show({
     message: `Confirmed ${item.label}`,
     undoLabel: "Undo",
     undoAction: () => {
-      actions.setChecklistItemState(item.id, prevState, "cpa");
+      setState(item.id, prevState, "cpa");
     },
     durationMs: 5000,
   });
@@ -28,12 +33,12 @@ export function confirmWithUndo(item: ChecklistItem) {
  * prior states up-front so undo restores each item's exact previous state
  * (some may have been received_unreviewed, others received_issue, etc.).
  */
-export function confirmAllWithUndo(items: ChecklistItem[]) {
+export function confirmAllWithUndo(items: ChecklistItem[], setState: SetState) {
   if (items.length === 0) return;
   const snapshot = items.map((i) => ({ id: i.id, prevState: i.state }));
 
   for (const i of items) {
-    actions.setChecklistItemState(i.id, "received_confirmed", "cpa");
+    setState(i.id, "received_confirmed", "cpa");
   }
 
   toaster.show({
@@ -43,7 +48,7 @@ export function confirmAllWithUndo(items: ChecklistItem[]) {
     undoLabel: "Undo all",
     undoAction: () => {
       for (const s of snapshot) {
-        actions.setChecklistItemState(s.id, s.prevState, "cpa");
+        setState(s.id, s.prevState, "cpa");
       }
     },
     durationMs: 5000,

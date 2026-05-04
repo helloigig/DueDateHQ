@@ -7,7 +7,8 @@ import {
 } from "react-router-dom";
 import { actions, useStore } from "../data/store";
 import { trpc } from "../lib/api/client";
-import { useClient } from "../hooks/useClients";
+import { env } from "../config";
+import { useClient, useAddNote } from "../hooks/useClients";
 import { useDeadlinesForClient } from "../hooks/useDeadlines";
 import { useTasksForClient } from "../hooks/useTasks";
 import {
@@ -572,6 +573,7 @@ function NotesTab({ client }: { client: Client }) {
   const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
   const notes = client.noteEntries ?? [];
+  const addNoteMutation = useAddNote();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -586,7 +588,11 @@ function NotesTab({ client }: { client: Client }) {
   const onAdd = () => {
     const body = draft.trim();
     if (!body) return;
-    actions.addNote(client.id, body);
+    if (env.useMockData) {
+      actions.addNote(client.id, body);
+    } else {
+      addNoteMutation.mutate({ clientId: client.id, body });
+    }
     setDraft("");
   };
 

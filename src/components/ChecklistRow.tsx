@@ -9,7 +9,7 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import type { ChecklistItem, DocumentState } from "../types";
-import { actions } from "../data/store";
+import { useSetChecklistItemState } from "../hooks/useChecklist";
 import { confirmWithUndo } from "../lib/confirmWithUndo";
 
 /**
@@ -83,6 +83,7 @@ export function ChecklistRow({ item, onOpenEmailDraft }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [pulse, setPulse] = useState(false);
   const prevState = useRef<DocumentState>(item.state);
+  const setState = useSetChecklistItemState();
   // Pulse when this row's state advances to received_confirmed — the §5.3
   // invariant moment. Honours prefers-reduced-motion via the keyframe rule.
   useEffect(() => {
@@ -100,23 +101,23 @@ export function ChecklistRow({ item, onOpenEmailDraft }: Props) {
   const onConfirm = () => {
     // PRD §5.3 invariant — only "cpa" actor permitted here.
     // confirmWithUndo wraps this with a 5-sec undo window.
-    confirmWithUndo(item);
+    confirmWithUndo(item, setState);
   };
   const onReject = () => {
-    actions.setChecklistItemState(item.id, "requested_waiting", "cpa");
+    setState(item.id, "requested_waiting", "cpa");
   };
   const onRestore = () => {
-    actions.setChecklistItemState(item.id, "not_requested", "cpa");
+    setState(item.id, "not_requested", "cpa");
   };
   const onMarkNA = () => {
-    actions.setChecklistItemState(item.id, "not_applicable", "cpa");
+    setState(item.id, "not_applicable", "cpa");
   };
   const onConfirmAnyway = () => {
-    confirmWithUndo(item);
+    confirmWithUndo(item, setState);
   };
   const onMarkIssue = () => {
     // No-op state change — UI just keeps it as `received_issue`.
-    actions.setChecklistItemState(item.id, "received_issue", "cpa");
+    setState(item.id, "received_issue", "cpa");
   };
 
   const labelStrike =

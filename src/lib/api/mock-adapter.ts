@@ -847,18 +847,44 @@ export const mockAdapter = {
       return { ok: true as const };
     },
     batchAdjustDeadlines: async (input: {
-      clientIds: string[];
-      oldDate: string;
-      newDate: string;
+      // Backend signature: { id }. Mock pulls affected clients +
+      // newDeadline from the announcement so the call site matches the
+      // real-mode tRPC contract.
+      id?: string;
+      // Legacy direct signature still supported for older callers
+      // (BatchNotifyModal, AnnouncementDetail) until they migrate to
+      // useBatchAdjustFromAnnouncement.
+      clientIds?: string[];
+      oldDate?: string;
+      newDate?: string;
       announcementTitle?: string;
     }) => {
       await delay(200);
-      actions.batchAdjustDeadlines(
-        input.clientIds,
-        input.oldDate,
-        input.newDate,
-        input.announcementTitle
-      );
+      if (input.id && !input.clientIds) {
+        const a = getState().announcements.find((x) => x.id === input.id);
+        if (!a || !a.newDeadline) {
+          return { ok: true as const, deadlinesUpdated: 0 };
+        }
+        actions.batchAdjustDeadlines(
+          a.affectedClientIds,
+          a.oldDeadline ?? "",
+          a.newDeadline,
+          a.title,
+        );
+        actions.markAnnouncementRead(a.id);
+        return {
+          ok: true as const,
+          deadlinesUpdated: a.affectedClientIds.length,
+        };
+      }
+      if (input.clientIds && input.oldDate && input.newDate) {
+        actions.batchAdjustDeadlines(
+          input.clientIds,
+          input.oldDate,
+          input.newDate,
+          input.announcementTitle,
+        );
+      }
       return { ok: true as const };
     },
     detect: async () => {
@@ -894,6 +920,61 @@ export const mockAdapter = {
     rejectScraped: async () => {
       await delay();
       return { ok: true as const };
+    },
+    sendBulletinEmails: async (input: {
+      announcementId: string;
+      recipients: Array<{ clientId: string; subject: string; body: string }>;
+    }) => {
+      await delay(300);
+      const sent: Array<{ clientId: string; draftId: string }> = [];
+      const skipped: Array<{ clientId: string; reason: string }> = [];
+      const { clients, tasks } = getState();
+      const clientById = new Map(clients.map((c) => [c.id, c]));
+      const taskByClient = new Map<string, string>();
+      for (const t of tasks) {
+        if (!taskByClient.has(t.clientId)) taskByClient.set(t.clientId, t.id);
+      }
+      for (const r of input.recipients) {
+        const c = clientById.get(r.clientId);
+        if (!c) {
+          skipped.push({ clientId: r.clientId, reason: "client_not_in_firm" });
+          continue;
+        }
+        if (!c.contactEmail) {
+          skipped.push({ clientId: r.clientId, reason: "no_email" });
+          continue;
+        }
+        const taskId = taskByClient.get(r.clientId);
+        if (!taskId) {
+          skipped.push({ clientId: r.clientId, reason: "no_task" });
+          continue;
+        }
+        const id = actions.saveEmailDraft({
+          taskId,
+          clientId: r.clientId,
+          to: c.contactEmail,
+          cc: "",
+          subject: r.subject,
+          body: r.body,
+          tone: "formal",
+          aiSources: [
+            {
+              kind: "substrate",
+              note: `state announcement ${input.announcementId}`,
+            },
+          ],
+          status: "draft",
+          sendMethod: "cpa_send",
+        });
+        actions.sendEmail(id);
+        sent.push({ clientId: r.clientId, draftId: id });
+      }
+      return {
+        sentCount: sent.length,
+        skippedCount: skipped.length,
+        sent,
+        skipped,
+      };
     },
   },
 

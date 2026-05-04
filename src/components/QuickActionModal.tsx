@@ -5,6 +5,8 @@ import { actions } from "../data/store";
 import { bundleById } from "../data/bundles";
 import { formatLongDate, toIso, addDays, TODAY } from "../data/dateHelpers";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { useAddNote } from "../hooks/useClients";
+import { env } from "../config";
 
 type Mode = "choose" | "defer" | "note";
 
@@ -24,6 +26,7 @@ export function QuickActionModal({
     toIso(addDays(TODAY, 14))
   );
   const [note, setNote] = useState<string>("");
+  const addNoteMutation = useAddNote();
 
   useEffect(() => {
     if (open) {
@@ -65,7 +68,15 @@ export function QuickActionModal({
   const onNoteSubmit = () => {
     const body = note.trim();
     if (!body) return;
-    actions.addNote(client.id, body, deadline.id);
+    if (env.useMockData) {
+      actions.addNote(client.id, body, deadline.id);
+    } else {
+      addNoteMutation.mutate({
+        clientId: client.id,
+        body,
+        relatedDeadlineId: deadline.id,
+      });
+    }
     close();
   };
 
