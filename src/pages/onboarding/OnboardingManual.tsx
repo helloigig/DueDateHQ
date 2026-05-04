@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Plus, X } from "lucide-react";
 import { OnboardingShell } from "../../components/OnboardingShell";
+import {
+  AuthField,
+  AuthInput,
+  PrimaryButton,
+  SecondaryButton,
+  authInputClass,
+} from "../auth/AuthShell";
 import { actions } from "../../data/store";
 import type { EntityType, StateCode } from "../../types";
 
@@ -67,28 +75,28 @@ export function OnboardingManual() {
       title="Add your first clients"
       subtitle="Five rows is plenty to get started. You can add more anytime from Clients."
       brandLine="Quick-add takes < 60 seconds per client. AI suggests a service package automatically."
+      wide
     >
       <div className="space-y-3">
         {drafts.map((d, i) => (
           <div
             key={i}
-            className="bg-surface border border-line rounded-md p-3 grid grid-cols-1 md:grid-cols-[1fr_140px_100px_1fr_auto] gap-2 items-end"
+            className="bg-canvas border border-line rounded-md p-4 grid grid-cols-1 md:grid-cols-[1.4fr_140px_110px_1.6fr_auto] gap-4 items-end"
           >
-            <Field label="Name">
-              <input
+            <AuthField label="Name">
+              <AuthInput
                 value={d.name}
                 onChange={(e) => update(i, { name: e.target.value })}
                 placeholder="Emily Hartfield"
-                className="w-full border border-line rounded px-2 py-1.5 text-sm"
               />
-            </Field>
-            <Field label="Entity">
+            </AuthField>
+            <AuthField label="Entity">
               <select
                 value={d.entityType}
                 onChange={(e) =>
                   update(i, { entityType: e.target.value as EntityType })
                 }
-                className="w-full border border-line rounded px-2 py-1.5 text-sm bg-surface"
+                className={authInputClass}
               >
                 {ENTITIES.map((e) => (
                   <option key={e} value={e}>
@@ -96,14 +104,14 @@ export function OnboardingManual() {
                   </option>
                 ))}
               </select>
-            </Field>
-            <Field label="State">
+            </AuthField>
+            <AuthField label="State">
               <select
                 value={d.primaryState}
                 onChange={(e) =>
                   update(i, { primaryState: e.target.value as StateCode })
                 }
-                className="w-full border border-line rounded px-2 py-1.5 text-sm bg-surface"
+                className={authInputClass}
               >
                 {(["CA", "NY", "TX", "FL", "LA"] as StateCode[]).map((s) => (
                   <option key={s} value={s}>
@@ -111,60 +119,44 @@ export function OnboardingManual() {
                   </option>
                 ))}
               </select>
-            </Field>
-            <Field label="Email">
-              <input
+            </AuthField>
+            <AuthField label="Email">
+              <AuthInput
+                type="email"
                 value={d.contactEmail}
                 onChange={(e) => update(i, { contactEmail: e.target.value })}
                 placeholder="emily@example.com"
-                className="w-full border border-line rounded px-2 py-1.5 text-sm"
               />
-            </Field>
+            </AuthField>
             <button
               onClick={() => remove(i)}
               disabled={drafts.length === 1}
-              className="text-xs text-ink-500 hover:text-ink-900 px-2 py-1.5 disabled:opacity-30"
+              className="text-xs text-ink-500 hover:text-danger-ink disabled:opacity-30 inline-flex items-center gap-1 px-2 py-2 self-end"
+              aria-label={`Remove row ${i + 1}`}
             >
-              Remove
+              <X className="w-3.5 h-3.5" aria-hidden />
+              <span>Remove</span>
             </button>
           </div>
         ))}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={add}
-            className="text-sm px-3 py-1.5 rounded border border-line text-ink-700 hover:bg-sunken"
-          >
-            + Add another
-          </button>
+        <div className="flex items-center gap-3 pt-2">
+          <SecondaryButton onClick={add}>
+            <Plus className="w-3.5 h-3.5" aria-hidden /> Add another
+          </SecondaryButton>
           <span className="ml-auto text-xs text-ink-500">
             {valid.length} ready
           </span>
-          <button
+          <PrimaryButton
             onClick={submit}
-            disabled={valid.length === 0 || submitting}
-            className="text-sm px-4 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={valid.length === 0}
+            loading={submitting}
           >
-            {submitting ? "Adding…" : `Add ${valid.length} & continue`}
-          </button>
+            {submitting
+              ? "Adding"
+              : `Add ${valid.length} & continue`}
+          </PrimaryButton>
         </div>
       </div>
     </OnboardingShell>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block">
-      <span className="text-2xs uppercase tracking-wider text-ink-500 font-semibold block mb-1">
-        {label}
-      </span>
-      {children}
-    </label>
   );
 }

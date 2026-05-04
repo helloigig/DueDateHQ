@@ -1,12 +1,13 @@
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { OnboardingShell } from "../../components/OnboardingShell";
+import { PrimaryButton } from "../auth/AuthShell";
 import { Import } from "../Import";
 import { useStore } from "../../data/store";
 
 /**
  * Wraps the existing Import page inside the wizard chrome. The Import page
- * already has CSV detect / map / preview / commit; we just provide a
- * back-link and a continue affordance via the existing flow.
+ * already has CSV detect / map / preview / commit; we just provide a back-link
+ * and a continue affordance via the existing flow.
  */
 export function OnboardingImport() {
   return (
@@ -17,36 +18,31 @@ export function OnboardingImport() {
       title="Upload your client roster"
       subtitle="Drag a CSV from File In Time, TaxDome, Drake, ProConnect, QuickBooks, or plain Excel. AI maps the columns; you confirm. AI handles ambiguous rows by surfacing them inline."
       brandLine="Import Tier 1 — the only mandatory upload. Tiers 2-4 are optional capability unlocks later."
+      wide
     >
       <ImportWithContinue />
     </OnboardingShell>
   );
 }
 
-/**
- * Wraps Import with a contextual "Continue" affordance that appears once the
- * roster has clients. Avoids stranding the user inside the inner Import flow.
- */
 function ImportWithContinue() {
+  const navigate = useNavigate();
   const { clients } = useStore();
   const hasClients = clients.length > 0;
   return (
     <>
-      <div className="bg-surface border border-line rounded-md p-2">
+      <div className="bg-canvas border border-line rounded-md p-3">
         <Import />
       </div>
       {hasClients && (
-        <div className="mt-4 bg-info-bg border border-info-border rounded-md px-4 py-3 flex items-center gap-3">
-          <p className="text-sm text-info-ink flex-1">
+        <div className="mt-5 bg-indigo-soft/50 border border-indigo/30 rounded-md px-5 py-4 flex items-center gap-4 flex-wrap">
+          <p className="text-sm text-indigo-ink flex-1 min-w-0 leading-relaxed">
             <span className="font-semibold">{clients.length} clients in.</span>{" "}
             Next: confirm AI-suggested service packages so deadlines auto-generate.
           </p>
-          <Link
-            to="/onboarding/packages"
-            className="text-sm px-4 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover whitespace-nowrap"
-          >
-            Continue →
-          </Link>
+          <PrimaryButton onClick={() => navigate("/onboarding/packages")}>
+            Continue
+          </PrimaryButton>
         </div>
       )}
     </>
