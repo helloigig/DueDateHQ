@@ -64,6 +64,13 @@
       "when": 1777594000000,
       "tag": "0008_client_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777595000000,
+      "tag": "0009_task_actions",
+      "breakpoints": true
     }
   ]
 }
