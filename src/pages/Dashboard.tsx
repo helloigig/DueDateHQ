@@ -404,6 +404,7 @@ function StateAlertsPreview({
   announcements: Announcement[];
 }) {
   const navigate = useNavigate();
+  const clientsQuery = useClients();
 
   // Empty: monitoring assurance, calm.
   if (announcements.length === 0) {
@@ -510,6 +511,7 @@ function StateAlertsPreview({
             a={a}
             variant="preview"
             onSelect={() => navigate(`/alerts/${a.id}`)}
+            clientSource={clientsQuery.data?.items}
           />
         ))}
       </div>

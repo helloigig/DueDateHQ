@@ -884,6 +884,7 @@ export function Alerts() {
                 handled={handledIds.has(a.id)}
                 onSelect={() => handleSelect(a.id)}
                 onComplete={handleComplete}
+                clientSource={clientSource}
               />
             ))
           )}
