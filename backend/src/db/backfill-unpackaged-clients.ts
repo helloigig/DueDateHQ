@@ -16,19 +16,22 @@
  * script reports `skipped_no_match` for each row — same failure mode
  * that left them unpackaged in the first place.
  */
-import { and, eq, isNull, or } from "drizzle-orm";
+import { eq, isNull, or } from "drizzle-orm";
 import { db } from "./client.js";
 import { clients, deadlines, servicePackages } from "./schema.js";
 import { seedClientWithPackage } from "../lib/client-package-seeder.js";
+import { entityTypeMatches } from "../lib/entity-type.js";
 
 function pickSuggestedPackage(
   all: Array<typeof servicePackages.$inferSelect>,
   entityType: string,
   primaryState: string,
 ): (typeof servicePackages.$inferSelect) | null {
+  // Same case-insensitive matching as imports.ts pickSuggestedPackage —
+  // see backend/src/lib/entity-type.ts for the normalisation rationale.
   const matches = all.filter(
     (p) =>
-      p.applicableEntityTypes.includes(entityType) &&
+      entityTypeMatches(p.applicableEntityTypes, entityType) &&
       (p.applicableStates === null ||
         p.applicableStates.includes(primaryState)),
   );
