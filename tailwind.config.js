@@ -35,7 +35,7 @@ export default {
           hover: "#1E293B",
         },
 
-        // New design-system accent (per docs/design-system.md §2)
+        // Design-system accent (per DESIGN.md §Taste principles T2 + §Colors).
         // Indigo — reserved for "the next action" only (T2: one accent, one
         // viewport, one action).
         indigo: {

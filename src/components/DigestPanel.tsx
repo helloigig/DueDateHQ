@@ -52,7 +52,7 @@ export function DigestPanel() {
           <button
             onClick={onGenerate}
             disabled={generate.isPending}
-            className="ml-auto text-xs px-3 py-1 rounded bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 inline-flex items-center gap-1"
+            className="ml-auto text-xs px-3 py-1 rounded bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40 inline-flex items-center gap-1"
           >
             {generate.isPending
               ? "Generating…"

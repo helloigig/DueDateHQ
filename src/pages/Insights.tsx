@@ -184,7 +184,7 @@ export function Insights() {
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         <Link
                           to={`/clients/${client.id}`}
-                          className="text-2xs px-2 py-0.5 rounded bg-accent text-canvas hover:bg-accent-hover"
+                          className="text-2xs px-2 py-0.5 rounded bg-indigo text-white hover:bg-indigo-hover"
                         >
                           Open client
                         </Link>

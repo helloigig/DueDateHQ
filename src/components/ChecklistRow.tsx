@@ -351,7 +351,7 @@ function StateActions({
       return (
         <button
           onClick={() => onOpenEmailDraft(item.id, "send_reminder")}
-          className={`${sm} border-accent bg-accent text-canvas hover:bg-accent-hover flex items-center gap-1`}
+          className={`${sm} border-indigo bg-indigo text-white hover:bg-indigo-hover flex items-center gap-1`}
         >
           <Mail className="w-3 h-3" aria-hidden /> Send reminder now
         </button>
@@ -392,7 +392,7 @@ function StateActions({
           </button>
           <button
             onClick={() => onOpenEmailDraft(item.id, "ask_client")}
-            className={`${sm} border-accent bg-accent text-canvas hover:bg-accent-hover flex items-center gap-1`}
+            className={`${sm} border-indigo bg-indigo text-white hover:bg-indigo-hover flex items-center gap-1`}
           >
             <Mail className="w-3 h-3" aria-hidden /> Ask client
           </button>

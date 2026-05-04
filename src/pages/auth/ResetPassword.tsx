@@ -2,19 +2,15 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { trpc } from "../../lib/api/client";
 import { resetPasswordSchema } from "../../types/schemas";
-import {
-  AuthShell,
-  AuthField,
-  AuthInput,
-  PrimaryButton,
-  FormError,
-} from "./AuthShell";
+import { AuthShell, AuthField, authInputClass } from "./AuthShell";
 import { env } from "../../config";
 import { supabase } from "../../lib/supabase";
 
 export function ResetPassword() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  // Mock mode uses ?token=...; real mode uses Supabase recovery (tokens in
+  // URL hash, auto-consumed by supabase-js → onAuthStateChange).
   const mockToken = params.get("token") ?? "";
 
   const [password, setPassword] = useState("");
@@ -23,6 +19,10 @@ export function ResetPassword() {
   const [pending, setPending] = useState(false);
   const [recoveryReady, setRecoveryReady] = useState(env.useMockAuth);
 
+  // Real mode: wait for supabase-js to parse the URL hash. It fires
+  // PASSWORD_RECOVERY when the recovery link is valid; we also fall back to
+  // checking the current session in case the event has already fired
+  // before this mount.
   useEffect(() => {
     if (env.useMockAuth) return;
     let active = true;
@@ -52,6 +52,9 @@ export function ResetPassword() {
         setError(err.message);
         return;
       }
+      // Sign the user out so they re-authenticate with the new password —
+      // also prevents the recovery session from masquerading as a normal
+      // login afterward.
       await supabase().auth.signOut();
       navigate("/login", { replace: true });
     } finally {
@@ -64,7 +67,7 @@ export function ResetPassword() {
       <AuthShell title="Reset link missing">
         <p className="text-sm text-ink-700">
           Open the link from your reset email or{" "}
-          <Link to="/forgot-password" className="text-indigo hover:underline font-medium">
+          <Link to="/forgot-password" className="text-ink-900 underline">
             request a new one
           </Link>
           .
@@ -76,10 +79,10 @@ export function ResetPassword() {
   if (!env.useMockAuth && !recoveryReady) {
     return (
       <AuthShell title="Verifying reset link…">
-        <p className="text-sm text-ink-700 leading-relaxed">
+        <p className="text-sm text-ink-700">
           One moment — checking your reset link. If this hangs for more than
           a few seconds, the link may be expired or already used.{" "}
-          <Link to="/forgot-password" className="text-indigo hover:underline font-medium">
+          <Link to="/forgot-password" className="text-ink-900 underline">
             Request a new one
           </Link>
           .
@@ -96,7 +99,7 @@ export function ResetPassword() {
       return;
     }
     const parsed = resetPasswordSchema.safeParse({
-      token: mockToken || "supabase-recovery",
+      token: mockToken || "supabase-recovery", // unused in real mode
       password,
     });
     if (!parsed.success) {
@@ -115,37 +118,36 @@ export function ResetPassword() {
       title="Choose a new password"
       subtitle="At least 8 characters."
       footer={
-        <Link to="/login" className="text-indigo font-medium hover:underline">
-          ← Back to sign in
+        <Link to="/login" className="text-ink-900 underline">
+          Back to sign in
         </Link>
       }
     >
-      <form onSubmit={onSubmit} className="space-y-5">
+      <form onSubmit={onSubmit} className="space-y-3 text-sm">
         <AuthField label="New password">
-          <AuthInput
+          <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            className={authInputClass}
             autoFocus
           />
         </AuthField>
         <AuthField label="Confirm new password" error={error ?? undefined}>
-          <AuthInput
+          <input
             type="password"
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
+            className={authInputClass}
           />
         </AuthField>
-
-        {error && <FormError>{error}</FormError>}
-
-        <PrimaryButton
+        <button
           type="submit"
-          loading={mockReset.isPending || pending}
-          disabled={!password || !confirm}
+          disabled={mockReset.isPending || pending}
+          className="w-full text-sm px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40"
         >
-          {mockReset.isPending || pending ? "Saving" : "Update password"}
-        </PrimaryButton>
+          {mockReset.isPending || pending ? "Saving…" : "Update password"}
+        </button>
       </form>
     </AuthShell>
   );

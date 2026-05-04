@@ -138,7 +138,7 @@ export function TaskDetail() {
               actions.updateTaskStatus(task.id, "completed");
               setSuggestDismissed(true);
             }}
-            className="text-xs px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover shrink-0"
+            className="text-xs px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover shrink-0"
           >
             Mark complete
           </button>

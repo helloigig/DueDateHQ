@@ -632,7 +632,7 @@ function EmptyStateButton({
   children: React.ReactNode;
 }) {
   const cls = primary
-    ? "text-sm px-3 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover"
+    ? "text-sm px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover"
     : "text-sm px-3 py-1.5 rounded-md border border-line text-ink-700 hover:bg-sunken";
   return (
     <a href={to} className={cls}>

@@ -281,7 +281,7 @@ export function MultiStateWizard({
                 <button
                   onClick={onContinueToReview}
                   disabled={selectedStates.length === 0}
-                  className="text-sm px-4 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40"
+                  className="text-sm px-4 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40"
                 >
                   Continue → review
                 </button>
@@ -298,7 +298,7 @@ export function MultiStateWizard({
                 <button
                   onClick={() => setShowConfirm(true)}
                   disabled={filteredDeadlines === 0 || !clientId}
-                  className="text-sm px-4 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40"
+                  className="text-sm px-4 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40"
                   title={
                     !clientId
                       ? "Save the client first, then commit deadlines"

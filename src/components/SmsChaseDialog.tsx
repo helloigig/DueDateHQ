@@ -201,7 +201,7 @@ export function SmsChaseDialog({
                 !body.trim() ||
                 !phone.trim()
               }
-              className="ml-auto text-sm px-4 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 inline-flex items-center gap-1.5"
+              className="ml-auto text-sm px-4 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40 inline-flex items-center gap-1.5"
             >
               <Send className="w-3.5 h-3.5" aria-hidden />
               {send.isPending ? "Sending…" : "Send SMS"}

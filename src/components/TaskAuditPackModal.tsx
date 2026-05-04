@@ -143,7 +143,7 @@ export function TaskAuditPackModal({
         </button>
         <button
           onClick={onRun}
-          className="text-sm px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover flex items-center gap-1.5"
+          className="text-sm px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover flex items-center gap-1.5"
         >
           <Download className="w-3.5 h-3.5" aria-hidden />
           {format === "pdf" ? "Open print dialog" : "Download JSON"}
