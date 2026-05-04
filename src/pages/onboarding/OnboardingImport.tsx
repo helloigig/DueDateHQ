@@ -1,50 +1,52 @@
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { OnboardingShell } from "../../components/OnboardingShell";
-import { PrimaryButton } from "../auth/AuthShell";
 import { Import } from "../Import";
 import { useStore } from "../../data/store";
 
 /**
  * Wraps the existing Import page inside the wizard chrome. The Import page
- * already has CSV detect / map / preview / commit; we just provide a back-link
- * and a continue affordance via the existing flow.
+ * already has CSV detect / map / preview / commit; we just provide a
+ * back-link and a continue affordance via the existing flow.
  */
 export function OnboardingImport() {
   return (
     <OnboardingShell
       step={3}
       totalSteps={3}
+      estimate="~2 minutes"
       title="Upload your client roster"
-      subtitle="Drop a CSV. AI maps the columns; you confirm."
-      brandLine="Tier 1 covers the roster (clients + entity + state). Tiers 2-4 ship with prior-year returns, K-1 packets, and Gmail history later — they're capability unlocks, not gates."
-      wide
+      subtitle="Drag a CSV from File In Time, TaxDome, Drake, ProConnect, QuickBooks, or plain Excel. AI maps the columns; you confirm. AI handles ambiguous rows by surfacing them inline."
+      brandLine="Import Tier 1 — the only mandatory upload. Tiers 2-4 are optional capability unlocks later."
     >
       <ImportWithContinue />
     </OnboardingShell>
   );
 }
 
+/**
+ * Wraps Import with a contextual "Continue" affordance that appears once the
+ * roster has clients. Avoids stranding the user inside the inner Import flow.
+ */
 function ImportWithContinue() {
-  const navigate = useNavigate();
   const { clients } = useStore();
   const hasClients = clients.length > 0;
   return (
     <>
-      {/* Render Import inline — it has its own card chrome on the preview
-          region. Wrapping it in another card was double-bordering and
-          squeezing the preview-table width unnecessarily. */}
-      <div className="-mt-4">
+      <div className="bg-surface border border-line rounded-md p-2">
         <Import />
       </div>
       {hasClients && (
-        <div className="mt-5 bg-indigo-soft/50 border border-indigo/30 rounded-md px-5 py-4 flex items-center gap-4 flex-wrap">
-          <p className="text-sm text-indigo-ink flex-1 min-w-0 leading-relaxed">
+        <div className="mt-4 bg-info-bg border border-info-border rounded-md px-4 py-3 flex items-center gap-3">
+          <p className="text-sm text-info-ink flex-1">
             <span className="font-semibold">{clients.length} clients in.</span>{" "}
             Next: confirm AI-suggested service packages so deadlines auto-generate.
           </p>
-          <PrimaryButton onClick={() => navigate("/onboarding/packages")}>
-            Continue
-          </PrimaryButton>
+          <Link
+            to="/onboarding/packages"
+            className="text-sm px-4 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover whitespace-nowrap"
+          >
+            Continue →
+          </Link>
         </div>
       )}
     </>

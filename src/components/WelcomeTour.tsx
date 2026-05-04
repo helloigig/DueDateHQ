@@ -149,7 +149,7 @@ export function WelcomeTour() {
               )}
               <button
                 onClick={isLast ? closeModal : () => setSlide((s) => s + 1)}
-                className="text-sm px-4 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover inline-flex items-center gap-1.5"
+                className="text-sm px-4 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover inline-flex items-center gap-1.5"
               >
                 {isLast ? "Got it" : "Next"}
                 {!isLast && <ArrowRight className="w-3 h-3" aria-hidden />}
@@ -250,7 +250,7 @@ const SLIDES: ReadonlyArray<Slide> = [
             W-2 received. Matched to your &quot;Income — W-2&quot; checklist row.
           </p>
           <div className="flex gap-2 mt-2.5">
-            <button className="text-2xs px-2 py-1 rounded bg-accent text-canvas">
+            <button className="text-2xs px-2 py-1 rounded bg-indigo text-white">
               Confirm
             </button>
             <button className="text-2xs px-2 py-1 rounded border border-line text-ink-500">

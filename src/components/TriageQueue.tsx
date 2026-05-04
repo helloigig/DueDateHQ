@@ -584,7 +584,7 @@ function PrimaryAction({
   const yellowBtn =
     "text-xs px-3 py-1.5 rounded bg-warn-solid text-canvas hover:bg-warn-ink transition-colors flex items-center gap-1";
   const accentBtn =
-    "text-xs px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover transition-colors flex items-center gap-1";
+    "text-xs px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover transition-colors flex items-center gap-1";
   const ghost =
     "text-xs px-2 py-1.5 rounded text-ink-500 hover:bg-sunken hover:text-ink-900";
 

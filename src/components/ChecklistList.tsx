@@ -235,7 +235,7 @@ export function ChecklistList({ taskId, items, onOpenEmailDraft }: Props) {
             />
             <button
               onClick={submit}
-              className="text-xs px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover"
+              className="text-xs px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover"
             >
               Add
             </button>

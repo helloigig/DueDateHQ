@@ -96,7 +96,7 @@ export function ConfirmModal({
                   value={customName}
                   onChange={(e) => setCustomName(e.target.value)}
                   placeholder={`${clientName} — Multi-State`}
-                  className="w-full px-2.5 py-1.5 rounded border border-line text-sm focus:outline-none focus:border-accent"
+                  className="w-full px-2.5 py-1.5 rounded border border-line text-sm focus:outline-none focus:ring-2 focus:ring-indigo focus:border-indigo"
                 />
                 <span className="block text-2xs text-ink-400 mt-1">
                   Leave blank to use the default name.
@@ -125,7 +125,7 @@ export function ConfirmModal({
               onConfirm(saveAsPackage, customName.trim() || undefined)
             }
             disabled={isPending}
-            className="text-sm px-4 py-1.5 rounded-md bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40"
+            className="text-sm px-4 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40"
           >
             {isPending ? "Creating…" : `Create ${deadlineCount} deadlines`}
           </button>

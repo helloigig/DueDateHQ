@@ -189,7 +189,7 @@ export function PriorYearUpload() {
             <button
               onClick={onUpload}
               disabled={!isReady}
-              className="text-sm px-4 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 inline-flex items-center gap-1.5"
+              className="text-sm px-4 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40 inline-flex items-center gap-1.5"
             >
               <Upload className="w-3.5 h-3.5" aria-hidden />
               {progress.state === "uploading"
@@ -295,7 +295,7 @@ export function PriorYearUpload() {
                 <button
                   onClick={onCommit}
                   disabled={!clientId || commit.isPending}
-                  className="text-xs px-3 py-1 rounded bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="text-xs px-3 py-1 rounded bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40 disabled:cursor-not-allowed"
                   title={
                     !clientId
                       ? "Bind to a client above before committing"

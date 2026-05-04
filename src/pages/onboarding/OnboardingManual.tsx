@@ -1,14 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, X } from "lucide-react";
 import { OnboardingShell } from "../../components/OnboardingShell";
-import {
-  AuthField,
-  AuthInput,
-  PrimaryButton,
-  SecondaryButton,
-  authInputClass,
-} from "../auth/AuthShell";
 import { actions } from "../../data/store";
 import type { EntityType, StateCode } from "../../types";
 
@@ -71,31 +63,32 @@ export function OnboardingManual() {
     <OnboardingShell
       step={3}
       totalSteps={3}
+      estimate="~60 seconds"
       title="Add your first clients"
       subtitle="Five rows is plenty to get started. You can add more anytime from Clients."
       brandLine="Quick-add takes < 60 seconds per client. AI suggests a service package automatically."
-      wide
     >
       <div className="space-y-3">
         {drafts.map((d, i) => (
           <div
             key={i}
-            className="bg-canvas border border-line rounded-md p-4 grid grid-cols-1 md:grid-cols-[1.4fr_140px_110px_1.6fr_auto] gap-4 items-end"
+            className="bg-surface border border-line rounded-md p-3 grid grid-cols-1 md:grid-cols-[1fr_140px_100px_1fr_auto] gap-2 items-end"
           >
-            <AuthField label="Name">
-              <AuthInput
+            <Field label="Name">
+              <input
                 value={d.name}
                 onChange={(e) => update(i, { name: e.target.value })}
                 placeholder="Emily Hartfield"
+                className="w-full border border-line rounded px-2 py-1.5 text-sm"
               />
-            </AuthField>
-            <AuthField label="Entity">
+            </Field>
+            <Field label="Entity">
               <select
                 value={d.entityType}
                 onChange={(e) =>
                   update(i, { entityType: e.target.value as EntityType })
                 }
-                className={authInputClass}
+                className="w-full border border-line rounded px-2 py-1.5 text-sm bg-surface"
               >
                 {ENTITIES.map((e) => (
                   <option key={e} value={e}>
@@ -103,14 +96,14 @@ export function OnboardingManual() {
                   </option>
                 ))}
               </select>
-            </AuthField>
-            <AuthField label="State">
+            </Field>
+            <Field label="State">
               <select
                 value={d.primaryState}
                 onChange={(e) =>
                   update(i, { primaryState: e.target.value as StateCode })
                 }
-                className={authInputClass}
+                className="w-full border border-line rounded px-2 py-1.5 text-sm bg-surface"
               >
                 {(["CA", "NY", "TX", "FL", "LA"] as StateCode[]).map((s) => (
                   <option key={s} value={s}>
@@ -118,44 +111,60 @@ export function OnboardingManual() {
                   </option>
                 ))}
               </select>
-            </AuthField>
-            <AuthField label="Email">
-              <AuthInput
-                type="email"
+            </Field>
+            <Field label="Email">
+              <input
                 value={d.contactEmail}
                 onChange={(e) => update(i, { contactEmail: e.target.value })}
                 placeholder="emily@example.com"
+                className="w-full border border-line rounded px-2 py-1.5 text-sm"
               />
-            </AuthField>
+            </Field>
             <button
               onClick={() => remove(i)}
               disabled={drafts.length === 1}
-              className="text-xs text-ink-500 hover:text-danger-ink disabled:opacity-30 inline-flex items-center gap-1 px-2 py-2 self-end"
-              aria-label={`Remove row ${i + 1}`}
+              className="text-xs text-ink-500 hover:text-ink-900 px-2 py-1.5 disabled:opacity-30"
             >
-              <X className="w-3.5 h-3.5" aria-hidden />
-              <span>Remove</span>
+              Remove
             </button>
           </div>
         ))}
-        <div className="flex items-center gap-3 pt-2">
-          <SecondaryButton onClick={add}>
-            <Plus className="w-3.5 h-3.5" aria-hidden /> Add another
-          </SecondaryButton>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={add}
+            className="text-sm px-3 py-1.5 rounded border border-line text-ink-700 hover:bg-sunken"
+          >
+            + Add another
+          </button>
           <span className="ml-auto text-xs text-ink-500">
             {valid.length} ready
           </span>
-          <PrimaryButton
+          <button
             onClick={submit}
-            disabled={valid.length === 0}
-            loading={submitting}
+            disabled={valid.length === 0 || submitting}
+            className="text-sm px-4 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {submitting
-              ? "Adding"
-              : `Add ${valid.length} & continue`}
-          </PrimaryButton>
+            {submitting ? "Adding…" : `Add ${valid.length} & continue`}
+          </button>
         </div>
       </div>
     </OnboardingShell>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="text-2xs uppercase tracking-wider text-ink-500 font-semibold block mb-1">
+        {label}
+      </span>
+      {children}
+    </label>
   );
 }

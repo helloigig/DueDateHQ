@@ -68,7 +68,7 @@ export function BlockingAlertsDialog({
                 <Link
                   to={`/alerts/${a.id}`}
                   onClick={onClose}
-                  className="text-sm px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover shrink-0"
+                  className="text-sm px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover shrink-0"
                 >
                   Review →
                 </Link>

@@ -330,7 +330,7 @@ function FormStep(props: {
           className={`w-full px-2.5 py-1.5 rounded border focus:outline-none focus:ring-2 ${
             errors.name
               ? "border-red-300 focus:ring-red-500"
-              : "border-line focus:ring-ink-900"
+              : "border-line focus:ring-indigo"
           }`}
           data-autofocus
         />
@@ -400,7 +400,7 @@ function FormStep(props: {
           className={`w-full px-2.5 py-1.5 rounded border focus:outline-none focus:ring-2 ${
             errors.email
               ? "border-red-300 focus:ring-red-500"
-              : "border-line focus:ring-ink-900"
+              : "border-line focus:ring-indigo"
           }`}
         />
       </Field>
@@ -410,7 +410,7 @@ function FormStep(props: {
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           placeholder="(555) 555-0100"
-          className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-ink-900"
+          className="w-full px-2.5 py-1.5 rounded border border-line focus:outline-none focus:ring-2 focus:ring-indigo"
         />
       </Field>
 

@@ -9,22 +9,25 @@ import {
 } from "lucide-react";
 import { signIn } from "../../data/session";
 import { actions } from "../../data/store";
-import {
-  AuthField,
-  AuthInput,
-  AuthShell,
-  BrandBar,
-  FormError,
-  HelpButton,
-  InfoHint,
-  PrimaryButton,
-} from "./AuthShell";
+import { authInputClass } from "./AuthShell";
 import { env } from "../../config";
 import { supabase } from "../../lib/supabase";
 
 /**
- * Sign-UP — passwordless magic-link, first-time users only. Email → magic
- * link → click → /onboarding/firm.
+ * Sign-UP — passwordless magic-link, first-time users only.
+ *
+ * Email → magic link → click → land on /onboarding/firm. Onboarding is
+ * REQUIRED for new accounts (firm name, primary states, import path).
+ * Existing users belong on /login, not here. Supabase enforces this via
+ * `shouldCreateUser: true` — if the email already has an account, the
+ * magic link signs them in but lands them on /onboarding/firm anyway, and
+ * the bridge will route them through to dashboard if onboarding is already
+ * complete.
+ *
+ * Mock mode: no real email; we sign in directly with `_pending` firm and
+ * `actions.resetToEmpty()` so the new account starts clean (no leftover
+ * demo seeds from a prior session in the same browser). Then route to
+ * /onboarding/firm.
  */
 export function Signup() {
   const navigate = useNavigate();
@@ -72,6 +75,8 @@ export function Signup() {
     setPending(true);
     try {
       if (env.useMockAuth) {
+        // Mock: clean store first so the new account doesn't inherit
+        // demo data that may be left in localStorage from a prior session.
         actions.resetToEmpty();
         const { userName, firmName } = inferNames(email);
         signIn({
@@ -80,6 +85,7 @@ export function Signup() {
           userEmail: email,
           tier: "pro",
         });
+        // Persist the inferred firm name so OnboardingFirm pre-fills.
         const raw = localStorage.getItem("duedatehq.session.v1");
         if (raw) {
           try {
@@ -120,195 +126,207 @@ export function Signup() {
 
   if (step === "sent") {
     return (
-      <AuthShell title="Check your email" subtitle={
-        <>
-          We sent a sign-up link to{" "}
-          <span className="font-medium text-ink-900">{email}</span>. Click the
-          link — we'll set up your firm in the next step.
-        </>
-      }>
-        <button
-          onClick={() => {
-            setStep("email");
-            setSubmitError(null);
-          }}
-          className="text-xs text-ink-500 hover:text-indigo inline-flex items-center gap-1 mb-6 transition-colors"
-        >
-          <ArrowLeft className="w-3 h-3" aria-hidden /> Use a different email
-        </button>
+      <div className="min-h-screen bg-canvas flex items-center justify-center p-6">
+        <div className="w-full max-w-md bg-surface border border-line rounded-md p-8 text-center">
+          <button
+            onClick={() => {
+              setStep("email");
+              setSubmitError(null);
+            }}
+            className="text-xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-1"
+          >
+            <ArrowLeft className="w-3 h-3" aria-hidden /> Use a different email
+          </button>
+          <div className="w-14 h-14 rounded-full bg-info-bg border border-info-border flex items-center justify-center text-info-ink mx-auto mt-3">
+            <Mail className="w-6 h-6" aria-hidden />
+          </div>
+          <h1 className="text-xl font-semibold text-ink-900 mt-4">
+            Check your email
+          </h1>
+          <p className="text-sm text-ink-500 mt-2">
+            We sent a sign-up link to{" "}
+            <span className="font-medium text-ink-900">{email}</span>. Click
+            the link — we'll set up your firm in the next step.
+          </p>
 
-        <div className="flex items-center gap-3 bg-canvas border border-line rounded-md px-4 py-3">
-          <span className="w-9 h-9 rounded-full bg-indigo-soft text-indigo flex items-center justify-center shrink-0">
-            <Mail className="w-4 h-4" aria-hidden />
-          </span>
-          <p className="text-sm text-ink-700 leading-snug">
-            The link expires in 30 minutes. Onboarding picks up where you left off.
+          {submitError && (
+            <div className="text-xs text-danger-ink bg-danger-bg border border-danger-border rounded px-3 py-2 mt-4">
+              {submitError}
+            </div>
+          )}
+
+          <p className="text-2xs text-ink-400 mt-6 pt-4 border-t border-line">
+            Didn't get it? Check spam, or{" "}
+            <button
+              onClick={() =>
+                sendLink(new Event("submit") as unknown as React.FormEvent)
+              }
+              className="underline hover:no-underline"
+              disabled={pending}
+            >
+              {pending ? "resending…" : "resend the link"}
+            </button>
+            .
           </p>
         </div>
-
-        {submitError && <div className="mt-4"><FormError>{submitError}</FormError></div>}
-
-        <p className="text-2xs text-ink-400 mt-8 pt-6 border-t border-line">
-          Didn't get it? Check spam, or{" "}
-          <button
-            onClick={() =>
-              sendLink(new Event("submit") as unknown as React.FormEvent)
-            }
-            className="text-indigo hover:underline"
-            disabled={pending}
-          >
-            {pending ? "resending…" : "resend the link"}
-          </button>
-          .
-        </p>
-      </AuthShell>
+      </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col">
-      <BrandBar />
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        {/* Left — form */}
-        <div className="flex items-start justify-center px-6">
-          <div className="w-full max-w-md pt-16 pb-24">
-            <header>
-              <h1 className="text-display font-semibold text-ink-900 leading-tight">
-                30 days free, then $49/mo
-              </h1>
-              <p className="text-sm text-ink-500 mt-2 leading-relaxed">
-                We'll set up your firm workspace in the next step. Teammates
-                join via invite later. No credit card; after day 30 you pay or
-                your data goes read-only.
-              </p>
-            </header>
+    <div className="min-h-screen bg-canvas grid grid-cols-1 lg:grid-cols-2">
+      {/* Left — form */}
+      <div className="flex flex-col justify-center p-8 lg:p-12">
+        <div className="max-w-sm mx-auto w-full">
+          <Link to="/login" className="text-sm font-semibold text-ink-900">
+            DueDateHQ
+          </Link>
+          <p className="text-2xs uppercase tracking-wider text-ink-500 mt-8 font-semibold">
+            Sign up
+          </p>
+          <h1 className="text-2xl font-semibold text-ink-900 mt-1">
+            30 days free, then $49/mo
+          </h1>
+          <p className="text-sm text-ink-500 mt-2">
+            We'll set up your firm workspace in the next step. Teammates join
+            via invite later. No credit card; after day 30 you pay or your
+            data goes read-only.
+          </p>
 
-            <form onSubmit={sendLink} className="space-y-5 mt-8">
-              <AuthField label="Work email">
-                <AuthInput
-                  type="email"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    setSubmitError(null);
-                  }}
-                  placeholder="you@yourfirm.com"
-                  autoFocus
-                />
-              </AuthField>
+          <form onSubmit={sendLink} className="space-y-3 text-sm mt-6">
+            <label className="block">
+              <span className="text-xs font-medium text-ink-700 mb-1 block">
+                Email
+              </span>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setSubmitError(null);
+                }}
+                placeholder="you@yourfirm.com"
+                className={authInputClass}
+                autoFocus
+              />
+            </label>
 
-              {/* Firm-already-exists detection (PRD: domain-based discovery) */}
-              {knownDomain && (
-                <InfoHint>
-                  <p className="font-medium text-ink-900">
-                    {knownDomain.firmName} already exists at this domain.
-                  </p>
-                  <p className="mt-1 text-info-ink">
-                    Owner: {knownDomain.ownerName}.{" "}
-                    <button
-                      type="button"
-                      onClick={() => alert("Request sent — wireframe stub")}
-                      className="text-indigo font-medium hover:underline"
-                    >
-                      Request to join
-                    </button>{" "}
-                    or continue to create your own.
-                  </p>
-                </InfoHint>
-              )}
-
-              {submitError && <FormError>{submitError}</FormError>}
-
-              <div>
-                <PrimaryButton
-                  type="submit"
-                  disabled={!email}
-                  loading={pending}
-                >
-                  {pending
-                    ? "Sending link"
-                    : env.useMockAuth
-                      ? "Continue to firm setup"
-                      : "Send sign-up link"}
-                </PrimaryButton>
-                <p className="text-2xs text-ink-400 mt-3">
-                  By continuing you agree to the Terms and Privacy Policy.
+            {/* Firm-already-exists detection (PRD: domain-based discovery) */}
+            {knownDomain && (
+              <div className="text-xs bg-info-bg border border-info-border rounded px-3 py-2 text-info-ink">
+                <p className="font-medium">
+                  {knownDomain.firmName} already exists at this domain.
+                </p>
+                <p className="mt-0.5">
+                  Owner: {knownDomain.ownerName}.{" "}
+                  <button
+                    type="button"
+                    onClick={() => alert("Request sent — wireframe stub")}
+                    className="underline hover:no-underline"
+                  >
+                    Request to join
+                  </button>
+                  {" "}or continue to create your own.
                 </p>
               </div>
-            </form>
+            )}
 
-            <div className="mt-8 pt-6 border-t border-line space-y-3 text-xs text-ink-500">
-              <p>
-                Joining an existing firm? Look for an invite email from your
-                firm owner — the link takes you straight in.{" "}
-                <Link to="/accept-invite" className="text-indigo font-medium hover:underline">
-                  Lost the email?
-                </Link>
-              </p>
-              <p>
-                Already have an account?{" "}
-                <Link to="/login" className="text-indigo font-medium hover:underline">
-                  Sign in
-                </Link>
-                .
-              </p>
-            </div>
+            {submitError && (
+              <div className="text-xs text-danger-ink bg-danger-bg border border-danger-border rounded px-3 py-2">
+                {submitError}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={pending || !email}
+              className="w-full text-sm px-3 py-2 rounded-md bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40 mt-2"
+            >
+              {pending
+                ? "Sending link…"
+                : env.useMockAuth
+                  ? "Continue → set up firm"
+                  : "Send sign-up link"}
+            </button>
+            <p className="text-2xs text-ink-400 text-center">
+              By continuing you agree to the Terms and Privacy Policy.
+            </p>
+          </form>
+
+          <div className="mt-6 pt-6 border-t border-line space-y-3">
+            {/* Joining an existing firm — email-link is primary. Owner clicks
+                "invite Alice" in Settings → Team, Alice gets an email, click
+                takes her to /accept-invite/<token>. */}
+            <p className="text-xs text-ink-500">
+              Joining an existing firm? Look for an invite email from your firm
+              owner — the link takes you straight in.{" "}
+              <Link to="/accept-invite" className="text-ink-900 underline">
+                Lost the email?
+              </Link>
+            </p>
+
+            <p className="text-xs text-ink-500">
+              Already have an account?{" "}
+              <Link to="/login" className="text-ink-900 underline">
+                Sign in
+              </Link>
+              .
+            </p>
           </div>
         </div>
+      </div>
 
-        {/* Right — Day-1 contract */}
-        <div className="hidden lg:flex items-start justify-center bg-canvas border-l border-line px-10">
-          <div className="w-full max-w-md pt-16 pb-24">
-            <p className="text-2xs uppercase tracking-[0.18em] text-ink-500 font-semibold">
-              What you get on Day 1
+      {/* Right — Day-1 contract */}
+      <div className="hidden lg:flex flex-col justify-center bg-sunken/40 border-l border-line p-12">
+        <div className="max-w-md mx-auto">
+          <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
+            What you get on Day 1
+          </p>
+          <h2 className="text-xl font-semibold text-ink-900 mt-2 leading-snug">
+            AI is useful right now — not someday.
+          </h2>
+          <p className="text-sm text-ink-500 mt-2 max-w-sm">
+            We don't apologize for cold start. The four substrates (entity,
+            industry, state, cohort) make AI productive the minute your roster
+            is in.
+          </p>
+
+          <ul className="mt-6 space-y-4">
+            <Promise
+              icon={<Sparkles className="w-3.5 h-3.5" aria-hidden />}
+              title="50-state deadline database, federal forms covered"
+              detail="100% accuracy on federal, 99%+ on state. Every deadline links to its official source."
+            />
+            <Promise
+              icon={<ShieldCheck className="w-3.5 h-3.5" aria-hidden />}
+              title="24-hour state-alert SLA — or your money back"
+              detail="If we miss a state extension within 24 hours of official announcement and your client incurs a penalty, that month is credited."
+              accent
+            />
+            <Promise
+              icon={<Inbox className="w-3.5 h-3.5" aria-hidden />}
+              title="Per-task forwarding emails, no OAuth required"
+              detail="Every task gets a unique address like emily-1040-X7fK@duedatehq.com. Client docs route to the right place automatically."
+            />
+            <Promise
+              icon={<Mail className="w-3.5 h-3.5" aria-hidden />}
+              title="AI-drafted reminders, you review and send"
+              detail="Mode D writes the chase emails grounded in the client's history and your voice. You stay in the loop on every send."
+            />
+          </ul>
+
+          <div className="mt-8 pt-6 border-t border-line">
+            <p className="text-xs text-ink-500">
+              <span className="font-medium text-ink-900">
+                30 days free, then $29–99/mo.
+              </span>{" "}
+              No card to start; you pay before day 31 or your data goes
+              read-only. Counter to the annual-upfront model you're used to —
+              we earn the conversion through usage, not credit-card capture.
             </p>
-            <h2 className="text-title font-semibold text-ink-900 mt-2 leading-snug">
-              AI is useful right now — not someday.
-            </h2>
-            <p className="text-sm text-ink-500 mt-2 leading-relaxed">
-              We don't apologize for cold start. The four substrates (entity,
-              industry, state, cohort) make AI productive the minute your
-              roster is in.
-            </p>
-
-            <ul className="mt-7 space-y-5">
-              <Promise
-                icon={<Sparkles className="w-3.5 h-3.5" aria-hidden />}
-                title="50-state deadline database, federal forms covered"
-                detail="100% accuracy on federal, 99%+ on state. Every deadline links to its official source."
-              />
-              <Promise
-                icon={<ShieldCheck className="w-3.5 h-3.5" aria-hidden />}
-                title="24-hour state-alert SLA — or your money back"
-                detail="If we miss a state extension within 24 hours of official announcement and your client incurs a penalty, that month is credited."
-                accent
-              />
-              <Promise
-                icon={<Inbox className="w-3.5 h-3.5" aria-hidden />}
-                title="Per-task forwarding emails, no OAuth required"
-                detail="Every task gets a unique address like emily-1040-X7fK@duedatehq.com. Client docs route to the right place automatically."
-              />
-              <Promise
-                icon={<Mail className="w-3.5 h-3.5" aria-hidden />}
-                title="AI-drafted reminders, you review and send"
-                detail="Mode D writes the chase emails grounded in the client's history and your voice. You stay in the loop on every send."
-              />
-            </ul>
-
-            <div className="mt-8 pt-6 border-t border-line">
-              <p className="text-xs text-ink-500 leading-relaxed">
-                <span className="font-medium text-ink-900">
-                  30 days free, then $29–99/mo.
-                </span>{" "}
-                No card to start; you pay before day 31 or your data goes
-                read-only. Counter to the annual-upfront model — we earn the
-                conversion through usage, not credit-card capture.
-              </p>
-            </div>
           </div>
         </div>
-      </main>
-      <HelpButton />
+      </div>
     </div>
   );
 }
@@ -328,17 +346,17 @@ function Promise({
     <li className="flex items-start gap-3">
       <span
         className={[
-          "w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5",
+          "w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5",
           accent
             ? "bg-warn-bg text-warn-ink border border-warn-border"
-            : "bg-indigo-soft text-indigo",
+            : "bg-surface text-ink-700 border border-line",
         ].join(" ")}
       >
         {icon}
       </span>
       <div>
         <p className="text-sm font-medium text-ink-900">{title}</p>
-        <p className="text-xs text-ink-500 mt-1 leading-relaxed">{detail}</p>
+        <p className="text-xs text-ink-500 mt-0.5">{detail}</p>
       </div>
     </li>
   );

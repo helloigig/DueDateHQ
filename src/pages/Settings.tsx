@@ -1060,7 +1060,7 @@ function TeamPanel() {
           <button
             onClick={invite}
             disabled={!emailInput.trim()}
-            className="text-sm px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed"
+            className="text-sm px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Send invite
           </button>
@@ -1221,7 +1221,7 @@ function FirmPanel() {
           </Field>
           <button
             onClick={save}
-            className="text-sm px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover"
+            className="text-sm px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover"
           >
             Save firm settings
           </button>
@@ -1677,7 +1677,7 @@ function ReminderTemplateEditor({
                 disabled={!eligible && phase !== 2}
                 className={`text-xs px-3 py-1.5 rounded shrink-0 ${
                   phase === 2
-                    ? "bg-accent text-canvas hover:bg-accent-hover"
+                    ? "bg-indigo text-white hover:bg-indigo-hover"
                     : "border border-line text-ink-700 hover:bg-sunken"
                 } disabled:opacity-40 disabled:cursor-not-allowed`}
                 title={
@@ -1735,7 +1735,7 @@ function ReminderTemplateEditor({
           </button>
           <button
             onClick={() => onSave({ subject, body, phase })}
-            className="ml-auto text-sm px-4 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover"
+            className="ml-auto text-sm px-4 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover"
           >
             Save changes
           </button>
@@ -2014,7 +2014,7 @@ function IntegrationRow({
             <button
               onClick={onSync}
               disabled={syncing}
-              className="text-xs px-3 py-1 rounded bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40"
+              className="text-xs px-3 py-1 rounded bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40"
               title="Pull latest customers from this provider into your client list"
             >
               {syncing ? "Syncing…" : "Sync now"}
@@ -2036,7 +2036,7 @@ function IntegrationRow({
             "text-xs px-3 py-1 rounded",
             !configured
               ? "border border-line text-ink-400 cursor-not-allowed"
-              : "bg-accent text-canvas hover:bg-accent-hover",
+              : "bg-indigo text-white hover:bg-indigo-hover",
           ].join(" ")}
           title={
             configured

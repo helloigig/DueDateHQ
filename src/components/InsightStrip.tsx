@@ -64,7 +64,7 @@ export function InsightStrip() {
             <div className="mt-2 flex flex-wrap gap-1">
               <button
                 onClick={() => navigate(`/clients/${leadClient.id}`)}
-                className="text-xs px-2.5 py-1 rounded bg-accent text-canvas hover:bg-accent-hover inline-flex items-center gap-1"
+                className="text-xs px-2.5 py-1 rounded bg-indigo text-white hover:bg-indigo-hover inline-flex items-center gap-1"
               >
                 Open client <ArrowRight className="w-3 h-3" aria-hidden />
               </button>

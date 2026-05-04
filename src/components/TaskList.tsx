@@ -1121,7 +1121,7 @@ function AskClientMenu({
           e.stopPropagation();
           setOpen((v) => !v);
         }}
-        className="text-xs px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover inline-flex items-center gap-1"
+        className="text-xs px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover inline-flex items-center gap-1"
         aria-haspopup="menu"
         aria-expanded={open}
       >

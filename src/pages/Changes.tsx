@@ -80,7 +80,7 @@ export function Changes() {
             </Link>
             <Link
               to="/signup"
-              className="px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover"
+              className="px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover"
             >
               Start free trial
             </Link>

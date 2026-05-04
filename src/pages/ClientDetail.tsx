@@ -601,7 +601,7 @@ function NotesTab({ client }: { client: Client }) {
           onChange={(e) => setDraft(e.target.value)}
           rows={3}
           placeholder="e.g. Called client; waiting on W-2 copies by Friday."
-          className="w-full px-3 py-2 rounded border border-line focus:outline-none focus:ring-2 focus:ring-ink-900 text-sm resize-none"
+          className="w-full px-3 py-2 rounded border border-line focus:outline-none focus:ring-2 focus:ring-indigo text-sm resize-none"
         />
         <div className="flex items-center justify-between mt-2">
           <span className="text-xs text-ink-400">

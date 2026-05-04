@@ -163,7 +163,7 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
           <button
             onClick={onMarkComplete}
             disabled={task.status === "completed"}
-            className="text-sm px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed"
+            className="text-sm px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {task.status === "completed" ? "Completed" : "Mark complete"}
           </button>
