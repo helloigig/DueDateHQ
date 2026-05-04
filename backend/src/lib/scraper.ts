@@ -50,9 +50,22 @@ export interface ScraperSource {
 }
 
 /**
- * Phase-1 source registry. Real production maintains this as a config
- * table editable by ops; here we hardcode the top-7 most-active states.
- * Add more by appending — each runs on its own fetch cycle.
+ * Phase-1 source registry — covers the 10 states with seeded service
+ * templates (data/supportedStates.ts). Each entry maps to one DOR /
+ * comptroller authority and runs on its own fetch cycle.
+ *
+ * Real production maintains this as a config table editable by ops;
+ * here we hardcode so the scraper is self-contained and deploy-time
+ * additions don't require a migration. Add more by appending.
+ *
+ * Coverage notes:
+ *   - CA / NY / TX have native RSS feeds (high signal, low noise)
+ *   - FL / IL / MA / GA / LA / NJ / PA fall back to HTML newsroom
+ *     scraping — `parseHtml` pulls likely-news anchors and the
+ *     classifier marks them parse_confidence < 0.7 so the reviewer
+ *     queue catches them before they project to firms
+ *   - WA was removed because it's not in supportedStates.ts; the
+ *     scraper would generate noise no client could be matched to
  */
 export const DEFAULT_SOURCES: ScraperSource[] = [
   {
@@ -80,9 +93,21 @@ export const DEFAULT_SOURCES: ScraperSource[] = [
     kind: "html",
   },
   {
+    stateCode: "GA",
+    authority: "GA DOR",
+    url: "https://dor.georgia.gov/press-releases",
+    kind: "html",
+  },
+  {
     stateCode: "IL",
     authority: "IL DOR",
     url: "https://www2.illinois.gov/rev/Pages/News.aspx",
+    kind: "html",
+  },
+  {
+    stateCode: "LA",
+    authority: "LA DOR",
+    url: "https://revenue.louisiana.gov/NewsAndPublications",
     kind: "html",
   },
   {
@@ -92,10 +117,16 @@ export const DEFAULT_SOURCES: ScraperSource[] = [
     kind: "html",
   },
   {
-    stateCode: "WA",
-    authority: "WA DOR",
-    url: "https://dor.wa.gov/about/news-releases",
+    stateCode: "NJ",
+    authority: "NJ Treasury",
+    url: "https://www.nj.gov/treasury/taxation/news.shtml",
     kind: "html",
+  },
+  {
+    stateCode: "PA",
+    authority: "PA DOR",
+    url: "https://www.revenue.pa.gov/Pages/News-Release-RSS.aspx",
+    kind: "rss",
   },
 ];
 
