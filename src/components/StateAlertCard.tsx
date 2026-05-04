@@ -7,6 +7,12 @@ import { clients as MOCK_CLIENTS } from "@/data/mockClients";
 import type { Announcement } from "@/types";
 import { cn } from "@/lib/utils";
 
+type ClientLike = {
+  id: string;
+  name: string;
+  contactEmail?: string | null;
+};
+
 /**
  * StateAlertCard — the canonical alert presentation. Single source of
  * truth for /alerts (variant="feed") and Dashboard's preview section
@@ -55,12 +61,27 @@ export interface AffectedClient {
   email?: string;
 }
 
-export function affectedClientsFor(a: Announcement): AffectedClient[] {
-  const map = new Map(MOCK_CLIENTS.map((c) => [c.id, c]));
+/**
+ * Resolve `affectedClientIds` to display chips. Caller passes the live
+ * client roster (real-mode tRPC `clients.list`, mock-mode store) so chips
+ * reflect the firm's actual roster — not a frozen MOCK_CLIENTS lookup.
+ * Falls back to MOCK_CLIENTS only when the caller didn't pass a source
+ * (legacy callers / design previews).
+ */
+export function affectedClientsFor(
+  a: Announcement,
+  source?: ReadonlyArray<ClientLike>,
+): AffectedClient[] {
+  const list = source ?? MOCK_CLIENTS;
+  const map = new Map(list.map((c) => [c.id, c]));
   return a.affectedClientIds
     .map((id) => map.get(id))
     .filter((c): c is NonNullable<typeof c> => Boolean(c))
-    .map((c) => ({ id: c.id, name: c.name, email: c.contactEmail }));
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      email: c.contactEmail ?? undefined,
+    }));
 }
 
 export interface StateAlertCardProps {
@@ -72,6 +93,11 @@ export interface StateAlertCardProps {
   handled?: boolean;
   /** Click handler — feed: select the card; preview: navigate to /alerts/:id. */
   onSelect: () => void;
+  /** Live client roster used to resolve recipient chips. When omitted,
+   *  falls back to MOCK_CLIENTS (legacy callers / design previews).
+   *  Real-mode callers pass tRPC `clients.list().items` so chips reflect
+   *  the firm's actual roster. */
+  clientSource?: ReadonlyArray<ClientLike>;
   /** Optional — kept for callers that still pass it; the feed-card hover
    *  Send chip was retired in favor of the co-pilot pane's wired Send. */
   onComplete?: (id: string) => void;
@@ -83,10 +109,11 @@ export function StateAlertCard({
   selected = false,
   handled = false,
   onSelect,
+  clientSource,
   onComplete: _onComplete,
 }: StateAlertCardProps) {
   const tone = TYPE_TONE[a.type];
-  const affected = affectedClientsFor(a);
+  const affected = affectedClientsFor(a, clientSource);
   const visibleChips = affected.slice(0, 5);
   const overflow = Math.max(0, affected.length - visibleChips.length);
   const isFeed = variant === "feed";

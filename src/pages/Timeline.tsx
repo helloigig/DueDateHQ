@@ -22,23 +22,41 @@ import {
 import { MultiSelectChip } from "../components/MultiSelectChip";
 import { DueDate } from "../components/ui/DueDate";
 import { clients as MOCK_CLIENTS } from "../data/mockClients";
+import { useClients } from "../hooks/useClients";
 import type { ClientTier } from "../types";
 import { cn } from "../lib/utils";
 
-// Lookup map: clientId → entityType / tier / primaryState. Used to
+// Lookup row: clientId → entityType / tier / primaryState. Used to
 // enrich TaskRow with cross-axis filter dimensions (entity, tier,
-// jurisdiction). Kept module-level so the lookup is stable across
-// re-renders without a useMemo per cell.
-const CLIENT_LOOKUP = new Map(
-  MOCK_CLIENTS.map((c) => [
-    c.id,
-    {
-      entityType: c.entityType,
-      tier: c.tier,
-      primaryState: c.primaryState,
-    },
-  ]),
-);
+// jurisdiction). Built per-render from live `clients.list` data so real
+// mode reflects the firm's actual roster; falls back to MOCK_CLIENTS for
+// the mock-mode seed when live data is unavailable.
+type ClientLookupRow = {
+  entityType: string;
+  tier: ClientTier;
+  primaryState: string;
+};
+type ClientSourceRow = {
+  id: string;
+  entityType: string;
+  tier: ClientTier;
+  primaryState: string;
+};
+function buildClientLookup(
+  source: ReadonlyArray<ClientSourceRow>,
+): Map<string, ClientLookupRow> {
+  return new Map(
+    source.map((c) => [
+      c.id,
+      {
+        entityType: c.entityType,
+        tier: c.tier,
+        primaryState: c.primaryState,
+      },
+    ]),
+  );
+}
+const MOCK_CLIENT_LOOKUP = buildClientLookup(MOCK_CLIENTS);
 
 /**
  * Timeline — IA v0.7 §3.9a forward-planning surface.
@@ -181,7 +199,10 @@ type LiveMilestone = {
   officialDueDate: string | null;
 };
 
-function groupLiveMilestones(rows: LiveMilestone[]): TaskRow[] {
+function groupLiveMilestones(
+  rows: LiveMilestone[],
+  clientLookup: Map<string, ClientLookupRow>,
+): TaskRow[] {
   const byTask = new Map<string, LiveMilestone[]>();
   for (const r of rows) {
     const arr = byTask.get(r.taskId) ?? [];
@@ -214,7 +235,7 @@ function groupLiveMilestones(rows: LiveMilestone[]): TaskRow[] {
       lead.formType || lead.jurisdiction
         ? [lead.formType, lead.jurisdiction].filter(Boolean).join(" · ")
         : "—";
-    const lookup = CLIENT_LOOKUP.get(lead.clientId);
+    const lookup = clientLookup.get(lead.clientId);
     // Strip time component if present — DESIGN.md locked policy: dates only.
     const officialDueIso =
       dueIso && dueIso.length >= 10 ? dueIso.slice(0, 10) : undefined;
@@ -292,14 +313,21 @@ export function Timeline() {
       return next;
     });
   const fleetQuery = trpc.taskMilestones.fleetStack.useQuery({});
+  const clientsQuery = useClients();
+  const clientLookup = useMemo(() => {
+    const live = clientsQuery.data?.items;
+    if (live && live.length > 0) return buildClientLookup(live);
+    return MOCK_CLIENT_LOOKUP;
+  }, [clientsQuery.data]);
   const liveTimelines = useMemo(
     // Cast through unknown — FE-side router types are stale until BE
     // redeploys with the joined fleetStack shape; runtime contract is safe.
     () =>
       groupLiveMilestones(
         (fleetQuery.data ?? []) as unknown as LiveMilestone[],
+        clientLookup,
       ),
-    [fleetQuery.data],
+    [fleetQuery.data, clientLookup],
   );
 
   // In real mode, never substitute MOCK_TIMELINES — empty BE shows empty
