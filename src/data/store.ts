@@ -1182,6 +1182,40 @@ export const actions = {
     emit();
   },
 
+  /** Recall a sent draft within the 60s soft-recall window. Mock-mode
+   *  parity for the BE's emails.recall mutation — flips status to
+   *  `recalled` and reverts the matching checklist item from
+   *  `requested_waiting` back to `not_requested` so the chase doesn't
+   *  appear to have happened. */
+  recallEmail(draftId: string) {
+    const draft = state.emailDrafts.find((d) => d.id === draftId);
+    if (!draft || draft.status !== "sent") return;
+    state = {
+      ...state,
+      emailDrafts: state.emailDrafts.map((d) =>
+        d.id === draftId ? { ...d, status: "recalled" as const } : d,
+      ),
+      checklistItems: draft.checklistItemId
+        ? state.checklistItems.map((c) =>
+            c.id === draft.checklistItemId &&
+            c.state === "requested_waiting"
+              ? { ...c, state: "not_requested" as const, lastReminderAt: undefined }
+              : c,
+          )
+        : state.checklistItems,
+    };
+    const task = state.tasks.find((t) => t.id === draft.taskId);
+    if (task) {
+      appendActivity(
+        task.clientId,
+        "email_sent",
+        `Recalled: ${draft.subject}`,
+        task.deadlineId,
+      );
+    }
+    emit();
+  },
+
   /** Resolve a Mode E AI insight. */
   resolveInsight(
     insightId: string,
