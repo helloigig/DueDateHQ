@@ -27,11 +27,16 @@ AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName;
 
 type AlertDialogSize = "sm" | "md" | "lg" | "xl";
 
+// max-width caps that ALSO never exceed the viewport minus a 1rem gutter
+// on each side. Without the inner `min()`, a future caller of `size="xl"`
+// on a 360px-wide screen would render the dialog edge-to-edge with no
+// breathing room, which the dogfooding feedback (2026-05-04) flagged on
+// the Import "Import N clients?" confirm.
 const SIZE_CLASS: Record<AlertDialogSize, string> = {
-  sm: "max-w-sm",
-  md: "max-w-md",
-  lg: "max-w-lg",
-  xl: "max-w-2xl",
+  sm: "max-w-[min(100vw-2rem,24rem)]",
+  md: "max-w-[min(100vw-2rem,28rem)]",
+  lg: "max-w-[min(100vw-2rem,32rem)]",
+  xl: "max-w-[min(100vw-2rem,42rem)]",
 };
 
 interface AlertDialogContentProps

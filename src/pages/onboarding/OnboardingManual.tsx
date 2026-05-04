@@ -63,10 +63,8 @@ export function OnboardingManual() {
     <OnboardingShell
       step={3}
       totalSteps={3}
-      estimate="~60 seconds"
       title="Add your first clients"
       subtitle="Five rows is plenty to get started. You can add more anytime from Clients."
-      brandLine="Quick-add takes < 60 seconds per client. AI suggests a service package automatically."
     >
       <div className="space-y-3">
         {drafts.map((d, i) => (

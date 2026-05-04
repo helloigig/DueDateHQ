@@ -73,10 +73,8 @@ export function OnboardingPackages() {
     <OnboardingShell
       step={3}
       totalSteps={3}
-      estimate="~1 minute"
       title="Confirm service packages"
       subtitle="AI suggested a package for each client based on entity type and state. Glance, click 'Accept all' if they look right, or change individually."
-      brandLine="Mode A substrate-driven. Entity + State + Industry + Cohort make this useful Day 1 — no 'AI is learning' here."
     >
       {activeClients.length === 0 ? (
         <div className="bg-surface border border-line rounded-md p-6 text-center text-sm text-ink-500">

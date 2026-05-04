@@ -148,12 +148,10 @@ export function OnboardingFirm() {
     <OnboardingShell
       step={1}
       totalSteps={3}
-      estimate="~20 seconds"
       title="Set up your firm workspace"
       subtitle="Your account is created. Now we set up the firm — the tenant where your clients, deadlines, and filings live."
-      brandLine="One account, one firm at MVP. Multi-firm membership ships in Phase 2 (next quarter)."
     >
-      <div className="space-y-6 max-w-md">
+      <div className="space-y-6">
         <Field
           label="Firm name"
           hint="Goes on outbound client emails, audit-trail exports, and the forwarding-address prefix."
@@ -169,11 +167,11 @@ export function OnboardingFirm() {
 
         <Field
           label="Where do you file?"
-          hint={`Pick every state you handle filings in. The first one is your home state — its address goes on outbound emails. ${
+          hint={
             filingStates.length === 1
-              ? "Most firms file in 3-15 states; you can add more anytime in Settings."
-              : `You've picked ${filingStates.length} state${filingStates.length === 1 ? "" : "s"}.`
-          }`}
+              ? undefined
+              : `${filingStates.length} states picked.`
+          }
         >
           <StateMultiSelect
             selected={filingStates}
@@ -246,12 +244,6 @@ export function OnboardingFirm() {
         >
           {bootstrap.isPending ? "Creating workspace…" : "Continue"}
         </button>
-
-        <div className="bg-info-bg/40 border border-info-border rounded-md px-3 py-2.5 text-2xs text-ink-700 leading-relaxed">
-          <span className="font-medium text-ink-900">Trial:</span> Pro tier is
-          free for 30 days — no card. After day 30 you pay or your data goes
-          read-only. Pick a plan in Settings → Billing whenever you're ready.
-        </div>
       </div>
     </OnboardingShell>
   );

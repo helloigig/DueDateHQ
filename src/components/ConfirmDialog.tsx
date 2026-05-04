@@ -19,6 +19,7 @@ export function ConfirmDialog({
   cancelLabel = "Cancel",
   destructive = false,
   requireAcknowledge,
+  size = "md",
   onConfirm,
   onCancel,
 }: {
@@ -30,6 +31,8 @@ export function ConfirmDialog({
   destructive?: boolean;
   /** If provided, the confirm button is disabled until the user ticks an acknowledgement. */
   requireAcknowledge?: string;
+  /** Forwarded to AlertDialogContent. Defaults to "md" (max-w-md). */
+  size?: "sm" | "md" | "lg" | "xl";
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -46,7 +49,7 @@ export function ConfirmDialog({
         }
       }}
     >
-      <AlertDialogContent size="md">
+      <AlertDialogContent size={size}>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription className="sr-only">
