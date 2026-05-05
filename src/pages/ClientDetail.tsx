@@ -136,6 +136,15 @@ export function ClientDetail() {
   const deadlines = deadlinesQuery.data ?? [];
   const archiveClientMut = useArchiveClient();
   const [tab, setTab] = useState<Tab>("todo");
+  // Tracks whether the user explicitly clicked a tab. Once true, the
+  // default-tab effect below stops auto-switching — Sarah's manual
+  // selection wins. Yuqi audit 2026-05-05: "if To Do is empty, default
+  // to Filings tab."
+  const tabExplicitRef = useRef(false);
+  const onTabChange = (next: Tab) => {
+    tabExplicitRef.current = true;
+    setTab(next);
+  };
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -144,6 +153,22 @@ export function ClientDetail() {
     AddDeadlinePrefill | undefined
   >(undefined);
   const [exportOpen, setExportOpen] = useState(false);
+
+  // Default tab — landing on To Do is the right answer when the client
+  // has active work to chase / confirm. When To Do would be empty (no
+  // active deadlines), Filings is what Sarah opens to answer "where is
+  // this client at." We auto-switch on first data load, but only if
+  // the user hasn't already clicked a tab — manual selection wins.
+  useEffect(() => {
+    if (tabExplicitRef.current) return;
+    if (!deadlinesQuery.data) return;
+    const hasActive = deadlinesQuery.data.some(
+      (d) => d.status !== "completed" && d.status !== "filed_extension",
+    );
+    if (!hasActive) {
+      setTab("filings");
+    }
+  }, [deadlinesQuery.data]);
 
   useEffect(() => {
     if (searchParams.get("addDeadline") === "1") {
@@ -375,7 +400,7 @@ export function ClientDetail() {
         ).map(([key, label, Icon]) => (
           <button
             key={key}
-            onClick={() => setTab(key)}
+            onClick={() => onTabChange(key)}
             className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm ${
               tab === key
                 ? "text-ink-900 border-b-2 border-ink-900 font-medium"
@@ -418,7 +443,7 @@ export function ClientDetail() {
                 <button
                   key={key}
                   onClick={() => {
-                    setTab(key);
+                    onTabChange(key);
                     setOverflowOpen(false);
                   }}
                   className={`w-full text-left px-3 py-1.5 text-sm hover:bg-sunken ${
@@ -439,7 +464,7 @@ export function ClientDetail() {
             client={client}
             allDeadlines={clientDeadlines}
             onAddDeadline={() => setAddDeadlineOpen(true)}
-            onOpenDocuments={() => setTab("documents")}
+            onOpenDocuments={() => onTabChange("documents")}
           />
         )}
         {/* Engagement tab retired 2026-05-05 — see type Tab comment.
@@ -449,7 +474,7 @@ export function ClientDetail() {
             client={client}
             allDeadlines={clientDeadlines}
             onAddDeadline={() => setAddDeadlineOpen(true)}
-            onOpenDocuments={() => setTab("documents")}
+            onOpenDocuments={() => onTabChange("documents")}
           />
         )}
         {tab === "filings" && (

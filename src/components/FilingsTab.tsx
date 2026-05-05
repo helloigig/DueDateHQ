@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ExternalLink, FileText, Sparkles, AlertTriangle, Check } from "lucide-react";
+import { ExternalLink, FileText, Sparkles, AlertTriangle, Check, ChevronRight } from "lucide-react";
 import type { Client } from "../types";
 import type { Deadline, DeadlineStatus } from "../types";
 import { trpc } from "../lib/api/client";
 import type { FederalFormDTO } from "../lib/api/router";
 import type { AddDeadlinePrefill } from "./AddDeadlineModal";
+import { useTasksForClient } from "../hooks/useTasks";
 
 /**
  * Disambiguate quarterly/monthly federal forms (941 / 720 / 1099-NEC
@@ -64,6 +65,20 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
     clientId: client.id,
   });
   const applicability = applicabilityQuery.data;
+
+  // Tasks for this client — needed to map a Deadline row to its
+  // owning Task so the row can navigate into TaskDetail. 1:1 with
+  // Deadline at MVP per types.ts comment, so a single .find() lookup
+  // by deadlineId is fine. Yuqi audit 2026-05-05: filing rows looked
+  // like data but had no affordance — wrap as Link.
+  const tasks = useTasksForClient(client.id);
+  const taskByDeadlineId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const t of tasks) {
+      if (t.deadlineId) m.set(t.deadlineId, t.id);
+    }
+    return m;
+  }, [tasks]);
 
   // Catalog for "Reference" zone — every active federal form for the
   // entity type, including ones already covered. Filtered client-side
@@ -135,9 +150,13 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
   );
 
   // Active filings for this client, grouped by tax year + jurisdiction.
-  // Replaces the previous "go straight to applicability" framing —
-  // the user reads this tab to see "what's planned for this client THIS
-  // year" first, then "what's the catalog say is applicable" second.
+  // Year sort order — Yuqi audit 2026-05-05: previously descending
+  // (newest first), which put 2027 above 2026 (current). Sarah's
+  // mental model: "current year first, then what's coming, then
+  // history." Sort: current → future ascending → past descending.
+  // Year is parsed once (officialDueDate is YYYY-MM-DD ISO), then we
+  // bucket relative to currentYear and concat the three groups.
+  const currentYear = String(new Date().getFullYear());
   const filingsByYear = useMemo(() => {
     const m = new Map<
       string,
@@ -149,9 +168,16 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
       entry.deadlines.push(d);
       m.set(year, entry);
     }
-    return Array.from(m.values()).sort((a, b) => b.year.localeCompare(a.year));
-  }, [deadlines]);
-  const currentYear = String(new Date().getFullYear());
+    const all = Array.from(m.values());
+    const current = all.filter((y) => y.year === currentYear);
+    const future = all
+      .filter((y) => y.year > currentYear)
+      .sort((a, b) => a.year.localeCompare(b.year)); // 2027 → 2028 → ...
+    const past = all
+      .filter((y) => y.year < currentYear)
+      .sort((a, b) => b.year.localeCompare(a.year)); // 2025 → 2024 → ...
+    return [...current, ...future, ...past];
+  }, [deadlines, currentYear]);
 
   return (
     <div className="space-y-4">
@@ -219,51 +245,77 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
                       )}
                     </span>
                   </div>
-                  <ul className="space-y-1">
+                  <ul className="space-y-0.5 -mx-2">
                     {yrFilings
                       .slice()
                       .sort((a, b) =>
                         a.officialDueDate.localeCompare(b.officialDueDate),
                       )
-                      .map((d) => (
-                        <li
-                          key={d.id}
-                          className="flex items-center gap-3 text-sm"
-                        >
-                          <span
-                            className={`text-2xs uppercase tracking-wide font-mono px-1.5 py-0.5 rounded shrink-0 ${
-                              d.jurisdiction === "federal"
-                                ? "bg-ink-900 text-canvas"
-                                : "bg-sunken text-ink-700 border border-line"
-                            }`}
-                          >
-                            {d.jurisdiction === "federal"
-                              ? "FED"
-                              : d.jurisdiction.toUpperCase()}
-                          </span>
-                          <span className="text-ink-900">
-                            {d.form}
-                            {(() => {
-                              const period = periodSuffix(
-                                d.form,
-                                d.officialDueDate,
-                              );
-                              return period ? (
+                      .map((d) => {
+                        const taskId = taskByDeadlineId.get(d.id);
+                        const period = periodSuffix(d.form, d.officialDueDate);
+                        // Row interior — same layout whether the row is
+                        // a Link or a plain <li>. Wrapping prevents drift
+                        // between the two render paths.
+                        const interior = (
+                          <>
+                            <span
+                              className={`text-2xs uppercase tracking-wide font-mono px-1.5 py-0.5 rounded shrink-0 ${
+                                d.jurisdiction === "federal"
+                                  ? "bg-ink-900 text-canvas"
+                                  : "bg-sunken text-ink-700 border border-line"
+                              }`}
+                            >
+                              {d.jurisdiction === "federal"
+                                ? "FED"
+                                : d.jurisdiction.toUpperCase()}
+                            </span>
+                            <span className="text-ink-900">
+                              {d.form}
+                              {period && (
                                 <span
-                                  className="ml-1.5 text-2xs px-1.5 py-0.5 rounded bg-info-bg/60 text-info-ink border border-info-border tabular-nums"
+                                  className="ml-1.5 text-2xs px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line tabular-nums"
                                   title={`${period} of fiscal year`}
                                 >
                                   {period}
                                 </span>
-                              ) : null;
-                            })()}
-                          </span>
-                          <span className="text-2xs text-ink-400 ml-auto tabular-nums">
-                            due {d.officialDueDate}
-                          </span>
-                          <FilingStatusPill status={d.status} />
-                        </li>
-                      ))}
+                              )}
+                            </span>
+                            <span className="text-2xs text-ink-400 ml-auto tabular-nums">
+                              due {d.officialDueDate}
+                            </span>
+                            <FilingStatusPill status={d.status} />
+                          </>
+                        );
+                        return (
+                          <li key={d.id}>
+                            {/* Row affordance — Yuqi audit 2026-05-05:
+                                "each filing row should click into task
+                                detail." When the deadline has an owning
+                                Task (1:1 at MVP), wrap as Link with hover
+                                + chevron. Orphaned deadlines (no Task)
+                                fall back to plain <li> — should be rare
+                                but the seed data may have them. */}
+                            {taskId ? (
+                              <Link
+                                to={`/clients/${client.id}/tasks/${taskId}`}
+                                className="flex items-center gap-3 text-sm px-2 py-1.5 rounded hover:bg-sunken transition-colors group"
+                                title={`Open ${d.form} task →`}
+                              >
+                                {interior}
+                                <ChevronRight
+                                  className="w-3.5 h-3.5 text-ink-300 group-hover:text-ink-500 shrink-0"
+                                  aria-hidden
+                                />
+                              </Link>
+                            ) : (
+                              <div className="flex items-center gap-3 text-sm px-2 py-1.5 text-ink-400">
+                                {interior}
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })}
                   </ul>
                 </div>
               );
@@ -367,11 +419,11 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
         }
       />
 
-      {/* Footer note — provenance is the trust signal. */}
-      <p className="text-2xs text-ink-400 px-1">
-        Catalog source: backend federal_forms table · Federal Register
-        change-detection running every 6h.
-      </p>
+      {/* Footer note dropped 2026-05-05 — was "Catalog source: backend
+          federal_forms table · Federal Register change-detection running
+          every 6h." which is internal implementation detail with zero
+          user payoff. The Catalog admin link in the section header
+          already carries the trust signal (curated + auditable). */}
     </div>
   );
 }
