@@ -304,20 +304,15 @@ export function ClientDetail() {
             )}
             <span className="text-ink-300" aria-hidden>·</span>
             <span>
-              <span className="text-ink-400">Open deadlines</span>{" "}
-              <span className="text-ink-700 font-medium tabular-nums">
-                {clientDeadlines.filter(
-                  (d) =>
-                    d.status !== "completed" &&
-                    d.status !== "filed_extension",
-                ).length}
-              </span>
-            </span>
-            <span className="text-ink-300" aria-hidden>·</span>
-            <span>
               <span className="text-ink-400">Since</span>{" "}
               <span className="text-ink-700">{addedAtLabel}</span>
             </span>
+            {/* "Open deadlines" intentionally omitted from the meta line
+                (2026-05-05 — Yuqi audit). The header strip is identity
+                (who is this client), not status (what's open). The open
+                count lives on the To Do tab badge and inside the Filings
+                tab; surfacing it here too made two "4 deadlines" labels
+                point at the same set on fresh clients (Bluebonnet bug). */}
           </div>
           {/* AI behaviour summary — placeholder until the BE composer
               ships. Phase 2 derives the sentence from activity_events:
@@ -357,27 +352,48 @@ export function ClientDetail() {
             "Multi-year patterns" section since they describe the same
             history axis. Notes promoted from sub-section to a real tab
             so firm-internal memory has its own destination. */}
-        {(
-          [
-            ["todo", "To Do", CircleCheck],
-            ["filings", "Filings", ClipboardList],
-            ["mailbox", "Mailbox", Mail],
-            ["notes", "Notes", Brain],
-          ] as const
-        ).map(([key, label, Icon]) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm ${
-              tab === key
-                ? "text-ink-900 border-b-2 border-ink-900 font-medium"
-                : "text-ink-500 hover:text-ink-700"
-            }`}
-          >
-            <Icon className="w-3.5 h-3.5" aria-hidden />
-            {label}
-          </button>
-        ))}
+        {(() => {
+          // Open-work count for the To Do tab badge — single home for
+          // "what's still on Sarah's plate for this client." Replaces the
+          // duplicate "Open deadlines: N" reading that used to live on the
+          // header meta line.
+          const openDeadlineCount = clientDeadlines.filter(
+            (d) =>
+              d.status !== "completed" && d.status !== "filed_extension",
+          ).length;
+          const filingCount = clientDeadlines.length;
+          const tabsConfig = [
+            { key: "todo" as const, label: "To Do", Icon: CircleCheck, badge: openDeadlineCount },
+            { key: "filings" as const, label: "Filings", Icon: ClipboardList, badge: filingCount },
+            { key: "mailbox" as const, label: "Mailbox", Icon: Mail, badge: 0 },
+            { key: "notes" as const, label: "Notes", Icon: Brain, badge: 0 },
+          ];
+          return tabsConfig.map(({ key, label, Icon, badge }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm ${
+                tab === key
+                  ? "text-ink-900 border-b-2 border-ink-900 font-medium"
+                  : "text-ink-500 hover:text-ink-700"
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" aria-hidden />
+              {label}
+              {badge > 0 && (
+                <span
+                  className={`ml-0.5 text-2xs tabular-nums px-1.5 py-0.5 rounded ${
+                    tab === key
+                      ? "bg-ink-900 text-canvas"
+                      : "bg-sunken text-ink-500"
+                  }`}
+                >
+                  {badge}
+                </span>
+              )}
+            </button>
+          ));
+        })()}
         {/* Overflow menu — Audit log + the v0.6 surfaces (Documents,
             Contacts) demoted out of the primary tab strip in v0.7. */}
         <div className="ml-auto relative">
