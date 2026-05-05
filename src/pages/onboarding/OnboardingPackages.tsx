@@ -6,6 +6,7 @@ import { useStore } from "../../data/store";
 import { BUNDLES } from "../../data/bundles";
 import { suggestBundleForEntity } from "../../data/bundles";
 import type { Client } from "../../types";
+import { ClientChip } from "../../components/ClientChip";
 
 /**
  * Step 2.5 — confirm AI-suggested service packages per client. PRD §3.17
@@ -172,7 +173,12 @@ function ClientRow({
         )}
       </span>
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-ink-900 truncate">{client.name}</p>
+        <ClientChip
+          client={client}
+          size="md"
+          as="span"
+          showState={false}
+        />
         <p className="text-2xs text-ink-500">
           {client.entityType} · {client.primaryState}
         </p>

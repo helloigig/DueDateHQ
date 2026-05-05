@@ -32,7 +32,8 @@ import { trpc } from "@/lib/api/client";
 import { clients as MOCK_CLIENTS } from "@/data/mockClients";
 import { useStore } from "@/data/store";
 import { env } from "@/config";
-import type { Announcement } from "@/types";
+import type { Announcement, ClientTier, StateCode } from "@/types";
+import { ClientChip } from "@/components/ClientChip";
 import { cn } from "@/lib/utils";
 import { EmailBulletinEditModal } from "@/components/EmailBulletinEditModal";
 import { NexusCheckModal } from "@/components/NexusCheckModal";
@@ -80,11 +81,24 @@ interface AffectedClient {
   id: string;
   name: string;
   email?: string;
+  // Tier + primaryState carried so the recipient chips can render the
+  // canonical ClientChip (name + tier dot + state pill) without an extra
+  // roster lookup. Optional because not every client roster shape (legacy
+  // MOCK_CLIENTS fallback, partial imports) carries them. Undefined-when-
+  // missing (not null) to keep the shape compatible with NexusRecipient.
+  tier?: ClientTier;
+  primaryState?: StateCode;
 }
 
 function affectedClientsFor(
   a: Announcement,
-  source: ReadonlyArray<{ id: string; name: string; contactEmail?: string | null }>,
+  source: ReadonlyArray<{
+    id: string;
+    name: string;
+    contactEmail?: string | null;
+    tier?: ClientTier | null;
+    primaryState?: StateCode | null;
+  }>,
 ): AffectedClient[] {
   const map = new Map(source.map((c) => [c.id, c]));
   return a.affectedClientIds
@@ -94,6 +108,8 @@ function affectedClientsFor(
       id: c.id,
       name: c.name,
       email: c.contactEmail ?? undefined,
+      tier: c.tier ?? undefined,
+      primaryState: c.primaryState ?? undefined,
     }));
 }
 
@@ -455,7 +471,15 @@ function CopilotPane({
                             : `Click to exclude ${c.name} from this send`
                         }
                       >
-                        <span className="truncate max-w-[110px]">{c.name}</span>
+                        <span className="truncate max-w-[140px]">
+                          <ClientChip
+                            client={c}
+                            size="sm"
+                            as="span"
+                            showTier
+                            showState={false}
+                          />
+                        </span>
                         <X
                           className={cn(
                             "w-2.5 h-2.5 transition-opacity",

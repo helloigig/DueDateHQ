@@ -61,7 +61,7 @@ import { ExportModal } from "../components/ExportModal";
 import { ExportClientsButton } from "../components/ExportClientsButton";
 import { PinClientButton } from "../components/Sidebar";
 import { BackLink } from "../components/ui/BackLink";
-import { StateChipGroup } from "../components/StateChipGroup";
+import { ClientChip } from "../components/ClientChip";
 import { STATE_NAMES, type StateCode } from "../types";
 import { bundleByName, type FilingBundle } from "../data/bundles";
 import { resolveFederalForm } from "../data/canonicalForm";
@@ -239,13 +239,18 @@ export function ClientDetail() {
           wrapping client name on narrow viewports. */}
       <div className="mt-3 flex flex-col sm:flex-row sm:items-start gap-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Title typography matches PageHeader (text-display, 22/600).
-                Inline h1 (not <PageHeader>) because the badge cluster needs
-                to wrap on the same line as the name. */}
-            <h1 className="text-display font-semibold text-ink-900 leading-7 tracking-[-0.01em]">
-              {client.name}
-            </h1>
+          <div className="flex items-start gap-3 flex-wrap">
+            {/* Canonical client identity — name + tier label + primary
+                state pill, all rendered by the shared ClientChip
+                primitive. as="span" because the page header is already
+                the destination, not a link to itself. */}
+            <ClientChip
+              client={client}
+              size="lg"
+              as="span"
+              showTier
+              showState
+            />
             {/* Entity-type badge — replaces the old comma-separated meta
                 line. The dot-separated `s_corp · Texas · active · Added —`
                 pattern was decorative noise; the data lives in the badge
@@ -256,10 +261,6 @@ export function ClientDetail() {
             >
               {entityTypeDisplay(client.entityType)}
             </span>
-            <StateChipGroup
-              primary={client.primaryState}
-              nexus={client.nexusStates}
-            />
             {/* "Working on" badge — the filings the firm is currently
                 executing for this client. Pulls from active (not-completed,
                 not-extended) deadlines, deduped by formType. Caps at 3 +
@@ -290,12 +291,9 @@ export function ClientDetail() {
               fields. Use whitespace (gap-section) and let label tone carry
               the structure. */}
           <div className="mt-2 text-xs text-ink-500 flex items-baseline flex-wrap gap-x-section gap-y-1">
-            <span>
-              <span className="text-ink-400">Tier</span>{" "}
-              <span className="text-ink-700 font-medium capitalize">
-                {client.tier ?? "standard"}
-              </span>
-            </span>
+            {/* Tier moved into the canonical ClientChip above —
+                identity (name + tier + primary state) lives in one
+                place per the ClientChip primitive contract. */}
             {client.servicePackages.length > 0 ? (
               <span className="inline-flex items-baseline gap-1">
                 <span className="text-ink-400">

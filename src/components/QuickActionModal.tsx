@@ -12,6 +12,7 @@ import {
   useSetDeadlineStatus,
 } from "../hooks/useDeadlines";
 import { env } from "../config";
+import { ClientChip } from "./ClientChip";
 
 type Mode = "choose" | "defer" | "note";
 
@@ -124,7 +125,13 @@ export function QuickActionModal({
       >
         <div className="px-5 py-3 border-b border-line">
           <div className="text-xs uppercase tracking-wide text-ink-500">
-            {client.name}
+            <ClientChip
+              client={client}
+              size="sm"
+              as="link"
+              showTier={false}
+              showState={false}
+            />
           </div>
           <div className="text-sm font-semibold text-ink-900">
             {deadline.form} ·{" "}

@@ -23,6 +23,7 @@ import { simulateInboundDocument } from "../lib/simulate-inbound";
 import { DeadlineChip, defaultActionsForState } from "./ui/DeadlineChip";
 import { classifyDeadlineState } from "../data/dateHelpers";
 import { TaskActions } from "./TaskActions";
+import { ClientChip } from "./ClientChip";
 
 interface Props {
   task: Task;
@@ -73,9 +74,16 @@ export function TaskHeader({
           Clients
         </Link>
         <ChevronRight className="w-3 h-3" aria-hidden />
-        <Link to={`/clients/${client.id}`} className="hover:text-ink-900">
-          {client.name}
-        </Link>
+        {/* Breadcrumb leaf for the client — sm chip keeps it inline at
+            the breadcrumb font size; tier dot is suppressed because the
+            full identity sits in the H1 below. */}
+        <ClientChip
+          client={client}
+          size="sm"
+          as="link"
+          showTier={false}
+          showState={false}
+        />
         <ChevronRight className="w-3 h-3" aria-hidden />
         <span className="text-ink-900">{task.formType}</span>
       </nav>

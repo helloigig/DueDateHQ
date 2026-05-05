@@ -10,6 +10,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { confirmWithUndo, confirmAllWithUndo } from "../lib/confirmWithUndo";
 import { useSetChecklistItemState } from "../hooks/useChecklist";
 import { TODAY, toIso, parseDate, daysBetween } from "../data/dateHelpers";
+import { ClientChip } from "../components/ClientChip";
 
 type Tab = "confirms" | "chases" | "all";
 type Window = "all" | "overdue" | "this_week" | "this_month" | "long_term";
@@ -345,18 +346,19 @@ export function Inbox() {
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-ink-900 truncate">
-                      <span className="font-medium">{client.name}</span>
+                      <ClientChip
+                        client={client}
+                        size="sm"
+                        as="span"
+                        showState
+                      />
                       <span className="text-ink-400"> · </span>
                       {c.label}
                     </p>
                     <p className="text-2xs text-ink-500">
                       {task.formType}
-                      {client.primaryState && (
-                        <>
-                          {" · "}
-                          <span className="font-mono">{client.primaryState}</span>
-                        </>
-                      )}
+                      {/* primaryState now lives inside the ClientChip
+                          above — single source for client identity. */}
                       {showStaffFilter && task.assignedUser && (
                         <>
                           {" · "}
