@@ -524,7 +524,10 @@ export function Timeline() {
           burning ~120px of vertical canvas. The line keeps the
           tone-coded numbers so the eye still picks up urgency at a
           glance, but doesn't pretend to be a hero metric. */}
-      <div className="mb-region text-xs text-ink-500 flex items-center gap-3 flex-wrap">
+      {/* Discrete metrics — gap-section spacing, not middle dots. Per
+          DESIGN.md §Don't (line ~484): "Don't separate metric values with
+          middle dots when a clean row works." */}
+      <div className="mb-region text-xs text-ink-500 flex items-baseline gap-x-section gap-y-1 flex-wrap">
         <span>
           <span
             className={cn(
@@ -536,7 +539,6 @@ export function Timeline() {
           </span>{" "}
           behind internal
         </span>
-        <span className="text-ink-300" aria-hidden>·</span>
         <span>
           <span
             className={cn(
@@ -548,7 +550,6 @@ export function Timeline() {
           </span>{" "}
           awaiting docs
         </span>
-        <span className="text-ink-300" aria-hidden>·</span>
         <span>
           <span
             className={cn(

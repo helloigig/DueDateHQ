@@ -165,10 +165,10 @@ export function TaskActions({ task }: Props) {
         ) : (
           <button
             onClick={onMarkComplete}
-            className={`text-sm px-3 py-1.5 rounded inline-flex items-center gap-1.5 ${
+            className={`text-sm px-3 py-1.5 rounded-md inline-flex items-center gap-1.5 ${
               isLowConfidence
                 ? "bg-warn-bg text-warn-ink border border-warn-border hover:bg-warn-bg/80"
-                : "bg-accent text-canvas hover:bg-accent-hover"
+                : "bg-indigo text-white hover:bg-indigo-hover"
             }`}
             title={
               isLowConfidence

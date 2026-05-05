@@ -181,7 +181,7 @@ export function TaskDetail() {
         task={task}
         client={client}
         completionPct={completionPct(checklist)}
-        // Chase from the DeadlineChip opens the same Mode D draft modal
+        // Chase from the DeadlineChip opens the same AI-drafted modal
         // as the per-checklist-item "Send reminder" — task-level chase
         // (no specific item) leaves checklistItem undefined.
         onChase={() => setEmailIntent({ task, client })}

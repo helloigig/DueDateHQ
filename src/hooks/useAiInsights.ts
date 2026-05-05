@@ -22,13 +22,13 @@ export function useAiInsightsForClient(
 
 /** All open insights — used by triage queue / global insight strip. Mock-
  *  only for now (BE doesn't expose a firm-wide insights list yet — Phase 1
- *  with the Mode E sweep). */
+ *  with the cross-year-insighter sweep). */
 export function useAllOpenInsights(): AiInsight[] {
   const { aiInsights } = useStore();
   return aiInsights.filter((i) => i.status === "open");
 }
 
-/** Per-client imported facts (Mode B/C/E baseline). Mock-only — Phase 1
+/** Per-client imported facts (arrival-timing / anomaly / cross-year baseline). Mock-only — Phase 1
  *  exposes via `importedFacts.listForClient`. */
 export function useImportedFactsForClient(clientId: string | undefined) {
   const { importedFacts } = useStore();

@@ -84,7 +84,10 @@ export function Import({ chromeless = false }: { chromeless?: boolean } = {}) {
       {!chromeless && (
         <>
           <BackLink fallback="/clients" fallbackLabel="Clients" />
-          <h1 className="mt-3 text-xl font-semibold text-ink-900">
+          {/* Title typography matches PageHeader (text-display, 22/600).
+              Inline h1 here because the import wizard chrome (BackLink +
+              progress steps) precedes the title in tight vertical rhythm. */}
+          <h1 className="mt-3 text-display font-semibold text-ink-900 leading-7 tracking-[-0.01em]">
             Upload clients from CSV
           </h1>
         </>
@@ -528,7 +531,7 @@ function PreviewStep({
               <th className="text-left px-4 py-2 font-medium">Entity</th>
               <th className="text-left px-4 py-2 font-medium">State</th>
               <th className="text-left px-4 py-2 font-medium">Email</th>
-              <th className="text-left px-4 py-2 font-medium">Bundle</th>
+              <th className="text-left px-4 py-2 font-medium">Service package</th>
               <th
                 className="text-left px-4 py-2 font-medium"
                 title="Tier (0–3) and additional nexus states from the CSV"

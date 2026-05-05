@@ -9,7 +9,7 @@ import type { Client } from "../../types";
 
 /**
  * Step 2.5 — confirm AI-suggested service packages per client. PRD §3.17
- * step 4. Auto-suggests via Mode A substrate (entity + state); user confirms
+ * step 4. Auto-suggests via inbound-classifier substrate (entity + state); user confirms
  * or picks differently. Bulk action: "Apply S-Corp Standard to all S-Corps."
  *
  * Inserted between roster import and Done so the user sees their substrate-

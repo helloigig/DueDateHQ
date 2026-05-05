@@ -176,7 +176,7 @@ export function OAuthWireframeModal({ provider, onClose }: Props) {
               </p>
               <p className="text-xs text-ok-ink">
                 <span className="font-semibold tabular-nums">{imported.facts}</span> prior-year facts
-                imported (powers Mode B/C/E).
+                imported.
               </p>
             </div>
             <p className="text-xs text-ink-500">

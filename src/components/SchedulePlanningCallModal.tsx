@@ -45,7 +45,7 @@ const WINDOW_OPTIONS = [
 ] as const;
 
 // Talking-points generator stub. In production, BE returns this per-client
-// (Mode E personalization). For the design-stage modal we use a generic set
+// (cross-year-insighter personalization). For the design-stage modal we use a generic set
 // that adapts to the alert's summary.
 function talkingPointsFor(_client: Client, ann: Announcement): string[] {
   return [

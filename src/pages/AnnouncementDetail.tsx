@@ -320,23 +320,26 @@ export function AnnouncementDetail() {
               )}
             </div>
 
+            {/* Issuance / effective / detected — stitched as one metadata
+                string (middle dots within a string are valid per DESIGN.md
+                §Don't). Detected uses date-only per the no-times-of-day
+                policy (memory: feedback_deadlines_dates_only). */}
             <div className="text-sm text-ink-700 mt-3">
               Issued {formatLongDate(ann.issuanceDate)}
               {ann.effectiveDate &&
                 ` · Effective ${formatLongDate(ann.effectiveDate)}`}{" "}
-              · Detected {new Date(ann.detectedAt).toLocaleString("en-US")}
+              · Detected {formatLongDate(ann.detectedAt.slice(0, 10))}
             </div>
 
-            <div className="mt-3 flex items-center gap-3 text-sm">
+            <div className="mt-3 flex items-center gap-x-section gap-y-1 flex-wrap text-sm">
               <a
                 href={ann.sourceUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-indigo-600 hover:underline"
+                className="text-indigo-ink hover:underline"
               >
                 View official source ↗
               </a>
-              <span className="text-ink-400">·</span>
               <span
                 className="text-ink-700"
                 title={SOURCE_AUTHORITY_TOOLTIP[ann.sourceAuthority]}

@@ -30,7 +30,7 @@ interface Props {
   client: Client;
   /** Completion percentage 0-100 from the checklist; renders the progress ring. */
   completionPct?: number;
-  /** Open the Mode D email-draft modal in chase mode. The DeadlineChip
+  /** Open the AI email-draft modal in chase mode. The DeadlineChip
    *  surfaces this when `recommendedAction === "chase"`. Wired by the
    *  parent (TaskDetail) so the modal state stays at page scope. */
   onChase?: () => void;
@@ -86,7 +86,10 @@ export function TaskHeader({
         <div className="min-w-0 flex items-start gap-3">
           <ProgressRing pct={completionPct} />
           <div>
-          <h1 className="text-xl font-semibold text-ink-900">
+          {/* Title typography matches PageHeader (text-display, 22/600).
+              Inline h1 (not <PageHeader>) because the deadline chip + meta
+              cling to the title row inside a flex layout. */}
+          <h1 className="text-display font-semibold text-ink-900 leading-7 tracking-[-0.01em]">
             {task.formType}
           </h1>
           {/* Deadline state chip — replaces the parallel "Due / Internal target /
@@ -130,7 +133,7 @@ export function TaskHeader({
                   status: task.status,
                 }).recommendedAction,
                 {
-                  // Chase opens the Mode D draft modal — handler lives on
+                  // Chase opens the AI-drafted modal — handler lives on
                   // TaskDetail so modal state stays page-scoped. Resolved
                   // in favour of main's prop-callback wiring (was: chip
                   // passed undefined to suppress chase entirely while we
@@ -169,14 +172,13 @@ export function TaskHeader({
               View in Timeline
             </Link>
           </div>
-          <div className="text-xs text-ink-500 mt-2 flex items-center flex-wrap gap-x-3 gap-y-1">
+          <div className="text-xs text-ink-500 mt-2 flex items-baseline flex-wrap gap-x-section gap-y-1">
             <span>
               <span className="text-ink-400">Preparer:</span>{" "}
               <span className="text-ink-900">
                 {task.assignedUser || "Unassigned"}
               </span>
             </span>
-            <span className="text-ink-300">·</span>
             <span>
               <span className="text-ink-400">Reviewer:</span>{" "}
               <span className={task.reviewerUser ? "text-ink-900" : "text-ink-500"}>

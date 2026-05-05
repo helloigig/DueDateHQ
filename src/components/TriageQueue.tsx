@@ -31,9 +31,9 @@ import { StateBadge } from "./ui/StateBadge";
  *
  * Composition by urgency:
  *   1. Decisions waiting on the CPA (yellow zone): confirms + flag resolutions
- *   2. Today's outgoing: Mode B-timed reminders ready to send
+ *   2. Today's outgoing: arrival-timing-timed reminders ready to send
  *   3. External signals: state alerts affecting clients (Pattern 3)
- *   4. Advisory opportunities: Mode E insights (Pattern 4)
+ *   4. Advisory opportunities: cross-year-insighter insights (Pattern 4)
  *
  * What it deliberately ISN'T: a calendar. Time-grouped deadlines live below
  * as a secondary "context" section the CPA scrolls to only when they need
@@ -169,7 +169,7 @@ export function TriageQueue({ onCountChange }: Props) {
       });
     }
 
-    // 5) Advisory opportunities (Mode E)
+    // 5) Advisory opportunities (cross-year-insighter)
     for (const ins of insights) {
       const client = clientById.get(ins.clientId);
       if (!client) continue;
@@ -298,7 +298,7 @@ export function TriageQueue({ onCountChange }: Props) {
               key: "outgoing",
               title: "Today's outgoing",
               blurb:
-                "Reminders Mode B says it's time to send. Each opens the AI draft modal — you review, you send.",
+                "Reminders the AI flagged as ready to send. Each opens the draft — you review, you send.",
               items: items.filter((i) => i.kind === "outgoing_reminder"),
             },
             {
@@ -312,7 +312,7 @@ export function TriageQueue({ onCountChange }: Props) {
               key: "advisory",
               title: "Advisory opportunities",
               blurb:
-                "Mode E pattern recognition. The lever for moving from preparer to advisor (Pattern 4).",
+                "Cross-year patterns the AI surfaced — the lever for moving from preparer to advisor.",
               items: items.filter((i) => i.kind === "insight"),
             },
           ];

@@ -4,13 +4,13 @@ import { Link } from "react-router-dom";
 import { useAnnouncements } from "../hooks/useAnnouncements";
 import { trpc } from "../lib/api/client";
 
-// Mode F Health module — per IA v0.7 amendment §3.9d.
+// State monitoring health module — per IA v0.7 amendment §3.9d.
 //
 // State-monitoring's own monitoring. Without this surface, "no alerts" is
 // ambiguous (real silence vs. monitoring is broken). This is the second
 // module on Today, below the action queue.
 //
-// Per PRD §4.3 Mode F SLO: per-state freshness ≤ 6h target / ≤ 24h hard ceiling.
+// Per PRD §4.3 state-monitor freshness SLO: per-state freshness ≤ 6h target / ≤ 24h hard ceiling.
 // Color: green if all states ≤ 6h fresh; amber if any 6-24h stale; red if any
 // > 24h or scraper job dead.
 //
@@ -99,7 +99,7 @@ export function ModeFHealth() {
       <div className="text-sm text-ink-900">
         {queryDegraded ? (
           <span className="text-danger-ink">
-            Announcement pipeline unreachable — Mode F degraded.{" "}
+            Announcement pipeline unreachable — monitoring degraded.{" "}
             <button
               onClick={() => {
                 healthQuery.refetch();
@@ -161,7 +161,7 @@ export function ModeFHealth() {
           to="/settings/integrations"
           className="text-ink-500 hover:text-ink-900 underline-offset-2 hover:underline"
         >
-          Mode F eval metrics →
+          Monitoring eval metrics →
         </Link>
         {!queryDegraded && !queryLoading && (
           <span className="ml-auto text-2xs text-ink-300 italic">

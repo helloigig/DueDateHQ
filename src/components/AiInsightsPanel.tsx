@@ -22,8 +22,8 @@ interface Props {
 
 /**
  * Right rail on Task detail; collapsible section on Client detail. Surfaces
- * Mode B (per-client timing), Mode C aggregated (last year's issues), and
- * Mode E (cross-year cards). Cold-start fallback per PRD §4.2 when there's
+ * arrival-timing (per-client timing), anomaly aggregated (last year's issues), and
+ * cross-year-insighter (cross-year cards). Cold-start fallback per PRD §4.2 when there's
  * no ImportedFact history.
  */
 export function AiInsightsPanel({
@@ -36,7 +36,7 @@ export function AiInsightsPanel({
 }: Props) {
   const hasHistory = facts.length > 0;
   const openInsights = insights.filter((i) => i.status === "open");
-  // Cross-fact consistency — Mode C-style flags when same fact has multiple
+  // Cross-fact consistency — anomaly-detector-style flags when same fact has multiple
   // sources with disagreeing values (PRD §9.6 v0.8 amendment). Renders below
   // cross-year insights as its own section.
   const consistencyQuery = trpc.imports.factConsistency.useQuery({
@@ -80,7 +80,7 @@ export function AiInsightsPanel({
           AI insights
         </h2>
         <span className="ml-auto text-2xs text-ink-400">
-          Mode B · C · E
+          Timing · consistency · cross-year
         </span>
       </header>
 
@@ -142,10 +142,10 @@ export function AiInsightsPanel({
         </div>
       )}
 
-      {/* Cross-fact consistency — Mode C flags */}
+      {/* Cross-fact consistency — anomaly-detector flags */}
       {consistencyFlags.length > 0 && (
         <div className="border-b border-line">
-          <SectionTitle>Fact consistency (Mode C)</SectionTitle>
+          <SectionTitle>Fact consistency</SectionTitle>
           <ul className="divide-y divide-line">
             {consistencyFlags.map((flag, i) => (
               <li
@@ -217,10 +217,10 @@ export function AiInsightsPanel({
         </div>
       )}
 
-      {/* Mode E — cross-year insights */}
+      {/* cross-year-insighter — cross-year insights */}
       {openInsights.length > 0 && (
         <div className="border-b border-line">
-          <SectionTitle>Cross-year (Mode E)</SectionTitle>
+          <SectionTitle>Cross-year insights</SectionTitle>
           <ul className="divide-y divide-line">
             {openInsights.map((insight) => (
               <li key={insight.id} className="px-4 py-3">
@@ -273,10 +273,10 @@ export function AiInsightsPanel({
         </div>
       )}
 
-      {/* Mode B — per-client timing */}
+      {/* arrival-timing — per-client timing */}
       {timingPreds.length > 0 && (
         <div className="border-b border-line">
-          <SectionTitle>Arrival timing (Mode B)</SectionTitle>
+          <SectionTitle>Arrival timing</SectionTitle>
           <ul className="divide-y divide-line">
             {timingPreds.slice(0, 5).map((t) => (
               <li key={t.itemType} className="px-4 py-2.5 text-xs text-ink-700">
@@ -292,10 +292,10 @@ export function AiInsightsPanel({
         </div>
       )}
 
-      {/* Mode E — cross-year missing patterns */}
+      {/* cross-year-insighter — cross-year missing patterns */}
       {crossYear.length > 0 && (
         <div className="border-b border-line">
-          <SectionTitle>Missing this year (Mode E)</SectionTitle>
+          <SectionTitle>Missing this year</SectionTitle>
           <ul className="divide-y divide-line">
             {crossYear.slice(0, 4).map((c) => (
               <li key={c.itemType} className="px-4 py-2.5">

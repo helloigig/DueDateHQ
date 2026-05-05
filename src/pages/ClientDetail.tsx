@@ -241,7 +241,10 @@ export function ClientDetail() {
       <div className="mt-3 flex flex-col sm:flex-row sm:items-start gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-semibold text-ink-900">
+            {/* Title typography matches PageHeader (text-display, 22/600).
+                Inline h1 (not <PageHeader>) because the badge cluster needs
+                to wrap on the same line as the name. */}
+            <h1 className="text-display font-semibold text-ink-900 leading-7 tracking-[-0.01em]">
               {client.name}
             </h1>
             {/* Entity-type badge — replaces the old comma-separated meta
@@ -282,16 +285,20 @@ export function ClientDetail() {
               tier · service packages · open deadline counts · since.
               All read-only; deeper edits live in the modals (Edit /
               service package settings). */}
-          <div className="mt-2 text-xs text-ink-500 flex items-center flex-wrap gap-x-2 gap-y-1">
+          {/* Engagement meta — discrete fields (Tier / Packages / Open
+              deadlines / Since). Per DESIGN.md §Don'ts: middle dots are for
+              within-field metadata strings, not for separating discrete
+              fields. Use whitespace (gap-section) and let label tone carry
+              the structure. */}
+          <div className="mt-2 text-xs text-ink-500 flex items-baseline flex-wrap gap-x-section gap-y-1">
             <span>
               <span className="text-ink-400">Tier</span>{" "}
               <span className="text-ink-700 font-medium capitalize">
                 {client.tier ?? "standard"}
               </span>
             </span>
-            <span className="text-ink-300" aria-hidden>·</span>
             {client.servicePackages.length > 0 ? (
-              <span className="inline-flex items-center gap-1">
+              <span className="inline-flex items-baseline gap-1">
                 <span className="text-ink-400">
                   {client.servicePackages.length === 1
                     ? "Package"
@@ -307,7 +314,6 @@ export function ClientDetail() {
                 <span className="text-ink-500">— none assigned</span>
               </span>
             )}
-            <span className="text-ink-300" aria-hidden>·</span>
             <span>
               <span className="text-ink-400">Open deadlines</span>{" "}
               <span className="text-ink-700 font-medium tabular-nums">
@@ -318,7 +324,6 @@ export function ClientDetail() {
                 ).length}
               </span>
             </span>
-            <span className="text-ink-300" aria-hidden>·</span>
             <span>
               <span className="text-ink-400">Since</span>{" "}
               <span className="text-ink-700">{addedAtLabel}</span>
@@ -963,7 +968,7 @@ function ToDoTab({
   // both surfaces.
   const todoQuery = trpc.todoItems.list.useQuery({ limit: 200 });
   const liveTodoItems = todoQuery.data?.items ?? [];
-  // Mode B rows include a per-checklist-item snapshot. Flatten across
+  // arrival-timing rows include a per-checklist-item snapshot. Flatten across
   // every TodoItem that belongs to this client, attaching the parent
   // task metadata so the per-item rows can render formType/jurisdiction
   // exactly the way Today's expanded panel does.
@@ -1461,7 +1466,7 @@ function MailboxTab({ client }: { client: Client }) {
           </h3>
           <span
             className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
-            title="Mode D — drafts wait for your review before send."
+            title="email-drafter — drafts wait for your review before send."
           >
             <Sparkles className="w-3 h-3" aria-hidden />
             AI drafted
@@ -1505,7 +1510,7 @@ function MailboxTab({ client }: { client: Client }) {
 }
 
 /**
- * Compact Mode B/E summary card on the client header. Click to expand
+ * Compact arrival-timing / cross-year summary card on the client header. Click to expand
  * for the full insights panel. Cold-start fallback per PRD §4.2.
  */
 function ClientAiInsightsCard({ clientId }: { clientId: string }) {
@@ -1515,7 +1520,7 @@ function ClientAiInsightsCard({ clientId }: { clientId: string }) {
   const clientQuery = useClient(clientId);
   const client = clientQuery.data;
 
-  // Layer B advisory triggers — derive from Mode E. Tag insights by
+  // Layer B advisory triggers — derive from cross-year-insighter. Tag insights by
   // category for visual grouping. PRD §4.4 Layer B.
   const advisoryTriggers = open.filter((i) => i.mode === "E");
   // Churn-risk early warning — derive from heuristics on response patterns
@@ -1547,7 +1552,7 @@ function ClientAiInsightsCard({ clientId }: { clientId: string }) {
 
   return (
     <div className="mt-4 space-y-2">
-      {/* Layer B: advisory triggers (Mode E) — these are the "wages doubled
+      {/* Layer B: advisory triggers (cross-year-insighter) — these are the "wages doubled
           → 401k convo" / "Schedule E disappeared → did the property sell?"
           surfaces. The lever for moving from preparer to advisor (Pattern 4). */}
       {advisoryTriggers.length > 0 && (
@@ -1595,7 +1600,7 @@ function ClientAiInsightsCard({ clientId }: { clientId: string }) {
         </div>
       )}
 
-      {/* Mode B / aggregated facts — shown only if no advisory items, since
+      {/* arrival-timing / aggregated facts — shown only if no advisory items, since
           they're more ambient than actionable. */}
       {advisoryTriggers.length === 0 && facts.length > 0 && (
         <div className="bg-surface border border-line rounded-md px-4 py-2 text-xs text-ink-500">
@@ -1629,7 +1634,7 @@ function churnRiskSignals(score: number): string {
 /**
  * Documents tab — IA §3.3. Longitudinal table: rows = document types,
  * columns = tax years. Each cell shows whether the doc was received in
- * that year. Powers the "did we have this last year" Mode E surface.
+ * that year. Powers the "did we have this last year" cross-year-insighter surface.
  */
 function DocumentsTab({ client }: { client: Client }) {
   const facts = useImportedFactsForClient(client.id);
@@ -1691,7 +1696,7 @@ function DocumentsTab({ client }: { client: Client }) {
         </h3>
         <p className="text-xs text-ink-500 mt-1">
           Rows are document types. Columns are tax years. Highlights gaps where
-          last year had a doc and this year doesn't (Mode E).
+          last year had a doc and this year doesn't (cross-year-insighter).
         </p>
       </div>
       <div className="overflow-x-auto">
@@ -1758,12 +1763,12 @@ function DocumentsTab({ client }: { client: Client }) {
  *
  *   • avg response time to chase emails (inbound_replies vs email_drafts)
  *   • reminder-to-receipt ratio (how many chases per item received)
- *   • Mode A confidence rate (avg aiConfidence on classified docs)
+ *   • inbound-classifier confidence rate (avg aiConfidence on classified docs)
  *   • extension history (count of tasks.status === "filed_extension")
  *   • pushback frequency (replyIntent === "timeline_pushback" rate)
  *   • mismatched-attachment rate (replyIntent === "mismatched_attachment")
  *   • bounce rate on outbound to this client
- *   • AI insight resolution rate (Mode E aiInferences.wasActedOn)
+ *   • AI insight resolution rate (cross-year-insighter aiInferences.wasActedOn)
  *
  * The CPA can edit the auto-text manually; the override persists to
  * `clients.ai_summary_override` (Phase 2 schema). Until the composer
@@ -1793,7 +1798,7 @@ function ClientAiSummary({ client }: { client: Client }) {
           onChange={(e) => setDraft(e.target.value)}
           rows={3}
           maxLength={500}
-          className="w-full text-sm bg-surface border border-line rounded px-2 py-1.5 text-ink-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+          className="w-full text-sm bg-surface border border-line rounded px-2 py-1.5 text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2"
         />
         <div className="mt-2 flex items-center justify-end gap-2">
           <button

@@ -77,7 +77,7 @@ export function DocumentMatrixPreview({
   }
 
   // Detect a possible gap to surface in the subtitle: a doc that came
-  // in last year but hasn't this year. Mode E's small wedge.
+  // in last year but hasn't this year. cross-year-insighter's small wedge.
   const gapType = useMemo(() => {
     for (const t of types) {
       if (

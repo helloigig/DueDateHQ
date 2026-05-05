@@ -404,7 +404,7 @@ export function Mail() {
                 }}
                 className={`rounded-md border border-line bg-surface p-3 hover:bg-sunken/40 ${
                   canOpenTask || m.clientId
-                    ? "cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                    ? "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2"
                     : "cursor-default opacity-90"
                 }`}
                 aria-label={
@@ -666,7 +666,7 @@ function TaskPicker({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search by client or form…"
-          className="m-3 px-3 py-2 border border-line rounded text-sm bg-surface focus:outline-none focus:ring-1 focus:ring-accent"
+          className="m-3 px-3 py-2 border border-line rounded text-sm bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2"
         />
         <ul className="flex-1 overflow-y-auto divide-y divide-line">
           {clientsQuery.isLoading || tasksQuery.isLoading ? (
