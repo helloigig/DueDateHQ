@@ -1,5 +1,6 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { lazyWithChunkRetry } from "./lib/lazy-with-retry";
 // Auth pages stay eagerly imported — they're the entry points (post-signout
 // redirect target + magic-link landing) and are individually tiny. Loading
 // them lazily would just add a Suspense flash on the most-hit page.
@@ -13,88 +14,88 @@ import { Changes } from "./pages/Changes";
 
 // Protected app pages — code-split. Keeps /login bundle small (no
 // Dashboard, Clients, mock seed data, etc. on the entry page).
-const AppShell = lazy(() =>
+const AppShell = lazyWithChunkRetry(() =>
   import("./components/AppShell").then((m) => ({ default: m.AppShell })),
 );
-const Dashboard = lazy(() =>
+const Dashboard = lazyWithChunkRetry(() =>
   import("./pages/Dashboard").then((m) => ({ default: m.Dashboard })),
 );
-const Clients = lazy(() =>
+const Clients = lazyWithChunkRetry(() =>
   import("./pages/Clients").then((m) => ({ default: m.Clients })),
 );
-const ClientDetail = lazy(() =>
+const ClientDetail = lazyWithChunkRetry(() =>
   import("./pages/ClientDetail").then((m) => ({ default: m.ClientDetail })),
 );
-const TaskDetail = lazy(() =>
+const TaskDetail = lazyWithChunkRetry(() =>
   import("./pages/TaskDetail").then((m) => ({ default: m.TaskDetail })),
 );
-const Inbox = lazy(() =>
+const Inbox = lazyWithChunkRetry(() =>
   import("./pages/Inbox").then((m) => ({ default: m.Inbox })),
 );
-const Insights = lazy(() =>
+const Insights = lazyWithChunkRetry(() =>
   import("./pages/Insights").then((m) => ({ default: m.Insights })),
 );
-const Mail = lazy(() =>
+const Mail = lazyWithChunkRetry(() =>
   import("./pages/Mail").then((m) => ({ default: m.Mail })),
 );
-const Timeline = lazy(() =>
+const Timeline = lazyWithChunkRetry(() =>
   import("./pages/Timeline").then((m) => ({ default: m.Timeline })),
 );
 // /alerts is the v0u 3-column workshop surface (rail | feed | pane).
 // Mounted OUTSIDE AppShell so the v0u layout owns the viewport — the rail
 // inside Alerts.tsx carries primary nav for this surface.
-const Alerts = lazy(() =>
+const Alerts = lazyWithChunkRetry(() =>
   import("./pages/Alerts").then((m) => ({ default: m.Alerts })),
 );
-const Import = lazy(() =>
+const Import = lazyWithChunkRetry(() =>
   import("./pages/Import").then((m) => ({ default: m.Import })),
 );
-const Placeholder = lazy(() =>
+const Placeholder = lazyWithChunkRetry(() =>
   import("./pages/Placeholder").then((m) => ({ default: m.Placeholder })),
 );
-const Settings = lazy(() =>
+const Settings = lazyWithChunkRetry(() =>
   import("./pages/Settings").then((m) => ({ default: m.Settings })),
 );
-const Calendar = lazy(() =>
+const Calendar = lazyWithChunkRetry(() =>
   import("./pages/Calendar").then((m) => ({ default: m.Calendar })),
 );
-const TodayDesign = lazy(() =>
+const TodayDesign = lazyWithChunkRetry(() =>
   import("./pages/Today").then((m) => ({ default: m.Today })),
 );
-const TodayTriage = lazy(() =>
+const TodayTriage = lazyWithChunkRetry(() =>
   import("./pages/TodayTriage").then((m) => ({ default: m.TodayTriage })),
 );
-const OnboardingFirm = lazy(() =>
+const OnboardingFirm = lazyWithChunkRetry(() =>
   import("./pages/onboarding/OnboardingFirm").then((m) => ({
     default: m.OnboardingFirm,
   })),
 );
-const OnboardingChoosePath = lazy(() =>
+const OnboardingChoosePath = lazyWithChunkRetry(() =>
   import("./pages/onboarding/OnboardingChoosePath").then((m) => ({
     default: m.OnboardingChoosePath,
   })),
 );
-const OnboardingManual = lazy(() =>
+const OnboardingManual = lazyWithChunkRetry(() =>
   import("./pages/onboarding/OnboardingManual").then((m) => ({
     default: m.OnboardingManual,
   })),
 );
-const OnboardingDemo = lazy(() =>
+const OnboardingDemo = lazyWithChunkRetry(() =>
   import("./pages/onboarding/OnboardingDemo").then((m) => ({
     default: m.OnboardingDemo,
   })),
 );
-const OnboardingImport = lazy(() =>
+const OnboardingImport = lazyWithChunkRetry(() =>
   import("./pages/onboarding/OnboardingImport").then((m) => ({
     default: m.OnboardingImport,
   })),
 );
-const OnboardingPackages = lazy(() =>
+const OnboardingPackages = lazyWithChunkRetry(() =>
   import("./pages/onboarding/OnboardingPackages").then((m) => ({
     default: m.OnboardingPackages,
   })),
 );
-const OnboardingDone = lazy(() =>
+const OnboardingDone = lazyWithChunkRetry(() =>
   import("./pages/onboarding/OnboardingDone").then((m) => ({
     default: m.OnboardingDone,
   })),

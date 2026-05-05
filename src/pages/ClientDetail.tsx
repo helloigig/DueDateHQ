@@ -63,6 +63,12 @@ import { PinClientButton } from "../components/Sidebar";
 import { BackLink } from "../components/ui/BackLink";
 import { PageContainer } from "../components/ui/PageContainer";
 import { StateChipGroup } from "../components/StateChipGroup";
+import { ClientChip } from "../components/ClientChip";
+// PageContainer (from main, PR #133) for the 1080px page width.
+// StateChipGroup (also from main) dropped — ClientChip's `lg` variant
+// renders the state pill internally, so importing the standalone group
+// here is dead weight after the migration.
+import { PageContainer } from "../components/ui/PageContainer";
 import { STATE_NAMES, type StateCode } from "../types";
 import { bundleByName, type FilingBundle } from "../data/bundles";
 import { resolveFederalForm } from "../data/canonicalForm";
@@ -275,6 +281,23 @@ export function ClientDetail() {
             <h1 className="text-display font-semibold text-ink-900 leading-7 tracking-[-0.01em]">
               {client.name}
             </h1>
+          {/* Row 1: identity. ClientChip (size="lg", showTier, showState)
+              is the canonical rendering of the name+tier+state triplet —
+              this is the migration target of PR #135; the standalone
+              StateChipGroup and the inline H1 it replaced are removed.
+              Entity-type badge + archived flag remain as siblings since
+              they're not part of the per-client identity tuple. The
+              "Working on" badge that used to live here was relocated to
+              the meta line below in PR #133 — it's context, not headline
+              (Mercury T2: one accent per viewport). */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <ClientChip
+              client={client}
+              size="lg"
+              as="span"
+              showTier
+              showState
+            />
             <span
               className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line"
               title="Entity type"
@@ -307,6 +330,11 @@ export function ClientDetail() {
                 {client.tier ?? "standard"}
               </span>
             </span>
+            {/* Tier moved into the canonical ClientChip above (lg
+                variant with showTier renders the label inline next to
+                the name) — identity (name + tier + primary state)
+                lives in one place per the ClientChip primitive
+                contract. */}
             {client.servicePackages.length > 0 && (
               <span className="inline-flex items-baseline gap-1">
                 <span className="text-ink-400">
@@ -1201,31 +1229,63 @@ function ToDoTab({
   const taskHref = (taskId?: string) =>
     taskId ? `/clients/${client.id}/tasks/${taskId}` : `/clients/${client.id}`;
 
-  // Derive the unique tasks from the items list — each task is a
-  // first-class navigable unit on this surface. Yuqi audit 2026-05-05:
-  // "you can't enter task from client" — items used to be flat with the
-  // task name buried as small subtitle, the task was never the click
-  // target. This strip surfaces tasks as the primary unit and a clear
-  // entry point to TaskDetail.
+  // Derive the unique tasks from BOTH:
+  //   (a) the full per-client task list (useTasksForClient / store tasks
+  //       in mock mode) — so every task shows, even ones without open
+  //       todoItems right now (Yuqi audit 2026-05-06: previously a
+  //       client with all-confirmed items had an empty Tasks strip
+  //       even though its tasks still existed).
+  //   (b) any items that DO have open todoItems — surfaces the
+  //       open-count badge on the matching chip.
+  // Each task is a first-class navigable unit on this surface;
+  // clicking → TaskDetail.
+  const remoteTasksList = useTasksForClient(
+    !env.useMockData ? client.id : undefined,
+  );
   const tasksOnPage = useMemo(() => {
-    const seen = new Map<string, { id: string; name: string; openCount: number }>();
+    const seen = new Map<
+      string,
+      { id: string; name: string; openCount: number }
+    >();
+    // (a) Seed from the canonical per-client task list. Real mode
+    // pulls from BE via useTasksForClient; mock mode reads the store.
+    const sourceTasks = env.useMockData
+      ? storeTasks.filter((t) => t.clientId === client.id)
+      : remoteTasksList;
+    for (const t of sourceTasks) {
+      const taskName =
+        // Live BE shape carries formType + jurisdiction; mock store has
+        // the same fields. Compose a readable label either way.
+        [t.formType, t.jurisdiction].filter(Boolean).join(" · ") ||
+        "Task";
+      seen.set(t.id, { id: t.id, name: taskName, openCount: 0 });
+    }
+    // (b) Layer in open counts from the items list — only items the
+    // client owes (waiting / not requested / unreviewed / issue) count
+    // toward the badge.
     for (const ci of items) {
       if (!ci.taskId) continue;
-      const entry = seen.get(ci.taskId) ?? {
-        id: ci.taskId,
-        name: ci.taskName ?? "Task",
-        openCount: 0,
-      };
       const isOpen =
         ci.state === "not_requested" ||
         ci.state === "requested_waiting" ||
         ci.state === "received_unreviewed" ||
         ci.state === "received_issue";
-      if (isOpen) entry.openCount += 1;
-      seen.set(ci.taskId, entry);
+      if (!isOpen) continue;
+      const entry = seen.get(ci.taskId);
+      if (entry) {
+        entry.openCount += 1;
+      } else {
+        // Item references a task we didn't see in (a) — fall back to
+        // the item's taskName so the chip still shows.
+        seen.set(ci.taskId, {
+          id: ci.taskId,
+          name: ci.taskName ?? "Task",
+          openCount: 1,
+        });
+      }
     }
     return Array.from(seen.values()).sort((a, b) => b.openCount - a.openCount);
-  }, [items]);
+  }, [items, remoteTasksList, storeTasks, client.id]);
 
   return (
     <div className="space-y-4">

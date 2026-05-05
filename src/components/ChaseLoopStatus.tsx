@@ -12,6 +12,7 @@ import { useSetChecklistItemState } from "../hooks/useChecklist";
 import { useAllOpenInsights } from "../hooks/useAiInsights";
 import { TODAY, toIso } from "../data/dateHelpers";
 import { EmailDraftModal, type EmailDraftIntent } from "./EmailDraftModal";
+import { ClientChip } from "./ClientChip";
 
 /**
  * The dashboard hero — re-organized around what actually blocks the CPA's
@@ -164,7 +165,7 @@ export function ChaseLoopStatus() {
                     onClick={() => navigate(`/clients/${client.id}/tasks/${task.id}`)}
                     className="text-left hover:underline w-full"
                   >
-                    <span className="font-medium text-ink-900">{client.name}</span>
+                    <ClientChip client={client} size="sm" as="span" />
                     <span className="text-ink-400"> · </span>
                     <span>{d.item.label}</span>
                     <span className="text-ink-400"> — </span>
@@ -184,7 +185,7 @@ export function ChaseLoopStatus() {
                     onClick={() => navigate(`/clients/${client.id}`)}
                     className="text-left hover:underline w-full"
                   >
-                    <span className="font-medium text-ink-900">{client.name}</span>
+                    <ClientChip client={client} size="sm" as="span" />
                     <span className="text-ink-400"> · </span>
                     <span className="line-clamp-1">{d.insight.title}</span>
                   </button>
@@ -236,7 +237,7 @@ export function ChaseLoopStatus() {
                   onClick={() => navigate(`/clients/${client.id}/tasks/${task.id}`)}
                   className="text-left hover:underline truncate flex-1"
                 >
-                  <span className="font-medium text-ink-900">{client.name}</span>
+                  <ClientChip client={client} size="sm" as="span" />
                   <span className="text-ink-400"> · </span>
                   <span>{c.label}</span>
                 </button>
@@ -296,7 +297,7 @@ export function ChaseLoopStatus() {
                   <Mail className="w-3 h-3" aria-hidden />
                 </button>
                 <span className="truncate flex-1">
-                  <span className="font-medium text-ink-900">{client.name}</span>
+                  <ClientChip client={client} size="sm" as="span" />
                   <span className="text-ink-400"> · </span>
                   <span>{c.label}</span>
                   {daysSinceLast !== null && (

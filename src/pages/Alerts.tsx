@@ -32,7 +32,8 @@ import { trpc } from "@/lib/api/client";
 import { clients as MOCK_CLIENTS } from "@/data/mockClients";
 import { useStore } from "@/data/store";
 import { env } from "@/config";
-import type { Announcement } from "@/types";
+import type { Announcement, ClientTier, StateCode } from "@/types";
+import { ClientChip } from "@/components/ClientChip";
 import { cn } from "@/lib/utils";
 import { EmailBulletinEditModal } from "@/components/EmailBulletinEditModal";
 import { NexusCheckModal } from "@/components/NexusCheckModal";
@@ -80,11 +81,24 @@ interface AffectedClient {
   id: string;
   name: string;
   email?: string;
+  // Tier + primaryState carried so the recipient chips can render the
+  // canonical ClientChip (name + tier dot + state pill) without an extra
+  // roster lookup. Optional because not every client roster shape (legacy
+  // MOCK_CLIENTS fallback, partial imports) carries them. Undefined-when-
+  // missing (not null) to keep the shape compatible with NexusRecipient.
+  tier?: ClientTier;
+  primaryState?: StateCode;
 }
 
 function affectedClientsFor(
   a: Announcement,
-  source: ReadonlyArray<{ id: string; name: string; contactEmail?: string | null }>,
+  source: ReadonlyArray<{
+    id: string;
+    name: string;
+    contactEmail?: string | null;
+    tier?: ClientTier | null;
+    primaryState?: StateCode | null;
+  }>,
 ): AffectedClient[] {
   const map = new Map(source.map((c) => [c.id, c]));
   return a.affectedClientIds
@@ -94,6 +108,8 @@ function affectedClientsFor(
       id: c.id,
       name: c.name,
       email: c.contactEmail ?? undefined,
+      tier: c.tier ?? undefined,
+      primaryState: c.primaryState ?? undefined,
     }));
 }
 
@@ -455,7 +471,15 @@ function CopilotPane({
                             : `Click to exclude ${c.name} from this send`
                         }
                       >
-                        <span className="truncate max-w-[110px]">{c.name}</span>
+                        <span className="truncate max-w-[140px]">
+                          <ClientChip
+                            client={c}
+                            size="sm"
+                            as="span"
+                            showTier
+                            showState={false}
+                          />
+                        </span>
                         <X
                           className={cn(
                             "w-2.5 h-2.5 transition-opacity",
@@ -713,6 +737,28 @@ export function Alerts() {
       void utils.deadlines.listForTriage.invalidate();
     },
   });
+  // Per-alertType mutations — penalty_relief / pte_change / rate_change.
+  // Each persists via tRPC in real mode; the mock adapter mirrors the same
+  // shape so demo workspaces still flow. Confirm callbacks below dispatch
+  // these mutations + flip the alert handled in lockstep with the success.
+  const tagClientsMutation = trpc.alertActions.tagClientsForRelief.useMutation({
+    onSuccess: () => {
+      void utils.announcements.list.invalidate();
+    },
+  });
+  const schedulePlanningCallsMutation =
+    trpc.alertActions.schedulePlanningCalls.useMutation({
+      onSuccess: () => {
+        void utils.announcements.list.invalidate();
+      },
+    });
+  const recomputeEstimatesMutation =
+    trpc.alertActions.recomputeEstimates.useMutation({
+      onSuccess: () => {
+        void utils.deadlines.listForTriage.invalidate();
+        void utils.announcements.list.invalidate();
+      },
+    });
   // sendBulletinEmails is a recently-added BE procedure — the FE router
   // type may lag behind. Cast through proxy access to keep the build
   // green until the next router type sync.
@@ -1105,76 +1151,132 @@ export function Alerts() {
     if (a) handleComplete(a.id);
   }, [nexusForAnnouncement, handleComplete]);
 
-  // penalty_relief — open the BatchTagModal. Confirm tags clients for
-  // filing-time review and (optionally) drafts notice emails. Closing the
-  // modal — confirmed or cancelled — flips the alert to handled.
+  // penalty_relief — opens BatchTagModal; confirm fires
+  // alertActions.tagClientsForRelief (real BE in real mode, deterministic
+  // mock-adapter handler in mock mode). Optimistic toast still fires on
+  // mutation success; mutation error surfaces via toast.error and the
+  // alert stays in the active feed.
   const handleOpenTag = useCallback((a: Announcement) => {
     setTagForAnnouncement(a);
   }, []);
   const handleTagConfirm = useCallback(
-    (input: { clientIds: string[]; expiresAt: string | null; composeEmail: boolean }) => {
+    async (input: {
+      clientIds: string[];
+      expiresAt: string | null;
+      composeEmail: boolean;
+    }) => {
       const a = tagForAnnouncement;
       if (!a) return;
-      // Phase 2 — wire to BE batchTag mutation. Phase 1: optimistic
-      // toast + handled.
-      toast.success(
-        `Tagged ${input.clientIds.length} ${input.clientIds.length === 1 ? "client" : "clients"} for filing-time review`,
-      );
-      setTagForAnnouncement(null);
-      handleComplete(a.id);
+      try {
+        const result = await tagClientsMutation.mutateAsync({
+          announcementId: a.id,
+          clientIds: input.clientIds,
+          expiresAt: input.expiresAt,
+        });
+        toast.success(
+          `Tagged ${result.taggedCount} ${result.taggedCount === 1 ? "client" : "clients"} for filing-time review${result.duplicateCount > 0 ? ` · ${result.duplicateCount} already tagged` : ""}`,
+        );
+        setTagForAnnouncement(null);
+        handleComplete(a.id);
+      } catch (err) {
+        toast.error(
+          `Couldn't tag clients — ${err instanceof Error ? err.message : "try again"}`,
+        );
+      }
     },
-    [tagForAnnouncement, handleComplete],
+    [tagForAnnouncement, tagClientsMutation, handleComplete],
   );
 
-  // pte_change — open the SchedulePlanningCallModal.
+  // pte_change — opens SchedulePlanningCallModal; confirm fires
+  // alertActions.schedulePlanningCalls.
   const handleOpenPlanningCall = useCallback((a: Announcement) => {
     setPlanningCallForAnnouncement(a);
   }, []);
   const handlePlanningCallConfirm = useCallback(
-    (input: {
+    async (input: {
       clientIds: string[];
       suggestedWindow: "this_week" | "next_2_weeks" | "before_deadline";
       composeEmail: boolean;
     }) => {
       const a = planningCallForAnnouncement;
       if (!a) return;
-      const windowLabel =
-        input.suggestedWindow === "this_week"
-          ? "this week"
-          : input.suggestedWindow === "next_2_weeks"
-            ? "next 2 weeks"
-            : "before deadline";
-      toast.success(
-        `Planning ${input.clientIds.length === 1 ? "call" : "calls"} scheduled for ${windowLabel}`,
-      );
-      setPlanningCallForAnnouncement(null);
-      handleComplete(a.id);
+      try {
+        const result = await schedulePlanningCallsMutation.mutateAsync({
+          announcementId: a.id,
+          clientIds: input.clientIds,
+          suggestedWindow: input.suggestedWindow,
+        });
+        const windowLabel =
+          input.suggestedWindow === "this_week"
+            ? "this week"
+            : input.suggestedWindow === "next_2_weeks"
+              ? "next 2 weeks"
+              : "before deadline";
+        toast.success(
+          `Scheduled ${result.callsCreated} planning ${result.callsCreated === 1 ? "call" : "calls"} for ${windowLabel} · ${result.todoItemsAdded} ${result.todoItemsAdded === 1 ? "task" : "tasks"} added to Today`,
+        );
+        setPlanningCallForAnnouncement(null);
+        handleComplete(a.id);
+      } catch (err) {
+        toast.error(
+          `Couldn't schedule planning calls — ${err instanceof Error ? err.message : "try again"}`,
+        );
+      }
     },
-    [planningCallForAnnouncement, handleComplete],
+    [planningCallForAnnouncement, schedulePlanningCallsMutation, handleComplete],
   );
 
-  // rate_change — open the RecomputeEstimatesModal.
+  // rate_change — opens RecomputeEstimatesModal; confirm fires
+  // alertActions.recomputeEstimates. Modal returns selections grouped by
+  // client (clientId + estimateIds[]) — flatten to the BE input shape
+  // (deadlineId rows). The BE undo token surfaces in the toast so the CPA
+  // can reverse if a client questions the change.
   const handleOpenRecompute = useCallback((a: Announcement) => {
     setRecomputeForAnnouncement(a);
   }, []);
   const handleRecomputeConfirm = useCallback(
-    (input: {
+    async (input: {
       selections: Array<{ clientId: string; estimateIds: string[] }>;
       composeEmail: boolean;
     }) => {
       const a = recomputeForAnnouncement;
       if (!a) return;
-      const total = input.selections.reduce(
-        (sum, s) => sum + s.estimateIds.length,
-        0,
+      // Flatten {clientId, estimateIds[]} → [{deadlineId}] per BE shape.
+      // estimateIds in this surface ARE deadlineIds (rate_change touches
+      // estimate-class deadlines).
+      const flattened = input.selections.flatMap((s) =>
+        s.estimateIds.map((deadlineId) => ({ deadlineId })),
       );
-      toast.success(
-        `Recomputed ${total} ${total === 1 ? "estimate" : "estimates"}`,
-      );
-      setRecomputeForAnnouncement(null);
-      handleComplete(a.id);
+      try {
+        const result = await recomputeEstimatesMutation.mutateAsync({
+          announcementId: a.id,
+          selections: flattened,
+          // ruleJurisdiction comes from the announcement's stateCode; the
+          // alert payload guarantees it's one of the supported set.
+          ruleJurisdiction: (a.stateCode || "federal") as
+            | "federal"
+            | "CA"
+            | "NY"
+            | "NJ"
+            | "MA"
+            | "IL"
+            | "AZ",
+          // ruleTaxYear — current year is the safe default; the alert
+          // payload doesn't carry tax_year explicitly today.
+          ruleTaxYear: new Date().getFullYear(),
+        });
+        toast.success(
+          `Recomputed ${result.recomputedCount} ${result.recomputedCount === 1 ? "estimate" : "estimates"}${result.bankUpdateTodos > 0 ? ` · ${result.bankUpdateTodos} bank-update ${result.bankUpdateTodos === 1 ? "task" : "tasks"} added` : ""} · Undo (24h)`,
+        );
+        setRecomputeForAnnouncement(null);
+        handleComplete(a.id);
+      } catch (err) {
+        toast.error(
+          `Couldn't recompute estimates — ${err instanceof Error ? err.message : "try again"}`,
+        );
+      }
     },
-    [recomputeForAnnouncement, handleComplete],
+    [recomputeForAnnouncement, recomputeEstimatesMutation, handleComplete],
   );
 
   // Mobile column visibility — at <md the workshop is single-column.

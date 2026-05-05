@@ -7,6 +7,7 @@ import {
   Check,
   Slash,
 } from "lucide-react";
+import { ChevronRight, X as XIcon, ArrowRight } from "lucide-react";
 import { useSelection } from "../hooks/useSelection";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -1140,6 +1141,14 @@ export function Timeline() {
               );
             }}
           />
+          <button
+            type="button"
+            disabled
+            className="text-xs px-2.5 py-1 rounded bg-sunken/20 text-ink-300 cursor-not-allowed inline-flex items-center gap-1"
+            title="Coming next pass — needs a team-member picker + tasks.assign mutation"
+          >
+            Assign to… (soon)
+          </button>
           <button
             type="button"
             onClick={() => timelineSelection.clear()}

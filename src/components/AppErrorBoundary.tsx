@@ -32,6 +32,19 @@ export class AppErrorBoundary extends Component<
     console.error("AppErrorBoundary caught:", error, info.componentStack);
   }
 
+  /** True when the caught error is the classic "stale Vite chunk after
+   *  prod redeploy" signature. Backstop in case `lazyWithChunkRetry`
+   *  somehow misses it (e.g. error wrapped by another layer). */
+  isChunkLoadError(): boolean {
+    const message = this.state.error?.message ?? "";
+    return (
+      message.includes("Failed to fetch dynamically imported module") ||
+      message.includes("error loading dynamically imported module") ||
+      message.includes("Importing a module script failed") ||
+      message.includes("Loading chunk")
+    );
+  }
+
   reset = () => {
     this.setState({ error: null });
   };
@@ -44,16 +57,17 @@ export class AppErrorBoundary extends Component<
 
   render() {
     if (this.state.error) {
+      const isStaleChunk = this.isChunkLoadError();
       return (
         <div className="min-h-screen flex items-center justify-center bg-canvas p-6">
           <div className="max-w-md text-center">
             <div className="text-2xl font-semibold text-ink-900 mb-2">
-              Something went wrong
+              {isStaleChunk ? "App was just updated" : "Something went wrong"}
             </div>
             <p className="text-sm text-ink-500 mb-4">
-              The app hit an unexpected error and couldn't continue rendering.
-              Your data is safe — try refreshing or going back to the
-              dashboard.
+              {isStaleChunk
+                ? "We shipped a new version while this tab was open. Reload to pick it up — your data is safe."
+                : "The app hit an unexpected error and couldn't continue rendering. Your data is safe — try refreshing or going back to the dashboard."}
             </p>
             <details className="text-2xs text-ink-400 mb-4 text-left bg-sunken/40 rounded px-3 py-2">
               <summary className="cursor-pointer">Error details</summary>
