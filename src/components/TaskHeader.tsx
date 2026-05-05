@@ -8,7 +8,6 @@ import {
   FileDown,
   Package,
   Slash,
-  CalendarRange,
 } from "lucide-react";
 import type { Client, Task } from "../types";
 import { useStore } from "../data/store";
@@ -28,7 +27,10 @@ import { TaskActions } from "./TaskActions";
 interface Props {
   task: Task;
   client: Client;
-  /** Completion percentage 0-100 from the checklist; renders the progress ring. */
+  /** @deprecated 2026-05-06 — ProgressRing was removed because the
+   *  unlabeled "0%" was opaque. The actual progress signal lives in
+   *  the checklist sections below. Prop kept on the API so existing
+   *  callers don't break. */
   completionPct?: number;
   /** Open the AI email-draft modal in chase mode. The DeadlineChip
    *  surfaces this when `recommendedAction === "chase"`. Wired by the
@@ -39,7 +41,6 @@ interface Props {
 export function TaskHeader({
   task,
   client,
-  completionPct = 0,
   onChase,
 }: Props) {
   const [copied, setCopied] = useState(false);
@@ -79,12 +80,14 @@ export function TaskHeader({
         <span className="text-ink-900">{task.formType}</span>
       </nav>
 
-      {/* Header layout: ring + title block stack BELOW the action group on
-          mobile so the right-aligned "Mark complete" pill never sits on top
-          of the progress ring. At sm+ the row goes side-by-side. */}
+      {/* Header layout: title block sits side-by-side with the action
+          group at sm+; stacks on mobile so the right-aligned action
+          pills don't crowd the title. ProgressRing dropped 2026-05-06
+          per Yuqi audit ("what does 0% mean?") — the actual progress
+          signal lives in the checklist sections below ("Still
+          waiting · 1 of 1 items"). */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
-        <div className="min-w-0 flex items-start gap-3">
-          <ProgressRing pct={completionPct} />
+        <div className="min-w-0 flex-1">
           <div>
           {/* Title typography matches PageHeader (text-display, 22/600).
               Inline h1 (not <PageHeader>) because the deadline chip + meta
@@ -159,18 +162,11 @@ export function TaskHeader({
                 },
               )}
             />
-            {/* Cross-product jump — see this task in the cross-client
-                Timeline view, focused + scrolled into place. Yuqi
-                audit 2026-05-05 — the path from a single task to "what
-                else lands the same week" was missing. */}
-            <Link
-              to={`/timeline?focus=${task.officialDueDate}&clientId=${client.id}`}
-              className="text-2xs text-ink-500 hover:text-ink-900 hover:underline inline-flex items-center gap-1"
-              title="See what else lands this week across the firm"
-            >
-              <CalendarRange className="w-3 h-3" aria-hidden />
-              View in Timeline
-            </Link>
+            {/* "View in Timeline" link removed 2026-05-06 — Path to
+                filing IS the per-task timeline view. Linking to a
+                cross-client Timeline duplicated the same axis. If
+                cross-week workload context is wanted, the Timeline
+                destination is one click away in the sidebar. */}
           </div>
           <div className="text-xs text-ink-500 mt-2 flex items-baseline flex-wrap gap-x-section gap-y-1">
             <span>
@@ -216,152 +212,179 @@ export function TaskHeader({
       </div>
 
       {/* Forwarding strip — Method A per PRD §7.4. Yuqi audit
-          2026-05-05 said "messy": previous version had 5 elements
-          competing on one line (label + address + Copy + microcopy +
-          3 buttons). Slimmed to: address + Copy on the left, dev /
-          export buttons on the right. The "Replies route here..."
-          microcopy moved into a tooltip on the address itself — the
-          info is still discoverable but doesn't fight the address for
-          the eye. Simulate-inbound gated to mock mode (debug only). */}
-      <div className="mt-4 pt-3 border-t border-line flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
-        <span className="text-ink-500 uppercase tracking-wider font-semibold">
-          Forwarding
-        </span>
-        <code
-          className="font-mono text-ink-900 bg-sunken px-2 py-1 rounded"
-          title="Replies + forwarded docs route to this address. AI sorts attachments and flags them for your review."
-        >
-          {task.forwardingEmail}
-        </code>
-        <button
-          onClick={copy}
-          className="text-ink-500 hover:text-ink-900 flex items-center gap-1 transition-colors"
-          title="Copy forwarding address"
-        >
-          {copied ? (
-            <span className="text-ok-ink flex items-center gap-1 animate-in fade-in">
-              <Check className="w-3 h-3" /> Copied
-            </span>
-          ) : (
-            <>
-              <Copy className="w-3 h-3" /> Copy
-            </>
-          )}
-        </button>
-        <span className="ml-auto flex items-center gap-2">
-          <CoverSheetButton taskId={task.id} />
-          {env.useMockData && (
-            <button
-              onClick={() => simulateInboundDocument(task.id, client.name)}
-              className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken inline-flex items-center gap-1.5"
-              title="Mock-mode helper: simulates a client reply with attached document"
-            >
-              <Inbox className="w-3 h-3" aria-hidden /> Simulate inbound
-            </button>
-          )}
+          2026-05-06: "is forwarding that email important? what does
+          cover sheet/audit trail mean?"
+            • Forwarding IS load-bearing — it's the substrate. Added
+              an inline explainer line so the user knows what the
+              address is for at a glance, not via tooltip.
+            • Cover sheet + Audit trail are niche (mail-in clients,
+              annual audits) — moved behind a ⋯ overflow so they
+              don't compete with the substrate address for first
+              read. Mock-mode-only Simulate inbound stays as a
+              debug helper but only when env.useMockData. */}
+      <div className="mt-4 pt-3 border-t border-line text-xs">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+          <span className="text-ink-500 uppercase tracking-wider font-semibold">
+            Forwarding
+          </span>
+          <code className="font-mono text-ink-900 bg-sunken px-2 py-1 rounded">
+            {task.forwardingEmail}
+          </code>
           <button
-            onClick={() => {
-              exportAuditTrailJson(task);
-              exportAuditTrailPdf(task);
-            }}
-            className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken inline-flex items-center gap-1.5"
-            title="IRS audit-trail compliant export"
+            onClick={copy}
+            className="text-ink-500 hover:text-ink-900 flex items-center gap-1 transition-colors"
+            title="Copy forwarding address"
           >
-            <FileDown className="w-3 h-3" aria-hidden /> Audit trail
+            {copied ? (
+              <span className="text-ok-ink flex items-center gap-1 animate-in fade-in">
+                <Check className="w-3 h-3" /> Copied
+              </span>
+            ) : (
+              <>
+                <Copy className="w-3 h-3" /> Copy
+              </>
+            )}
           </button>
-        </span>
+          <ForwardingOverflow
+            task={task}
+            clientName={client.name}
+          />
+        </div>
+        <p className="text-2xs text-ink-500 mt-1.5 leading-relaxed">
+          Email this address to forward client docs. AI extracts data,
+          threads inbound files to this task, flags issues for your
+          review. Replies to chase emails land here automatically.
+        </p>
       </div>
     </header>
   );
 }
 
 /**
- * Cover sheet button — generates a per-task PDF the CPA can attach to
- * a chase email or print to mail. Async: requests an export, polls
- * until ready, opens the URL in a new tab.
+ * Niche actions tucked behind a ⋯ overflow on the forwarding strip:
+ *   • Cover sheet — printable PDF for clients mailing in physical docs
+ *   • Audit trail — IRS-compliance export
+ *   • Simulate inbound — mock-mode dev helper only
  *
- * In mock mode the export-worker isn't running so the button is
- * disabled with a tooltip explaining why. Real mode: 1-3 second
- * generation depending on the export-worker queue depth.
+ * These were three competing buttons on the strip that crowded the
+ * forwarding address itself. Tucking them away keeps the substrate
+ * (the address) primary and these niche affordances discoverable
+ * without being loud.
  */
-function CoverSheetButton({ taskId }: { taskId: string }) {
+function ForwardingOverflow({
+  task,
+  clientName,
+}: {
+  task: Task;
+  clientName: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="ml-auto relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="text-xs px-2 py-1 rounded text-ink-500 hover:text-ink-900 hover:bg-sunken inline-flex items-center gap-1"
+        title="More actions on this task"
+      >
+        <span aria-hidden>⋯</span>
+        <span className="sr-only">More actions</span>
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute z-30 right-0 top-full mt-1 min-w-[200px] bg-surface border border-line rounded-md shadow-pop p-1"
+          onMouseLeave={() => setOpen(false)}
+        >
+          <CoverSheetMenuItem taskId={task.id} onPicked={() => setOpen(false)} />
+          <button
+            type="button"
+            onClick={() => {
+              exportAuditTrailJson(task);
+              exportAuditTrailPdf(task);
+              setOpen(false);
+            }}
+            className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-sunken flex items-center gap-2"
+          >
+            <FileDown className="w-3 h-3 text-ink-500" aria-hidden />
+            <span>Audit trail</span>
+            <span className="ml-auto text-2xs text-ink-400">JSON + PDF</span>
+          </button>
+          {env.useMockData && (
+            <button
+              type="button"
+              onClick={() => {
+                simulateInboundDocument(task.id, clientName);
+                setOpen(false);
+              }}
+              className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-sunken flex items-center gap-2"
+              title="Mock-mode helper: simulates a client reply with attached document"
+            >
+              <Inbox className="w-3 h-3 text-ink-500" aria-hidden />
+              <span>Simulate inbound</span>
+              <span className="ml-auto text-2xs text-ink-400">debug</span>
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Inline cover-sheet item for the overflow menu. Wraps the existing
+ * CoverSheetButton's logic but renders as a menu row instead of a
+ * standalone button.
+ */
+function CoverSheetMenuItem({
+  taskId,
+  onPicked,
+}: {
+  taskId: string;
+  onPicked: () => void;
+}) {
   const sheet = useCoverSheet();
   const isMock = env.useMockData;
-
-  // Open the URL once it transitions to ready
   if (sheet.status.state === "ready" && sheet.status.url) {
     const url = sheet.status.url;
-    // window.open synchronously here triggers Safari popup blocker;
-    // use a useEffect-style guard via setTimeout to defer to next tick
     setTimeout(() => {
       window.open(url, "_blank", "noopener");
       sheet.reset();
     }, 0);
   }
-
   const onClick = () => {
     if (isMock) return;
     void sheet.generate(taskId);
+    onPicked();
   };
-
   const label =
     sheet.status.state === "queued"
-      ? "Generating…"
+      ? "Generating cover sheet…"
       : sheet.status.state === "failed"
         ? "Retry cover sheet"
         : "Cover sheet";
-
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={isMock || sheet.status.state === "queued"}
-      className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+      className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-sunken flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
       title={
         isMock
           ? "Cover sheet generation runs on the BE export worker — not available in mock mode"
           : "Generate a per-task cover sheet PDF — attach to chase emails or mail it"
       }
     >
-      <FileDown className="w-3 h-3" aria-hidden /> {label}
+      <FileDown className="w-3 h-3 text-ink-500" aria-hidden />
+      <span>{label}</span>
+      <span className="ml-auto text-2xs text-ink-400">PDF</span>
     </button>
   );
 }
 
-/**
- * Progress ring showing checklist completion percentage. Built with SVG
- * so it scales cleanly. Color shifts subtly as the value crosses 50% / 90%.
- * The needle-thin stroke keeps the ring elegant — never a "loud" donut.
- */
-function ProgressRing({ pct }: { pct: number }) {
-  const clamped = Math.max(0, Math.min(100, Math.round(pct)));
-  const radius = 18;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (clamped / 100) * circumference;
-  const stroke =
-    clamped >= 100
-      ? "stroke-ok-solid"
-      : clamped >= 50
-      ? "stroke-info-solid"
-      : "stroke-ink-400";
-  return (
-    <div className="relative w-12 h-12 shrink-0" aria-label={`${clamped}% complete`} role="img">
-      <svg viewBox="0 0 44 44" className="w-12 h-12 -rotate-90">
-        <circle cx="22" cy="22" r={radius} fill="none" className="stroke-line" strokeWidth="2.5" />
-        <circle
-          cx="22"
-          cy="22"
-          r={radius}
-          fill="none"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          className={`${stroke} transition-[stroke-dashoffset] duration-500 ease-out`}
-        />
-      </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-2xs font-medium text-ink-700 tabular-nums">
-        {clamped}%
-      </span>
-    </div>
-  );
-}
+// CoverSheetButton inlined into ForwardingOverflow above — Yuqi audit
+// 2026-05-06 moved cover sheet behind ⋯ overflow on the forwarding strip.
+
+// ProgressRing removed 2026-05-06 — see Props.completionPct comment.

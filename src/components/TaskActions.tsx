@@ -163,30 +163,39 @@ export function TaskActions({ task }: Props) {
             <RotateCcw className="w-3.5 h-3.5" aria-hidden /> Re-open
           </button>
         ) : (
-          <button
-            onClick={onMarkComplete}
-            className={`text-sm px-3 py-1.5 rounded-md inline-flex items-center gap-1.5 ${
-              isLowConfidence
-                ? "bg-warn-bg text-warn-ink border border-warn-border hover:bg-warn-bg/80"
-                : "bg-indigo text-white hover:bg-indigo-hover"
-            }`}
-            title={
-              isLowConfidence
-                ? `Only ${completionPct}% of items confirmed — you'll be asked to type to confirm`
-                : "Close this task"
-            }
-          >
-            <Check className="w-3.5 h-3.5" aria-hidden /> Mark complete
+          // Mark complete — primary CTA. The unlabeled "0/1" badge was
+          // opaque per Yuqi audit ("what does 0/1 mean?"). Count moves
+          // OUT of the button onto a quiet status line below it
+          // ("0 of 1 confirmed"); button itself is calm + scannable.
+          // Amber-bg low-confidence styling stays so the user still
+          // gets a visual warning when closing a task with un-received
+          // items.
+          <div className="flex flex-col items-stretch gap-0.5">
+            <button
+              onClick={onMarkComplete}
+              className={`text-sm px-3 py-1.5 rounded-md inline-flex items-center justify-center gap-1.5 ${
+                isLowConfidence
+                  ? "bg-warn-bg text-warn-ink border border-warn-border hover:bg-warn-bg/80"
+                  : "bg-indigo text-white hover:bg-indigo-hover"
+              }`}
+              title={
+                isLowConfidence
+                  ? `Only ${completionPct}% confirmed — you'll be asked to type to confirm`
+                  : "Close this task"
+              }
+            >
+              <Check className="w-3.5 h-3.5" aria-hidden /> Mark complete
+            </button>
             {relevantItems.length > 0 && (
               <span
-                className={`text-2xs tabular-nums px-1 py-0.5 rounded ${
-                  isLowConfidence ? "bg-warn-border/40" : "bg-canvas/20"
+                className={`text-2xs text-center tabular-nums ${
+                  isLowConfidence ? "text-warn-ink" : "text-ink-500"
                 }`}
               >
-                {confirmedItems.length}/{relevantItems.length}
+                {confirmedItems.length} of {relevantItems.length} confirmed
               </span>
             )}
-          </button>
+          </div>
         )}
 
         <ReassignPopover task={task} />
