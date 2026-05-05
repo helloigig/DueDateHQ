@@ -8,7 +8,7 @@ const KEY = "duedatehq.advisory_peek_dismissed.v1";
 
 /**
  * Pattern 4 — the advisory awakening (PRD §2.7). A lightweight peek above
- * the task list surfacing Mode E opportunities at firm-level. The CPA's
+ * the task list surfacing cross-year-insighter opportunities at firm-level. The CPA's
  * eye lands on it briefly, then drops to today's tasks. One sentence per
  * lead opportunity — not a wall of cards.
  *

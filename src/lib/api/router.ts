@@ -388,7 +388,7 @@ export const appRouter = t.router({
   }),
 
   // todoItems — computed view per PRD §4.8 + IA v0.7 §3.1. NOT a stored
-  // table; aggregates from 9 sources (Modes A-F + InboundReply intent +
+  // table; aggregates from 9 sources (all AI capabilities + InboundReply intent +
   // DeliveryEvent bounces + manual). Frontend renders via ActionQueue.
   todoItems: t.router({
     list: t.procedure
@@ -446,8 +446,8 @@ export const appRouter = t.router({
   }),
 
   // taskMilestones — PRD §9.4.1. Mini-timeline data model. Powers Task detail
-  // header + Timeline destination. AI authority: Mode B writes target_date;
-  // Mode E writes status=blocked; AI cannot write status=done.
+  // header + Timeline destination. AI authority: arrival-timing writes target_date;
+  // cross-year-insighter writes status=blocked; AI cannot write status=done.
   taskMilestones: t.router({
     listForTask: t.procedure
       .input(z.object({ taskId: z.string().uuid() }))
@@ -462,7 +462,7 @@ export const appRouter = t.router({
           .optional(),
       )
       .query(async (): Promise<TaskMilestoneRow[]> => NOT_IMPL()),
-    /** Mode B propose-and-seed — calls predictMilestoneTargetDates and inserts
+    /** arrival-timing propose-and-seed — calls predictMilestoneTargetDates and inserts
      *  5 default milestones. Idempotent — returns existing on repeat call. */
     proposeForTask: t.procedure
       .input(z.object({ taskId: z.string().uuid() }))
@@ -474,7 +474,7 @@ export const appRouter = t.router({
           basisOfEstimate?: string;
         }> => NOT_IMPL(),
       ),
-    /** Mode E blocker detection — proposes status="blocked" for at-risk
+    /** cross-year-insighter blocker detection — proposes status="blocked" for at-risk
      *  milestones (yellow zone). CPA dismisses via update mutation. */
     detectBlockers: t.procedure
       .input(z.object({ taskId: z.string().uuid() }))
@@ -617,7 +617,7 @@ export const appRouter = t.router({
         }> => NOT_IMPL(),
       ),
     /** Tier 3 commit — write reviewed prior-year extraction to imported_facts.
-     *  Mode E reads these via generateCrossYearInsights. */
+     *  cross-year-insighter reads these via generateCrossYearInsights. */
     commitPriorYearReturn: t.procedure
       .input(
         z.object({
@@ -641,7 +641,7 @@ export const appRouter = t.router({
           factTypes: string[];
         }> => NOT_IMPL(),
       ),
-    /** Cross-fact consistency check — Mode C-style flag list for ImportedFact
+    /** Cross-fact consistency check — anomaly-detector-style flag list for ImportedFact
      *  rows where the same (client × year × fact_type) has multiple sources
      *  with values that disagree beyond tolerance. */
     factConsistency: t.procedure
@@ -967,7 +967,7 @@ export const appRouter = t.router({
           inferenceId: number;
         }> => NOT_IMPL(),
       ),
-    /** Mode B — arrival timing prediction for chase scheduling */
+    /** arrival-timing — arrival timing prediction for chase scheduling */
     predictArrivalTiming: t.procedure
       .input(
         z.object({
@@ -990,7 +990,7 @@ export const appRouter = t.router({
           inferenceId: number;
         } | null> => NOT_IMPL(),
       ),
-    /** Mode C — contextual anomaly detection on financial values */
+    /** anomaly-detector — contextual anomaly detection on financial values */
     detectAnomaly: t.procedure
       .input(
         z.object({
@@ -1012,7 +1012,7 @@ export const appRouter = t.router({
           inferenceId: number;
         } | null> => NOT_IMPL(),
       ),
-    /** Mode E — cross-year advisory insights */
+    /** cross-year-insighter — cross-year advisory insights */
     generateCrossYearInsights: t.procedure
       .input(
         z.object({
@@ -1079,7 +1079,7 @@ export const appRouter = t.router({
           p95LatencyMs: number | null;
         }> => NOT_IMPL()
       ),
-    /** Multi-mode overview — one row per Mode A-F in a single query. Drives
+    /** Multi-mode overview — one row per inbound-classifier-F in a single query. Drives
      *  Settings → AI eval all-modes table. */
     summaryAll: t.procedure.query(
       async (): Promise<

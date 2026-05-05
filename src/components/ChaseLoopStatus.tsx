@@ -18,9 +18,9 @@ import { EmailDraftModal, type EmailDraftIntent } from "./EmailDraftModal";
  * day, not the calendar. Three cards in priority order:
  *
  *   1. Decisions waiting — yellow-zone resolution (highest urgency)
- *   2. Documents to confirm — Mode A inbound classifications pending CPA
+ *   2. Documents to confirm — AI-classified inbound classifications pending CPA
  *      approval (the §5.3 invariant moment)
- *   3. Chase ready to send — Mode B says it's time to follow up with these
+ *   3. Chase ready to send — arrival-timing says it's time to follow up with these
  *      clients
  *
  * Each card shows top 3 items inline + a deep-link to its full inbox.
@@ -44,7 +44,7 @@ export function ChaseLoopStatus() {
     [clients]
   );
 
-  // 1. Decisions: AI flags (received_issue) + Mode E insights (unresolved)
+  // 1. Decisions: AI flags (received_issue) + cross-year-insighter insights (unresolved)
   const decisions = useMemo(() => {
     const flagged = checklistItems
       .filter((c) => c.state === "received_issue")
@@ -108,11 +108,11 @@ export function ChaseLoopStatus() {
     return (
       <section className="bg-surface border border-line rounded-md p-6 text-center">
         <p className="text-sm font-medium text-ink-900">
-          Quiet morning — nothing waiting on you.
+          Nothing waiting on you.
         </p>
         <p className="text-xs text-ink-500 mt-1">
-          AI is watching for inbound docs and timing-driven chases. We'll surface
-          the next thing when it arrives.
+          We're watching for inbound docs and timing-driven chases. The next
+          item will surface here when it arrives.
         </p>
       </section>
     );

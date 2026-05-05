@@ -33,7 +33,7 @@ export type DotStackChecklistState =
   | "requested_waiting" // 🟠 amber — chase sent, awaiting client
   | "received_unreviewed" // 🔵 info — client sent something, needs CPA confirm
   | "received_confirmed" // 🟢 ok — done
-  | "received_issue" // 🔴 danger — Mode C anomaly
+  | "received_issue" // 🔴 danger — AI-flagged anomaly
   | "not_applicable"; // ⚪ muted — N/A
 
 const checklistStateColor: Record<DotStackChecklistState, string> = {

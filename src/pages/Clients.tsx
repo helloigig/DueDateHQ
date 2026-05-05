@@ -570,23 +570,25 @@ export function Clients() {
         )}
       </div>
 
-      {/* Row-tint legend — tells the user the warn-bg-tinted rows are
-          state-alert-affected without making them hunt for context.
-          Hidden when the active set has no alerted rows. The chip on
-          each row jumps straight to the alert detail's bundle send. */}
+      {/* Inline pill on alert-affected client rows surfaces the affiliation
+          without painting status color across the row (T4). Per-row pill
+          replaces the prior row-tint affordance. The legend doubles as a
+          handoff link to /alerts so the CPA can jump straight to triage. */}
       {alertedClientIds.size > 0 && (
-        <div className="text-2xs text-ink-500 inline-flex items-center gap-2">
+        <div className="text-2xs text-ink-500 inline-flex items-center gap-2 flex-wrap">
           <span className="inline-flex items-center gap-1.5">
             <span
-              className="inline-block w-3 h-3 rounded bg-warn-bg/60 border border-warn-border/60"
+              className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-warn-bg text-warn-ink text-[10px] font-medium"
               aria-hidden
-            />
+            >
+              State alert
+            </span>
             <span>
               <span className="text-ink-700 font-medium">
                 {alertedClientIds.size}
               </span>{" "}
-              {alertedClientIds.size === 1 ? "client" : "clients"} affected by
-              an active state alert
+              {alertedClientIds.size === 1 ? "client" : "clients"} tagged with
+              this pill have an active state alert affecting their filings.
             </span>
           </span>
           <Link
@@ -667,7 +669,7 @@ export function Clients() {
               <SortableTh col="entity" sortCol={sortCol} sortDir={sortDir} onClick={toggleSort} align="left">
                 Entity
               </SortableTh>
-              <th className="text-center px-2 py-2 font-semibold w-10" title="Opportunity flag — Mode E + Layer B/C signals">
+              <th className="text-center px-2 py-2 font-semibold w-10" title="Opportunity flag — cross-year-insighter + Layer B/C signals">
                 Opp
               </th>
             </tr>
@@ -704,12 +706,14 @@ export function Clients() {
                     : fc.waiting > 0
                       ? "text-ink-900 font-medium"
                       : "text-ink-400";
-              const rowTint = hasAlert
-                ? "bg-warn-bg/30 hover:bg-warn-bg/50"
-                : "hover:bg-sunken";
-              // Phase 2 mock — Mode E opportunity badge (real wiring Phase 5).
+              // T4: status colors are pills, never row backgrounds. Alert
+              // affiliation surfaces via the dedicated alert-affected pill in
+              // the row itself; the row stays neutral so the eye lands on
+              // gap signals (waiting, oldest-reminder days), not on tint.
+              const rowTint = "hover:bg-sunken";
+              // Phase 2 mock — cross-year-insighter opportunity badge (real wiring Phase 5).
               // Surface a tag on premium clients with overdue items as a stand-in
-              // until Mode E ships actual advisory triggers.
+              // until cross-year-insighter ships actual advisory triggers.
               const opportunity =
                 c.tier === "premium" && fc.waiting > 3
                   ? "C" // churn risk
@@ -743,34 +747,36 @@ export function Clients() {
                     />
                   </td>
                   <td className="px-4 py-2.5">
-                    <Link
-                      to={href}
-                      className="text-ink-900 font-medium hover:underline"
-                    >
-                      {c.name}
-                    </Link>
-                    {/* Per-row alert affordance — surfaces a chip linking
-                        directly to the alert detail (where the bundled
-                        send action lives). Used to be: row tinted yellow,
-                        nowhere to go. Now: one click → alert with this
-                        client pre-included in the bundle composer. */}
-                    {(() => {
-                      const alert = alertByClientId.get(c.id);
-                      if (!alert) return null;
-                      return (
-                        <Link
-                          to={`/alerts/${alert.id}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="ml-2 inline-flex items-center gap-1 text-2xs px-1.5 py-0.5 rounded border border-warn-border bg-warn-bg/60 text-warn-ink hover:bg-warn-bg align-middle"
-                          title={`${alert.stateCode} alert · ${alert.title} — open to email all affected clients`}
-                        >
-                          <span className="font-semibold tabular-nums">
-                            {alert.stateCode}
-                          </span>
-                          <span className="hidden md:inline">alert ↗</span>
-                        </Link>
-                      );
-                    })()}
+                    {/* Per-row alert affordance — chip links directly to
+                        the alert detail (where the bundled send lives).
+                        Replaces the prior row-tint approach (T4: status
+                        colors are pills, never row paint). One click →
+                        alert with this client pre-included in the bundle. */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Link
+                        to={href}
+                        className="text-ink-900 font-medium hover:underline truncate"
+                      >
+                        {c.name}
+                      </Link>
+                      {(() => {
+                        const alert = alertByClientId.get(c.id);
+                        if (!alert) return null;
+                        return (
+                          <Link
+                            to={`/alerts/${alert.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full bg-warn-bg text-warn-ink hover:bg-warn-bg/80 shrink-0 align-middle"
+                            title={`${alert.stateCode} alert · ${alert.title} — open to email all affected clients`}
+                          >
+                            <span className="font-semibold tabular-nums">
+                              {alert.stateCode}
+                            </span>
+                            <span className="hidden md:inline">alert ↗</span>
+                          </Link>
+                        );
+                      })()}
+                    </div>
                   </td>
                   <td className="px-4 py-2.5">
                     <TierPill tier={c.tier} />
@@ -1024,7 +1030,7 @@ function BatchFileRequestModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-stretch justify-end bg-ink-900/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-stretch justify-end bg-ink-900/40 backdrop-blur-[2px]"
       onClick={onClose}
     >
       <div
@@ -1095,7 +1101,7 @@ function BatchFileRequestModal({
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 maxLength={300}
-                className="w-full text-sm border border-line rounded px-2.5 py-1.5 bg-canvas text-ink-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent transition-shadow"
+                className="w-full text-sm border border-line rounded px-2.5 py-1.5 bg-canvas text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 transition-shadow"
               />
             </div>
             <div>
@@ -1111,7 +1117,7 @@ function BatchFileRequestModal({
                 onChange={(e) => setBody(e.target.value)}
                 rows={10}
                 maxLength={20000}
-                className="w-full text-sm bg-canvas border border-line rounded px-2.5 py-2 text-ink-900 leading-relaxed focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent transition-shadow"
+                className="w-full text-sm bg-canvas border border-line rounded px-2.5 py-2 text-ink-900 leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 transition-shadow"
               />
             </div>
           </section>
@@ -1206,12 +1212,14 @@ function SortableTh({
 
 function TierPill({ tier }: { tier: ClientTier | undefined }) {
   if (!tier) return <span className="text-ink-500">—</span>;
+  // Tier is a label (read-only indicator), not a status. Stay neutral so
+  // it doesn't compete for the eye with the gap-loud waiting/review/state-
+  // alert pills. T3 + T4: pills for indicators; status colors are pills,
+  // never decoration on neutral metadata.
   const tone =
     tier === "premium"
-      ? "bg-accent/10 text-accent border-accent/30"
-      : tier === "custom"
-        ? "bg-warn-bg text-warn-ink border-warn-border"
-        : "bg-sunken text-ink-700 border-line";
+      ? "bg-indigo-soft text-indigo-ink border-indigo-soft"
+      : "bg-sunken text-ink-700 border-line";
   return (
     <span
       className={`inline-flex items-center text-2xs font-medium px-1.5 py-0.5 rounded border ${tone}`}

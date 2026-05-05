@@ -66,7 +66,7 @@ export function TagPicker({
     <div className="px-5 py-4">
       {/* Picked states + input row */}
       <div
-        className="flex flex-wrap items-center gap-1.5 px-2.5 py-2 rounded-md border border-line bg-canvas/40 focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/30 min-h-[44px] cursor-text"
+        className="flex flex-wrap items-center gap-1.5 px-2.5 py-2 rounded-md border border-line bg-canvas/40 focus-within:border-indigo focus-within:ring-2 focus-within:ring-indigo focus-within:ring-offset-2 min-h-[44px] cursor-text"
         onClick={() => inputRef.current?.focus()}
       >
         {selected.map((code) => {

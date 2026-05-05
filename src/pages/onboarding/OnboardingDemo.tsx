@@ -27,9 +27,9 @@ export function OnboardingDemo() {
         <ul className="mt-2 text-sm text-ink-700 space-y-1.5 list-disc pl-5">
           <li>49 active clients across CA, NY, TX, LA, FL.</li>
           <li>~150 deadlines spread across overdue / week / month / long-term.</li>
-          <li>A live state-extension alert affecting 6 clients (Pattern 3 demo).</li>
-          <li>3 years of prior facts for Mode B / E demonstrations.</li>
-          <li>Mode E flagship insight: "Schedule E disappeared after 5 years" on Mark Sullivan.</li>
+          <li>A live state-extension alert affecting 6 clients.</li>
+          <li>3 years of prior facts so timing and cross-year insights have signal.</li>
+          <li>Flagship cross-year insight: "Schedule E disappeared after 5 years" on Mark Sullivan.</li>
         </ul>
         <p className="text-xs text-ink-500 mt-4">
           You can wipe demo data anytime from Settings → Data → Reset.

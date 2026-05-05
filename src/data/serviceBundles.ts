@@ -163,7 +163,7 @@ export const SERVICE_BUNDLES: ServiceBundle[] = [
   {
     id: "addon-payroll-tied",
     name: "Payroll-Tied Filings",
-    description: "Quarterly + annual federal employment returns for employers with staff. Add-on to any business bundle.",
+    description: "Quarterly + annual federal employment returns for employers with staff. Add-on to any business package.",
     entityTypes: ["Employer", "C-Corp", "S-Corp", "Partnership", "LLC", "Sole-Proprietor"],
     includedFormCodes: ["941", "940", "W-2", "W-3", "1099-NEC", "1099-MISC"],
     addOn: true,
@@ -183,7 +183,7 @@ export const SERVICE_BUNDLES: ServiceBundle[] = [
   {
     id: "addon-international",
     name: "International Disclosure Add-on",
-    description: "Required forms for clients with foreign holdings, accounts, or income. Add-on to any individual or business bundle.",
+    description: "Required forms for clients with foreign holdings, accounts, or income. Add-on to any individual or business package.",
     entityTypes: ["Individual", "C-Corp", "S-Corp", "Partnership", "LLC", "Trust", "Foreign-filer"],
     includedFormCodes: ["5471", "5472", "8865", "8938", "FinCEN-114", "1042-S"],
     addOn: true,
@@ -203,7 +203,7 @@ export const SERVICE_BUNDLES: ServiceBundle[] = [
   {
     id: "addon-real-estate-business",
     name: "Real Estate Business Add-on",
-    description: "Rental real estate held inside a partnership or S-Corp. Add-on to the entity's primary bundle.",
+    description: "Rental real estate held inside a partnership or S-Corp. Add-on to the entity's primary package.",
     entityTypes: ["Partnership", "S-Corp", "LLC"],
     includedFormCodes: ["8825", "4562", "4797"],
     addOn: true,

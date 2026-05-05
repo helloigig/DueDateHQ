@@ -22,7 +22,7 @@ import { PageContainer } from "../components/ui/PageContainer";
  * action is unambiguous: revenue or risk the AI noticed that a partner can
  * act on. The internal spec name "Insights" / "Layer C" stays in the code.
  *
- * The partner-retention thesis. Mode E + cohort substrate produce surfaces no
+ * The partner-retention thesis. cross-year-insighter + cohort substrate produce surfaces no
  * individual firm can build by hand: "this client is underbilled," "your Q3
  * is going to break capacity," "you've handled this edge case before."
  *
@@ -44,7 +44,7 @@ export function Insights() {
     return m;
   }, [clients]);
 
-  // Mode E advisory triggers — typed RSU/salary/property/life-event signals
+  // cross-year-insighter advisory triggers — typed RSU/salary/property/life-event signals
   // come from useAllOpenInsights. Currently insights all map to mode E in
   // the store; the title text carries the trigger type.
   const advisoryTriggers = insights;
@@ -144,7 +144,7 @@ export function Insights() {
           <h2 className="text-sm font-semibold text-ink-900">
             Advisory triggers
           </h2>
-          <span className="text-2xs text-ink-500">Mode E · life events + revenue patterns</span>
+          <span className="text-2xs text-ink-500">Life events + revenue patterns</span>
           <span className="ml-auto text-2xs text-ink-500 tabular-nums">
             {advisoryTriggers.length} open
           </span>
@@ -152,7 +152,7 @@ export function Insights() {
         <div className="px-5 py-4">
           {advisoryTriggers.length === 0 ? (
             <p className="text-xs text-ink-500">
-              No advisory triggers right now. Mode E sweeps each client's
+              No advisory triggers right now. The AI sweeps each client's
               multi-year history for life events (RSU vests, salary jumps,
               new properties) and surfaces them here when you have a few
               minutes to act.
@@ -177,7 +177,11 @@ export function Insights() {
                           {client.name}
                         </Link>
                         <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded border border-info-border bg-info-bg text-info-ink">
-                          Mode {insight.mode}
+                          {insight.mode === "B"
+                            ? "Timing"
+                            : insight.mode === "C"
+                              ? "Consistency"
+                              : "Cross-year"}
                         </span>
                       </div>
                       <p className="text-sm text-ink-900">{insight.title}</p>

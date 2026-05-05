@@ -1,7 +1,7 @@
 import type { AiInsight } from "../types";
 
 /**
- * Mode E proactive cross-year insights, plus a few Mode B/C aggregates.
+ * cross-year-insighter proactive cross-year insights, plus a few arrival-timing/C aggregates.
  * Surfaces in the AI insights panel on Client and Task detail. Cold-start
  * fallback (PRD §4.2) replaces these when ImportedFact history is missing.
  */

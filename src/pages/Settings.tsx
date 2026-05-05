@@ -496,7 +496,8 @@ function AiEvalPanel() {
         ) : status.data?.configured ? (
           <p className="text-sm text-ok-ink inline-flex items-center gap-2">
             <ShieldCheck className="w-4 h-4" aria-hidden />
-            Anthropic configured. Mode A + D + scraper run on real Claude.
+            Anthropic configured. Inbound classification, email drafting, and
+            scraper run on real Claude.
           </p>
         ) : (
           <div className="text-sm text-warn-ink bg-warn-bg/40 border border-warn-border rounded px-3 py-2">
@@ -511,21 +512,21 @@ function AiEvalPanel() {
       </Card>
 
       <Card
-        title="All modes overview"
-        description="Acceptance / cost / latency for each AI mode (A-F) over the firm's lifetime. Each row is a separate Mode; click into one for the time-series drift chart below."
+        title="AI capability eval"
+        description="Acceptance / cost / latency for each AI capability over the firm's lifetime. Click a row for the time-series drift chart below. The single-letter ID stays for backend telemetry cross-reference."
       >
         {summaryAll.isLoading ? (
-          <p className="text-sm text-ink-500">Loading mode summary…</p>
+          <p className="text-sm text-ink-500">Loading capability summary…</p>
         ) : summaryAll.error ? (
           <p className="text-sm text-danger-ink">
-            Couldn't load mode summary: {summaryAll.error.message}
+            Couldn't load capability summary: {summaryAll.error.message}
           </p>
         ) : summaryAll.data ? (
           <div className="overflow-x-auto -mx-2">
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-ink-500 uppercase tracking-wider">
-                  <th className="text-left font-semibold px-2 py-1.5">Mode</th>
+                  <th className="text-left font-semibold px-2 py-1.5">Capability</th>
                   <th className="text-right font-semibold px-2 py-1.5">Calls</th>
                   <th className="text-right font-semibold px-2 py-1.5">Acted on</th>
                   <th className="text-right font-semibold px-2 py-1.5">Accept rate</th>
@@ -546,10 +547,13 @@ function AiEvalPanel() {
                       className={`border-t border-line cursor-pointer hover:bg-sunken/30 ${mode === s.mode ? "bg-sunken/40" : ""}`}
                       onClick={() => setMode(s.mode)}
                     >
-                      <td className="px-2 py-2 font-mono">
-                        Mode {s.mode}
-                        <span className="ml-2 text-2xs text-ink-400 font-sans">
-                          {MODE_LABEL[s.mode]}
+                      <td className="px-2 py-2">
+                        <span className="text-ink-900">{MODE_LABEL[s.mode]}</span>
+                        <span
+                          className="ml-2 text-2xs text-ink-400 font-mono"
+                          title="Backend telemetry id"
+                        >
+                          {s.mode}
                         </span>
                       </td>
                       <td className="text-right tabular-nums px-2 py-2 text-ink-700">
@@ -591,22 +595,24 @@ function AiEvalPanel() {
         title="Acceptance over time"
         description="What fraction of AI proposals you accept, bucketed by ISO week. Drift = latest week vs trailing 4-week mean. >5pp drop fires the alert below."
       >
-        {/* Mode selector — full A-F set per v0.8 amendment (Mode F added) */}
+        {/* Capability selector — six AI capabilities (state-monitor added in
+            v0.8 amendment). Letter id is shown as a small font-mono suffix
+            for engineer cross-reference with ai_inferences.mode. */}
         <div className="flex flex-wrap gap-1 mb-4">
           {(["A", "B", "C", "D", "E", "F"] as const).map((m) => (
             <button
               key={m}
               onClick={() => setMode(m)}
               className={[
-                "text-xs px-3 py-1 rounded border",
+                "text-xs px-3 py-1 rounded-md border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2",
                 mode === m
                   ? "bg-sunken text-ink-900 border-ink-900 font-medium"
                   : "border-line text-ink-500 hover:bg-sunken hover:text-ink-700",
               ].join(" ")}
             >
-              Mode {m}
-              <span className="ml-1.5 text-2xs opacity-70">
-                {MODE_LABEL[m]}
+              {MODE_LABEL[m]}
+              <span className="ml-1.5 text-2xs opacity-60 font-mono">
+                {m}
               </span>
             </button>
           ))}
@@ -620,8 +626,9 @@ function AiEvalPanel() {
           </p>
         ) : drift.data && drift.data.weeks.length === 0 ? (
           <p className="text-sm text-ink-500">
-            No Mode {mode} inferences logged yet. Once your firm starts
-            confirming AI suggestions or sending drafts, this will populate.
+            No "{MODE_LABEL[mode]}" inferences logged yet. Once your firm
+            starts confirming AI suggestions or sending drafts, this will
+            populate.
           </p>
         ) : drift.data ? (
           <>
@@ -680,8 +687,8 @@ function AiEvalPanel() {
                   <p className="font-medium">Drift alert</p>
                   <p className="mt-0.5">
                     Latest acceptance dropped more than 5pp below the
-                    trailing 4-week mean. Mode {mode} may be regressing —
-                    check recent inferences for misclassifications.
+                    trailing 4-week mean. "{MODE_LABEL[mode]}" may be
+                    regressing — check recent inferences for misclassifications.
                   </p>
                 </div>
               </div>
@@ -695,28 +702,31 @@ function AiEvalPanel() {
 
       <Card
         title="What gets logged"
-        description="Every Anthropic call writes to ai_inferences with mode + model + cost + latency + the input hash for grouping. CPA acceptance flips was_acted_on; this dashboard reads those flags."
+        description="Every Anthropic call writes to ai_inferences with capability id + model + cost + latency + the input hash for grouping. CPA acceptance flips was_acted_on; this dashboard reads those flags."
       >
         <ul className="text-xs text-ink-500 space-y-1.5">
           <li>
-            <span className="font-mono text-ink-700">Mode A</span>{" "}
-            (classify) — every inbound document. Logged on the BE inbound
-            email handler.
+            <span className="text-ink-700 font-medium">Classify inbound</span>
+            <span className="text-ink-400 ml-1 font-mono text-2xs">A</span>{" "}
+            — every inbound document. Logged on the BE inbound email handler.
           </li>
           <li>
-            <span className="font-mono text-ink-700">Mode D</span>{" "}
-            (draft email) — every "Custom email…" click. Logged when the
-            BE returns the draft.
+            <span className="text-ink-700 font-medium">Draft emails</span>
+            <span className="text-ink-400 ml-1 font-mono text-2xs">D</span>{" "}
+            — every "Custom email…" click. Logged when the BE returns the
+            draft.
           </li>
           <li>
-            <span className="font-mono text-ink-700">Scraper</span> — LLM
-            lift on low-confidence regex hits. Logged with mode='C' for now
-            (worth a separate mode bucket once volume justifies).
+            <span className="text-ink-700 font-medium">Scraper</span> — LLM
+            lift on low-confidence regex hits. Logged under the anomaly
+            capability (C) for now; promotes to its own capability id once
+            volume justifies.
           </li>
           <li className="text-ink-400 italic mt-2">
-            Modes B / C / E stay deterministic by design — their existing
-            logic (history math, statistical anomaly, set-difference) is
-            meaningful without an LLM round-trip.
+            Predict timing, anomaly flags, and cross-year insights stay
+            deterministic by design — their existing logic (history math,
+            statistical anomaly, set-difference) is meaningful without an
+            LLM round-trip.
           </li>
         </ul>
       </Card>
@@ -1337,14 +1347,14 @@ function TeamPanel() {
               value={emailInput}
               onChange={(e) => setEmailInput(e.target.value)}
               placeholder="teammate@firm.com"
-              className="w-full border border-line rounded px-2 py-1.5 text-sm"
+              className="w-full h-9 bg-sunken border border-line rounded-md px-3 py-2 text-sm focus-visible:outline-none focus-visible:bg-surface focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 hover:border-line-strong"
             />
           </Field>
           <Field label="Role">
             <select
               value={roleInput}
               onChange={(e) => setRoleInput(e.target.value as TeamRole)}
-              className="border border-line rounded px-2 py-1.5 text-sm bg-surface"
+              className="h-9 bg-surface border border-line rounded-md px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 hover:border-line-strong"
             >
               {(Object.keys(ROLE_DEF) as TeamRole[]).map((r) => (
                 <option key={r} value={r}>
@@ -1667,25 +1677,25 @@ function FirmPanel() {
             <input
               value={firmName}
               onChange={(e) => setFirmName(e.target.value)}
-              className="w-full border border-line rounded px-2 py-1.5 text-sm"
+              className="w-full h-9 bg-sunken border border-line rounded-md px-3 py-2 text-sm focus-visible:outline-none focus-visible:bg-surface focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 hover:border-line-strong"
             />
           </Field>
           <Field label="Primary states served (comma-separated)">
             <input
               value={statesText}
               onChange={(e) => setStatesText(e.target.value)}
-              className="w-full border border-line rounded px-2 py-1.5 text-sm"
+              className="w-full h-9 bg-sunken border border-line rounded-md px-3 py-2 text-sm focus-visible:outline-none focus-visible:bg-surface focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 hover:border-line-strong"
               placeholder="CA, NY, TX"
             />
           </Field>
           <Field label="Postal address (CAN-SPAM)">
             <input
               defaultValue="100 Market St, Suite 200, San Francisco, CA 94105"
-              className="w-full border border-line rounded px-2 py-1.5 text-sm"
+              className="w-full h-9 bg-sunken border border-line rounded-md px-3 py-2 text-sm focus-visible:outline-none focus-visible:bg-surface focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 hover:border-line-strong"
             />
           </Field>
           <Field label="Time zone">
-            <select className="border border-line rounded px-2 py-1.5 text-sm">
+            <select className="h-9 bg-sunken border border-line rounded-md px-3 py-2 text-sm focus-visible:outline-none focus-visible:bg-surface focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 hover:border-line-strong">
               <option>America/Los_Angeles</option>
               <option>America/New_York</option>
               <option>America/Chicago</option>
@@ -2324,9 +2334,12 @@ function Phase2StatusCard({
           <ShieldCheck className="w-4 h-4 text-ok-ink" aria-hidden />
         )}
         <div className="flex-1 min-w-0">
-          <h2 className="text-sm font-semibold text-ink-900">
+          {/* Inline h3 inside a tinted status banner — not a section title.
+              Card-level title slot is reserved for the surrounding panel
+              header; this h3 names the localized control. */}
+          <h3 className="text-sm font-semibold text-ink-900">
             Phase 2 auto-send
-          </h2>
+          </h3>
           <p className="text-2xs text-ink-500 mt-0.5">
             {paused ? (
               <>
@@ -2355,9 +2368,9 @@ function Phase2StatusCard({
         </div>
         <button
           onClick={onTogglePause}
-          className={`text-xs px-3 py-1.5 rounded border inline-flex items-center gap-1.5 ${
+          className={`text-xs px-3 py-1.5 rounded-md border inline-flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 ${
             paused
-              ? "bg-accent text-canvas border-accent hover:bg-accent-hover"
+              ? "bg-indigo text-white border-indigo hover:bg-indigo-hover"
               : "border-line text-ink-700 hover:bg-sunken"
           }`}
         >
@@ -2465,7 +2478,7 @@ function ReminderTemplateEditor({
             <input
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="w-full border border-line rounded px-2 py-1.5 text-sm"
+              className="w-full h-9 bg-sunken border border-line rounded-md px-3 py-2 text-sm focus-visible:outline-none focus-visible:bg-surface focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 hover:border-line-strong"
             />
           </Field>
           <Field label="Body (variables: {{client_name}}, {{deadline_date}}, {{forwarding_email}}, etc.)">

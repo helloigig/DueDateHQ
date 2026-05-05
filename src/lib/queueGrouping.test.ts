@@ -7,9 +7,9 @@ import {
 } from "./queueGrouping";
 
 // Live-BE shape contract (from backend/src/trpc/routers/todoItems.ts):
-//   • Mode F state alert    → clientId="", client="N clients"
-//   • Mode A/B/C/D/E + reply → clientId=<UUID>, client=<name>
-//   • Mode D in mock-adapter → client="N clients" (legacy multi-client)
+//   • state-monitor state alert    → clientId="", client="N clients"
+//   • inbound-classifier/B/C/D/E + reply → clientId=<UUID>, client=<name>
+//   • email-drafter in mock-adapter → client="N clients" (legacy multi-client)
 //   • urgency_score ∈ ℕ; urgency bucket ∈ {high, medium, normal}
 //
 // These tests guard the grouping helper against regressions when the BE
@@ -93,8 +93,8 @@ describe("buildQueueRows", () => {
     }
   });
 
-  it("carves Mode F state alerts out as their own row variant", () => {
-    // Live-BE shape: Mode F has clientId="" and client="N clients".
+  it("carves state-monitor state alerts out as their own row variant", () => {
+    // Live-BE shape: state-monitor has clientId="" and client="N clients".
     const items: QueueTodoItem[] = [
       {
         id: "mode_f-ann-1",
@@ -160,7 +160,7 @@ describe("buildQueueRows", () => {
   });
 
   it("carves multi-client batches as bulk_batch rows", () => {
-    // Mock-adapter Mode D path emits client="8 clients" for batch sends.
+    // Mock-adapter email-drafter path emits client="8 clients" for batch sends.
     // Live BE doesn't currently produce this, but the contract holds.
     const items: QueueTodoItem[] = [
       {

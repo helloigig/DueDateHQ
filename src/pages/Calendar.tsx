@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { CalendarGrid } from "../components/CalendarGrid";
+import { PageContainer } from "../components/ui/PageContainer";
+import { PageHeader } from "../components/ui/PageHeader";
 import { useStore } from "../data/store";
 import { TODAY } from "../data/dateHelpers";
 import type { Deadline } from "../types";
@@ -50,42 +52,39 @@ export function Calendar() {
   }, [deadlines]);
 
   return (
-    <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 space-y-5">
-      <header>
-        <h1 className="text-2xl font-semibold text-ink-900">Calendar</h1>
-        <p className="text-sm text-ink-500 mt-2 max-w-2xl">
-          The shape of your month — every deadline plotted by day. Click a day
-          to filter, click a pill to open the task.
-        </p>
-        <p className="mt-3 text-sm text-ink-700 flex items-center flex-wrap gap-x-3 gap-y-1 tabular-nums">
-          {stats.overdue > 0 && (
-            <>
-              <span className="text-danger-ink">
-                <span className="font-semibold">{stats.overdue}</span> overdue
-              </span>
-              <span className="text-ink-300">·</span>
-            </>
-          )}
-          {stats.today > 0 && (
-            <>
-              <span>
-                <span className="text-ink-900 font-semibold">{stats.today}</span>{" "}
-                <span className="text-ink-500">due today</span>
-              </span>
-              <span className="text-ink-300">·</span>
-            </>
-          )}
-          <span>
-            <span className="text-ink-900 font-semibold">{stats.thisMonth}</span>{" "}
-            <span className="text-ink-500">this month</span>
+    <PageContainer variant="wide" className="space-y-card">
+      <PageHeader
+        title="Calendar"
+        meta="The shape of your month"
+      />
+      <p className="-mt-card mb-card text-sm text-ink-500 max-w-2xl">
+        Every deadline plotted by day. Click a day to filter, click a pill to
+        open the task.
+      </p>
+      {/* Metric row — gap-section between distinct metrics; bare numbers
+          inline-tinted for danger / accent / neutral. No middle dots. */}
+      <div className="flex items-baseline flex-wrap gap-x-section gap-y-1 tabular-nums text-sm">
+        {stats.overdue > 0 && (
+          <span className="text-danger-ink">
+            <span className="font-semibold">{stats.overdue}</span>
+            <span className="ml-1.5">overdue</span>
           </span>
-          <span className="text-ink-300">·</span>
+        )}
+        {stats.today > 0 && (
           <span>
-            <span className="text-ink-900 font-semibold">{stats.total}</span>{" "}
-            <span className="text-ink-500">total open</span>
+            <span className="text-ink-900 font-semibold">{stats.today}</span>
+            <span className="ml-1.5 text-ink-500">due today</span>
           </span>
-        </p>
-      </header>
+        )}
+        <span>
+          <span className="text-ink-900 font-semibold">{stats.thisMonth}</span>
+          <span className="ml-1.5 text-ink-500">this month</span>
+        </span>
+        <span>
+          <span className="text-ink-900 font-semibold">{stats.total}</span>
+          <span className="ml-1.5 text-ink-500">total open</span>
+        </span>
+      </div>
 
       <div className="bg-surface border border-line rounded-md overflow-hidden">
         <CalendarGrid />
@@ -98,6 +97,6 @@ export function Calendar() {
         </Link>
         .
       </p>
-    </div>
+    </PageContainer>
   );
 }

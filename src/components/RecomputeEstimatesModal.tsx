@@ -257,7 +257,7 @@ export function RecomputeEstimatesModal({
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={submit} disabled={totals.estimateCount === 0}>
-            Recompute {totals.estimateCount}
+            Recompute {totals.estimateCount} {totals.estimateCount === 1 ? "estimate" : "estimates"}
             {composeEmail && ` + draft ${recipients.length} email${recipients.length === 1 ? "" : "s"}`}
           </Button>
         </DialogFooter>

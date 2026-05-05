@@ -63,7 +63,7 @@ export function ConfirmModal({
             ({stateLabel}).
           </p>
           <p className="text-xs text-ink-500">
-            Tasks and Mode A baseline checklists will be spawned alongside.
+            Tasks and AI-suggested checklists will be spawned alongside.
             You can mark anything not-applicable later.
           </p>
 

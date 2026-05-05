@@ -333,9 +333,9 @@ function StateMultiSelect({
                       !supported
                         ? "bg-sunken/40 text-ink-300 border border-line/60 cursor-not-allowed"
                         : isHome
-                          ? "bg-accent text-canvas ring-2 ring-offset-1 ring-accent shadow-sm"
+                          ? "bg-ink-900 text-surface ring-2 ring-offset-1 ring-ink-900 shadow-sm"
                           : picked
-                            ? "bg-accent/90 text-canvas hover:bg-accent shadow-sm"
+                            ? "bg-ink-900/90 text-surface hover:bg-ink-900 shadow-sm"
                             : "bg-surface border border-line text-ink-700 hover:bg-sunken hover:border-ink-400",
                     ].join(" ")}
                   >

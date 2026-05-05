@@ -362,7 +362,7 @@ export function NexusCheckModal({
             onClick={() => submitForActive(true)}
             disabled={isLoading}
           >
-            Notify only · Skip filings
+            Notify only, skip filings
           </Button>
           <Button
             onClick={() => submitForActive(false)}

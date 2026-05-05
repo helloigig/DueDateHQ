@@ -16,7 +16,7 @@ import { useSession } from "../data/session";
 import { useSendEmail } from "../hooks/useEmailDrafts";
 
 /**
- * Email draft side-panel — IA §3.7. Mode D's primary surface. Triggered
+ * Email draft side-panel — IA §3.7. email-drafter's primary surface. Triggered
  * from many places (Task detail, Alert detail, AI flag resolution).
  * Slides in from the right so the underlying surface (task / client /
  * inbox) stays visible — matches the /alerts CopilotPane pattern. Tone

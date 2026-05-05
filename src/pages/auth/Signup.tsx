@@ -324,7 +324,7 @@ export function Signup() {
             <Promise
               icon={<Mail className="w-3.5 h-3.5" aria-hidden />}
               title="AI-drafted reminders, you review and send"
-              detail="Mode D writes the chase emails grounded in the client's history and your voice. You stay in the loop on every send."
+              detail="The AI writes the chase emails grounded in the client's history and your voice. You stay in the loop on every send."
             />
           </ul>
 
