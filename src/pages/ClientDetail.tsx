@@ -68,13 +68,13 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { MultiSelectChip } from "../components/MultiSelectChip";
 import { cn } from "../lib/utils";
-// ClientChip is the canonical client-identity primitive (PR #135) used
-// across dense lists (Action Queue, Mail rows, Alerts chips). On THIS
-// page the client IS the page subject, so we render name + tier + state
-// as a labeled identity strip rather than a single chip — same data,
-// more readable layout for a header. The chip stays the canonical
-// rendering everywhere else.
-import { ClientChip } from "../components/ClientChip";
+// Note — ClientChip (the canonical client-identity primitive from PR
+// #135) is intentionally NOT imported here. On dense lists (Action
+// Queue, Mail rows, Alerts chips) the chip is canonical because compact
+// shape wins. On THIS page the client IS the page subject, so we render
+// name + tier + state as a labeled identity strip rather than a single
+// chip — same data, more readable layout for a header. The chip stays
+// the canonical rendering everywhere else.
 import { STATE_NAMES, type StateCode } from "../types";
 import { bundleByName, type FilingBundle } from "../data/bundles";
 import { resolveFederalForm } from "../data/canonicalForm";
