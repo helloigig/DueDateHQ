@@ -129,6 +129,12 @@ export const clients = pgTable("clients", {
   // Auto-pay flag — when true, recomputeEstimates auto-creates a
   // "update bank instruction" TodoItem after mutation.
   estimateAutopay: boolean("estimate_autopay").notNull().default(false),
+  // CPA-authored override for the AI behaviour summary on the client
+  // detail header (the 1-2 sentence read of how this client behaves —
+  // response speed, extension history, etc.). When null the FE renders
+  // the auto-composed placeholder; when set, this string takes
+  // precedence and the regenerator skips this client until cleared.
+  aiSummaryOverride: text("ai_summary_override"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .default(sql`now()`),

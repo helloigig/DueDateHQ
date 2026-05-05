@@ -3,6 +3,8 @@ import type { Client, StateCode } from "../types";
 import { actions } from "../data/store";
 import { toIso, addDays, TODAY } from "../data/dateHelpers";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { useQuickAddDeadline } from "../hooks/useDeadlines";
+import { env } from "../config";
 import { FEDERAL_FORMS } from "../data/federalForms";
 
 // Curated short list of the most common selections for quick picking.
@@ -131,6 +133,7 @@ export function AddDeadlineModal({
   );
   const [date, setDate] = useState(toIso(addDays(TODAY, 30)));
   const [customForm, setCustomForm] = useState("");
+  const quickAddMut = useQuickAddDeadline();
 
   // Pull the federal forms catalog from the BE. When `entityType` is
   // known we filter server-side to the entity's applicable forms; CPAs
@@ -196,7 +199,20 @@ export function AddDeadlineModal({
   const canSave = resolvedForm.length > 0 && date.length > 0;
 
   const onSave = () => {
-    actions.addDeadline(client.id, resolvedForm, jurisdiction, date);
+    if (env.useMockData) {
+      actions.addDeadline(client.id, resolvedForm, jurisdiction, date);
+    } else {
+      // Real mode hits deadlines.quickAdd. The BE inserts the row
+      // scoped to the firm, links it to the client, and the hook's
+      // onSuccess invalidates listForTriage + listForClient so both
+      // the dashboard queue and this client's Filings tab refresh.
+      quickAddMut.mutate({
+        clientId: client.id,
+        form: resolvedForm,
+        jurisdiction,
+        officialDueDate: date,
+      });
+    }
     onClose();
   };
 

@@ -6,6 +6,11 @@ import { bundleById } from "../data/bundles";
 import { formatLongDate, toIso, addDays, TODAY } from "../data/dateHelpers";
 import { useModalDialog } from "../hooks/useModalDialog";
 import { useAddNote } from "../hooks/useClients";
+import {
+  useDeferDeadline,
+  useFileExtension,
+  useSetDeadlineStatus,
+} from "../hooks/useDeadlines";
 import { env } from "../config";
 
 type Mode = "choose" | "defer" | "note";
@@ -27,6 +32,9 @@ export function QuickActionModal({
   );
   const [note, setNote] = useState<string>("");
   const addNoteMutation = useAddNote();
+  const setStatusMut = useSetDeadlineStatus();
+  const deferMut = useDeferDeadline();
+  const fileExtensionMut = useFileExtension();
 
   useEffect(() => {
     if (open) {
@@ -49,20 +57,41 @@ export function QuickActionModal({
 
   const close = () => onClose();
 
+  // Each handler uses the existing FE→BE mutation hook in real mode
+  // (which invalidates listForTriage + listForClient on success so
+  // both Today + the client's Filings tab pick up the change), and
+  // falls through to the local-store action in mock mode for instant
+  // demo feel.
   const onComplete = () => {
-    actions.setDeadlineStatus(deadline.id, "completed");
+    if (env.useMockData) {
+      actions.setDeadlineStatus(deadline.id, "completed");
+    } else {
+      setStatusMut.mutate({ id: deadline.id, status: "completed" });
+    }
     close();
   };
   const onInProgress = () => {
-    actions.setDeadlineStatus(deadline.id, "in_progress");
+    if (env.useMockData) {
+      actions.setDeadlineStatus(deadline.id, "in_progress");
+    } else {
+      setStatusMut.mutate({ id: deadline.id, status: "in_progress" });
+    }
     close();
   };
   const onDeferSubmit = () => {
-    actions.deferDeadline(deadline.id, deferDate);
+    if (env.useMockData) {
+      actions.deferDeadline(deadline.id, deferDate);
+    } else {
+      deferMut.mutate({ id: deadline.id, newDate: deferDate });
+    }
     close();
   };
   const onFiledExtension = () => {
-    actions.fileExtension(deadline.id);
+    if (env.useMockData) {
+      actions.fileExtension(deadline.id);
+    } else {
+      fileExtensionMut.mutate({ id: deadline.id });
+    }
     close();
   };
   const onNoteSubmit = () => {
