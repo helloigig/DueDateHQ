@@ -1,4 +1,24 @@
-export const TODAY = new Date("2026-04-23T00:00:00");
+// `TODAY` and `NOW_ANCHOR` are mode-aware:
+//   • Mock mode (default / demo): pinned to 2026-04-23 so fixture data with
+//     known `detectedAt` / `dueDate` values lands in the intended bucket
+//     every time. Without this, demo escalation tiers, "behind plan" counts,
+//     and snooze gating drift as real time advances.
+//   • Real mode (VITE_USE_MOCK_DATA=false): tracks actual local-day start
+//     and current UTC moment so escalation, deadline state, and snooze-
+//     until-tomorrow all advance day-to-day with real users' clocks.
+//
+// Both stay typed as `Date` so the ~70 import sites across the app don't
+// change. Module evaluates once per page load; that resolution is fine
+// for the lifetime of a session.
+const isMockMode = import.meta.env.VITE_USE_MOCK_DATA !== "false";
+
+export const TODAY = isMockMode
+  ? new Date("2026-04-23T00:00:00")
+  : (() => {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      return d;
+    })();
 
 export function parseDate(iso: string): Date {
   return new Date(iso + "T00:00:00");
@@ -19,9 +39,13 @@ export function addDays(d: Date, n: number): Date {
 
 /**
  * Hours between two ISO timestamps (a → b). Positive if b is after a.
- * Uses "now" = TODAY anchor so escalation is deterministic in demo.
+ * In mock mode "now" is pinned to a fixed anchor so escalation tiers
+ * are deterministic in the demo. In real mode "now" is real-now so
+ * tier (fresh / reminder / escalated / blocking) advances day-to-day.
  */
-const NOW_ANCHOR = new Date("2026-04-23T11:00:00Z"); // mid-morning Thursday
+const NOW_ANCHOR = isMockMode
+  ? new Date("2026-04-23T11:00:00Z") // mid-morning Thursday
+  : new Date();
 
 export function hoursSince(iso: string): number {
   const t = new Date(iso).getTime();
