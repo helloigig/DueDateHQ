@@ -449,7 +449,7 @@ export const announcements: Announcement[] = [
     effectiveDate: "2026-07-01",
     detectedAt: "2026-04-14T17:30:00Z",
     type: "nexus_change",
-    taxType: "sales",
+    taxType: "sales_use",
     retroactive: false,
     counties: [],
     entityTypes: ["LLC", "Partnership", "S-Corp"],
