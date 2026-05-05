@@ -2741,6 +2741,71 @@ export const mockAdapter = {
       };
     },
   },
+
+  /**
+   * dailyDigest — mock-mode stubs for the Daily AM digest settings card.
+   * Stores draft settings in module-level state so toggling and saving
+   * round-trips correctly without persistence. Preview returns "sent"
+   * so the UI flashes the success state for design demos.
+   */
+  dailyDigest: (() => {
+    let mockSettings: {
+      enabled: boolean;
+      sendHour: number;
+      days: Array<"sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat">;
+    } = {
+      enabled: false,
+      sendHour: 7,
+      days: ["mon", "tue", "wed", "thu", "fri"],
+    };
+    return {
+      getSettings: async () => {
+        await delay();
+        return mockSettings;
+      },
+      updateSettings: async (input: typeof mockSettings) => {
+        await delay();
+        mockSettings = input;
+        return { ok: true as const };
+      },
+      previewMyDigest: async () => {
+        await delay(400);
+        console.info("[mock] dailyDigest.previewMyDigest");
+        return { status: "sent" as const };
+      },
+      listRecentRuns: async () => {
+        await delay();
+        // Two seeded "yesterday" + "two days ago" rows so the recent-sends
+        // panel renders with realistic content in the demo workspace.
+        const today = new Date();
+        const iso = (d: Date) => d.toISOString().slice(0, 10);
+        const y1 = new Date(today.getTime() - 86_400_000);
+        const y2 = new Date(today.getTime() - 2 * 86_400_000);
+        return [
+          {
+            id: "mock-run-1",
+            localDate: iso(y1),
+            sentAt: y1.toISOString(),
+            status: "sent",
+            urgentCount: 3,
+            alertsCount: 1,
+            repliesCount: 2,
+            errorMessage: null,
+          },
+          {
+            id: "mock-run-2",
+            localDate: iso(y2),
+            sentAt: y2.toISOString(),
+            status: "skipped_quiet",
+            urgentCount: 0,
+            alertsCount: 0,
+            repliesCount: 0,
+            errorMessage: null,
+          },
+        ];
+      },
+    };
+  })(),
 } as const;
 
 export type MockAdapter = typeof mockAdapter;

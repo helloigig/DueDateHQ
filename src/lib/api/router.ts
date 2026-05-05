@@ -1634,6 +1634,50 @@ export const appRouter = t.router({
         }> => NOT_IMPL()
       ),
   }),
+
+  // Daily AM digest — per-user opt-in + cadence + preview-now. Real
+  // mode dispatches to backend/src/lib/daily-digest-scheduler.ts; mock
+  // mode returns local stubs. See backend/src/trpc/routers/dailyDigest.ts
+  // for the canonical schema.
+  dailyDigest: t.router({
+    getSettings: t.procedure.query(
+      async (): Promise<{
+        enabled: boolean;
+        sendHour: number;
+        days: Array<"mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun">;
+      }> => NOT_IMPL(),
+    ),
+    updateSettings: t.procedure
+      .input(
+        z.object({
+          enabled: z.boolean(),
+          sendHour: z.number().int().min(0).max(23),
+          days: z.array(
+            z.enum(["sun", "mon", "tue", "wed", "thu", "fri", "sat"]),
+          ).min(1),
+        }),
+      )
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    previewMyDigest: t.procedure.mutation(
+      async (): Promise<{
+        status: "sent" | "skipped_quiet" | "skipped_disabled" | "failed";
+      }> => NOT_IMPL(),
+    ),
+    listRecentRuns: t.procedure.query(
+      async (): Promise<
+        Array<{
+          id: string;
+          localDate: string;
+          sentAt: string;
+          status: string;
+          urgentCount: number;
+          alertsCount: number;
+          repliesCount: number;
+          errorMessage: string | null;
+        }>
+      > => NOT_IMPL(),
+    ),
+  }),
 });
 
 export type AppRouter = typeof appRouter;
