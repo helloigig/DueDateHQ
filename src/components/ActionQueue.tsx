@@ -242,16 +242,26 @@ function ClientGroupRowView({ row }: { row: ClientGroupRow }) {
   const checkedCount = Object.values(checked).filter(Boolean).length;
   const includedChaseItems = allChaseItems.filter((ci) => checked[ci.id]);
 
-  const onSendBundled = (payload: {
+  // Real-mode bundled send wiring (PR B.5) — saves a draft scoped to
+  // the first task containing any checked item, then immediately sends
+  // it via the BE pipeline. The schema constrains email_drafts.taskId
+  // to a single task; bundling across tasks therefore lives in the
+  // body, not the FK. Phase 2 introduces multi-task drafts so the
+  // email_drafts row can fan out activity events across every linked
+  // task. Mock-mode keeps the in-memory store shortcut.
+  const saveDraftMut = trpc.emails.saveDraft.useMutation();
+  const sendEmailMut = trpc.emails.send.useMutation();
+  const liveClientQuery = trpc.clients.get.useQuery(
+    { id: row.clientId ?? "" },
+    { enabled: !env.useMockData && Boolean(row.clientId) },
+  );
+  const clientEmail = liveClientQuery.data?.contactEmail ?? undefined;
+
+  const onSendBundled = async (payload: {
     subject: string;
     body: string;
     itemIds: string[];
   }) => {
-    // Phase 1: single bundled draft for the first task that owns
-    // any of the checked items. Real-mode drafts FK to tasks (one
-    // draft → one task in the schema), so the email belongs to that
-    // task even though the body covers items from sibling tasks too.
-    // Phase 2 swaps this for a multi-task draft model.
     const firstTaskId = includedChaseItems.find((it) => it.taskId)?.taskId;
     if (!firstTaskId) {
       toast.error("Can't send — no linked task. Open the client to add one.");
@@ -267,21 +277,52 @@ function ClientGroupRowView({ row }: { row: ClientGroupRow }) {
         body: payload.body,
         tone: "formal",
         aiSources: [
-          { kind: "substrate", note: `bundled chase ${payload.itemIds.length} items` },
+          {
+            kind: "substrate",
+            note: `bundled chase ${payload.itemIds.length} items`,
+          },
         ],
         sendMethod: "cpa_send",
         status: "draft",
       });
       actions.sendEmail(id);
+      toast.success(
+        `Sent · ${payload.itemIds.length} ${payload.itemIds.length === 1 ? "item" : "items"} bundled into one email`,
+      );
+      setBundleOpen(false);
+      return;
     }
-    // Real-mode: tRPC emails.saveDraft + send wiring lives in PR B.5.
-    // For now mock-mode is the only path that closes; real-mode just
-    // closes the modal and leaves a toast so the user knows the
-    // composer hasn't been wired beyond mock yet.
-    toast.success(
-      `Sent · ${payload.itemIds.length} ${payload.itemIds.length === 1 ? "item" : "items"} bundled into one email`,
-    );
-    setBundleOpen(false);
+    // Real mode: persist + send through the BE. The chain is
+    // saveDraft → send so the activity_event row that emails.send
+    // writes uses the just-created draft id (clean audit trail).
+    if (!clientEmail) {
+      toast.error(
+        "Can't send — no email on file for this client. Add one in client detail.",
+      );
+      return;
+    }
+    try {
+      const draft = (await saveDraftMut.mutateAsync({
+        taskId: firstTaskId,
+        toAddress: clientEmail,
+        ccAddress: null,
+        subject: payload.subject,
+        body: payload.body,
+        tone: "default",
+        aiSources: {
+          kind: "bundled_chase",
+          itemCount: payload.itemIds.length,
+        },
+      } as never)) as { id: string };
+      await sendEmailMut.mutateAsync({ id: draft.id } as never);
+      toast.success(
+        `Sent · ${payload.itemIds.length} ${payload.itemIds.length === 1 ? "item" : "items"} bundled into one email`,
+      );
+      setBundleOpen(false);
+    } catch (err) {
+      const m = err instanceof Error ? err.message : "Send failed";
+      toast.error(`Send failed: ${m}`);
+    }
   };
 
   return (
