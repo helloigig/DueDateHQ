@@ -8,7 +8,6 @@ import {
   FileDown,
   Package,
   Slash,
-  CalendarRange,
 } from "lucide-react";
 import type { Client, Task } from "../types";
 import { useStore } from "../data/store";
@@ -159,18 +158,14 @@ export function TaskHeader({
                 },
               )}
             />
-            {/* Cross-product jump — see this task in the cross-client
-                Timeline view, focused + scrolled into place. Yuqi
-                audit 2026-05-05 — the path from a single task to "what
-                else lands the same week" was missing. */}
-            <Link
-              to={`/timeline?focus=${task.officialDueDate}&clientId=${client.id}`}
-              className="text-2xs text-ink-500 hover:text-ink-900 hover:underline inline-flex items-center gap-1"
-              title="See what else lands this week across the firm"
-            >
-              <CalendarRange className="w-3 h-3" aria-hidden />
-              View in Timeline
-            </Link>
+            {/* "View in Timeline" cross-product jump dropped 2026-05-05
+                — Yuqi flagged it as visually-confusable with Path-to-
+                Filing on the same page. Path-to-filing IS this task's
+                timeline; a sibling link to the firm-wide /timeline
+                view felt like duplicate UX. The Timeline destination
+                remains reachable from the sidebar; deep-link from a
+                task can come back when the cross-firm view earns its
+                own placement. */}
           </div>
           <div className="text-xs text-ink-500 mt-2 flex items-baseline flex-wrap gap-x-section gap-y-1">
             <span>

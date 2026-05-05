@@ -6,6 +6,8 @@ import type { Deadline, DeadlineStatus } from "../types";
 import { trpc } from "../lib/api/client";
 import type { FederalFormDTO } from "../lib/api/router";
 import type { AddDeadlinePrefill } from "./AddDeadlineModal";
+import { useTasksForClient } from "../hooks/useTasks";
+import { quarterLabelForForm } from "../data/formPeriods";
 
 /**
  * FilingsTab — surfaces the federal forms that apply to this client,
@@ -42,6 +44,15 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
     clientId: client.id,
   });
   const applicability = applicabilityQuery.data;
+  // Tasks for this client — used to deep-link each filing-plan row to
+  // its task detail page, so the CPA can pivot from a deadline straight
+  // into the chase / review surface for that filing.
+  const tasks = useTasksForClient(client.id);
+  const taskByDeadlineId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const t of tasks) m.set(t.deadlineId, t.id);
+    return m;
+  }, [tasks]);
 
   // Catalog for "Reference" zone — every active federal form for the
   // entity type, including ones already covered. Filtered client-side
@@ -63,6 +74,25 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
       set.add(bare);
     }
     return set;
+  }, [deadlines]);
+
+  // Group deadlines by tax year for the Filing-plan section. Defined
+  // here (above the early-return guards) so all hooks run on every
+  // render — moving this used to live below the loading/error early
+  // returns, which broke React's rules-of-hooks any time a new hook
+  // landed above (e.g. the new useTasksForClient call).
+  const filingsByYear = useMemo(() => {
+    const m = new Map<
+      string,
+      { year: string; deadlines: Deadline[] }
+    >();
+    for (const d of deadlines) {
+      const year = d.officialDueDate.slice(0, 4);
+      const entry = m.get(year) ?? { year, deadlines: [] };
+      entry.deadlines.push(d);
+      m.set(year, entry);
+    }
+    return Array.from(m.values()).sort((a, b) => b.year.localeCompare(a.year));
   }, [deadlines]);
 
   if (applicabilityQuery.isLoading) {
@@ -112,23 +142,8 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
     (f) => !applicableNumbers.has(f.formNumber),
   );
 
-  // Active filings for this client, grouped by tax year + jurisdiction.
-  // Replaces the previous "go straight to applicability" framing —
-  // the user reads this tab to see "what's planned for this client THIS
-  // year" first, then "what's the catalog say is applicable" second.
-  const filingsByYear = useMemo(() => {
-    const m = new Map<
-      string,
-      { year: string; deadlines: Deadline[] }
-    >();
-    for (const d of deadlines) {
-      const year = d.officialDueDate.slice(0, 4);
-      const entry = m.get(year) ?? { year, deadlines: [] };
-      entry.deadlines.push(d);
-      m.set(year, entry);
-    }
-    return Array.from(m.values()).sort((a, b) => b.year.localeCompare(a.year));
-  }, [deadlines]);
+  // filingsByYear is computed above (before the early returns) so the
+  // hooks order is stable across render cycles.
   const currentYear = String(new Date().getFullYear());
 
   return (
@@ -197,35 +212,62 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
                       )}
                     </span>
                   </div>
-                  <ul className="space-y-1">
+                  <ul className="divide-y divide-line/60 -mx-2">
                     {yrFilings
                       .slice()
                       .sort((a, b) =>
                         a.officialDueDate.localeCompare(b.officialDueDate),
                       )
-                      .map((d) => (
-                        <li
-                          key={d.id}
-                          className="flex items-center gap-3 text-sm"
-                        >
-                          <span
-                            className={`text-2xs uppercase tracking-wide font-mono px-1.5 py-0.5 rounded shrink-0 ${
-                              d.jurisdiction === "federal"
-                                ? "bg-ink-900 text-canvas"
-                                : "bg-sunken text-ink-700 border border-line"
-                            }`}
-                          >
-                            {d.jurisdiction === "federal"
-                              ? "FED"
-                              : d.jurisdiction.toUpperCase()}
-                          </span>
-                          <span className="text-ink-900">{d.form}</span>
-                          <span className="text-2xs text-ink-400 ml-auto tabular-nums">
-                            due {d.officialDueDate}
-                          </span>
-                          <FilingStatusPill status={d.status} />
-                        </li>
-                      ))}
+                      .map((d) => {
+                        const taskId = taskByDeadlineId.get(d.id);
+                        const period = quarterLabelForForm(
+                          d.form,
+                          d.officialDueDate,
+                        );
+                        const row = (
+                          <div className="flex items-center gap-3 text-sm px-2 py-1.5">
+                            <span
+                              className={`text-2xs uppercase tracking-wide font-mono px-1.5 py-0.5 rounded shrink-0 ${
+                                d.jurisdiction === "federal"
+                                  ? "bg-ink-900 text-canvas"
+                                  : "bg-sunken text-ink-700 border border-line"
+                              }`}
+                            >
+                              {d.jurisdiction === "federal"
+                                ? "FED"
+                                : d.jurisdiction.toUpperCase()}
+                            </span>
+                            <span className="text-ink-900">{d.form}</span>
+                            {period && (
+                              <span
+                                className="text-2xs uppercase tracking-wide px-1 py-0.5 rounded bg-info-bg/60 text-info-ink border border-info-border tabular-nums"
+                                title={`${period} of the tax year`}
+                              >
+                                {period}
+                              </span>
+                            )}
+                            <span className="text-2xs text-ink-400 ml-auto tabular-nums">
+                              due {d.officialDueDate}
+                            </span>
+                            <FilingStatusPill status={d.status} />
+                          </div>
+                        );
+                        return (
+                          <li key={d.id}>
+                            {taskId ? (
+                              <Link
+                                to={`/clients/${client.id}/tasks/${taskId}`}
+                                className="block hover:bg-sunken/40 rounded"
+                                title="Open task detail"
+                              >
+                                {row}
+                              </Link>
+                            ) : (
+                              row
+                            )}
+                          </li>
+                        );
+                      })}
                   </ul>
                 </div>
               );

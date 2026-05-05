@@ -49,7 +49,8 @@ import {
 } from "../hooks/useAiInsights";
 import { PageSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
-import { daysBetween, formatLongDate, parseDate, TODAY } from "../data/dateHelpers";
+import { formatLongDate, parseDate, TODAY } from "../data/dateHelpers";
+import { quarterLabelForForm } from "../data/formPeriods";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import {
   AddDeadlineModal,
@@ -447,6 +448,7 @@ export function ClientDetail() {
             allDeadlines={clientDeadlines}
             onAddDeadline={() => setAddDeadlineOpen(true)}
             onOpenDocuments={() => setTab("documents")}
+            onSwitchToFilings={() => setTab("filings")}
           />
         )}
         {/* Engagement tab retired 2026-05-05 — see type Tab comment.
@@ -457,6 +459,7 @@ export function ClientDetail() {
             allDeadlines={clientDeadlines}
             onAddDeadline={() => setAddDeadlineOpen(true)}
             onOpenDocuments={() => setTab("documents")}
+            onSwitchToFilings={() => setTab("filings")}
           />
         )}
         {tab === "filings" && (
@@ -725,6 +728,41 @@ function NotesTab({ client }: { client: Client }) {
   const [draft, setDraft] = useState("");
   const notes = client.noteEntries ?? [];
   const addNoteMutation = useAddNote();
+  // Task-scoped notes for this client. Mock-mode reads from the local
+  // store; real mode degrades to a per-task pointer because the BE
+  // doesn't yet expose `taskNotes.listForClient`. Yuqi 2026-05-05 —
+  // "Notes should show notes from individual task plus the note for
+  // the client" — surface task notes in a sibling section so the CPA
+  // sees both kinds of memory in one place.
+  const { taskNotes: storeTaskNotes, tasks: storeTasks } = useStore();
+  const clientTasks = useMemo(
+    () => storeTasks.filter((t) => t.clientId === client.id),
+    [storeTasks, client.id],
+  );
+  const taskIdToName = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const t of clientTasks) {
+      const period =
+        quarterLabelForForm(t.formType ?? "", t.officialDueDate ?? "") ?? null;
+      const base = [t.formType, t.jurisdiction].filter(Boolean).join(" · ");
+      m.set(
+        t.id,
+        period && t.formType
+          ? base.replace(t.formType, `${t.formType} ${period}`)
+          : base,
+      );
+    }
+    return m;
+  }, [clientTasks]);
+  const taskNotesForClient = useMemo(() => {
+    if (!env.useMockData) return [] as Array<{ id: string; taskId: string; body: string; pinned: boolean; createdAt: string; authorName: string }>;
+    return storeTaskNotes
+      .filter((n) => taskIdToName.has(n.taskId))
+      .sort((a, b) => {
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+        return b.createdAt.localeCompare(a.createdAt);
+      });
+  }, [storeTaskNotes, taskIdToName]);
 
   // Sort: pinned first, then newest. Search field removed per
   // 2026-05-04 feedback — notes are short and few; the timeline is
@@ -790,7 +828,7 @@ function NotesTab({ client }: { client: Client }) {
 
       {sortedNotes.length === 0 ? (
         <div className="bg-surface border border-line rounded-lg p-6 text-center text-sm text-ink-500">
-          No notes yet. Add your first above.
+          No client-level notes yet. Add your first above.
         </div>
       ) : (
         <ul className="space-y-2">
@@ -799,6 +837,62 @@ function NotesTab({ client }: { client: Client }) {
           ))}
         </ul>
       )}
+
+      {/* Task-scoped notes — Yuqi 2026-05-05: a "note" can attach to the
+          client (above) OR to a specific filing task. Surface both here
+          so a partner reading the client doesn't miss task-level
+          context the preparer left. Each item links into the task. */}
+      <section className="bg-surface border border-line rounded-md overflow-hidden">
+        <header className="flex items-baseline gap-2 px-4 py-3 border-b border-line">
+          <h3 className="text-sm font-semibold text-ink-900">Task notes</h3>
+          <span className="text-2xs text-ink-500 tabular-nums">
+            {taskNotesForClient.length}{" "}
+            {taskNotesForClient.length === 1 ? "note" : "notes"}
+          </span>
+          <span className="text-2xs text-ink-400 ml-auto">
+            written on a specific filing
+          </span>
+        </header>
+        {taskNotesForClient.length === 0 ? (
+          <p className="px-4 py-4 text-xs text-ink-500">
+            {env.useMockData
+              ? "No task-level notes yet. Open a task and add a note from its sidebar."
+              : "Open any task on this client and use the task notes panel to leave per-filing context."}
+          </p>
+        ) : (
+          <ul className="divide-y divide-line">
+            {taskNotesForClient.slice(0, 12).map((n) => {
+              const taskLabel = taskIdToName.get(n.taskId) ?? "Task";
+              const ts = new Date(n.createdAt);
+              return (
+                <li key={n.id} className="px-4 py-2.5">
+                  <div className="flex items-baseline gap-2 text-2xs text-ink-500 mb-1">
+                    {n.pinned && (
+                      <span className="inline-flex items-center gap-1 text-warn-ink font-medium">
+                        <Pin className="w-3 h-3" aria-hidden />
+                        Pinned
+                      </span>
+                    )}
+                    <Link
+                      to={`/clients/${client.id}/tasks/${n.taskId}`}
+                      className="font-medium text-ink-700 hover:text-ink-900 hover:underline"
+                    >
+                      {taskLabel}
+                    </Link>
+                    <span>·</span>
+                    <span>{ts.toLocaleDateString("en-US")}</span>
+                    <span>·</span>
+                    <span>{n.authorName}</span>
+                  </div>
+                  <p className="text-sm text-ink-700 whitespace-pre-wrap">
+                    {n.body}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
@@ -953,11 +1047,13 @@ function ToDoTab({
   client,
   allDeadlines,
   onAddDeadline,
+  onSwitchToFilings,
 }: {
   client: Client;
   allDeadlines: Deadline[];
   onAddDeadline: () => void;
   onOpenDocuments: () => void;
+  onSwitchToFilings: () => void;
 }) {
   const { checklistItems: storeChecklistItems, tasks: storeTasks } = useStore();
   // ── Source-of-truth fix (2026-05-05) ───────────────────────────────────
@@ -988,11 +1084,28 @@ function ToDoTab({
     lastReminderAt?: string;
   };
 
+  // Decorate the task name with a quarter qualifier when the task's
+  // primary form is quarterly (941 / 1040-ES). Three "941"s with no
+  // quarter labels was the canonical Yuqi 2026-05-05 complaint —
+  // identical strings on three rows are unreadable. The decorator runs
+  // here so all downstream renders inherit it.
+  const decorateTaskName = (taskName: string | undefined, dueDate: string | undefined) => {
+    if (!taskName) return taskName;
+    if (!dueDate) return taskName;
+    // taskName format from BE is "<form> · <jurisdiction>" — split off
+    // the form so we only quarter-tag the form code, not the suffix.
+    const [form, ...rest] = taskName.split(" · ");
+    const q = quarterLabelForForm(form, dueDate);
+    if (!q) return taskName;
+    return rest.length > 0 ? `${form} ${q} · ${rest.join(" · ")}` : `${form} ${q}`;
+  };
+
   const liveItems = useMemo<WaitingItem[]>(() => {
     const out: WaitingItem[] = [];
     for (const it of liveTodoItems) {
       if (it.clientId !== client.id) continue;
       const ci = (it as { checklistItems?: WaitingItem[] }).checklistItems;
+      const decoratedTaskName = decorateTaskName(it.task, it.dueDate);
       if (ci && ci.length > 0) {
         for (const c of ci) {
           out.push({
@@ -1000,7 +1113,7 @@ function ToDoTab({
             label: c.label,
             state: c.state,
             taskId: it.taskId,
-            taskName: it.task,
+            taskName: decoratedTaskName,
             dueDate: it.dueDate,
           });
         }
@@ -1017,12 +1130,14 @@ function ToDoTab({
           state:
             it.source === "mode_c_anomaly" ? "received_issue" : "received_unreviewed",
           taskId: it.taskId,
-          taskName: it.task,
+          taskName: decoratedTaskName,
           dueDate: it.dueDate,
         });
       }
     }
     return out;
+    // decorateTaskName is a stable closure; deps cover its inputs via the array below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveTodoItems, client.id]);
 
   // Mock-mode fallback: read raw checklistItems from the store. Only
@@ -1043,14 +1158,27 @@ function ToDoTab({
         .filter((ci) => taskIdSet.has(ci.taskId))
         .map((ci) => {
           const task = tasksByIdMap.get(ci.taskId);
+          const rawName = task
+            ? [task.formType, task.jurisdiction].filter(Boolean).join(" · ")
+            : undefined;
+          // Mock-mode parity with live: tag quarterly forms (941 / 1040-ES)
+          // so three "941"s render as "941 Q2", "941 Q3", "941 Q4".
+          const dueDate = task?.officialDueDate;
+          const period =
+            task?.formType && dueDate
+              ? quarterLabelForForm(task.formType, dueDate)
+              : null;
+          const taskName =
+            rawName && period
+              ? rawName.replace(task!.formType, `${task!.formType} ${period}`)
+              : rawName;
           return {
             id: ci.id,
             label: ci.label,
             state: ci.state,
             taskId: ci.taskId,
-            taskName: task
-              ? [task.formType, task.jurisdiction].filter(Boolean).join(" · ")
-              : undefined,
+            taskName,
+            dueDate,
             lastReminderAt: ci.lastReminderAt ?? undefined,
           };
         }),
@@ -1290,106 +1418,24 @@ function ToDoTab({
         </section>
       )}
 
-      {/* Open deadlines — full per-task entry points so the CPA can pivot
-          from a deadline directly into its task detail. Each row carries:
-            • form + jurisdiction badge (federal vs state-specific)
-            • status pill (overdue / due-soon / on-track / waiting)
-            • the official due date AND the internal target date — both shift
-              together when a state alert moves the deadline, so the CPA sees
-              the buffer they have, not just the wall date
-            • countdown ("in 12 days", "8 days overdue") for at-a-glance triage
-          Rows are clickable when a Task exists for the deadline (1:1 at MVP). */}
-      <section className="bg-surface border border-line rounded-md p-4">
-        <header className="flex items-baseline gap-2 mb-2">
-          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
-            Open deadlines for this client
-          </h3>
-          <span className="text-2xs text-ink-500 tabular-nums">
-            {allDeadlines.filter(
-              (d) => d.status !== "completed" && d.status !== "filed_extension",
-            ).length}{" "}
-            open
-          </span>
-        </header>
-        <ul className="divide-y divide-line">
-          {allDeadlines
-            .filter(
-              (d) => d.status !== "completed" && d.status !== "filed_extension",
-            )
-            .slice(0, 8)
-            .map((d) => {
-              const task = tasksByIdMap.get(`t-${d.id}`) ??
-                Array.from(tasksByIdMap.values()).find((t) => t.deadlineId === d.id);
-              const days = daysBetween(TODAY, parseDate(d.officialDueDate));
-              const isOverdue = days < 0;
-              const isDueSoon = days >= 0 && days <= 7;
-              const countdown = isOverdue
-                ? `${Math.abs(days)}d overdue`
-                : days === 0
-                  ? "due today"
-                  : `in ${days}d`;
-              const pillClass = isOverdue
-                ? "bg-danger-bg text-danger-ink border border-danger-border"
-                : isDueSoon
-                  ? "bg-warn-bg text-warn-ink border border-warn-border"
-                  : "bg-sunken text-ink-700 border border-line";
-              const row = (
-                <div className="text-sm text-ink-900 flex items-baseline gap-3 py-1.5">
-                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-sunken text-ink-700 border border-line shrink-0 uppercase">
-                    {d.jurisdiction}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="truncate">{d.form}</p>
-                    {task && (
-                      <p className="text-2xs text-ink-500 tabular-nums">
-                        Internal target {formatLongDate(task.internalTargetDate)}
-                      </p>
-                    )}
-                  </div>
-                  <span
-                    className={`text-2xs px-1.5 py-0.5 rounded tabular-nums shrink-0 ${pillClass}`}
-                  >
-                    {countdown}
-                  </span>
-                  <span className="text-xs text-ink-500 tabular-nums shrink-0 w-28 text-right">
-                    {formatLongDate(d.officialDueDate)}
-                  </span>
-                </div>
-              );
-              return (
-                <li key={d.id} className="first:pt-0 last:pb-0">
-                  {task ? (
-                    <Link
-                      to={`/clients/${client.id}/tasks/${task.id}`}
-                      className="block hover:bg-sunken/40 -mx-1 px-1 rounded"
-                      title="Open task detail"
-                    >
-                      {row}
-                    </Link>
-                  ) : (
-                    row
-                  )}
-                </li>
-              );
-            })}
-        </ul>
-        {allDeadlines.filter(
-          (d) => d.status !== "completed" && d.status !== "filed_extension",
-        ).length > 8 && (
-          <p className="text-2xs text-ink-500 mt-2">
-            +
-            {allDeadlines.filter(
-              (d) => d.status !== "completed" && d.status !== "filed_extension",
-            ).length - 8}{" "}
-            more open
-          </p>
-        )}
-      </section>
-
-      <p className="inline-flex items-center gap-1 text-2xs text-ink-400">
-        <Check className="w-3 h-3" aria-hidden />
-        {completeCount} item{completeCount === 1 ? "" : "s"} complete this tax
-        year (open the related task to see source attachments).
+      {/* The "Open deadlines for this client" block that used to live here
+          was a flat duplicate of the Filing plan in the Filings tab —
+          two views of the same data on adjacent tabs. The user
+          (Yuqi 2026-05-05) flagged it as redundancy and asked us to be
+          brave: this tab is for ACTIONS the CPA owes today (chase /
+          confirm), the Filings tab is the CALENDAR (what's planned, by
+          year). The link below preserves the click-into-deadline
+          affordance without restating the list. */}
+      <p className="text-2xs text-ink-500 inline-flex items-center gap-1.5">
+        <Check className="w-3 h-3 text-ink-400" aria-hidden />
+        {completeCount} item{completeCount === 1 ? "" : "s"} confirmed this tax year.
+        <span className="text-ink-300">·</span>
+        <button
+          onClick={() => onSwitchToFilings()}
+          className="text-ink-500 hover:text-ink-900 underline"
+        >
+          See the Filings tab for the full deadline plan →
+        </button>
       </p>
     </div>
   );
@@ -1782,13 +1828,37 @@ function ClientAiSummary({ client }: { client: Client }) {
   // Stub composer — picks a contextual placeholder based on tier so
   // demos read naturally. Phase 2 replaces this with the real signal-
   // composed sentence from the BE.
+  //
+  // Standard tier intentionally has no placeholder: when there are no
+  // signals to report, the locked-state insights label below ("AI insights
+  // unlock once you import a prior-year return…") already explains the
+  // empty state. Two sentences saying the same thing is noise.
   const placeholder =
     client.tier === "premium"
       ? "Premium engagement — fast responder, clean quarterly handoffs. Watch for K-1 lag in March."
       : client.tier === "custom"
         ? "Custom-scoped engagement — review the package details before kicking off the next filing."
-        : "Reliable filer — no recent flags. Insights will refine here as activity accumulates.";
+        : null;
   const summary = client.aiSummaryOverride ?? placeholder;
+  // No override and no tier-specific placeholder → render a minimal
+  // "Add note" affordance instead of a fake placeholder sentence. The
+  // ClientAiInsightsCard below already explains "AI insights unlock once
+  // you import a prior-year return…" — repeating it in italic is noise.
+  if (!editing && !summary) {
+    return (
+      <button
+        onClick={() => {
+          setDraft("");
+          setEditing(true);
+        }}
+        className="mt-2 inline-flex items-center gap-1 text-2xs text-ink-500 hover:text-ink-900"
+        title="Add a manual override summary for this client"
+      >
+        <Sparkles className="w-3 h-3" aria-hidden />
+        Add summary
+      </button>
+    );
+  }
 
   if (editing) {
     return (

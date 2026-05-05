@@ -154,8 +154,16 @@ export function StateAlertCard({
               {timeAgoShort(a.detectedAt)}
             </span>
           </div>
+          {/* Body / summary — falls back to a generated one-liner when
+              the announcement has no human-authored summary (Yuqi
+              2026-05-05: cards that arrived from the scraper without
+              a body looked half-loaded — `${authority} published a
+              ${type}` is a thin description but at least the row never
+              renders empty). */}
           <p className="mt-2 text-sm text-ink-700 leading-snug line-clamp-2">
-            {a.summary}
+            {a.summary && a.summary.trim()
+              ? a.summary
+              : `${a.authority} published a ${TYPE_LABEL[a.type].toLowerCase()} for ${a.affectedClientIds.length} of your clients. Open the detail pane for the full text.`}
           </p>
           {handled && (
             <div className="mt-2 inline-flex items-center gap-1 text-2xs font-medium text-ok-ink bg-ok-bg border border-ok-border rounded px-1.5 py-0.5">
@@ -180,7 +188,11 @@ export function StateAlertCard({
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
                 {visibleChips.map((c) => (
-                  <ClientChip key={c.id} name={c.name} />
+                  <ClientChip
+                    key={c.id}
+                    name={c.name}
+                    href={`/clients/${c.id}`}
+                  />
                 ))}
                 {overflow > 0 && (
                   <span className="text-xs text-ink-500 px-1.5 tabular-nums">

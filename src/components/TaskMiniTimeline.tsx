@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, AlertOctagon, Pencil, X } from "lucide-react";
+import { Sparkles, AlertOctagon, X } from "lucide-react";
 import type { Task, ChecklistItem } from "../types";
 import { trpc } from "../lib/api/client";
 
@@ -274,6 +274,41 @@ function canonicalize(milestoneType: string): string {
   return milestoneType;
 }
 
+/**
+ * Map status → background class for the colored dot. Centralised because
+ * the same colour appears on the dot itself AND inside the hover pill —
+ * if they drift apart the user sees two different colours for one state.
+ */
+function statusDotBg(status: Status): string {
+  switch (status) {
+    case "done":
+      return "bg-ok-solid";
+    case "in_progress":
+      return "bg-warn-solid";
+    case "overdue":
+      return "bg-danger-solid";
+    case "blocked":
+      return "bg-danger-solid";
+    default:
+      return "bg-line";
+  }
+}
+
+function statusWord(status: Status): string {
+  switch (status) {
+    case "done":
+      return "Done";
+    case "in_progress":
+      return "In progress";
+    case "overdue":
+      return "Overdue";
+    case "blocked":
+      return "Blocked";
+    default:
+      return "Not started";
+  }
+}
+
 function Waypoint({
   wp,
   isFirst,
@@ -285,27 +320,30 @@ function Waypoint({
   isLast: boolean;
   onEdit?: () => void;
 }) {
-  const dotClasses = (() => {
+  const [hovered, setHovered] = useState(false);
+  const dotBg = statusDotBg(wp.status);
+  // Status-rendered ring still visible on the dot for in-progress / blocked
+  // — these are the two states the CPA needs to spot at a glance, even
+  // without hovering. The flat-coloured states (done / overdue / not-
+  // started) read clearly without a ring.
+  const dotRing = (() => {
     switch (wp.status) {
-      case "done":
-        return "bg-ok-solid";
       case "in_progress":
-        return "bg-warn-solid ring-2 ring-warn-border ring-offset-2 ring-offset-surface";
-      case "overdue":
-        return "bg-danger-solid";
+        return "ring-2 ring-warn-border ring-offset-2 ring-offset-surface";
       case "blocked":
-        return "bg-danger-solid ring-2 ring-danger-border ring-offset-2 ring-offset-surface animate-pulse";
+        return "ring-2 ring-danger-border ring-offset-2 ring-offset-surface animate-pulse";
       default:
-        return "bg-line";
+        return "";
     }
   })();
-  const tooltipText = wp.blockerReason
-    ? `${wp.label} — BLOCKED: ${wp.blockerReason}${wp.targetDate ? ` · target ${wp.targetDate}` : ""}${onEdit ? " · click to edit" : ""}`
-    : `${wp.label} — ${wp.status.replace("_", " ")}${wp.targetDate ? ` · target ${wp.targetDate}` : ""}${onEdit ? " · click to edit" : ""}`;
+  // Clickability is communicated through three non-text affordances:
+  //   1) cursor-pointer on the whole waypoint (button vs div),
+  //   2) the dot scales up slightly on hover,
+  //   3) the hover pill appears above the dot.
+  // The pencil icon + "click to edit" tooltip text were dropped 2026-05-05
+  // per Yuqi: textual affordances are noise when the visual cues read
+  // clearly on their own.
 
-  // When onEdit is provided (live BE-backed milestone), wrap the waypoint
-  // in a button so the whole stack — dot + label + date — is the click
-  // target. Heuristic-derived rows render as a plain div.
   const inner = (
     <>
       {/* Connector line on left and right (skipped at edges) */}
@@ -330,21 +368,18 @@ function Waypoint({
         )}
       </div>
 
-      {/* Dot */}
+      {/* Dot — scales up subtly on hover so the user feels the click
+          target before reading the popover. */}
       <div
-        className={`relative z-10 w-3 h-3 rounded-full shrink-0 ${dotClasses}`}
+        className={`relative z-10 w-3 h-3 rounded-full shrink-0 transition-transform duration-150 ${dotBg} ${dotRing} ${
+          onEdit && hovered ? "scale-125" : ""
+        }`}
       />
 
       {/* Label + date */}
       <div className="mt-2 text-center min-w-0 w-full">
-        <div className="text-2xs font-medium text-ink-700 truncate inline-flex items-center gap-1 justify-center">
+        <div className="text-2xs font-medium text-ink-700 truncate">
           {wp.label}
-          {onEdit && (
-            <Pencil
-              className="w-2.5 h-2.5 text-ink-300 group-hover:text-ink-500 transition-colors shrink-0"
-              aria-hidden
-            />
-          )}
         </div>
         {wp.targetDate && (
           <div className="text-2xs text-ink-400 tabular-nums truncate">
@@ -352,6 +387,25 @@ function Waypoint({
           </div>
         )}
       </div>
+
+      {/* Hover pill — minimal: colored status dot + status word. Date
+          + label are already visible below the dot, so the pill only
+          adds the one piece of information the CPA can't see otherwise:
+          the status. Click target is the entire waypoint, not a button
+          inside the pill — the pencil icon and "Override date / status"
+          row both got dropped per 2026-05-05 feedback as visual noise. */}
+      {onEdit && hovered && (
+        <div
+          role="tooltip"
+          className="absolute -top-7 left-1/2 -translate-x-1/2 z-30 inline-flex items-center gap-1.5 whitespace-nowrap px-2 py-1 rounded-full bg-ink-900 text-canvas text-2xs font-medium shadow-overlay pointer-events-none"
+        >
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${dotBg}`}
+            aria-hidden
+          />
+          {wp.blockerReason ? `Blocked: ${wp.blockerReason}` : statusWord(wp.status)}
+        </div>
+      )}
     </>
   );
 
@@ -360,9 +414,12 @@ function Waypoint({
       <button
         type="button"
         onClick={onEdit}
-        title={tooltipText}
-        aria-label={`Edit ${wp.label} milestone`}
-        className="group flex-1 flex flex-col items-center min-w-0 relative bg-transparent border-0 p-0 cursor-pointer rounded hover:bg-sunken/30 focus:outline-none focus:ring-2 focus:ring-info-border focus:ring-offset-1 focus:ring-offset-surface transition-colors"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        onFocus={() => setHovered(true)}
+        onBlur={() => setHovered(false)}
+        aria-label={`${wp.label} — ${statusWord(wp.status)}${wp.targetDate ? `, target ${wp.targetDate}` : ""}. Click to edit.`}
+        className="group flex-1 flex flex-col items-center min-w-0 relative bg-transparent border-0 p-0 cursor-pointer rounded hover:bg-sunken/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-info-border focus-visible:ring-offset-1 focus-visible:ring-offset-surface transition-colors"
       >
         {inner}
       </button>
@@ -372,7 +429,7 @@ function Waypoint({
   return (
     <div
       className="flex-1 flex flex-col items-center min-w-0 relative"
-      title={tooltipText}
+      aria-label={`${wp.label} — ${statusWord(wp.status)}`}
     >
       {inner}
     </div>

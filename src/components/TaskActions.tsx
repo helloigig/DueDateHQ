@@ -172,18 +172,20 @@ export function TaskActions({ task }: Props) {
             }`}
             title={
               isLowConfidence
-                ? `Only ${completionPct}% of items confirmed — you'll be asked to type to confirm`
-                : "Close this task"
+                ? `${confirmedItems.length} of ${relevantItems.length} document${relevantItems.length === 1 ? "" : "s"} confirmed (${completionPct}%) — you'll be asked to type to confirm before closing`
+                : `${confirmedItems.length} of ${relevantItems.length} document${relevantItems.length === 1 ? "" : "s"} confirmed — close this task`
             }
           >
             <Check className="w-3.5 h-3.5" aria-hidden /> Mark complete
             {relevantItems.length > 0 && (
               <span
-                className={`text-2xs tabular-nums px-1 py-0.5 rounded ${
+                className={`text-2xs tabular-nums px-1 py-0.5 rounded inline-flex items-baseline gap-1 ${
                   isLowConfidence ? "bg-warn-border/40" : "bg-canvas/20"
                 }`}
+                aria-label={`${confirmedItems.length} of ${relevantItems.length} documents confirmed`}
               >
                 {confirmedItems.length}/{relevantItems.length}
+                <span className="opacity-70">docs</span>
               </span>
             )}
           </button>
