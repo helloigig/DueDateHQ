@@ -63,15 +63,23 @@ const URGENCY_LABEL: Record<MockTodoItem["urgency"], string> = {
 };
 
 function UrgencyDot({ urgency }: { urgency: MockTodoItem["urgency"] }) {
+  // Wrap the 8px dot in a 16x16 container that matches the chevron column
+  // on the per-client row, so leading icons + the text after them sit at
+  // the same x position regardless of which row variant rendered.
   return (
     <span
-      className={cn(
-        "w-2 h-2 rounded-pill shrink-0 mt-1.5",
-        URGENCY_DOT_CLASS[urgency],
-      )}
+      className="w-4 h-4 shrink-0 flex items-center justify-center pt-0.5"
       aria-label={URGENCY_LABEL[urgency]}
       role="img"
-    />
+    >
+      <span
+        className={cn(
+          "w-2 h-2 rounded-pill",
+          URGENCY_DOT_CLASS[urgency],
+        )}
+        aria-hidden
+      />
+    </span>
   );
 }
 
@@ -625,7 +633,7 @@ function SubItemRow({
         type="button"
         onClick={() => navigateForItem(item, navigate)}
         className={cn(
-          "w-full text-left px-region py-2 pl-10 flex items-start gap-3 transition-colors",
+          "w-full text-left px-region py-2 pl-10 flex items-start gap-2 transition-colors",
           "hover:bg-surface focus-visible:bg-surface focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-indigo/40",
         )}
       >
@@ -692,7 +700,7 @@ function StateAlertRowView({ row }: { row: StateAlertRow }) {
       <button
         type="button"
         onClick={() => navigateForItem(item, navigate)}
-        className="w-full text-left px-region py-3 flex items-start gap-3 hover:bg-sunken/40 transition-colors"
+        className="w-full text-left px-region py-3 flex items-start gap-2 hover:bg-sunken/40 transition-colors"
       >
         <UrgencyDot urgency={item.urgency} />
         <div className="flex-1 min-w-0">
@@ -731,7 +739,7 @@ function BulkBatchRowView({ row }: { row: BulkBatchRow }) {
       <button
         type="button"
         onClick={() => navigateForItem(item, navigate)}
-        className="w-full text-left px-region py-3 flex items-start gap-3 hover:bg-sunken/40 transition-colors"
+        className="w-full text-left px-region py-3 flex items-start gap-2 hover:bg-sunken/40 transition-colors"
       >
         <UrgencyDot urgency={item.urgency} />
         <div className="flex-1 min-w-0">
