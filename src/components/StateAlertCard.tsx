@@ -1,7 +1,8 @@
 import { CalendarClock, Check } from "lucide-react";
+import { Link } from "react-router-dom";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { StateBadge } from "@/components/ui/StateBadge";
-import { ClientChip } from "@/components/ClientChip";
+import { Avatar } from "@/components/ui/Avatar";
 import { formatLongDate, hoursSince } from "@/data/dateHelpers";
 import { clients as MOCK_CLIENTS } from "@/data/mockClients";
 import type { Announcement } from "@/types";
@@ -154,8 +155,17 @@ export function StateAlertCard({
               {timeAgoShort(a.detectedAt)}
             </span>
           </div>
+          {/* Body / summary — falls back to a generated one-liner when
+              the announcement has no human-authored summary. Yuqi
+              2026-05-05: cards that arrived from the scraper without
+              a body looked half-loaded ("Press release from FDLE"
+              with no description rendered an empty paragraph).
+              `${authority} published a ${type}` is a thin description
+              but at least the row never renders blank. */}
           <p className="mt-2 text-sm text-ink-700 leading-snug line-clamp-2">
-            {a.summary}
+            {a.summary && a.summary.trim()
+              ? a.summary
+              : `${a.authority} published a ${TYPE_LABEL[a.type].toLowerCase()} for ${a.affectedClientIds.length} of your clients. Open the detail pane for the full text.`}
           </p>
           {handled && (
             <div className="mt-2 inline-flex items-center gap-1 text-2xs font-medium text-ok-ink bg-ok-bg border border-ok-border rounded px-1.5 py-0.5">
@@ -180,7 +190,7 @@ export function StateAlertCard({
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
                 {visibleChips.map((c) => (
-                  <ClientChip key={c.id} client={c} size="sm" as="link" />
+                  <AffectedClientChip key={c.id} client={c} />
                 ))}
                 {overflow > 0 && (
                   <span className="text-xs text-ink-500 px-1.5 tabular-nums">
@@ -217,5 +227,32 @@ export function StateAlertCard({
           inline Send avoids two parallel send paths that were drifting
           out of sync (the inline one was toast-only). */}
     </div>
+  );
+}
+
+/**
+ * AffectedClientChip — framed avatar + name pill specific to the alert
+ * "Affects N clients" zone. We deliberately don't reuse `ClientChip` here
+ * because that primitive is hardlined "no avatars" — it lives in dense
+ * rosters where avatars create visual noise. The alert card's affected-
+ * clients zone is a different context: a small set of high-attention
+ * names, where the avatar carries a "this is a specific client, click
+ * through" affordance. Keeping the primitive split preserves the
+ * ClientChip contract while giving this surface its own framed shape.
+ */
+function AffectedClientChip({ client }: { client: AffectedClient }) {
+  const firstLetter = (client.name.trim()[0] ?? "?").toUpperCase();
+  return (
+    <Link
+      to={`/clients/${client.id}`}
+      className="inline-flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-pill border border-line bg-surface hover:bg-sunken hover:border-line-strong transition-colors min-w-0 max-w-full"
+      onClick={(e) => e.stopPropagation()}
+      title={client.name}
+    >
+      <Avatar size="xs" tone="neutral" initials={firstLetter} name={client.name} />
+      <span className="text-xs font-medium text-ink-900 truncate">
+        {client.name}
+      </span>
+    </Link>
   );
 }

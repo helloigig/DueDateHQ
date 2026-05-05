@@ -8,13 +8,13 @@ import {
   Mail,
   Lightbulb,
   PanelLeftClose,
-  PanelLeftOpen,
   GanttChartSquare,
   UserPlus,
   LogOut,
   Pin,
   PinOff,
   Check,
+  ChevronDown,
 } from "lucide-react";
 import { useAnnouncements } from "../hooks/useAnnouncements";
 import { useSession, signOut } from "../data/session";
@@ -158,6 +158,7 @@ export function Sidebar() {
       <WorkspaceHeader
         collapsed={collapsed}
         firmName={session?.firmName ?? "Your firm"}
+        onToggleCollapse={() => setCollapsed((v) => !v)}
       />
 
       <nav className="flex-1 py-4 px-2 space-y-1">
@@ -246,8 +247,6 @@ export function Sidebar() {
           </p>
         )}
 
-        <InviteTeammateCard collapsed={collapsed} />
-
         <NavLink
           to="/settings"
           title={collapsed ? "Settings" : undefined}
@@ -274,29 +273,15 @@ export function Sidebar() {
             </>
           )}
         </NavLink>
-
-        {/* Toggle — icon-only in both modes. Yuqi audit 2026-05-05: the
-            expanded variant carried "Collapse" text that added noise
-            without information; the icon + tooltip + aria-label carry
-            the affordance. Aligns with the Pin button collapse on the
-            ClientDetail header — secondary tools become glyphs. */}
-        <button
-          onClick={() => setCollapsed((v) => !v)}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="mt-1 w-full flex items-center justify-center rounded-md text-sm text-ink-400 hover:bg-sunken hover:text-ink-700 py-2"
-        >
-          {collapsed ? (
-            <PanelLeftOpen className="w-4 h-4 shrink-0" aria-hidden />
-          ) : (
-            <PanelLeftClose className="w-4 h-4 shrink-0" aria-hidden />
-          )}
-        </button>
       </div>
 
-      {/* User account — bottom-left, Linear/Notion convention.
-          Replaces the user dropdown that used to live in the TopBar so
-          there's a single account entrance. */}
+      {/* Bottom-left footer cluster — Invite teammate + user account.
+          Linear/Notion convention: invite affordance pinned next to the
+          account chip so the social actions sit together at the
+          easiest-to-reach corner. The collapse toggle moved to the
+          workspace header (top), keeping the bottom for identity-only
+          actions. */}
+      <InviteTeammateCard collapsed={collapsed} />
       <UserAccountTrigger collapsed={collapsed} />
     </aside>
   );
@@ -319,7 +304,7 @@ function UserAccountTrigger({ collapsed }: { collapsed: boolean }) {
   const email = session?.userEmail;
 
   return (
-    <div className="border-t border-line px-2 py-2">
+    <div className="px-2 py-2">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -403,30 +388,34 @@ function InviteTeammateCard({ collapsed }: { collapsed: boolean }) {
 
   if (collapsed) {
     return (
-      <Link
-        to="/settings/team"
-        title="Invite teammate"
-        aria-label="Invite teammate"
-        className="flex items-center justify-center py-2 rounded-md text-ink-500 hover:bg-sunken hover:text-ink-900 transition-colors"
-      >
-        <UserPlus className="w-4 h-4" aria-hidden />
-      </Link>
+      <div className="px-2 py-2 border-t border-line">
+        <Link
+          to="/settings/team"
+          title="Invite teammate"
+          aria-label="Invite teammate"
+          className="flex items-center justify-center py-2 rounded-md text-ink-500 hover:bg-sunken hover:text-ink-900 transition-colors"
+        >
+          <UserPlus className="w-4 h-4" aria-hidden />
+        </Link>
+      </div>
     );
   }
 
   return (
-    <Link
-      to="/settings/team"
-      className="group flex items-start gap-2 px-3 py-2 mb-1 rounded-md border border-line bg-surface/40 hover:bg-sunken transition-colors"
-    >
-      <UserPlus className="w-3.5 h-3.5 text-ink-500 shrink-0 mt-0.5" aria-hidden />
-      <div className="flex-1 min-w-0">
-        <div className="text-xs font-medium text-ink-900">Invite teammate</div>
-        <div className="text-2xs text-ink-500 leading-tight mt-0.5">
-          Add a preparer or reviewer to your firm.
+    <div className="px-2 py-2 border-t border-line">
+      <Link
+        to="/settings/team"
+        className="group flex items-start gap-2 px-3 py-2 rounded-md border border-line bg-surface/40 hover:bg-sunken transition-colors"
+      >
+        <UserPlus className="w-3.5 h-3.5 text-ink-500 shrink-0 mt-0.5" aria-hidden />
+        <div className="flex-1 min-w-0">
+          <div className="text-xs font-medium text-ink-900">Invite teammate</div>
+          <div className="text-2xs text-ink-500 leading-tight mt-0.5">
+            Add a preparer or reviewer to your firm.
+          </div>
         </div>
-      </div>
-    </Link>
+      </Link>
+    </div>
   );
 }
 
@@ -443,31 +432,40 @@ function InviteTeammateCard({ collapsed }: { collapsed: boolean }) {
 function WorkspaceHeader({
   collapsed,
   firmName,
+  onToggleCollapse,
 }: {
   collapsed: boolean;
   firmName: string;
+  onToggleCollapse: () => void;
 }) {
   const [open, setOpen] = useState(false);
 
   if (collapsed) {
     return (
       <div className="h-14 flex items-center justify-center border-b border-line px-3">
-        <Avatar
-          variant="square"
-          size="md"
-          tone="primary"
-          name={firmName}
-          title={firmName}
-        />
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          title="Expand sidebar"
+          aria-label="Expand sidebar"
+          className="rounded-md hover:bg-sunken p-1 -m-1 transition-colors"
+        >
+          <Avatar
+            variant="square"
+            size="md"
+            tone="primary"
+            name={firmName}
+          />
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="relative h-14 flex items-center border-b border-line px-3">
+    <div className="relative h-14 flex items-center border-b border-line px-3 gap-1">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 w-full hover:bg-sunken rounded px-2 py-1.5 -mx-1 group"
+        className="flex items-center gap-2 flex-1 min-w-0 hover:bg-sunken rounded px-2 py-1.5 -mx-1 group"
         aria-expanded={open}
       >
         <Avatar variant="square" size="md" tone="primary" name={firmName} />
@@ -479,9 +477,23 @@ function WorkspaceHeader({
             DueDateHQ
           </span>
         </div>
-        <span className="text-ink-400 group-hover:text-ink-700 text-xs shrink-0">
-          ⌄
-        </span>
+        <ChevronDown
+          className="w-4 h-4 shrink-0 text-ink-400 group-hover:text-ink-700"
+          aria-hidden
+        />
+      </button>
+
+      {/* Collapse toggle — top-right of the workspace header. Linear/
+          Notion convention: chrome controls live with the workspace
+          mark, not buried at the bottom of the nav. */}
+      <button
+        type="button"
+        onClick={onToggleCollapse}
+        title="Collapse sidebar"
+        aria-label="Collapse sidebar"
+        className="shrink-0 rounded-md text-ink-400 hover:bg-sunken hover:text-ink-700 p-1.5 transition-colors"
+      >
+        <PanelLeftClose className="w-4 h-4" aria-hidden />
       </button>
 
       {open && (
