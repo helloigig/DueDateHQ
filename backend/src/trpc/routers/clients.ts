@@ -68,6 +68,10 @@ const createInput = z.object({
   industry: z.string().max(80).optional().nullable(),
   notes: z.string().max(4000).optional().nullable(),
   tier: z.string().max(40).default("standard"),
+  // CPA override for the AI behaviour summary on the client detail
+  // header. Caps at 500 chars to keep the rendered line readable.
+  // Pass null to clear an existing override.
+  aiSummaryOverride: z.string().max(500).optional().nullable(),
 });
 
 // FE may send fields the BE doesn't support yet (servicePackages, hasDeadlineThisWeek).
@@ -102,6 +106,9 @@ function rowToClient(r: typeof clients.$inferSelect) {
     addedAt: r.createdAt.toISOString(),
     servicePackages: [] as string[],
     county: r.county ?? undefined,
+    // FE renders this in the AI summary block on the client detail
+    // header. Null means "no override; use the auto-composed text".
+    aiSummaryOverride: r.aiSummaryOverride ?? null,
   };
 }
 
@@ -257,6 +264,9 @@ export const clientsRouter = router({
           }),
           ...(input.patch.notes !== undefined && { notes: input.patch.notes }),
           ...(input.patch.tier !== undefined && { tier: input.patch.tier }),
+          ...(input.patch.aiSummaryOverride !== undefined && {
+            aiSummaryOverride: input.patch.aiSummaryOverride,
+          }),
           updatedAt: sql`now()`,
         })
         .where(and(eq(clients.id, input.id), eq(clients.firmId, ctx.firmId)));

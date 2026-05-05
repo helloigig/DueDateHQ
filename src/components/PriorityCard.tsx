@@ -10,6 +10,8 @@ import {
   parseDate,
 } from "../data/dateHelpers";
 import { actions } from "../data/store";
+import { useSetDeadlineStatus } from "../hooks/useDeadlines";
+import { env } from "../config";
 
 type PriorityItem =
   | {
@@ -71,6 +73,14 @@ export function PriorityCard({
   escalatedAlerts?: Announcement[];
   onDismiss: () => void;
 }) {
+  const setStatusMut = useSetDeadlineStatus();
+  const markComplete = (deadlineId: string) => {
+    if (env.useMockData) {
+      actions.setDeadlineStatus(deadlineId, "completed");
+    } else {
+      setStatusMut.mutate({ id: deadlineId, status: "completed" });
+    }
+  };
   const items: PriorityItem[] = useMemo(() => {
     const active = deadlines.filter(
       (d) =>
@@ -184,9 +194,7 @@ export function PriorityCard({
                 {countdownLabel(item.deadline.officialDueDate)}
               </span>
               <button
-                onClick={() =>
-                  actions.setDeadlineStatus(item.deadline.id, "completed")
-                }
+                onClick={() => markComplete(item.deadline.id)}
                 className="text-xs p-1.5 rounded bg-ok-bg text-ok-ink hover:bg-ok-border/40"
                 aria-label="Mark complete"
                 title="Mark complete"

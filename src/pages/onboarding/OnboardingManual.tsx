@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { OnboardingShell } from "../../components/OnboardingShell";
 import { actions } from "../../data/store";
+import { useCreateClient } from "../../hooks/useClients";
+import { env } from "../../config";
 import type { EntityType, StateCode } from "../../types";
 
 const ENTITIES: EntityType[] = [
@@ -31,6 +33,7 @@ export function OnboardingManual() {
   const navigate = useNavigate();
   const [drafts, setDrafts] = useState<DraftClient[]>([{ ...EMPTY }]);
   const [submitting, setSubmitting] = useState(false);
+  const createClientMut = useCreateClient();
 
   const update = (i: number, patch: Partial<DraftClient>) => {
     setDrafts((prev) =>
@@ -46,17 +49,40 @@ export function OnboardingManual() {
     (d) => d.name.trim() && d.contactEmail.trim()
   );
 
-  const submit = () => {
+  const submit = async () => {
     setSubmitting(true);
-    for (const d of valid) {
-      actions.addClient({
-        name: d.name.trim(),
-        entityType: d.entityType,
-        primaryState: d.primaryState,
-        contactEmail: d.contactEmail.trim(),
-      });
+    try {
+      if (env.useMockData) {
+        // Mock-mode bulk insert into the in-memory store. Single tick;
+        // no async work to await.
+        for (const d of valid) {
+          actions.addClient({
+            name: d.name.trim(),
+            entityType: d.entityType,
+            primaryState: d.primaryState,
+            contactEmail: d.contactEmail.trim(),
+          });
+        }
+      } else {
+        // Real mode: hit clients.create per row sequentially. The BE
+        // auto-suggests a service package (entity + state), spawns
+        // deadlines/tasks/checklists, and writes the activity event.
+        // Sequential keeps the FE's single-flight invalidation simple
+        // and avoids stampedes against the same suggestForClient table.
+        for (const d of valid) {
+          await createClientMut.mutateAsync({
+            name: d.name.trim(),
+            entityType: d.entityType,
+            primaryState: d.primaryState,
+            contactEmail: d.contactEmail.trim(),
+            tier: "standard",
+          });
+        }
+      }
+      navigate("/onboarding/packages");
+    } finally {
+      setSubmitting(false);
     }
-    navigate("/onboarding/packages");
   };
 
   return (
