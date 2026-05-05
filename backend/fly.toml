@@ -1,0 +1,73 @@
+# ⚠️ NOT THE LIVE CONFIG — left here only as a template/reference.
+#
+# The deployed app `duedatehq` is built from the repo-root /fly.toml +
+# /Dockerfile (see RUNBOOK.md "Deploying backend to Fly.io"). This file
+# disagrees on app name, port, region, release_command, and Node version.
+# Running `cd backend && fly deploy` from here will create / update the
+# WRONG app and partially overwrite the live machine config — that's the
+# bug that landed the deploy in a critical state on 2026-05-02.
+#
+# If you genuinely want a separate backend-only deploy in the future,
+# rename the app, update the saved config explicitly, and unblock by
+# coordinating with the root deploy. Otherwise, ignore this file.
+#
+# Original quickstart (kept for the historical record):
+#   1. brew install flyctl                    (one-time)
+#   2. fly auth login                          (one-time)
+#   3. cd backend && fly launch --no-deploy    (creates the app, edits this file)
+#      — pick a unique app name (Fly suggests one); the app URL becomes <name>.fly.dev
+#   4. Set secrets (NEVER paste real keys here, gitignored or not):
+#      fly secrets set DATABASE_URL=... \
+#                      SUPABASE_URL=... \
+#                      SUPABASE_ANON_KEY=... \
+#                      SUPABASE_SERVICE_ROLE_KEY=... \
+#                      ANTHROPIC_API_KEY=... \
+#                      INBOUND_WEBHOOK_SECRET=... \
+#                      DELIVERY_WEBHOOK_SECRET=... \
+#                      RESEND_API_KEY=... \
+#                      CORS_ORIGIN=https://<your-vercel-url>.vercel.app
+#   5. fly deploy
+#   6. Optional: fly logs        (tail real-time logs)
+#                fly status      (machine health)
+#                fly ssh console (debug inside the container)
+
+app = "duedatehq"
+primary_region = "lhr"      # eu-west — close to Supabase eu-west-1
+
+[build]
+  # Use the Dockerfile in this directory.
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  NODE_ENV = "production"
+  # CORS_ORIGIN is set via `fly secrets` so it can reference the Vercel URL
+  # without committing it. SCRAPER_DISABLED unset → scraper runs on schedule.
+  # METHOD_B_ENABLED unset → Method B poller off until Gmail/Outlook OAuth wired.
+  # QBO_SYNC_ENABLED unset → QBO sync off until OAuth wired.
+
+# Database migration — runs ONCE per deploy, before the new app version is
+# routed traffic. Fails the deploy if migration errors out, so a broken
+# migration never reaches production.
+[deploy]
+  release_command = "node --env-file-if-exists=.env.local dist/db/migrate.js"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"      # scale to 0 when idle (free tier)
+  auto_start_machines = true        # cold-start on incoming request
+  min_machines_running = 0
+  processes = ["app"]
+
+  # Health check — backend exposes GET /health
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"   # 1 vCPU, 256 MB — free tier; bump to "shared-cpu-2x" if scaling
+  memory = "512mb"          # bumped to 512 because Anthropic SDK + Drizzle hold ~200MB warm

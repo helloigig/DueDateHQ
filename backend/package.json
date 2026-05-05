@@ -1,0 +1,37 @@
+{
+  "name": "duedatehq-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "unset ANTHROPIC_API_KEY 2>/dev/null; tsx watch --env-file-if-exists=.env.local src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "unset ANTHROPIC_API_KEY 2>/dev/null; node --env-file-if-exists=.env.local dist/index.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx --env-file-if-exists=.env.local src/db/migrate.ts",
+    "db:seed": "tsx --env-file-if-exists=.env.local src/db/seed.ts",
+    "db:seed:federal-forms": "tsx --env-file-if-exists=.env.local src/db/seed-federal-forms.ts",
+    "db:probe": "tsx --env-file-if-exists=.env.local src/db/probe.ts",
+    "eval:inbound": "unset ANTHROPIC_API_KEY 2>/dev/null; tsx --env-file-if-exists=.env.local eval/run.ts",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
+    "@hono/node-server": "^1.13.0",
+    "@hono/trpc-server": "^0.3.4",
+    "@supabase/supabase-js": "^2.45.0",
+    "@trpc/server": "^11.16.0",
+    "drizzle-orm": "^0.36.0",
+    "hono": "^4.6.0",
+    "postgres": "^3.4.4",
+    "resend": "^6.12.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "drizzle-kit": "^0.28.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.2"
+  }
+}

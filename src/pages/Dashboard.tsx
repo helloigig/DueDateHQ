@@ -1,0 +1,659 @@
+import { useEffect, useMemo, useState } from "react";
+import { useShortcuts } from "../hooks/useKeyboard";
+import { useClients } from "../hooks/useClients";
+import { useTriageDeadlines } from "../hooks/useDeadlines";
+import { useDetectAnnouncements } from "../hooks/useAnnouncements";
+import { useRealtimeAnnouncements } from "../hooks/useRealtimeAnnouncements";
+import { useStore } from "../data/store";
+import { useSession } from "../data/session";
+import { ShortcutsModal } from "../components/ShortcutsModal";
+import { DashboardSkeleton } from "../components/skeletons/DashboardSkeleton";
+import { ErrorState } from "../components/ErrorState";
+import {
+  TODAY,
+  toIso,
+  daysBetween,
+  parseDate,
+  hoursSince,
+  escalationTier,
+} from "../data/dateHelpers";
+import { useDashboardPreferences } from "../data/preferences";
+import { ChaseBanner } from "../components/ChaseBanner";
+import { BlockingAlertsDialog } from "../components/BlockingAlertsDialog";
+import { OnboardingLayer2Widget } from "../components/OnboardingLayer2Widget";
+// import { WelcomeTour } from "../components/WelcomeTour"; // hidden per user direction
+import { CapacityStrip } from "../components/CapacityStrip";
+// ModeFHealth removed — the same monitoring signal ("50/50 states ·
+// last scrape 14m ago") is already on /alerts as the ambient line.
+// Two surfaces showing the same health was redundant.
+// import { ModeFHealth } from "../components/ModeFHealth";
+import { ActionQueue } from "../components/ActionQueue";
+import { JustHappenedStrip } from "../components/JustHappenedStrip";
+import { AiUsageInfo } from "../components/AiUsageInfo";
+import { PageHeader } from "../components/ui/PageHeader";
+import { DateLabel } from "../components/ui/DateLabel";
+import { MetricTile } from "../components/ui/MetricTile";
+import { SectionHeader } from "../components/ui/SectionHeader";
+import { StateAlertCard } from "../components/StateAlertCard";
+import { Megaphone, Mail, CheckCircle2, ChevronRight, type LucideIcon } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import type { Announcement } from "../types";
+import { escalationTier as escTier } from "../data/dateHelpers";
+
+const DONE_STATUSES = new Set(["completed", "filed_extension"]);
+
+/**
+ * Dashboard — the morning glance.
+ *
+ * Two zones above the fold:
+ *   1. State-alert band — conditional, vanishes when no actionable alerts
+ *   2. The queue — ActionQueue (urgency-sorted, with chase actions inline)
+ *
+ * Below the fold: capacity strip (≥3-staff firms only).
+ *
+ * Editorial rules:
+ *   • CPAs barely miss official deadlines — so "past official" is rare and
+ *     gets a calm-but-clear callout only when nonzero. The operational
+ *     signal is "past internal target" (the firm's 1-week buffer is being
+ *     eaten), which fires regularly during tax season.
+ *   • No big greeting cards or hero stat strips. A thin top strip with the
+ *     date and a one-line summary; the queue starts immediately below.
+ *   • Welcome tour, PWA install, advisory peek, digest panel are NOT on
+ *     this surface (they were noise — moved to Settings, /to-review, or
+ *     surfaced via per-row actions in the queue).
+ */
+export function Dashboard() {
+  useSession();
+  const clientsQuery = useClients();
+  const triageQuery = useTriageDeadlines();
+  const announcementsQuery = useRealtimeAnnouncements();
+  const detectMutation = useDetectAnnouncements();
+  const { tasks } = useStore();
+  const location = useLocation();
+  // /legacy/dashboard renders the pre-v0.7-amendment view: deadline list only,
+  // no ActionQueue, no Mode F Health. Lets us A/B compare during transition.
+  const isLegacy = location.pathname.startsWith("/legacy");
+
+  // One-shot: run the detector on mount (simulates 24h SLA scrape)
+  useEffect(() => {
+    detectMutation.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const { prefs, update } = useDashboardPreferences();
+
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+  useShortcuts([
+    { key: "j", description: "Next row", handler: () => focusAdjacentRow(1) },
+    { key: "k", description: "Previous row", handler: () => focusAdjacentRow(-1) },
+    {
+      key: "?",
+      shift: true,
+      description: "Show shortcuts",
+      handler: () => setShortcutsOpen(true),
+    },
+  ]);
+
+  const clients = clientsQuery.data?.items ?? [];
+  const announcements = announcementsQuery.data ?? [];
+
+  // Two surfaces work together (per Yuqi's "[State notification + suggested
+  // actions = THE surface]" — the alert is the news; the queue carries the
+  // derived verbs):
+  //   • AnnouncementBanner ("State alerts") — receives EVERY undismissed
+  //     alert. Renders actionable ones as full rows and folds news-only
+  //     alerts into a "N news items" chip. This is the single canonical
+  //     surface for the alerts themselves.
+  //   • ActionQueue — receives state-alert TodoItems generated by Mode F
+  //     (separately persisted on the BE). Surfaces the *actions* a CPA
+  //     should take in response ("Review draft for 6 clients", etc.).
+  //   The previous one-surface approach (PR #44 — alerts moved into queue,
+  //   banner was news-only) failed when Mode F hadn't generated a
+  //   corresponding TodoItem yet: alerts vanished from both surfaces and
+  //   the user only saw "5 active alerts" in the StateMonitoringHealth
+  //   strip with no way to act on them. Belt-and-suspenders: the banner
+  //   always shows the alerts; the queue is a derived view, not the only
+  //   path.
+  const activeBanners = announcements.filter((a) => !a.dismissed);
+  // firmRelevantAlerts (alerts hitting at least one client) still drives
+  // the >72h blocking dialog — that escalation only makes sense when a
+  // client cares about the alert.
+  const firmRelevantAlerts = activeBanners.filter(
+    (a) => a.affectedClientIds.length > 0,
+  );
+
+  const alertsByTier = useMemo(() => {
+    const out = {
+      fresh: [] as Announcement[],
+      reminder: [] as Announcement[],
+      escalated: [] as Announcement[],
+      blocking: [] as Announcement[],
+    };
+    for (const a of firmRelevantAlerts) {
+      out[escalationTier(hoursSince(a.detectedAt))].push(a);
+    }
+    return out;
+  }, [firmRelevantAlerts]);
+
+  const alertsSnoozedToday = prefs.alerts_snoozed_until === toIso(TODAY);
+  const showBlockingDialog =
+    alertsByTier.blocking.length > 0 && !alertsSnoozedToday;
+  const [blockingDismissed, setBlockingDismissed] = useState(false);
+
+  // Operational summary. Two distinct signals:
+  //   • pastInternalTarget — task is past its internal target date (1-week
+  //     buffer eaten). Daily-relevant. The signal Sarah actually feels.
+  //   • pastOfficial — task is past the government deadline. Rare. Means
+  //     extension territory. Almost always 0 in a healthy firm.
+  // Plus: dueThisWeek — calendar context. Always shown.
+  const summary = useMemo(() => {
+    const open = tasks.filter((t) => !DONE_STATUSES.has(t.status));
+    const todayIso = toIso(TODAY);
+    const pastInternalTarget = open.filter(
+      (t) => t.internalTargetDate < todayIso && t.officialDueDate >= todayIso,
+    ).length;
+    const pastOfficial = open.filter(
+      (t) => t.officialDueDate < todayIso,
+    ).length;
+    const dueToday = open.filter((t) => t.officialDueDate === todayIso).length;
+    const dueThisWeek = open.filter((t) => {
+      const days = daysBetween(TODAY, parseDate(t.officialDueDate));
+      return days >= 0 && days <= 7;
+    }).length;
+    const activeClients = clients.filter((c) => c.status === "active").length;
+    return {
+      pastInternalTarget,
+      pastOfficial,
+      dueToday,
+      dueThisWeek,
+      activeClients,
+    };
+  }, [tasks, clients]);
+
+  const todayIso = useMemo(() => toIso(TODAY), []);
+
+  const hasNoClients = clients.length === 0;
+
+  const isLoading = clientsQuery.isLoading || triageQuery.isLoading;
+  const loadError =
+    clientsQuery.error || triageQuery.error || announcementsQuery.error;
+
+  if (isLoading) return <DashboardSkeleton />;
+
+  if (loadError) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 md:px-6 py-6">
+        <ErrorState
+          title="Couldn't load your dashboard."
+          message={loadError instanceof Error ? loadError.message : undefined}
+          onRetry={() => {
+            clientsQuery.refetch();
+            triageQuery.refetch();
+            announcementsQuery.refetch();
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (hasNoClients) {
+    return (
+      <div className="max-w-[840px] mx-auto px-4 md:px-6 lg:px-8 py-section">
+        <PageHeader
+          title={
+            <>
+              Today
+              <span className="ml-2 font-medium text-ink-500">
+                <DateLabel value={todayIso} format="short" />
+              </span>
+            </>
+          }
+        />
+        <EmptyState
+          title="Let's get your clients in."
+          actions={
+            <>
+              <EmptyStateButton to="/import" primary>
+                Import CSV
+              </EmptyStateButton>
+              <EmptyStateButton to="/clients">Add 5 manually</EmptyStateButton>
+              <EmptyStateButton to="/import?demo=1">
+                Try demo data
+              </EmptyStateButton>
+            </>
+          }
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-[1080px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      {/* PAGE HEADER ROW — Mercury Home anatomy: H1 left + action button row
+          right. The action row carries the page's "what can I do here right
+          now" affordances (Mercury Home: Send / Transfer / Deposit / Request).
+          Per T2 — only the first action ("Send chase") wears the indigo
+          accent; the rest are ghost pills. */}
+      <div className="mb-region flex items-end justify-between gap-region flex-wrap">
+        <PageHeader
+          className="mb-0"
+          title={
+            <>
+              Today
+              <span className="ml-2 font-medium text-ink-500">
+                <DateLabel value={todayIso} format="short" />
+              </span>
+            </>
+          }
+        />
+        <DashboardActionRow />
+      </div>
+
+      {/* KPI STRIP — operational signal first, legal-miss as conditional
+          secondary. Per the deadline-UX principle: official date is a
+          reference constraint, not the primary daily driver. The signal
+          Sarah feels every day is "behind plan" (past internal target,
+          buffer eaten); legal misses are rare and only loud up when they
+          actually exist. So:
+            • "Behind plan" — always present, amber when nonzero. The
+              operational signal. Counts open tasks where today >
+              internal target but ≤ official deadline.
+            • "Filing today" — calendar context. Always present, neutral.
+            • "Past official" — danger tile, conditional. Only rendered
+              when the count is > 0. Never primary even when present —
+              its job is to alert without re-centering the mental model
+              on the legal date.
+          Pre-PR #92, the second slot flip-flopped between "Past target"
+          and "Past official" depending on count. That flipping conflated
+          two different decisions. Splitting them removes the ambiguity. */}
+      <div
+        className={`mb-card grid grid-cols-1 gap-region ${
+          summary.pastOfficial > 0
+            ? "md:grid-cols-3 max-w-2xl"
+            : "md:grid-cols-2 max-w-md"
+        }`}
+      >
+        <MetricTile
+          label="Behind plan"
+          value={summary.pastInternalTarget}
+          tone={summary.pastInternalTarget > 0 ? "warn" : "neutral"}
+        />
+        <MetricTile
+          label="Filing today"
+          value={summary.dueToday}
+          tone={summary.dueToday > 0 ? "warn" : "neutral"}
+        />
+        {summary.pastOfficial > 0 && (
+          <MetricTile
+            label="Past official"
+            value={summary.pastOfficial}
+            tone="danger"
+          />
+        )}
+      </div>
+
+      {/* WelcomeTour hidden per user direction — adds noise on the daily
+          surface; reintroduce as an onboarding-only banner gated on
+          firstSession if we want a tour later. */}
+      {/* <WelcomeTour /> */}
+
+      {/* ─────────────────────────────────────────────────────────────────
+          Today narrative (5 sections, read top → bottom):
+            1. Just happened — overnight diff (Mode A confirms, replies,
+               Mode C issues). Drained in seconds before chasing starts.
+            2. Action queue — the chase. State alerts pinned at top, then
+               one row per client (max-urgency dot, all outstanding items
+               aggregated, expand to act on individual items).
+            3. Quiet clients — the chase loop's stalled subset (14d+ no
+               reply). Needs a phone call, not another email.
+            4. Mode F Health — state-monitoring's own monitoring.
+            5. Capacity — staff allocation (≥3-staff firms only).
+          State-alert news (no client matches) drops out as a compact
+          chip above the queue. Pure-news doesn't generate queue rows
+          (Mode F gates on affectedClientIds.length > 0). */}
+
+      {/* §1: Just happened — overnight diff strip. */}
+      <JustHappenedStrip />
+
+      {/* State alerts — preview surface. Top 3 most-urgent rendered as
+          the canonical <StateAlertCard variant="preview"> (same shape
+          as /alerts so the user doesn't see two layouts of the same
+          data). Click navigates to /alerts/:id where the action lives.
+          Empty state shows a calm "all clear" line. */}
+      <StateAlertsPreview announcements={activeBanners} />
+
+      {/* §2: Action queue — AI-curated TodoItem feed (PRD §4.8 nine
+          sources, urgency-sorted with waiting_multiplier). State alerts
+          pinned at the top of the queue (Mode F rows render with a
+          distinct event-shape variant); per-client rows aggregate every
+          outstanding item for that client into a single send. Old per-
+          (client × task × form × state) row layout was theatrical at
+          scale (49 clients × 6 forms = 294 rows). */}
+      {!isLegacy && <ActionQueue />}
+
+      {/* §3: Quiet clients — automation has run out. The phone-call
+          subset of in-flight chases (14d+ since last reminder, still
+          waiting). Self-vanishes when zero. */}
+      <ChaseBanner />
+
+      {/* §4: ModeFHealth removed — see import block above. The state-
+          monitoring health signal lives once, on the /alerts page
+          ambient line ("50/50 states monitored · last scrape 14m ago"),
+          which the Dashboard's StateAlertsPreview links into. */}
+
+      {/* §5: Capacity — ≥3-staff firms only (gate inside the component).
+          Solo Sarah never sees this; mid-firm Yan Jing always does. */}
+      <CapacityStrip />
+
+      {/* Onboarding layer-2 nudges (set up forwarding email, connect
+          QBO). Self-gated to fade out once the firm wires the basics. */}
+      <OnboardingLayer2Widget />
+
+      {/* Blocking-alerts overlay — fires only at >72h escalation. Stays as
+          a modal because the spec demands a forced ack at that tier. */}
+      {showBlockingDialog && !blockingDismissed && (
+        <BlockingAlertsDialog
+          alerts={alertsByTier.blocking}
+          onSnooze={(reason) => {
+            update({ alerts_snoozed_until: toIso(TODAY) });
+            if (reason) {
+              console.info("[alerts] snooze logged", {
+                date: toIso(TODAY),
+                reason,
+              });
+            }
+            setBlockingDismissed(true);
+          }}
+          onClose={() => setBlockingDismissed(true)}
+        />
+      )}
+
+      <ShortcutsModal
+        open={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+        shortcuts={[
+          { keys: ["j"], label: "Next deadline row" },
+          { keys: ["k"], label: "Previous deadline row" },
+          { keys: ["Enter"], label: "Open focused row's actions" },
+          { keys: ["c"], label: "Mark focused row complete" },
+          { keys: ["/"], label: "Focus filter" },
+          { keys: ["⌘", "k"], label: "Open search" },
+          { keys: ["?"], label: "Show this help" },
+          { keys: ["Esc"], label: "Close dialog" },
+        ]}
+      />
+
+      <div className="pt-2 pb-6 text-2xs text-ink-400 flex items-center justify-between gap-4">
+        <AiUsageInfo />
+        <button
+          onClick={() => setShortcutsOpen(true)}
+          className="hover:text-ink-700 flex items-center gap-1"
+        >
+          <kbd className="px-1 py-0.5 border border-line rounded font-mono">
+            ?
+          </kbd>
+          for shortcuts
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// StateAlertsPreview — Dashboard's compact alert surface.
+//
+// Hard rule: Dashboard shows ONLY escalated alerts (>72h unactioned —
+// past soft SLA, demand action TODAY). Routine alerts collapse to an
+// ambient count line — they're one sidebar click away on /alerts.
+//
+// This earns the section's real estate. Routine alerts on Today
+// duplicated the /alerts page for no UX gain; the CPA is going to
+// /alerts to act on them anyway. Reserving Today for the truly
+// urgent makes the morning glance honest.
+//
+// Three states:
+//   • 0 alerts            → calm "all clear" line
+//   • 0 escalated, N affecting → ambient line ("N affecting · all under SLA")
+//   • M escalated, N total      → M cards inline + "{N-M} more routine →" link
+function StateAlertsPreview({
+  announcements,
+}: {
+  announcements: Announcement[];
+}) {
+  const navigate = useNavigate();
+  const clientsQuery = useClients();
+
+  // Empty: monitoring assurance, calm.
+  if (announcements.length === 0) {
+    return (
+      <section
+        className="bg-surface border border-line rounded-md px-4 py-2.5 flex items-center gap-3 mb-section"
+        aria-label="State alerts"
+      >
+        <span
+          className="w-2 h-2 rounded-full shrink-0 bg-ok-solid"
+          aria-hidden
+        />
+        <Megaphone className="w-3.5 h-3.5 shrink-0 text-ink-500" aria-hidden />
+        <span className="flex-1 text-sm text-ink-700">
+          <span className="font-medium text-ink-900">All clear.</span>{" "}
+          <span className="text-ink-500">
+            Monitoring 50 state authorities — nothing affecting your clients
+            right now.
+          </span>
+        </span>
+        <Link
+          to="/alerts"
+          className="text-2xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-0.5 shrink-0"
+        >
+          History <ChevronRight className="w-3 h-3" aria-hidden />
+        </Link>
+      </section>
+    );
+  }
+
+  // Affecting-firm subset.
+  const affecting = announcements.filter(
+    (a) => !a.dismissed && a.affectedClientIds.length > 0,
+  );
+
+  // Escalated subset — the only thing that earns Today's real estate.
+  const escalated = affecting.filter(
+    (a) => escTier(hoursSince(a.detectedAt)) === "escalated",
+  );
+  const routineCount = affecting.length - escalated.length;
+
+  // No escalated — single ambient line. Same shape as the empty state
+  // (calm), different copy (you have stuff, but not on fire).
+  if (escalated.length === 0) {
+    return (
+      <Link
+        to="/alerts"
+        className="block bg-surface border border-line rounded-md px-4 py-2.5 flex items-center gap-3 mb-section hover:border-line-strong transition-colors"
+        aria-label="State alerts"
+      >
+        <span
+          className="w-2 h-2 rounded-full shrink-0 bg-info-solid"
+          aria-hidden
+        />
+        <Megaphone className="w-3.5 h-3.5 shrink-0 text-ink-500" aria-hidden />
+        <span className="flex-1 text-sm text-ink-700">
+          <span className="font-medium text-ink-900 tabular-nums">
+            {affecting.length}
+          </span>{" "}
+          {affecting.length === 1 ? "alert" : "alerts"} affecting your clients
+          <span className="text-ink-500"> · all under SLA</span>
+        </span>
+        <span className="text-2xs text-ink-500 inline-flex items-center gap-0.5 shrink-0">
+          Open <ChevronRight className="w-3 h-3" aria-hidden />
+        </span>
+      </Link>
+    );
+  }
+
+  // Escalated present — sort escalated by impact (deadline-shifting,
+  // then most clients) so the most urgent card is first.
+  const sortedEscalated = [...escalated].sort((a, b) => {
+    const aShift = a.newDeadline ? 1 : 0;
+    const bShift = b.newDeadline ? 1 : 0;
+    if (aShift !== bShift) return bShift - aShift;
+    if (a.affectedClientIds.length !== b.affectedClientIds.length) {
+      return b.affectedClientIds.length - a.affectedClientIds.length;
+    }
+    return b.detectedAt.localeCompare(a.detectedAt);
+  });
+
+  return (
+    <section className="mb-section">
+      <SectionHeader
+        title="Escalated alerts"
+        meta={
+          escalated.length === 1
+            ? "1 past 72h SLA — act today"
+            : `${escalated.length} past 72h SLA — act today`
+        }
+        action={
+          <Link
+            to="/alerts"
+            className="text-xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-1"
+          >
+            All alerts <ChevronRight className="w-3 h-3" aria-hidden />
+          </Link>
+        }
+      />
+      <div className="flex flex-col gap-card">
+        {sortedEscalated.map((a) => (
+          <StateAlertCard
+            key={a.id}
+            a={a}
+            variant="preview"
+            onSelect={() => navigate(`/alerts/${a.id}`)}
+            clientSource={clientsQuery.data?.items}
+          />
+        ))}
+      </div>
+      {routineCount > 0 && (
+        <div className="mt-3 flex justify-center">
+          <Link
+            to="/alerts"
+            className="inline-flex items-center gap-1 text-xs text-ink-500 hover:text-ink-900 hover:underline underline-offset-[3px] decoration-[1.5px]"
+          >
+            {routineCount} more routine{" "}
+            {routineCount === 1 ? "alert" : "alerts"} on /alerts
+            <ChevronRight className="w-3.5 h-3.5" aria-hidden />
+          </Link>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// DashboardActionRow — top-right pill button cluster on the Dashboard page
+// header. Mercury Home anatomy: the page's primary actions sit beside the
+// title, not buried inside sections. Per T2 — only the first action wears
+// the indigo accent (the "next likely action"); the rest are ghost pills.
+function DashboardActionRow() {
+  const navigate = useNavigate();
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <ActionPill
+        primary
+        icon={Mail}
+        label="Send chase"
+        onClick={() => navigate("/mail")}
+      />
+      <ActionPill
+        icon={CheckCircle2}
+        label="Mark received"
+        onClick={() => navigate("/mail")}
+      />
+      {/* "View alerts" cut — sidebar Alerts nav + the inline "View all
+          alerts →" link inside the State alerts section already cover
+          this. Three paths to the same destination was redundant.
+          "New client" cut 2026-05-05 — the global +New button in the
+          AppShell header already covers this; two paths to the same
+          modal was the same redundancy class. */}
+    </div>
+  );
+}
+
+// ActionPill — pill-shaped page-header CTA. Per T3 (pills for actions) +
+// T2 (only one indigo accent on the page).
+function ActionPill({
+  primary,
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  primary?: boolean;
+  icon: LucideIcon;
+  label: string;
+  onClick?: () => void;
+}) {
+  const cls = primary
+    ? "bg-indigo text-white hover:bg-indigo-hover border-transparent"
+    : "bg-surface text-ink-700 hover:bg-sunken border-line hover:border-line-strong";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-pill border transition-colors whitespace-nowrap ${cls}`}
+    >
+      <Icon className="w-4 h-4" aria-hidden />
+      {label}
+    </button>
+  );
+}
+
+function focusAdjacentRow(direction: 1 | -1) {
+  const rows = Array.from(
+    document.querySelectorAll<HTMLElement>("[data-deadline-row]"),
+  );
+  if (rows.length === 0) return;
+  const active = document.activeElement as HTMLElement | null;
+  const currentIndex = rows.findIndex((r) => r === active);
+  const nextIndex =
+    currentIndex === -1
+      ? direction > 0
+        ? 0
+        : rows.length - 1
+      : Math.max(0, Math.min(rows.length - 1, currentIndex + direction));
+  rows[nextIndex]?.focus();
+  rows[nextIndex]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+
+function EmptyState({
+  title,
+  actions,
+}: {
+  title: string;
+  actions: React.ReactNode;
+}) {
+  return (
+    <div className="bg-surface border border-line rounded-md px-6 py-16 text-center">
+      <p className="text-sm text-ink-700 font-medium">{title}</p>
+      <div className="mt-4 flex items-center justify-center gap-2">
+        {actions}
+      </div>
+    </div>
+  );
+}
+
+function EmptyStateButton({
+  to,
+  primary,
+  children,
+}: {
+  to: string;
+  primary?: boolean;
+  children: React.ReactNode;
+}) {
+  const cls = primary
+    ? "text-sm px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover"
+    : "text-sm px-3 py-1.5 rounded-md border border-line text-ink-700 hover:bg-sunken";
+  return (
+    <a href={to} className={cls}>
+      {children}
+    </a>
+  );
+}

@@ -1,0 +1,86 @@
+import { router } from "./init.js";
+import { aiRouter } from "./routers/ai.js";
+import { aiInferencesRouter } from "./routers/aiInferences.js";
+import { aiInsightsRouter } from "./routers/aiInsights.js";
+import { filesFromClientsRouter } from "./routers/digest-sms.js";
+import {
+  announcementsRouter,
+  notificationsRouter,
+} from "./routers/announcements.js";
+import { authRouter } from "./routers/auth.js";
+import { clientsRouter } from "./routers/clients.js";
+import { deadlinesRouter } from "./routers/deadlines.js";
+import { emailsRouter, reminderTemplatesRouter } from "./routers/emails.js";
+import { exportsRouter } from "./routers/exports.js";
+import { importsRouter } from "./routers/imports.js";
+import { integrationsRouter } from "./routers/integrations.js";
+import { multistateRouter } from "./routers/multistate.js";
+import { servicePackagesRouter } from "./routers/servicePackages.js";
+import {
+  activityRouter,
+  checklistsRouter,
+  tasksRouter,
+} from "./routers/tasks.js";
+import { taskNotesRouter } from "./routers/taskNotes.js";
+import { teamRouter } from "./routers/team.js";
+import { todoItemsRouter } from "./routers/todoItems.js";
+import { modeFHealthRouter } from "./routers/modeFHealth.js";
+import { taskMilestonesRouter } from "./routers/taskMilestones.js";
+import { inboundRepliesRouter } from "./routers/inboundReplies.js";
+import { deliveryEventsRouter } from "./routers/deliveryEvents.js";
+import { uploadsRouter } from "./routers/uploads.js";
+import { federalFormsRouter } from "./routers/federalForms.js";
+import { alertActionsRouter } from "./routers/alertActions.js";
+import { dailyDigestRouter } from "./routers/dailyDigest.js";
+
+export const appRouter = router({
+  auth: authRouter,
+  clients: clientsRouter,
+  deadlines: deadlinesRouter,
+  servicePackages: servicePackagesRouter,
+  tasks: tasksRouter,
+  checklists: checklistsRouter,
+  activity: activityRouter,
+  taskNotes: taskNotesRouter,
+  announcements: announcementsRouter,
+  notifications: notificationsRouter,
+  emails: emailsRouter,
+  reminderTemplates: reminderTemplatesRouter,
+  team: teamRouter,
+  exports: exportsRouter,
+  integrations: integrationsRouter,
+  imports: importsRouter,
+  uploads: uploadsRouter,
+  ai: aiRouter,
+  aiInferences: aiInferencesRouter,
+  aiInsights: aiInsightsRouter,
+  filesFromClients: filesFromClientsRouter,
+  multistate: multistateRouter,
+  // v0.7 amendment surfaces (Phase 1 backend connection):
+  //   todoItems  → ActionQueue (Today) computed view per PRD §4.8
+  //   modeFHealth → State Monitoring Health module per IA §3.9d
+  todoItems: todoItemsRouter,
+  modeFHealth: modeFHealthRouter,
+  // v0.8 amendment Phase 2 backend (P0 follow-ups landing today):
+  //   taskMilestones  → mini-timeline data (PRD §9.4.1)
+  //   inboundReplies  → cross-client Mail Inbox + Task detail conversation surface (§5.8)
+  //   deliveryEvents  → Mail Issues tab + bounce surfacing (§5.8)
+  taskMilestones: taskMilestonesRouter,
+  inboundReplies: inboundRepliesRouter,
+  deliveryEvents: deliveryEventsRouter,
+  // Federal forms catalog + Federal Register change-detection.
+  // Replaces the hardcoded COMMON_FORMS list in AddDeadlineModal and
+  // backs FilingsTab + AI applicability per the BE federal_forms table.
+  federalForms: federalFormsRouter,
+  // Action procedures for the 5 non-disaster alert variants —
+  //   penalty_relief / pte_change / rate_change / nexus_change.
+  // (form_change procedures are on federalFormsRouter since they mutate
+  //  the catalog directly.)
+  alertActions: alertActionsRouter,
+  // Daily AM digest — per-user opt-in, cron-fired by the in-process
+  // scheduler in lib/daily-digest-scheduler.ts. The router exposes
+  // settings (Settings → Notifications card) + preview-now affordance.
+  dailyDigest: dailyDigestRouter,
+});
+
+export type AppRouter = typeof appRouter;

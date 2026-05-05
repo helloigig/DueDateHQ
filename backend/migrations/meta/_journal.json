@@ -1,0 +1,83 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1777420982621,
+      "tag": "0000_initial",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1777422885316,
+      "tag": "0001_layer_2_4_announcements_team_exports",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777572214645,
+      "tag": "0002_supabase_and_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777572214646,
+      "tag": "0003_v0_8_amendment_taskmilestone_inbound_delivery",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777590000000,
+      "tag": "0004_client_service_start_date",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777591000000,
+      "tag": "0005_announcement_related_source_urls",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777592000000,
+      "tag": "0006_federal_forms",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1777593000000,
+      "tag": "0007_alert_action_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777594000000,
+      "tag": "0008_client_notes",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777595000000,
+      "tag": "0009_task_actions",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777596000000,
+      "tag": "0010_client_ai_summary_override",
+      "breakpoints": true
+    }
+  ]
+}

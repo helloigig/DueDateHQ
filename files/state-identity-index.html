@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>American State Identity Index</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300;1,9..144,400&family=Albert+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg: #F5F2ED;
+    --bg-card: #FBF9F4;
+    --ink: #1A1814;
+    --ink-soft: #3D372F;
+    --muted: #8A8175;
+    --line: #D9D4CB;
+    --line-strong: #1A1814;
+    --accent: #8B2C1B;
+    --accent-soft: rgba(139, 44, 27, 0.08);
+
+    --font-display: 'Fraunces', Georgia, serif;
+    --font-sans: 'Albert Sans', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-weight: 400;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(139,44,27,0.03) 0%, transparent 40%),
+      radial-gradient(circle at 80% 80%, rgba(26,24,20,0.03) 0%, transparent 40%);
+  }
+
+  /* ── HEADER ─────────────────────────────── */
+  header {
+    padding: 6rem 5vw 3rem;
+    border-bottom: 1px solid var(--line);
+    position: relative;
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .eyebrow::after {
+    content: '';
+    height: 1px;
+    flex: 1;
+    background: var(--line);
+    max-width: 200px;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 300;
+    font-size: clamp(2.8rem, 7vw, 5.5rem);
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    max-width: 18ch;
+    margin-bottom: 2rem;
+  }
+
+  h1 em {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--accent);
+  }
+
+  .lede {
+    font-family: var(--font-display);
+    font-weight: 300;
+    font-size: 1.25rem;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 56ch;
+    font-style: italic;
+  }
+
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem 3rem;
+    margin-top: 3rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+
+  .meta-row span strong {
+    color: var(--ink);
+    font-weight: 500;
+    margin-left: 0.5rem;
+  }
+
+  /* ── INSTRUCTIONS ─────────────────────────── */
+  .instructions {
+    padding: 3rem 5vw;
+    max-width: 800px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .instructions h2 {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--ink);
+    margin-bottom: 1.25rem;
+  }
+
+  .instructions p {
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+    margin-bottom: 1rem;
+    line-height: 1.65;
+  }
+
+  .instructions code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: 0.15em 0.45em;
+    border-radius: 3px;
+  }
+
+  /* ── FILTER BAR ────────────────────────── */
+  .filter-bar {
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+    padding: 1.25rem 5vw;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .search-wrap {
+    flex: 1;
+    min-width: 220px;
+    max-width: 400px;
+    position: relative;
+  }
+
+  .search-wrap input {
+    width: 100%;
+    padding: 0.7rem 1rem 0.7rem 2.4rem;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 0;
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    color: var(--ink);
+    transition: border-color 0.2s;
+  }
+
+  .search-wrap input:focus {
+    outline: none;
+    border-color: var(--ink);
+  }
+
+  .search-wrap::before {
+    content: '⌕';
+    position: absolute;
+    left: 0.85rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.1rem;
+    color: var(--muted);
+    pointer-events: none;
+  }
+
+  .count {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+
+  .count strong {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* ── STATE CARD ────────────────────────── */
+  main {
+    padding: 4rem 5vw 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 5rem;
+  }
+
+  .state {
+    display: grid;
+    grid-template-columns: minmax(220px, 280px) 1fr;
+    gap: 4rem;
+    padding-bottom: 5rem;
+    border-bottom: 1px solid var(--line);
+    scroll-margin-top: 6rem;
+  }
+
+  .state:last-child { border-bottom: none; }
+
+  .state-info {
+    position: sticky;
+    top: 6rem;
+    align-self: start;
+  }
+
+  .state-number {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    margin-bottom: 0.75rem;
+  }
+
+  .state-name {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(2rem, 3.5vw, 3rem);
+    line-height: 0.95;
+    letter-spacing: -0.015em;
+    margin-bottom: 0.5rem;
+  }
+
+  .state-name em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .state-abbr {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    margin-bottom: 1.5rem;
+  }
+
+  .state-meta {
+    list-style: none;
+    border-top: 1px solid var(--line);
+    padding-top: 1.25rem;
+  }
+
+  .state-meta li {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 0.4rem 0;
+    font-size: 0.85rem;
+  }
+
+  .state-meta dt {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+
+  .state-meta dd {
+    color: var(--ink);
+    font-weight: 500;
+    text-align: right;
+  }
+
+  /* ── IMAGE GRID ────────────────────────── */
+  .visual-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+  }
+
+  .slot {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px dashed var(--line);
+    overflow: hidden;
+    transition: border-color 0.25s, transform 0.25s;
+  }
+
+  .slot:hover {
+    border-color: var(--ink);
+    border-style: solid;
+  }
+
+  .slot[data-filled="true"] {
+    border-style: solid;
+    border-color: var(--line);
+  }
+
+  .slot[data-aspect="square"] { aspect-ratio: 1 / 1; }
+  .slot[data-aspect="flag"] { aspect-ratio: 5 / 3; }
+  .slot[data-aspect="plate"] { aspect-ratio: 2 / 1; }
+  .slot[data-aspect="wide"] { aspect-ratio: 16 / 9; }
+  .slot[data-aspect="capitol"] { aspect-ratio: 4 / 3; }
+
+  .slot img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    background: white;
+  }
+
+  /* Custom-designed badges (inline SVG) */
+  .slot[data-badge="true"] {
+    background: var(--bg-card);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.35rem;
+  }
+
+  .slot[data-badge="true"] svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .slot[data-badge="true"] .slot-label {
+    background: linear-gradient(to top, rgba(251,249,244,0.95) 60%, transparent);
+    color: var(--ink-soft);
+  }
+
+  /* Small-size legibility test strip */
+  .size-preview {
+    padding: 4rem 5vw;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .size-preview h2 {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--ink);
+    margin-bottom: 1rem;
+  }
+
+  .size-preview p {
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+    margin-bottom: 2.5rem;
+    max-width: 60ch;
+    line-height: 1.65;
+  }
+
+  .size-preview-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .size-preview-row::before {
+    content: attr(data-label);
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    width: 72px;
+    flex-shrink: 0;
+  }
+
+  .size-preview-badge {
+    display: inline-block;
+    flex-shrink: 0;
+    line-height: 0;
+  }
+
+  .size-preview-badge svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .slot-label {
+    position: absolute;
+    inset: auto 0 0 0;
+    padding: 0.5rem 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    background: linear-gradient(to top, var(--bg-card) 50%, transparent);
+    pointer-events: none;
+  }
+
+  .slot[data-filled="true"] .slot-label {
+    background: linear-gradient(to top, rgba(255,255,255,0.95) 60%, transparent);
+    color: var(--ink-soft);
+  }
+
+  .slot-empty-mark {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-style: italic;
+    color: var(--line);
+    font-weight: 300;
+    transition: color 0.25s;
+  }
+
+  .slot:hover .slot-empty-mark { color: var(--muted); }
+
+  .slot[data-filled="true"] .slot-empty-mark { display: none; }
+
+  /* ── RESPONSIVE ─────────────────────────── */
+  @media (max-width: 900px) {
+    .state {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+    .state-info {
+      position: static;
+    }
+    .visual-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 480px) {
+    .visual-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* ── PRINT ─────────────────────────────── */
+  @media print {
+    .filter-bar { display: none; }
+    .state { page-break-inside: avoid; break-inside: avoid; border: none; }
+    body { background: white; }
+  }
+
+  /* ── HIDDEN / FILTERED ─────────────────── */
+  .state.hidden { display: none; }
+
+  /* ── FOOTER ────────────────────────────── */
+  footer {
+    padding: 3rem 5vw;
+    border-top: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">A Reference of Visual Identifiers · Vol. I</div>
+  <h1>The American State <em>Identity</em> Index</h1>
+  <p class="lede">A working reference for the nine visual signatures every state carries — a designed badge, plus outline, flag, seal, license plate, route shield, quarter, welcome sign, and capitol.</p>
+  <div class="meta-row">
+    <span>States <strong>50</strong></span>
+    <span>Categories <strong>9</strong></span>
+    <span>Slots <strong>450</strong></span>
+    <span>Designed Badges <strong>13 / 50</strong></span>
+    <span>Format <strong>Editable HTML</strong></span>
+  </div>
+</header>
+
+<section class="instructions">
+  <h2>How to use</h2>
+  <p><strong>Designed badges:</strong> Original circular icons distilled from each state's most recognizable visual signature — bear and red star for California, lone star for Texas, Zia sun for New Mexico, and so on. 13 of 50 are drawn so far; the rest sit empty awaiting design. To draft another, add an entry to the <code>stateBadges</code> object keyed by lowercase-hyphenated state name, with an inline SVG string as its value.</p>
+  <p><strong>Auto-populated:</strong> Flags, seals, and outlines for all 50 states are pulled live from Wikimedia Commons (public-domain government works). They appear automatically when the page loads.</p>
+  <p><strong>Needs manual sourcing:</strong> License plates, route shields, quarters, welcome signs, and capitol photos. These are either copyrighted photographs or have inconsistent file naming on Wikipedia. To add one, locate the <code>stateImages</code> override object near the bottom of this file and paste an image URL or local path against the matching state and category key. Save and reload.</p>
+  <p>Slots accept any web-renderable format (<code>.svg</code>, <code>.png</code>, <code>.jpg</code>, <code>.webp</code>). If a Wikimedia auto-load fails (rare naming exception), the slot reverts to its empty state automatically. Use the search bar to filter by state name.</p>
+</section>
+
+<section class="size-preview">
+  <h2>Designed badges · small-size legibility test</h2>
+  <p>The 13 designed badges shown at four scales. The 24px row is the stress test — each motif must remain distinguishable at favicon / list-icon size. Hover any badge to see its state name.</p>
+  <div class="size-preview-row" data-label="24 px" data-size="24"></div>
+  <div class="size-preview-row" data-label="40 px" data-size="40"></div>
+  <div class="size-preview-row" data-label="72 px" data-size="72"></div>
+  <div class="size-preview-row" data-label="128 px" data-size="128"></div>
+</section>
+
+<div class="filter-bar">
+  <div class="search-wrap">
+    <input type="text" id="search" placeholder="Filter by state…" autocomplete="off" />
+  </div>
+  <div class="count">Showing <strong id="count">50</strong> of 50</div>
+</div>
+
+<main id="states-container"></main>
+
+<footer>
+  <span>American State Identity Index</span>
+  <span>Editable Reference Template</span>
+</footer>
+
+<script>
+  // ───────────────────────────────────────────────────────────
+  // STATE DATA — edit imagePaths to populate slots
+  // Each state has 8 categories. Leave string empty to show placeholder.
+  // ───────────────────────────────────────────────────────────
+
+  const states = [
+    { name: 'Alabama',        abbr: 'AL', capital: 'Montgomery',     nickname: 'Yellowhammer State',     admitted: 1819 },
+    { name: 'Alaska',         abbr: 'AK', capital: 'Juneau',         nickname: 'The Last Frontier',      admitted: 1959 },
+    { name: 'Arizona',        abbr: 'AZ', capital: 'Phoenix',        nickname: 'Grand Canyon State',     admitted: 1912 },
+    { name: 'Arkansas',       abbr: 'AR', capital: 'Little Rock',    nickname: 'The Natural State',      admitted: 1836 },
+    { name: 'California',     abbr: 'CA', capital: 'Sacramento',     nickname: 'Golden State',           admitted: 1850 },
+    { name: 'Colorado',       abbr: 'CO', capital: 'Denver',         nickname: 'Centennial State',       admitted: 1876 },
+    { name: 'Connecticut',    abbr: 'CT', capital: 'Hartford',       nickname: 'Constitution State',     admitted: 1788 },
+    { name: 'Delaware',       abbr: 'DE', capital: 'Dover',          nickname: 'The First State',        admitted: 1787 },
+    { name: 'Florida',        abbr: 'FL', capital: 'Tallahassee',    nickname: 'Sunshine State',         admitted: 1845 },
+    { name: 'Georgia',        abbr: 'GA', capital: 'Atlanta',        nickname: 'Peach State',            admitted: 1788 },
+    { name: 'Hawaii',         abbr: 'HI', capital: 'Honolulu',       nickname: 'Aloha State',            admitted: 1959 },
+    { name: 'Idaho',          abbr: 'ID', capital: 'Boise',          nickname: 'Gem State',              admitted: 1890 },
+    { name: 'Illinois',       abbr: 'IL', capital: 'Springfield',    nickname: 'Prairie State',          admitted: 1818 },
+    { name: 'Indiana',        abbr: 'IN', capital: 'Indianapolis',   nickname: 'Hoosier State',          admitted: 1816 },
+    { name: 'Iowa',           abbr: 'IA', capital: 'Des Moines',     nickname: 'Hawkeye State',          admitted: 1846 },
+    { name: 'Kansas',         abbr: 'KS', capital: 'Topeka',         nickname: 'Sunflower State',        admitted: 1861 },
+    { name: 'Kentucky',       abbr: 'KY', capital: 'Frankfort',      nickname: 'Bluegrass State',        admitted: 1792 },
+    { name: 'Louisiana',      abbr: 'LA', capital: 'Baton Rouge',    nickname: 'Pelican State',          admitted: 1812 },
+    { name: 'Maine',          abbr: 'ME', capital: 'Augusta',        nickname: 'Pine Tree State',        admitted: 1820 },
+    { name: 'Maryland',       abbr: 'MD', capital: 'Annapolis',      nickname: 'Old Line State',         admitted: 1788 },
+    { name: 'Massachusetts',  abbr: 'MA', capital: 'Boston',         nickname: 'Bay State',              admitted: 1788 },
+    { name: 'Michigan',       abbr: 'MI', capital: 'Lansing',        nickname: 'Great Lakes State',      admitted: 1837 },
+    { name: 'Minnesota',      abbr: 'MN', capital: 'Saint Paul',     nickname: 'North Star State',       admitted: 1858 },
+    { name: 'Mississippi',    abbr: 'MS', capital: 'Jackson',        nickname: 'Magnolia State',         admitted: 1817 },
+    { name: 'Missouri',       abbr: 'MO', capital: 'Jefferson City', nickname: 'Show-Me State',          admitted: 1821 },
+    { name: 'Montana',        abbr: 'MT', capital: 'Helena',         nickname: 'Treasure State',         admitted: 1889 },
+    { name: 'Nebraska',       abbr: 'NE', capital: 'Lincoln',        nickname: 'Cornhusker State',       admitted: 1867 },
+    { name: 'Nevada',         abbr: 'NV', capital: 'Carson City',    nickname: 'Silver State',           admitted: 1864 },
+    { name: 'New Hampshire',  abbr: 'NH', capital: 'Concord',        nickname: 'Granite State',          admitted: 1788 },
+    { name: 'New Jersey',     abbr: 'NJ', capital: 'Trenton',        nickname: 'Garden State',           admitted: 1787 },
+    { name: 'New Mexico',     abbr: 'NM', capital: 'Santa Fe',       nickname: 'Land of Enchantment',    admitted: 1912 },
+    { name: 'New York',       abbr: 'NY', capital: 'Albany',         nickname: 'Empire State',           admitted: 1788 },
+    { name: 'North Carolina', abbr: 'NC', capital: 'Raleigh',        nickname: 'Tar Heel State',         admitted: 1789 },
+    { name: 'North Dakota',   abbr: 'ND', capital: 'Bismarck',       nickname: 'Peace Garden State',     admitted: 1889 },
+    { name: 'Ohio',           abbr: 'OH', capital: 'Columbus',       nickname: 'Buckeye State',          admitted: 1803 },
+    { name: 'Oklahoma',       abbr: 'OK', capital: 'Oklahoma City',  nickname: 'Sooner State',           admitted: 1907 },
+    { name: 'Oregon',         abbr: 'OR', capital: 'Salem',          nickname: 'Beaver State',           admitted: 1859 },
+    { name: 'Pennsylvania',   abbr: 'PA', capital: 'Harrisburg',     nickname: 'Keystone State',         admitted: 1787 },
+    { name: 'Rhode Island',   abbr: 'RI', capital: 'Providence',     nickname: 'Ocean State',            admitted: 1790 },
+    { name: 'South Carolina', abbr: 'SC', capital: 'Columbia',       nickname: 'Palmetto State',         admitted: 1788 },
+    { name: 'South Dakota',   abbr: 'SD', capital: 'Pierre',         nickname: 'Mount Rushmore State',   admitted: 1889 },
+    { name: 'Tennessee',      abbr: 'TN', capital: 'Nashville',      nickname: 'Volunteer State',        admitted: 1796 },
+    { name: 'Texas',          abbr: 'TX', capital: 'Austin',         nickname: 'Lone Star State',        admitted: 1845 },
+    { name: 'Utah',           abbr: 'UT', capital: 'Salt Lake City', nickname: 'Beehive State',          admitted: 1896 },
+    { name: 'Vermont',        abbr: 'VT', capital: 'Montpelier',     nickname: 'Green Mountain State',   admitted: 1791 },
+    { name: 'Virginia',       abbr: 'VA', capital: 'Richmond',       nickname: 'Old Dominion',           admitted: 1788 },
+    { name: 'Washington',     abbr: 'WA', capital: 'Olympia',        nickname: 'Evergreen State',        admitted: 1889 },
+    { name: 'West Virginia',  abbr: 'WV', capital: 'Charleston',     nickname: 'Mountain State',         admitted: 1863 },
+    { name: 'Wisconsin',      abbr: 'WI', capital: 'Madison',        nickname: 'Badger State',           admitted: 1848 },
+    { name: 'Wyoming',        abbr: 'WY', capital: 'Cheyenne',       nickname: 'Equality State',         admitted: 1890 },
+  ];
+
+  // ───────────────────────────────────────────────────────────
+  // AUTO-POPULATION — pulls public-domain government works
+  // (flags, seals, outlines) from Wikimedia Commons via stable
+  // Special:FilePath redirect URLs. Other categories require
+  // manual sourcing due to copyright or naming inconsistencies.
+  // ───────────────────────────────────────────────────────────
+
+  const COMMONS = 'https://commons.wikimedia.org/wiki/Special:FilePath/';
+
+  function autoPopulate(state) {
+    const name = state.name.replace(/\s+/g, '_');
+    const abbr = state.abbr;
+    return {
+      outline:      `${COMMONS}Map_of_USA_${abbr}.svg`,
+      flag:         `${COMMONS}Flag_of_${name}.svg`,
+      seal:         `${COMMONS}Seal_of_${name}.svg`,
+      // Categories below need manual sourcing — see notes in stateImages overrides.
+      licensePlate: '',
+      routeShield:  '',
+      quarter:      '',
+      welcomeSign:  '',
+      capitol:      '',
+    };
+  }
+
+  // ───────────────────────────────────────────────────────────
+  // OVERRIDES — paste your own URLs or relative paths here.
+  // Anything you set here wins over auto-population.
+  // Keys must match state name in lowercase with hyphens.
+  // ───────────────────────────────────────────────────────────
+
+  const stateImages = {
+    // Known Wikimedia naming exceptions (overrides applied automatically):
+    'massachusetts':  { seal: `${COMMONS}Seal_of_Massachusetts.svg` },
+    'new-mexico':     { seal: `${COMMONS}Seal_of_New_Mexico.svg` },
+    'rhode-island':   { seal: `${COMMONS}Seal_of_Rhode_Island.svg` },
+    'south-carolina': { seal: `${COMMONS}Seal_of_South_Carolina.svg` },
+    'vermont':        { seal: `${COMMONS}Vermont_state_seal.svg` },
+
+    // Example — to add a license plate, capitol, etc:
+    // 'alabama': {
+    //   licensePlate: 'images/al-plate.png',
+    //   routeShield: 'images/al-shield.svg',
+    //   quarter: 'images/al-quarter.png',
+    //   welcomeSign: 'images/al-welcome.jpg',
+    //   capitol: 'images/al-capitol.jpg',
+    // },
+  };
+
+  // ───────────────────────────────────────────────────────────
+  // CATEGORIES — order matches each state's visual grid
+  // ───────────────────────────────────────────────────────────
+
+  const categories = [
+    { key: 'badge',         label: 'Badge',          aspect: 'square'  },
+    { key: 'outline',       label: 'Outline',        aspect: 'square'  },
+    { key: 'flag',          label: 'Flag',           aspect: 'flag'    },
+    { key: 'seal',          label: 'Seal',           aspect: 'square'  },
+    { key: 'licensePlate',  label: 'License Plate',  aspect: 'plate'   },
+    { key: 'routeShield',   label: 'Route Shield',   aspect: 'square'  },
+    { key: 'quarter',       label: 'Quarter',        aspect: 'square'  },
+    { key: 'welcomeSign',   label: 'Welcome Sign',   aspect: 'wide'    },
+    { key: 'capitol',       label: 'Capitol',        aspect: 'capitol' },
+  ];
+
+  // ───────────────────────────────────────────────────────────
+  // CUSTOM BADGES — designed icon/badge per state, inline SVG.
+  // Optimized for small-size legibility: one dominant motif,
+  // bold strokes (≥3px on a 200×200 viewBox), 2–3 high-contrast
+  // colors, no typography (illegible below ~64px). Each badge
+  // should still read at 24×24 px. Add more states by adding
+  // entries keyed by lowercase-hyphenated state name.
+  // Currently designed: 13 most iconic states.
+  // ───────────────────────────────────────────────────────────
+
+  const stateBadges = {
+    // CALIFORNIA — chunky bear silhouette walking left, red star, red stripe
+    'california': `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="100" r="95" fill="#EFE4BD"/>
+      <circle cx="100" cy="100" r="95" fill="none" stroke="#1A1814" stroke-width="3"/>
+      <path d="M52,38 L58,57 L78,57 L62,69 L68,88 L52,76 L36,88 L42,69 L26,57 L46,57 Z" fill="#B91C1C"/>
+      <g fill="#2A1A0E">
+        <ellipse cx="148" cy="100" rx="24" ry="14"/>
+        <ellipse cx="105" cy="110" rx="58" ry="22"/>
+        <circle cx="48" cy="100" r="17"/>
+        <ellipse cx="28" cy="108" rx="13" ry="6"/>
+        <circle cx="50" cy="80" r="7"/>
+        <rect x="58" y="128" width="14" height="22"/>
+        <rect x="80" y="128" width="14" height="22"/>
+        <rect x="120" y="128" width="14" height="22"/>
+        <rect x="142" y="128" width="14" height="22"/>
+        <circle cx="172" cy="92" r="6"/>
+      </g>
+      <circle cx="52" cy="96" r="2" fill="#EFE4BD"/>
+      <rect x="20" y="160" width="160" height="7" fill="#B91C1C"/>
+    </svg>`,
+
+    // TEXAS — single oversized lone star, no clutter
+    'texas': `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="100" r="95" fill="#002868"/>
+      <circle cx="100" cy="100" r="95" fill="none" stroke="#1A1814" stroke-width="3"/>
+      <path d="M100,28 L120,88 L184,88 L132,124 L152,184 L100,148 L48,184 L68,124 L16,88 L80,88 Z" fill="#FFFFFF"/>
+    </svg>`,
+
+    // NEW YORK — Liberty torch, gold flame on midnight blue
+    'new-york': `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="100" r="95" fill="#1A3263"/>
+      <circle cx="100" cy="100" r="95" fill="none" stroke="#1A1814" stroke-width="3"/>
+      <path d="M100,28 C70,55 60,85 78,118 C82,100 92,90 105,90 C108,118 122,118 138,108 C138,82 120,52 110,38 C105,55 100,55 100,28 Z" fill="#F4B83C"/>
+      <path d="M100,55 C88,75 86,95 96,115 C100,100 105,93 110,90 C106,75 102,62 100,55 Z" fill="#FFE08A"/>
+      <rect x="78" y="120" width="44" height="10" fill="#E8C547"/>
+      <rect x="86" y="130" width="28" height="36" fill="#E8C547"/>
+      <rect x="72" y="166" width="56" height="12" fill="#E8C547"/>
+    </svg>`,
+
+    // FLORIDA — bold red Saint Andrew's cross + sun in center
+    'florida': `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <defs><clipPath id="b-fl-c"><circle cx="100" cy="100" r="95"/></clipPath></defs>
+      <g clip-path="url(#b-fl-c)">
+        <rect x="0" y="0" width="200" height="200" fill="#FBF3D6"/>
+        <line x1="10" y1="10" x2="190" y2="190" stroke="#C5273E" stroke-width="24"/>
+        <line x1="190" y1="10" x2="10" y2="190" stroke="#C5273E" stroke-width="24"/>
+      </g>
+      <circle cx="100" cy="100" r="95" fill="none" stroke="#1A1814" stroke-width="3"/>
+      <circle cx="100" cy="100" r="34" fill="#F4B83C" stroke="#1A1814" stroke-width="2.5"/>
+      <g stroke="#F4B83C" stroke-width="7" stroke-linecap="round">
+        <line x1="100" y1="63" x2="100" y2="52"/>
+        <line x1="100" y1="137" x2="100" y2="148"/>
+        <line x1="63" y1="100" x2="52" y2="100"/>
+        <line x1="137" y1="100" x2="148" y2="100"/>
+      </g>
+    </svg>`,
+
+    // HAWAII — full flag rendered to fit circle (Union Jack canton + 8 stripes)
+    'hawaii': `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <defs><clipPath id="b-hi-c"><circle cx="100" cy="100" r="95"/></clipPath></defs>
+      <g clip-path="url(#b-hi-c)">
+        <rect x="0" y="0" width="200" height="25" fill="#FFFFFF"/>
+        <rect x="0" y="25" width="200" height="25" fill="#BB133E"/>
+        <rect x="0" y="50" width="200" height="25" fill="#1F4E8C"/>
+        <rect x="0" y="75" width="200" height="25" fill="#FFFFFF"/>
+        <rect x="0" y="100" width="200" height="25" fill="#BB133E"/>
+        <rect x="0" y="125" width="200" height="25" fill="#1F4E8C"/>
+        <rect x="0" y="150" width="200" height="25" fill="#FFFFFF"/>
+        <rect x="0" y="175" width="200" height="25" fill="#BB133E"/>
+        <rect x="0" y="0" width="100" height="100" fill="#1F4E8C"/>
+        <line x1="0" y1="0" x2="100" y2="100" stroke="#FFFFFF" stroke-width="14"/>
+        <line x1="0" y1="0" x2="100" y2="100" stroke="#BB133E" stroke-width="6"/>
+        <line x1="100" y1="0" x2="0" y2="100" stroke="#FFFFFF" stroke-width="14"/>
+        <line x1="100" y1="0" x2="0" y2="100" stroke="#BB133E" stroke-width="6"/>
+        <line x1="50" y1="0" x2="50" y2="100" stroke="#FFFFFF" stroke-width="22"/>
+        <line x1="0" y1="50" x2="100" y2="50" stroke="#FFFFFF" stroke-width="22"/>
+        <line x1="50" y1="0" x2="50" y2="100" stroke="#BB133E" stroke-width="10"/>
+        <line x1="0" y1="50" x2="100" y2="50" stroke="#BB133E" stroke-width="10"/>
+      </g>
+      <circle cx="100" cy="100" r="95" fill="none" stroke="#1A1814" stroke-width="3"/>
+    </svg>`,
+
+    // ALASKA — big Polaris top-right + 7 fat dipper stars (no fragile lines)
+    'alaska': `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="100" r="95" fill="#0B1D3A"/>
+      <circle cx="100" cy="100" r="95" fill="none" stroke="#1A1814" stroke-width="3"/>
+      <path d="M154,32 L162,52 L184,52 L166,66 L172,86 L154,74 L136,86 L142,66 L124,52 L146,52 Z" fill="#F4B83C"/>
+      <g fill="#F4B83C">
+        <circle cx="50" cy="78" r="7"/>
+        <circle cx="72" cy="92" r="7"/>
+        <circle cx="92" cy="104" r="7"/>
+        <circle cx="116" cy="116" r="7"/>
+        <circle cx="124" cy="138" r="7"/>
+        <circle cx="100" cy="148" r="7"/>
+        <circle cx="76" cy="138" r="7"/>
+      </g>
+    </svg>`,
+
+    // ARIZONA — 13-ray sunburst + copper star
+    'arizona': `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <defs><clipPath id="b-az-c"><circle cx="100" cy="100" r="95"/></clipPath></defs>
+      <g clip-path="url(#b-az-c)">
+        <rect x="0" y="100" width="200" height="100" fill="#003F87"/>
+        <path d="M100,100 L0,100 L2.9,76 Z" fill="#CD212A"/>
+        <path d="M100,100 L2.9,76 L11.5,53.5 Z" fill="#F4B83C"/>
+        <path d="M100,100 L11.5,53.5 L25,33.7 Z" fill="#CD212A"/>
+        <path d="M100,100 L25,33.7 L43.2,17.7 Z" fill="#F4B83C"/>
+        <path d="M100,100 L43.2,17.7 L64.5,6.5 Z" fill="#CD212A"/>
+        <path d="M100,100 L64.5,6.5 L88,0.7 Z" fill="#F4B83C"/>
+        <path d="M100,100 L88,0.7 L112,0.7 Z" fill="#CD212A"/>
+        <path d="M100,100 L112,0.7 L135.5,6.5 Z" fill="#F4B83C"/>
+        <path d="M100,100 L135.5,6.5 L157,17.7 Z" fill="#CD212A"/>
+        <path d="M100,100 L157,17.7 L175,33.7 Z" fill="#F4B83C"/>
+        <path d="M100,100 L175,33.7 L188.5,53.5 Z" fill="#CD212A"/>
+        <path d="M100,100 L188.5,53.5 L197,76 Z" fill="#F4B83C"/>
+        <path d="M100,100 L197,76 L200,100 Z" fill="#CD212A"/>
+        <path d="M100,68 L110,96 L138,96 L116,114 L124,142 L100,124 L76,142 L84,114 L62,96 L90,96 Z" fill="#B87333"/>
+      </g>
+      <circle cx="100" cy="100" r="95" fill="none" stroke="#1A1814" stroke-width="3"/>
+    </svg>`,
+
+    // NEW MEXICO — Zia sun, much thicker rays
+    'new-mexico': `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="100" r="95" fill="#F4B83C"/>
+      <circle cx="100" cy="100" r="95" fill="none" stroke="#1A1814" stroke-width="3"/>
+      <circle cx="100" cy="100" r="20" fill="none" stroke="#BB133E" stroke-width="8"/>
+      <g stroke="#BB133E" stroke-width="9" stroke-linecap="butt">
+        <line x1="84" y1="80" x2="84" y2="56"/>
+        <line x1="94" y1="80" x2="94" y2="40"/>
+        <line x1="106" y1="80" x2="106" y2="40"/>
+        <line x1="116" y1="80" x2="116" y2="56"/>
+        <line x1="84" y1="120" x2="84" y2="144"/>
+        <line x1="94" y1="120" x2="94" y2="160"/>
+        <line x1="106" y1="120" x2="106" y2="160"/>
+        <line x1="116" y1="120" x2="116" y2="144"/>
+        <line x1="120" y1="84" x2="144" y2="84"/>
+        <line x1="120" y1="94" x2="160" y2="94"/>
+        <line x1="120" y1="106" x2="160" y2="106"/>
+        <line x1="120" y1="116" x2="144" y2="116"/>
+        <line x1="80" y1="84" x2="56" y2="84"/>
+        <line x1="80" y1="94" x2="40" y2="94"/>
+        <line x1="80" y1="106" x2="40" y2="106"/>
+        <line x1="80" y1="116" x2="56" y2="116"/>
+      </g>
+    </svg>`,
+
+    // MARYLAND — quartered Calvert/Crossland heraldry, full circle, no banner
+    'maryland': `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <clipPath id="b-md-c"><circle cx="100" cy="100" r="95"/></clipPath>
+        <pattern id="b-md-cal" patternUnits="userSpaceOnUse" width="36" height="36" patternTransform="rotate(45)">
+          <rect width="18" height="36" fill="#F4B83C"/>
+          <rect x="18" width="18" height="36" fill="#1A1814"/>
+        </pattern>
+        <pattern id="b-md-cross" patternUnits="userSpaceOnUse" width="60" height="60">
+          <rect width="60" height="60" fill="#FFFFFF"/>
+          <rect x="22" width="16" height="60" fill="#BB133E"/>
+          <rect y="22" width="60" height="16" fill="#BB133E"/>
+        </pattern>
+      </defs>
+      <g clip-path="url(#b-md-c)">
+        <rect x="0" y="0" width="100" height="100" fill="url(#b-md-cal)"/>
+        <rect x="100" y="0" width="100" height="100" fill="url(#b-md-cross)"/>
+        <rect x="0" y="100" width="100" height="100" fill="url(#b-md-cross)"/>
+        <rect x="100" y="100" width="100" height="100" fill="url(#b-md-cal)"/>
+      </g>
+      <circle cx="100" cy="100" r="95" fill="none" stroke="#1A1814" stroke-width="3"/>
+    </svg>`,
+
+    // SOUTH CAROLINA — bigger crescent + blocky palmetto crown
+    'south-carolina': `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="100" r="95" fill="#003875"/>
+      <circle cx="100" cy="100" r="95" fill="none" stroke="#1A1814" stroke-width="3"/>
+      <path d="M40,40 A28,28 0 1 0 40,96 A22,22 0 1 1 40,40 Z" fill="#FFFFFF"/>
+      <g fill="#FFFFFF">
+        <rect x="95" y="100" width="10" height="62"/>
+        <g transform="translate(100 90)">
+          <ellipse cx="0" cy="-22" rx="8" ry="28"/>
+          <ellipse cx="0" cy="-22" rx="8" ry="28" transform="rotate(30)"/>
+          <ellipse cx="0" cy="-22" rx="8" ry="28" transform="rotate(-30)"/>
+          <ellipse cx="0" cy="-22" rx="8" ry="28" transform="rotate(60)"/>
+          <ellipse cx="0" cy="-22" rx="8" ry="28" transform="rotate(-60)"/>
+          <ellipse cx="0" cy="-22" rx="8" ry="28" transform="rotate(90)"/>
+          <ellipse cx="0" cy="-22" rx="8" ry="28" transform="rotate(-90)"/>
+        </g>
+      </g>
+    </svg>`,
+
+    // COLORADO — bold C wrapping a fat gold disc, blue/white/blue bands
+    'colorado': `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <defs><clipPath id="b-co-c"><circle cx="100" cy="100" r="95"/></clipPath></defs>
+      <g clip-path="url(#b-co-c)">
+        <rect x="0" y="0" width="200" height="65" fill="#1F4E8C"/>
+        <rect x="0" y="65" width="200" height="70" fill="#FFFFFF"/>
+        <rect x="0" y="135" width="200" height="65" fill="#1F4E8C"/>
+      </g>
+      <circle cx="100" cy="100" r="95" fill="none" stroke="#1A1814" stroke-width="3"/>
+      <path d="M130,60 A40,40 0 1 0 130,140 L118,124 A24,24 0 1 1 118,76 Z" fill="#CD212A"/>
+      <circle cx="100" cy="100" r="22" fill="#F4B83C"/>
+    </svg>`,
+
+    // TENNESSEE — three big white stars in a blue disc on red
+    'tennessee': `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="100" r="95" fill="#CD212A"/>
+      <circle cx="100" cy="100" r="95" fill="none" stroke="#1A1814" stroke-width="3"/>
+      <circle cx="100" cy="100" r="58" fill="#1F4E8C" stroke="#FFFFFF" stroke-width="4"/>
+      <g fill="#FFFFFF">
+        <path d="M100,64 L104,75 L115,75 L106,82 L109,93 L100,86 L91,93 L94,82 L85,75 L96,75 Z"/>
+        <path d="M75,106 L79,117 L90,117 L81,124 L84,135 L75,128 L66,135 L69,124 L60,117 L71,117 Z"/>
+        <path d="M125,106 L129,117 L140,117 L131,124 L134,135 L125,128 L116,135 L119,124 L110,117 L121,117 Z"/>
+      </g>
+    </svg>`,
+
+    // OHIO — simplified swallowtail pennant (drops the fragile 17 micro-stars)
+    'ohio': `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="100" r="95" fill="#EFE4BD"/>
+      <circle cx="100" cy="100" r="95" fill="none" stroke="#1A1814" stroke-width="3"/>
+      <g transform="translate(20 60)">
+        <path d="M0,0 L120,0 L160,40 L120,80 L0,80 Z" fill="#FFFFFF" stroke="#1A1814" stroke-width="2"/>
+        <rect x="0" y="0" width="120" height="16" fill="#CD212A"/>
+        <rect x="0" y="32" width="120" height="16" fill="#CD212A"/>
+        <rect x="0" y="64" width="120" height="16" fill="#CD212A"/>
+        <path d="M120,0 L160,40 L120,16 Z" fill="#CD212A"/>
+        <path d="M120,32 L160,40 L120,48 Z" fill="#CD212A"/>
+        <path d="M120,64 L160,40 L120,80 Z" fill="#CD212A"/>
+        <path d="M0,0 L60,0 L60,80 L0,80 Z" fill="#1F4E8C"/>
+        <circle cx="30" cy="40" r="16" fill="none" stroke="#FFFFFF" stroke-width="6"/>
+        <circle cx="30" cy="40" r="8" fill="#CD212A"/>
+      </g>
+    </svg>`,
+  };
+
+  // ───────────────────────────────────────────────────────────
+  // RENDER
+  // ───────────────────────────────────────────────────────────
+
+  function slug(name) {
+    return name.toLowerCase().replace(/\s+/g, '-');
+  }
+
+  function renderStates() {
+    const main = document.getElementById('states-container');
+    main.innerHTML = states.map((s, i) => {
+      const key = slug(s.name);
+      const imgs = { ...autoPopulate(s), ...(stateImages[key] || {}) };
+      const number = String(i + 1).padStart(2, '0');
+
+      const slots = categories.map(c => {
+        // Custom designed badge: inline SVG
+        if (c.key === 'badge') {
+          const badgeSvg = stateBadges[key];
+          if (badgeSvg) {
+            return `
+              <div class="slot" data-aspect="${c.aspect}" data-filled="true" data-badge="true">
+                ${badgeSvg}
+                <div class="slot-label">${c.label}</div>
+              </div>
+            `;
+          }
+          return `
+            <div class="slot" data-aspect="${c.aspect}" data-filled="false">
+              <div class="slot-empty-mark">·</div>
+              <div class="slot-label">${c.label}</div>
+            </div>
+          `;
+        }
+        // Image-based slot (auto-populated or override URL)
+        const src = imgs[c.key] || '';
+        const filled = !!src;
+        return `
+          <div class="slot" data-aspect="${c.aspect}" data-filled="${filled}">
+            ${filled
+              ? `<img src="${src}" alt="${s.name} ${c.label}" loading="lazy" onerror="this.parentElement.dataset.filled='false'; this.remove();" />`
+              : `<div class="slot-empty-mark">·</div>`
+            }
+            <div class="slot-label">${c.label}</div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <article class="state" id="${key}" data-name="${s.name.toLowerCase()}">
+          <div class="state-info">
+            <div class="state-number">No. ${number} / 50</div>
+            <h2 class="state-name">${s.name.replace(/(\w+)$/, '<em>$1</em>')}</h2>
+            <div class="state-abbr">${s.abbr}</div>
+            <dl class="state-meta">
+              <li><dt>Capital</dt><dd>${s.capital}</dd></li>
+              <li><dt>Nickname</dt><dd>${s.nickname}</dd></li>
+              <li><dt>Admitted</dt><dd>${s.admitted}</dd></li>
+            </dl>
+          </div>
+          <div class="visual-grid">${slots}</div>
+        </article>
+      `;
+    }).join('');
+  }
+
+  // ───────────────────────────────────────────────────────────
+  // SEARCH FILTER
+  // ───────────────────────────────────────────────────────────
+
+  function setupSearch() {
+    const input = document.getElementById('search');
+    const count = document.getElementById('count');
+    input.addEventListener('input', () => {
+      const q = input.value.trim().toLowerCase();
+      let visible = 0;
+      document.querySelectorAll('.state').forEach(el => {
+        const match = !q || el.dataset.name.includes(q);
+        el.classList.toggle('hidden', !match);
+        if (match) visible++;
+      });
+      count.textContent = visible;
+    });
+  }
+
+  // ───────────────────────────────────────────────────────────
+  // SIZE PREVIEW — renders all designed badges at multiple
+  // pixel sizes so legibility at small scale can be verified.
+  // ───────────────────────────────────────────────────────────
+
+  function renderSizePreview() {
+    const stateMap = Object.fromEntries(states.map(s => [slug(s.name), s.name]));
+    document.querySelectorAll('.size-preview-row').forEach(row => {
+      const size = parseInt(row.dataset.size, 10);
+      const html = Object.entries(stateBadges).map(([key, svg]) => {
+        const name = stateMap[key] || key;
+        return `<div class="size-preview-badge" style="width:${size}px;height:${size}px" title="${name}">${svg}</div>`;
+      }).join('');
+      row.insertAdjacentHTML('beforeend', html);
+    });
+  }
+
+  renderStates();
+  renderSizePreview();
+  setupSearch();
+</script>
+
+</body>
+</html>
