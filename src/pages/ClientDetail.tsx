@@ -12,6 +12,7 @@ import {
   Sparkles,
   CircleCheck,
   Mail,
+  Phone,
   Pin,
   Siren,
   Check,
@@ -62,7 +63,10 @@ import { ExportClientsButton } from "../components/ExportClientsButton";
 import { PinClientButton } from "../components/Sidebar";
 import { BackLink } from "../components/ui/BackLink";
 import { PageContainer } from "../components/ui/PageContainer";
+import { PageHeader } from "../components/ui/PageHeader";
 import { StateChipGroup } from "../components/StateChipGroup";
+import { MultiSelectChip } from "../components/MultiSelectChip";
+import { cn } from "../lib/utils";
 import { ClientChip } from "../components/ClientChip";
 // PageContainer (from main, PR #133) for the 1080px page width.
 // StateChipGroup (also from main) dropped — ClientChip's `lg` variant
@@ -159,6 +163,17 @@ export function ClientDetail() {
     AddDeadlinePrefill | undefined
   >(undefined);
   const [exportOpen, setExportOpen] = useState(false);
+  // Header filters — match Timeline's filter pattern (Year + Form). Empty
+  // arrays = no filter (show everything). Filter state lives at the page
+  // level so it can scope BOTH the To Do tab AND the Filings tab via the
+  // single `filteredDeadlines` projection. Yuqi audit 2026-05-05: client
+  // page top section should mirror Timeline's structure (title + stats +
+  // 2 filters + tabs). At one-client scope the filters that matter are
+  // axes WITHIN the client (year of filing, form type) rather than
+  // axes OF the client (entity, jurisdiction, tier — those are header
+  // identity, not filter knobs).
+  const [yearFilter, setYearFilter] = useState<string[]>([]);
+  const [formFilter, setFormFilter] = useState<string[]>([]);
 
   // Default tab — landing on To Do is the right answer when the client
   // has active work to chase / confirm. When To Do would be empty (no
@@ -248,6 +263,74 @@ export function ClientDetail() {
     ),
   );
 
+  // Year + Form filter options — derived from the client's deadlines so
+  // empty rosters don't render dead dropdowns. Sorted: years descending
+  // (most recent first), forms alphabetically.
+  const yearOptions = Array.from(
+    new Set(clientDeadlines.map((d) => d.officialDueDate.slice(0, 4))),
+  )
+    .sort((a, b) => b.localeCompare(a))
+    .map((year) => ({ value: year, label: year }));
+  const formOptions = Array.from(
+    new Set(clientDeadlines.map((d) => d.form)),
+  )
+    .sort()
+    .map((form) => ({ value: form, label: form }));
+
+  // Filter projection — applied to BOTH the To Do tab and the Filings
+  // tab so the year/form chips drive every list on the page consistently.
+  // Empty filter arrays = pass-through (show everything).
+  const filteredDeadlines =
+    yearFilter.length === 0 && formFilter.length === 0
+      ? clientDeadlines
+      : clientDeadlines.filter((d) => {
+          if (
+            yearFilter.length > 0 &&
+            !yearFilter.includes(d.officialDueDate.slice(0, 4))
+          ) {
+            return false;
+          }
+          if (formFilter.length > 0 && !formFilter.includes(d.form)) {
+            return false;
+          }
+          return true;
+        });
+
+  // Per-client KPIs — match the shape of Timeline's stat strip so the
+  // user trains on one mental model across the two surfaces. Computed
+  // off `clientDeadlines` (unfiltered) because the stats describe the
+  // CLIENT's overall state, not the currently-filtered slice.
+  //   - behind: deadlines past internal target, still active
+  //   - extended: deadlines that filed an extension (active but
+  //     paused at the IRS-extended date)
+  //   - active: not-completed, not-extended (open work)
+  // Phase 1 — `awaiting docs` would require checklist data which is
+  // already used elsewhere in the component but not aggregated here;
+  // surfacing later via TaskActivityTimeline inputs.
+  const kpis = (() => {
+    let behind = 0;
+    let extended = 0;
+    let active = 0;
+    for (const d of clientDeadlines) {
+      if (d.status === "completed") continue;
+      if (d.status === "filed_extension") {
+        extended++;
+        continue;
+      }
+      active++;
+      if (d.internalDueDate) {
+        const internal = parseDate(d.internalDueDate);
+        if (!Number.isNaN(internal.getTime()) && internal < TODAY) {
+          behind++;
+        }
+      }
+    }
+    return { active, behind, extended };
+  })();
+
+  const hasContact = !!(client.contactEmail || client.contactPhone);
+  const hasFilters = yearFilter.length > 0 || formFilter.length > 0;
+
   const onArchiveConfirm = () => {
     if (env.useMockData) {
       actions.archiveClient(client.id);
@@ -265,147 +348,229 @@ export function ClientDetail() {
       <BackLink fallback="/clients" fallbackLabel="Clients" />
 
 
-      {/* Header layout: stacks vertically on mobile (action group sits BELOW
-          the wrapping H1 + meta) and goes side-by-side at sm+ where there's
-          room. Without the breakpoint, the right-rail buttons crash into a
-          wrapping client name on narrow viewports. */}
-      <div className="mt-3 flex flex-col sm:flex-row sm:items-start gap-3">
-        <div className="flex-1 min-w-0">
-          {/* Row 1: identity only — name + entity + state chips + archived
-              flag. Yuqi audit 2026-05-05: the previous header crowded the
-              first line with "Working on: TX FRANCHISE, 941" in info-blue,
-              competing with the name itself. Mercury T2 says one accent per
-              viewport; the working-on data is context, not headline, so
-              it moves to the meta line below in neutral type. */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-display font-semibold text-ink-900 leading-7 tracking-[-0.01em]">
-              {client.name}
-            </h1>
-          {/* Row 1: identity. ClientChip (size="lg", showTier, showState)
-              is the canonical rendering of the name+tier+state triplet —
-              this is the migration target of PR #135; the standalone
-              StateChipGroup and the inline H1 it replaced are removed.
-              Entity-type badge + archived flag remain as siblings since
-              they're not part of the per-client identity tuple. The
-              "Working on" badge that used to live here was relocated to
-              the meta line below in PR #133 — it's context, not headline
-              (Mercury T2: one accent per viewport). */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <ClientChip
-              client={client}
-              size="lg"
-              as="span"
-              showTier
-              showState
-            />
-            <span
-              className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line"
-              title="Entity type"
+      {/* Title row — same shape as Timeline's PageHeader. The h1 carries
+          just the client name; the muted suffix shows the open count
+          ("3 active") so the headline number is visible without scanning
+          to the stat strip below. Action group right-aligned. Yuqi audit
+          2026-05-05: "let's have the top section of the client page the
+          same structure as Timeline. Title, awaiting data, filter 1,
+          filter 2." */}
+      <PageHeader
+        title={client.name}
+        meta={
+          activeDeadlineCount > 0
+            ? `${activeDeadlineCount} active`
+            : "no active filings"
+        }
+        actions={
+          <>
+            <PinClientButton clientId={client.id} />
+            <ExportClientsButton clientId={client.id} />
+            <button
+              onClick={() => {
+                setAddDeadlinePrefill(undefined);
+                setAddDeadlineOpen(true);
+              }}
+              className="text-sm px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover inline-flex items-center gap-1.5"
+              title="Add a new deadline / task for this client"
             >
-              {entityTypeDisplay(client.entityType)}
+              <Plus className="w-3.5 h-3.5" aria-hidden />
+              Add deadline
+            </button>
+            <button
+              onClick={() => setEditOpen(true)}
+              className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => setArchiveOpen(true)}
+              disabled={client.status === "archived"}
+              className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Archive
+            </button>
+          </>
+        }
+      />
+
+      {/* Identity strip — entity / state / tier / packages / archived /
+          since. All neutral type. Sits as a single horizontal line below
+          the title so the eye reads name → identity → contact → stats
+          → filters → tabs in a clean rhythm. "Since" hides when no
+          addedAt; "Open deadlines" dropped from this row entirely
+          (the active count moved into the title meta). */}
+      <div className="mb-region text-xs text-ink-500 flex items-baseline flex-wrap gap-x-section gap-y-1">
+        <span>
+          <span className="text-ink-400">Tier</span>{" "}
+          <span className="text-ink-700 font-medium capitalize">
+            {client.tier ?? "standard"}
+          </span>
+        </span>
+        <span>
+          <span className="text-ink-400">Entity</span>{" "}
+          <span className="text-ink-700 font-medium">
+            {entityTypeDisplay(client.entityType)}
+          </span>
+        </span>
+        <span className="inline-flex items-baseline gap-1">
+          <span className="text-ink-400">State</span>
+          <StateChipGroup
+            primary={client.primaryState}
+            nexus={client.nexusStates}
+          />
+        </span>
+        {client.servicePackages.length > 0 && (
+          <span className="inline-flex items-baseline gap-1">
+            <span className="text-ink-400">
+              {client.servicePackages.length === 1 ? "Package" : "Packages"}
             </span>
-            <StateChipGroup
-              primary={client.primaryState}
-              nexus={client.nexusStates}
-            />
-            {client.status === "archived" && (
-              <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-500">
-                Archived
-              </span>
-            )}
-          </div>
-          {/* Row 2: meta line — Tier · Packages · Open deadlines · Working
-              on · Since. All neutral type, label-in-ink-400 / value-in-
-              ink-700 pattern. Packages hides entirely when empty (the
-              "— none assigned" stub was decorative noise — the absence is
-              its own information). Working on lives here as text, not as a
-              colored badge — see PRD pressure test: "is this a state
-              announcement (color)? or context (text)?" Filings-in-flight
-              is context; the chase / overdue / waiting states get color
-              elsewhere on the page. */}
-          <div className="mt-2 text-xs text-ink-500 flex items-baseline flex-wrap gap-x-section gap-y-1">
-            <span>
-              <span className="text-ink-400">Tier</span>{" "}
-              <span className="text-ink-700 font-medium capitalize">
-                {client.tier ?? "standard"}
-              </span>
-            </span>
-            {/* Tier moved into the canonical ClientChip above (lg
-                variant with showTier renders the label inline next to
-                the name) — identity (name + tier + primary state)
-                lives in one place per the ClientChip primitive
-                contract. */}
-            {client.servicePackages.length > 0 && (
-              <span className="inline-flex items-baseline gap-1">
-                <span className="text-ink-400">
-                  {client.servicePackages.length === 1
-                    ? "Package"
-                    : "Packages"}
-                </span>
-                {client.servicePackages.map((p) => (
-                  <PackageChip key={p} packageName={p} client={client} />
-                ))}
-              </span>
-            )}
-            <span>
-              <span className="text-ink-400">Open deadlines</span>{" "}
-              <span className="text-ink-700 font-medium tabular-nums">
-                {clientDeadlines.filter(
-                  (d) =>
-                    d.status !== "completed" &&
-                    d.status !== "filed_extension",
-                ).length}
-              </span>
-            </span>
-            {workingOnFormTypes.length > 0 && (
-              <span
-                className="inline-flex items-baseline gap-1 min-w-0"
-                title="Active filings the firm is currently executing"
-              >
-                <span className="text-ink-400 shrink-0">Working on</span>
-                <span className="text-ink-700 truncate">
-                  {workingOnFormTypes.slice(0, 3).join(", ")}
-                  {workingOnFormTypes.length > 3 &&
-                    ` +${workingOnFormTypes.length - 3}`}
-                </span>
-              </span>
-            )}
-            <span>
-              <span className="text-ink-400">Since</span>{" "}
-              <span className="text-ink-700">{addedAtLabel}</span>
-            </span>
-          </div>
-          {/* AI behaviour summary — placeholder until the BE composer
-              ships. Phase 2 derives the sentence from activity_events:
-              avg response time to chases, extension history, mode A
-              confidence rates, pushback frequency. Override persists
-              on clients.ai_summary_override. */}
-          <ClientAiSummary client={client} />
-        </div>
-        {/* Action group — kept together as a single shrink-0 cluster so the
-            row can never collapse half its buttons. On mobile the parent flex
-            stacks this group below the title; at sm+ it sits inline. */}
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <PinClientButton clientId={client.id} />
-          <ExportClientsButton clientId={client.id} />
-          {/* Legacy ExportModal still mounted (deadline iCal/PDF surfaces) but
-              no longer the default trigger — env.useMockData callers can still
-              reach it via setExportOpen if a future surface needs it. */}
-          <button
-            onClick={() => setEditOpen(true)}
-            className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40"
-          >
-            Edit
-          </button>
-          <button
-            onClick={() => setArchiveOpen(true)}
-            disabled={client.status === "archived"}
-            className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Archive
-          </button>
-        </div>
+            {client.servicePackages.map((p) => (
+              <PackageChip key={p} packageName={p} client={client} />
+            ))}
+          </span>
+        )}
+        {addedAtLabel && (
+          <span>
+            <span className="text-ink-400">Since</span>{" "}
+            <span className="text-ink-700">{addedAtLabel}</span>
+          </span>
+        )}
+        {client.status === "archived" && (
+          <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-500">
+            Archived
+          </span>
+        )}
       </div>
+
+      {/* Primary contact — only renders when we have at least one
+          channel on file. Email is mailto:, phone is tel: so click-to-
+          contact works on mobile + desktop mail/phone clients. Yuqi
+          audit 2026-05-05: "primary contact email + phone should be
+          visible under its name title." */}
+      {hasContact && (
+        <div className="mb-region text-xs text-ink-700 flex items-baseline flex-wrap gap-x-section gap-y-1">
+          {client.contactEmail && (
+            <a
+              href={`mailto:${client.contactEmail}`}
+              className="inline-flex items-baseline gap-1 hover:text-ink-900"
+              title="Send email"
+            >
+              <Mail
+                className="w-3 h-3 text-ink-400 self-center"
+                aria-hidden
+              />
+              {client.contactEmail}
+            </a>
+          )}
+          {client.contactPhone && (
+            <a
+              href={`tel:${client.contactPhone}`}
+              className="inline-flex items-baseline gap-1 hover:text-ink-900"
+              title="Call"
+            >
+              <Phone
+                className="w-3 h-3 text-ink-400 self-center"
+                aria-hidden
+              />
+              {client.contactPhone}
+            </a>
+          )}
+        </div>
+      )}
+
+      {/* Stat strip — mirrors Timeline's KPI line. Tone-coded numbers
+          only; no middle dots between metrics (DESIGN.md §Don't —
+          discrete fields use whitespace, dots are within-field). The
+          numbers describe the CLIENT's overall state, not the filtered
+          slice — so a year/form filter doesn't hide the broader
+          picture. "Working on" gets a soft inline mention here too so
+          it stays visible without crowding the title. */}
+      <div className="mb-region text-xs text-ink-500 flex items-baseline gap-x-section gap-y-1 flex-wrap">
+        <span>
+          <span
+            className={cn(
+              "tabular-nums font-semibold",
+              kpis.active > 0 ? "text-ink-700" : "text-ink-400",
+            )}
+          >
+            {kpis.active}
+          </span>{" "}
+          open
+        </span>
+        <span>
+          <span
+            className={cn(
+              "tabular-nums font-semibold",
+              kpis.behind > 0 ? "text-warn-ink" : "text-ink-700",
+            )}
+          >
+            {kpis.behind}
+          </span>{" "}
+          behind internal
+        </span>
+        <span>
+          <span
+            className={cn(
+              "tabular-nums font-semibold",
+              kpis.extended > 0 ? "text-info-ink" : "text-ink-700",
+            )}
+          >
+            {kpis.extended}
+          </span>{" "}
+          on extension
+        </span>
+        {workingOnFormTypes.length > 0 && (
+          <span className="inline-flex items-baseline gap-1 min-w-0">
+            <span className="text-ink-400 shrink-0">Working on</span>
+            <span className="text-ink-700 truncate">
+              {workingOnFormTypes.slice(0, 3).join(", ")}
+              {workingOnFormTypes.length > 3 &&
+                ` +${workingOnFormTypes.length - 3}`}
+            </span>
+          </span>
+        )}
+      </div>
+
+      {/* Filter chips — Year + Form. Match Timeline's MultiSelectChip
+          pattern + Clear-all button. Filters apply to BOTH the To Do
+          and Filings tabs (via the filteredDeadlines projection) so
+          one knob slices every list on the page consistently. Hidden
+          entirely when there are no deadlines (nothing to filter). */}
+      {clientDeadlines.length > 0 && (
+        <div className="mb-card flex items-center gap-2 flex-wrap">
+          <MultiSelectChip
+            label="Year"
+            options={yearOptions}
+            selected={yearFilter}
+            onChange={setYearFilter}
+          />
+          <MultiSelectChip
+            label="Form"
+            options={formOptions}
+            selected={formFilter}
+            onChange={setFormFilter}
+          />
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={() => {
+                setYearFilter([]);
+                setFormFilter([]);
+              }}
+              className="text-xs text-ink-500 hover:text-ink-900 underline underline-offset-2 ml-1"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* AI behaviour summary — kept (override surfaces here when set).
+          Sits below the structural header so the eye reads identity →
+          stats → filters → tabs first; the AI annotation is contextual
+          flavor for users who've authored an override. */}
+      <ClientAiSummary client={client} />
 
       <ClientAiInsightsCard clientId={client.id} />
 
@@ -487,10 +652,14 @@ export function ClientDetail() {
       </div>
 
       <div className="mt-5 space-y-5">
+        {/* Both To Do and Filings receive `filteredDeadlines` (year +
+            form filter projection). When no filter is active this is
+            === clientDeadlines, so unfiltered render is identical to
+            before. */}
         {tab === "todo" && (
           <ToDoTab
             client={client}
-            allDeadlines={clientDeadlines}
+            allDeadlines={filteredDeadlines}
             onAddDeadline={() => setAddDeadlineOpen(true)}
             onOpenDocuments={() => onTabChange("documents")}
           />
@@ -500,7 +669,7 @@ export function ClientDetail() {
         {tab === "engagement" && (
           <ToDoTab
             client={client}
-            allDeadlines={clientDeadlines}
+            allDeadlines={filteredDeadlines}
             onAddDeadline={() => setAddDeadlineOpen(true)}
             onOpenDocuments={() => onTabChange("documents")}
           />
@@ -508,7 +677,7 @@ export function ClientDetail() {
         {tab === "filings" && (
           <FilingsTab
             client={client}
-            deadlines={clientDeadlines}
+            deadlines={filteredDeadlines}
             onAddDeadline={(prefill) => {
               setAddDeadlinePrefill(prefill);
               setAddDeadlineOpen(true);

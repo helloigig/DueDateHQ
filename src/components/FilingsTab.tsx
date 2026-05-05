@@ -187,6 +187,17 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
       entry.deadlines.push(d);
       m.set(year, entry);
     }
+    // Always seed the current year so the "this year" structure is
+    // visible even when the client has zero deadlines. Yuqi audit
+    // 2026-05-05: "the filing should have the filing history, this
+    // year's filing and future filing... previously we had them, where
+    // are they?" — they were getting hidden when the year-bucket map
+    // was empty. Surface the current-year skeleton with an empty-state
+    // body so the user sees "yes, this is your 2026 plan; there's
+    // nothing in it yet" rather than just no section at all.
+    if (!m.has(currentYear)) {
+      m.set(currentYear, { year: currentYear, deadlines: [] });
+    }
     const all = Array.from(m.values());
     const current = all.filter((y) => y.year === currentYear);
     const future = all
@@ -205,7 +216,11 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
           catalog placeholder copy. Per dogfooding 2026-05-05: users
           opened Filings expecting their filings, got engineering meta
           copy instead. */}
-      {filingsByYear.length > 0 && (
+      {/* Filing plan — always rendered now (filingsByYear always has at
+          least the current year via the seed in the useMemo above), so
+          even an empty client sees "2026 — no filings yet" with a clear
+          add-deadline affordance. */}
+      {(
         <section className="bg-surface border border-line rounded-md">
           <header className="px-4 py-3 border-b border-line flex items-baseline gap-2">
             <h3 className="text-sm font-semibold text-ink-900">
@@ -264,6 +279,11 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
                       )}
                     </span>
                   </div>
+                  {yrFilings.length === 0 && (
+                    <p className="text-xs text-ink-400 px-2 py-1">
+                      No filings tracked for this tax year yet.
+                    </p>
+                  )}
                   <ul className="space-y-0.5 -mx-2">
                     {yrFilings
                       .slice()
