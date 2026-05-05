@@ -1,6 +1,15 @@
 import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Search, Upload, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Plus,
+  Search,
+  Upload,
+  X,
+} from "lucide-react";
 import { AddClientModal } from "../components/AddClientModal";
 import {
   BatchChaseDrawer,
@@ -28,7 +37,6 @@ import { toast } from "sonner";
 import { countdownLabel, parseDate, TODAY, daysBetween } from "../data/dateHelpers";
 import {
   STATE_NAMES,
-  type ClientStatus,
   type ClientTier,
   type EntityType,
   type StateCode,
@@ -47,12 +55,13 @@ const STATE_OPTIONS: { value: StateCode; label: string }[] = (
   Object.keys(STATE_NAMES) as StateCode[]
 ).map((code) => ({ value: code, label: `${code} · ${STATE_NAMES[code]}` }));
 
-const STATUS_OPTIONS: { value: ClientStatus; label: string }[] = [
-  { value: "active", label: "Active" },
-  { value: "prospect", label: "Prospect" },
-  { value: "inactive", label: "Inactive" },
-  { value: "archived", label: "Archived" },
-];
+// STATUS_OPTIONS retired 2026-05-06. The Clients page is now active-
+// scoped by default; the prior 4-pill row (Active / Prospect /
+// Inactive / Archived) was an axis the page didn't actually need —
+// archived is the only "out-of-roster" mode worth toggling, and that
+// has its own dedicated "Show Archived" toggle in the filter row.
+// Inactive / Prospect were artifacts of an earlier CRM concept; they
+// remain queryable via the API but no longer surface in the page UI.
 
 const TIER_OPTIONS: { value: ClientTier; label: string }[] = [
   { value: "premium", label: "Premium" },
@@ -93,6 +102,15 @@ export function Clients() {
   const [searchOpen, setSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  // Show-archived toggle replaces the Status pills row 2026-05-06.
+  // Default = active only; toggle ON = active + archived. The API
+  // filter handles the projection, so the table never sees archived
+  // rows unless the toggle is on.
+  const [showArchived, setShowArchived] = useState(false);
+  // Page-level dismiss of the State alert banner — sticks for the
+  // session, doesn't persist across reloads (the alert can be re-
+  // raised from /alerts → toggle dismissed there too).
+  const [alertBannerHidden, setAlertBannerHidden] = useState(false);
   // Default = no smart-filter preset. The KPI tiles at the top show the
   // gap-loud signals (waiting / stuck) and toggle the filter on click —
   // that mechanism replaces the previous default-on "Has waiting" behavior
@@ -137,11 +155,20 @@ export function Clients() {
   const allClientsQuery = useClients();
   const allClients = allClientsQuery.data?.items ?? [];
 
+  // Status filter is derived from the show-archived toggle — the
+  // page is active-scoped by default; the toggle adds archived to
+  // the projection. `filters.status` (now retired from the UI) is
+  // honored if non-empty so any back-compat callers still work.
+  const effectiveStatusFilter: string[] = filters.status.length
+    ? filters.status
+    : showArchived
+      ? ["active", "archived"]
+      : ["active"];
   const clientsQuery = useClients({
     search: query || undefined,
     entityType: filters.entity.length ? filters.entity : undefined,
     state: filters.state.length ? filters.state : undefined,
-    status: filters.status.length ? filters.status : undefined,
+    status: effectiveStatusFilter,
     tier: filters.tier.length ? filters.tier : undefined,
     servicePackage: filters.servicePackage.length
       ? filters.servicePackage
@@ -556,44 +583,10 @@ export function Clients() {
         />
       </div>
 
-      {/* Status — promoted from MultiSelectChip dropdown to inline pills.
-          Status has 3-4 options + always-relevant; hiding it behind a
-          chip toggle adds a click for no payoff. Other filters
-          (Entity/State/Tier/Package) keep the dropdown because their
-          option lists are long enough that an inline row would dominate
-          the viewport. */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
-          Status
-        </span>
-        {STATUS_OPTIONS.map((opt) => {
-          const active = filters.status.includes(opt.value);
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() =>
-                setFilters((f) => ({
-                  ...f,
-                  status: active
-                    ? f.status.filter((s) => s !== opt.value)
-                    : [...f.status, opt.value],
-                }))
-              }
-              className={`text-xs px-2.5 py-1 rounded-pill border transition-colors ${
-                active
-                  ? "bg-ink-900 text-canvas border-ink-900"
-                  : "bg-surface text-ink-700 border-line hover:bg-sunken"
-              }`}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Other attribute filters — kept as dropdown chips because the
-          option lists are long (50 states, 7 entities, N packages). */}
+      {/* Filter row — Entity / State / Tier / Package on the left,
+          "Show Archived" toggle on the right. The Status pills row
+          retired 2026-05-06 (active-scoped page; archived has its
+          own dedicated toggle). */}
       <div className="flex items-center gap-2 flex-wrap">
         <MultiSelectChip
           label="Entity"
@@ -628,35 +621,62 @@ export function Clients() {
             Clear all
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => setShowArchived((v) => !v)}
+          className={`ml-auto text-xs underline underline-offset-2 transition-colors ${
+            showArchived
+              ? "text-ink-900 font-medium"
+              : "text-ink-500 hover:text-ink-900"
+          }`}
+          aria-pressed={showArchived}
+          title={
+            showArchived
+              ? "Hide archived clients"
+              : "Include archived clients in the view"
+          }
+        >
+          {showArchived ? "Hide Archived" : "Show Archived"}
+        </button>
       </div>
 
-      {/* Inline pill on alert-affected client rows surfaces the affiliation
-          without painting status color across the row (T4). Per-row pill
-          replaces the prior row-tint affordance. The legend doubles as a
-          handoff link to /alerts so the CPA can jump straight to triage. */}
-      {alertedClientIds.size > 0 && (
-        <div className="text-2xs text-ink-500 inline-flex items-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1.5">
-            <span
-              className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-warn-bg text-warn-ink text-[10px] font-medium"
-              aria-hidden
-            >
-              State alert
-            </span>
-            <span>
-              <span className="text-ink-700 font-medium">
-                {alertedClientIds.size}
-              </span>{" "}
-              {alertedClientIds.size === 1 ? "client" : "clients"} tagged with
-              this pill have an active state alert affecting their filings.
-            </span>
+      {/* State alert banner — promoted from inline pill text to a
+          full-width yellow banner per the 2026-05-06 mockup. Wider
+          stripe = wider awareness; the X collapses it for the
+          session. The "Open alerts ↗" link is the CPA's handoff to
+          /alerts where the bundle send happens. The per-row pill
+          on each affected client (rendered in the table below)
+          remains as the handoff to the specific alert. */}
+      {alertedClientIds.size > 0 && !alertBannerHidden && (
+        <div className="bg-warn-bg/40 border border-warn-border rounded-md px-4 py-3 flex items-center gap-3">
+          <AlertTriangle
+            className="w-4 h-4 text-warn-ink shrink-0"
+            aria-hidden
+          />
+          <span className="inline-flex items-center text-2xs uppercase tracking-wider px-1.5 py-0.5 rounded bg-warn-bg/80 text-warn-ink font-semibold border border-warn-border shrink-0">
+            State alert
+          </span>
+          <span className="flex-1 text-sm text-ink-900">
+            <span className="font-semibold tabular-nums">
+              {alertedClientIds.size}
+            </span>{" "}
+            {alertedClientIds.size === 1 ? "client has" : "clients have"} an
+            active state alert affecting their filings.
           </span>
           <Link
             to="/alerts"
-            className="text-info-ink hover:underline"
+            className="inline-flex items-center gap-1 text-sm text-info-ink hover:underline shrink-0"
           >
             Open alerts ↗
           </Link>
+          <button
+            type="button"
+            onClick={() => setAlertBannerHidden(true)}
+            className="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-md text-ink-500 hover:text-ink-900 hover:bg-sunken transition-colors"
+            aria-label="Hide state alert banner"
+          >
+            <X className="w-3.5 h-3.5" aria-hidden />
+          </button>
         </div>
       )}
 
