@@ -21,7 +21,7 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import { MultiSelectChip } from "../components/MultiSelectChip";
-import { DueDate } from "../components/ui/DueDate";
+import { DeadlineChip } from "../components/ui/DeadlineChip";
 import { clients as MOCK_CLIENTS } from "../data/mockClients";
 import { useClients } from "../hooks/useClients";
 import type { ClientTier } from "../types";
@@ -892,13 +892,26 @@ function TaskTimelineRow({
               <span className="truncate">{t.task}</span>
               <span className="text-ink-400 mx-1">·</span>
               {t.officialDueIso ? (
-                <DueDate
-                  official={t.officialDueIso}
-                  internal={t.internalDueIso}
-                  formClass={t.formClass}
-                  filed={t.currentStage === "file" && t.daysBehind === 0 && t.missingCount === 0}
-                  inline
-                  className="text-xs"
+                <DeadlineChip
+                  variant="compact"
+                  officialDueDate={t.officialDueIso}
+                  internalTargetDate={t.internalDueIso}
+                  currentMilestoneTargetDate={t.internalDueIso}
+                  currentMilestoneLabel={STAGE_LABELS[t.currentStage]}
+                  status={
+                    t.currentStage === "file" &&
+                    t.daysBehind === 0 &&
+                    t.missingCount === 0
+                      ? "completed"
+                      : undefined
+                  }
+                  originalBufferDays={
+                    t.formClass === "quarterly"
+                      ? 3
+                      : t.formClass === "monthly"
+                        ? 2
+                        : 7
+                  }
                 />
               ) : (
                 <span className="text-ink-400">due {t.dueDate}</span>

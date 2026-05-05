@@ -82,9 +82,18 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
               comma-separated text was duplicate information at equal weight.
               The chip carries the operational state (active milestone, slip,
               IRS runway when relevant) and exposes state-appropriate actions
-              on click. Internal vs official semantics: chip's primary text is
-              milestone-driven; official date enters the visible band only
-              once the back-plan has slipped past internal target. */}
+              on click.
+
+              Reconciliation with the canonical Task action set (PR #94 /
+              <TaskActions/>): the chip popover and the action dropdown now
+              route through the same hooks (useUpdateTaskStatus +
+              useFileExtensionForTask) and use matching window.confirm prompts
+              so the audit trail is identical regardless of which entry the
+              CPA used. The chip's value-add is *state-aware recommendation*
+              (it surfaces the 1-2 verbs that match the current state with
+              precise sub-labels like "Stops the overdue clock"); the
+              dropdown's value-add is *the full lifecycle menu*. They are
+              complements, not alternates. */}
           <div className="mt-2 flex items-center flex-wrap gap-2">
             <DeadlineChip
               officialDueDate={task.officialDueDate}
@@ -108,22 +117,43 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
                   status: task.status,
                 }).recommendedAction,
                 {
-                  onChase: () =>
-                    alert(
-                      "Chase flow opens Mode D draft — wired to existing QuickActionModal in P1",
-                    ),
-                  onSubmit: () => updateStatus(task.id, "completed"),
-                  // Phase-1: file-extension routes through the dedicated mutation
-                  // (cascades to deadline) instead of a free-form status write.
-                  onFileExtension: () => fileExtension(task.id),
-                  onAdjustTarget: () =>
-                    alert(
-                      "Adjust target opens TaskMilestone editor — drag the waypoint in the mini-timeline below",
-                    ),
-                  onViewExtension: () =>
-                    alert(
-                      `Extension filed — new IRS deadline ${task.officialDueDate}`,
-                    ),
+                  // Mode D chase flow isn't yet liftable from QuickActionModal;
+                  // suppress the chase action entirely from the chip until P1
+                  // wires it through (passing undefined removes the action).
+                  onChase: undefined,
+                  // Mark complete — confirm prompt matches <TaskActions/>'
+                  // canonical "Mark complete" handler (TaskActions.tsx:84-91).
+                  onSubmit: () => {
+                    if (
+                      window.confirm(
+                        `Mark ${task.formType} complete? This closes the task.`,
+                      )
+                    ) {
+                      updateStatus(task.id, "completed");
+                    }
+                  },
+                  // File extension — same confirm prompt as <TaskActions/>'
+                  // canonical "File extension" handler (TaskActions.tsx:103-111).
+                  // Routes through useFileExtensionForTask which cascades to
+                  // the deadline record (not just a free-form status write).
+                  onFileExtension: () => {
+                    if (
+                      window.confirm(
+                        `Mark extension filed for ${task.formType}? Cascades to the deadline.`,
+                      )
+                    ) {
+                      fileExtension(task.id);
+                    }
+                  },
+                  // Adjust-target — TaskMilestone drag-to-edit lands in P1.
+                  // For now point the CPA at the canonical Defer dialog in
+                  // <TaskActions/>' overflow menu, which is the only existing
+                  // way to push working dates without altering the legal date.
+                  onAdjustTarget: undefined,
+                  // View extension — informational only. The chip's primary
+                  // text already reads "Extension filed · IRS {date}"; this
+                  // popover entry is reserved for richer detail later.
+                  onViewExtension: undefined,
                 },
               )}
             />
