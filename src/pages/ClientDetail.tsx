@@ -73,6 +73,7 @@ import { cn } from "../lib/utils";
 // as a labeled identity strip rather than a single chip — same data,
 // more readable layout for a header. The chip stays the canonical
 // rendering everywhere else.
+import { ClientChip } from "../components/ClientChip";
 import { STATE_NAMES, type StateCode } from "../types";
 import { bundleByName, type FilingBundle } from "../data/bundles";
 import { resolveFederalForm } from "../data/canonicalForm";

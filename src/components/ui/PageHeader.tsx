@@ -26,7 +26,10 @@ export const PageHeader = React.forwardRef<HTMLDivElement, PageHeaderProps>(
       <div
         ref={ref}
         className={cn(
-          "flex items-end justify-between gap-4 mb-card",
+          // min-h-9 (36px) locks the header row to a consistent height across
+          // every page — title-only pages and pages with action buttons all
+          // line up at the same baseline.
+          "flex min-h-9 items-end justify-between gap-4 mb-card",
           className,
         )}
         {...props}
