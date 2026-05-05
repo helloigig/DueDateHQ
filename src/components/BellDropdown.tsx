@@ -139,8 +139,34 @@ export function BellDropdown() {
 
         <ul className="max-h-96 overflow-y-auto">
           {filtered.length === 0 ? (
-            <li className="px-4 py-6 text-sm text-ink-500 text-center">
-              Nothing here.
+            <li className="px-4 py-8 text-center">
+              {/* Yuqi audit 2026-05-05: previous empty copy was "Nothing
+                  here." which left users wondering whether (a) they had
+                  no notifications, (b) the filter was hiding everything,
+                  or (c) state alerts they expected to see were missing.
+                  The bell is intentionally narrow (bounces / invites /
+                  extensions only — state alerts live at /alerts). The
+                  empty copy now both confirms the empty state AND
+                  redirects users hunting for state alerts to the right
+                  surface. */}
+              <p className="text-sm text-ink-700">
+                {filter === "all"
+                  ? "All caught up."
+                  : `No ${FILTER_LABELS[filter].toLowerCase()} right now.`}
+              </p>
+              {filter === "all" && (
+                <p className="text-2xs text-ink-500 mt-1.5 max-w-[260px] mx-auto">
+                  Bounces, team invites, and extension approvals show up here.
+                  Looking for state alerts?{" "}
+                  <Link
+                    to="/alerts"
+                    onClick={() => setOpen(false)}
+                    className="underline hover:text-ink-900"
+                  >
+                    Open Alerts →
+                  </Link>
+                </p>
+              )}
             </li>
           ) : (
             filtered.map((n) => (

@@ -2,6 +2,10 @@ import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Search, Upload, X } from "lucide-react";
 import { AddClientModal } from "../components/AddClientModal";
+import {
+  BatchChaseDrawer,
+  type BatchRecipient,
+} from "../components/BatchChaseDrawer";
 import { ExportClientsButton } from "../components/ExportClientsButton";
 import { PageHeader } from "../components/ui/PageHeader";
 import { PageContainer } from "../components/ui/PageContainer";
@@ -17,7 +21,6 @@ import { useTriageDeadlines } from "../hooks/useDeadlines";
 import { useAnnouncements } from "../hooks/useAnnouncements";
 import { useStore, actions } from "../data/store";
 import { useFeatureFlags } from "../hooks/useFeatureFlags";
-import { useModalDialog } from "../hooks/useModalDialog";
 import { trpc } from "../lib/api/client";
 import { env } from "../config";
 import { UpgradePrompt } from "../components/UpgradePrompt";
@@ -25,7 +28,6 @@ import { toast } from "sonner";
 import { countdownLabel, parseDate, TODAY, daysBetween } from "../data/dateHelpers";
 import {
   STATE_NAMES,
-  type Client,
   type ClientStatus,
   type ClientTier,
   type EntityType,
@@ -106,6 +108,26 @@ export function Clients() {
   // selection can't cross a filter boundary.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchModalOpen, setBatchModalOpen] = useState(false);
+  // Bulk file-request mutation. Cast through `any` matches the pattern
+  // already used by the legacy BatchFileRequestModal — FE-side router
+  // types are stale until the BE redeploys, but the runtime contract
+  // (clientIds, subject, body) is stable. We call it once per recipient
+  // (clientIds: [singleId]) so each gets their own pre-merged subject +
+  // body from the BatchChaseDrawer's per-recipient payload.
+  const sendBatchFileRequest = (
+    trpc.clients as unknown as {
+      sendBatchFileRequest: {
+        useMutation: () => {
+          mutateAsync: (input: {
+            clientIds: string[];
+            subject: string;
+            body: string;
+          }) => Promise<unknown>;
+          isPending: boolean;
+        };
+      };
+    }
+  ).sendBatchFileRequest.useMutation();
   const [sortCol, setSortCol] = useState<SortColumn>("open");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [addOpen, setAddOpen] = useState(false);
@@ -179,6 +201,32 @@ export function Clients() {
     }
     return s;
   }, [announcements]);
+
+  // Build BatchRecipient[] from the current selection. Each recipient
+  // gets a per-client `context` derived from fleetCounts so the
+  // {{context}} merge token in the BatchChaseDrawer template renders
+  // something meaningful ("3 items still needed for your filings")
+  // rather than generic boilerplate. Memoised so the drawer doesn't
+  // re-render on unrelated parent state churn.
+  const batchRecipients = useMemo<BatchRecipient[]>(() => {
+    return Array.from(selectedIds)
+      .map((id) => allClients.find((c) => c.id === id))
+      .filter((c): c is NonNullable<typeof c> => !!c)
+      .map((c) => {
+        const fc = fleetCounts.get(c.id);
+        const waiting = fc?.waiting ?? 0;
+        const context =
+          waiting > 0
+            ? `${waiting} ${waiting === 1 ? "item" : "items"} still needed for your filings`
+            : "documents for your upcoming filings";
+        return {
+          clientId: c.id,
+          clientName: c.name,
+          clientEmail: c.contactEmail,
+          context,
+        };
+      });
+  }, [selectedIds, allClients, fleetCounts]);
 
   // For the per-row alert chip — pick the most recent active alert
   // hitting each client. Drives the "View alert →" affordance Yuqi
@@ -309,7 +357,7 @@ export function Clients() {
   }
   if (clientsQuery.error) {
     return (
-      <div className="max-w-5xl mx-auto px-4 md:px-6 py-6">
+      <PageContainer variant="wide">
         <ErrorState
           title="Couldn't load clients."
           message={
@@ -319,13 +367,13 @@ export function Clients() {
           }
           onRetry={() => clientsQuery.refetch()}
         />
-      </div>
+      </PageContainer>
     );
   }
 
   if (allClients.length === 0) {
     return (
-      <PageContainer>
+      <PageContainer variant="wide">
         {/* Single-purpose direct empty state. The user came to /clients
             deliberately to manage clients — give them one strong action,
             not a re-onboarding menu. */}
@@ -384,7 +432,12 @@ export function Clients() {
   };
 
   return (
-    <PageContainer variant="wide" className="space-y-section">
+    // Yuqi audit 2026-05-05 — page wrapper was `space-y-section` (48px),
+    // which made every page-level block (header → tiles → filter row →
+    // table) feel disconnected. Clients is a dense control panel, not a
+    // calm digest like Today; tightening to `space-y-card` (24px) keeps
+    // the controls grouped without losing legible separation.
+    <PageContainer variant="wide" className="space-y-card">
       {/* Header — title meta carries the active-count, actions live inline so
           "Add client" + "Import CSV" sit on the same row as the page name. */}
       <PageHeader
@@ -458,16 +511,21 @@ export function Clients() {
 
       {/* KPI tiles — clients-page axes, not Today's signals.
           The page's job is to slice/find clients, so the tiles surface
-          attributes (active count, multi-state count, stuck cohort)
-          rather than per-deadline signals (which live on Today). The
-          \"Awaiting reply\" tile was retired here because it duplicated
-          Today's chase queue — the data lives in the Waiting column on
-          each row already, and surfacing it as a top-level number on
-          this page didn't tell the CPA anything they couldn't read in
-          the table. \"Stuck >14d\" stays — it's the one fleet-level
-          urgency signal the table doesn't surface as a single sortable
-          number. */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-card">
+          attributes (active count, stuck cohort) rather than per-
+          deadline signals (which live on Today). "Awaiting reply" was
+          retired previously (duplicated Today's chase queue).
+          "Stuck >14d" stays — fleet-level urgency signal the table
+          doesn't surface as a single sortable number.
+          Yuqi audit 2026-05-05: Multi-state tile now hides when zero
+          (was rendering "0 multi-state" which is uninformative — the
+          page already says "0 matches" via the filter behaviour, and
+          a zero count on a quick-filter tile just confuses Sarah).
+          Same conditional pattern as Dashboard's "Past official". */}
+      <div
+        className={`grid grid-cols-1 gap-card ${
+          multiStateCount > 0 ? "md:grid-cols-3" : "md:grid-cols-2"
+        }`}
+      >
         <MetricTile
           label="Active clients"
           value={clients.length}
@@ -478,14 +536,16 @@ export function Clients() {
               : `of ${allClients.length} matching filters`
           }
         />
-        <MetricTile
-          label="Multi-state"
-          value={multiStateCount}
-          tone="neutral"
-          helper="Clients with nexus beyond their primary state"
-          active={smartFilters.has("multiState")}
-          onClick={() => toggleSmart("multiState")}
-        />
+        {multiStateCount > 0 && (
+          <MetricTile
+            label="Multi-state"
+            value={multiStateCount}
+            tone="neutral"
+            helper="Clients with nexus beyond their primary state"
+            active={smartFilters.has("multiState")}
+            onClick={() => toggleSmart("multiState")}
+          />
+        )}
         <MetricTile
           label={`Stuck >${STUCK_THRESHOLD_DAYS}d`}
           value={stuckFleetCount}
@@ -892,277 +952,86 @@ export function Clients() {
         </div>
       )}
 
-      {batchModalOpen && (
-        <BatchFileRequestModal
-          clientIds={Array.from(selectedIds)}
-          allClients={allClients}
-          onClose={() => setBatchModalOpen(false)}
-          onSent={() => {
+      <BatchChaseDrawer
+        open={batchModalOpen}
+        intent="file_request"
+        recipients={batchRecipients}
+        onClose={() => setBatchModalOpen(false)}
+        onSend={async (payload) => {
+          // Per-recipient fanout. The drawer hands us pre-merged subject +
+          // body per recipient (with {{client_name}} / {{context}} already
+          // substituted), so we send one email per recipient to preserve
+          // the personalisation. Mock-mode writes through the local store
+          // (so the seeded Mailbox view shows the new rows immediately);
+          // real-mode goes through the existing emails.send mutation per
+          // recipient. Future BE optimisation: a `sendBatchPersonalised`
+          // proc that accepts an array of {clientId, subject, body} for
+          // single-roundtrip fanout. For now N round-trips is fine — Sarah
+          // bulk-sends to ≤50 at a time, which is well under any timeout.
+          if (env.useMockData) {
+            let count = 0;
+            for (const r of payload.recipients) {
+              const taskId = `batch-${r.clientId}`;
+              const draftId = actions.saveEmailDraft({
+                taskId,
+                clientId: r.clientId,
+                to:
+                  allClients.find((c) => c.id === r.clientId)?.contactEmail ??
+                  `${r.clientName} <client@example.com>`,
+                cc: "",
+                subject: r.subject,
+                body: r.body,
+                tone: "casual",
+                aiSources: [],
+                sendMethod: "cpa_send",
+                status: "draft",
+              });
+              actions.sendEmail(draftId);
+              count++;
+            }
+            const skipped =
+              selectedIds.size - payload.recipients.length;
+            toast.success(
+              `Sent ${count} ${count === 1 ? "request" : "requests"}` +
+                (skipped > 0 ? ` · ${skipped} skipped (no email)` : ""),
+            );
             setBatchModalOpen(false);
             setSelectedIds(new Set());
-          }}
-        />
-      )}
+            return;
+          }
+          // Real-mode — call the existing per-client mutation N times.
+          // Each call carries already-merged subject/body so the BE just
+          // records and sends; no template substitution happens server-
+          // side. We sequence with Promise.allSettled so a single failure
+          // doesn't drop the rest of the batch.
+          const results = await Promise.allSettled(
+            payload.recipients.map((r) =>
+              sendBatchFileRequest.mutateAsync({
+                clientIds: [r.clientId],
+                subject: r.subject,
+                body: r.body,
+              }),
+            ),
+          );
+          const sentCount = results.filter(
+            (r) => r.status === "fulfilled",
+          ).length;
+          const failedCount = results.length - sentCount;
+          const skippedNoEmail =
+            selectedIds.size - payload.recipients.length;
+          const totalSkipped = skippedNoEmail + failedCount;
+          toast.success(
+            `Sent ${sentCount} ${sentCount === 1 ? "request" : "requests"}` +
+              (totalSkipped > 0 ? ` · ${totalSkipped} skipped` : ""),
+          );
+          setBatchModalOpen(false);
+          setSelectedIds(new Set());
+        }}
+      />
     </PageContainer>
   );
 }
 
-// ── Batch file-request modal ──────────────────────────────────────────────
-// Bulk-send a doc-request email to N selected clients. Phase 1 stub:
-// shows the recipient list + composes one editable subject/body that
-// gets fanned out per-recipient. Phase 2 wires this to a real BE proc
-// (announcements.sendBulletinEmails-style fanout) so the audit trail
-// captures one event per client.
-function BatchFileRequestModal({
-  clientIds,
-  allClients,
-  onClose,
-  onSent,
-}: {
-  clientIds: string[];
-  allClients: Client[];
-  onClose: () => void;
-  onSent: () => void;
-}) {
-  const recipients = allClients.filter((c) => clientIds.includes(c.id));
-  const [subject, setSubject] = useState(
-    "Quick request — documents needed for your filings",
-  );
-  const [body, setBody] = useState(
-    "Hi {first_name},\n\nA quick check-in — we need a few documents from you to keep your filings on track. Please reply with what you have so far; I'll follow up on anything missing.\n\nThanks!",
-  );
-  const dialogRef = useModalDialog(true, onClose);
-  // Filter recipients: must have an email on file. Skipped recipients
-  // are surfaced in the result toast so the CPA knows why a count
-  // doesn't match what they selected.
-  const eligibleRecipients = useMemo(
-    () => recipients.filter((r) => !!r.contactEmail),
-    [recipients],
-  );
-  const ineligibleCount = recipients.length - eligibleRecipients.length;
-
-  // Cast through `any` — FE-side router types are stale until the BE
-  // redeploys with the new procedure. Same shape as the
-  // `announcements.sendBulletinEmails` cast earlier in this file's
-  // history; runtime contract is safe.
-  const sendBatch = (
-    trpc.clients as unknown as {
-      sendBatchFileRequest: {
-        useMutation: () => {
-          mutateAsync: (input: {
-            clientIds: string[];
-            subject: string;
-            body: string;
-          }) => Promise<{
-            sentCount: number;
-            skippedCount: number;
-            sent: Array<{ clientId: string; draftId: string }>;
-            skipped: Array<{ clientId: string; reason: string }>;
-          }>;
-          isPending: boolean;
-        };
-      };
-    }
-  ).sendBatchFileRequest.useMutation();
-  const isSending = sendBatch.isPending;
-  // Tiny helper — substitute placeholders without leaning on
-  // String.prototype.replaceAll (not in the project's TS lib target).
-  const interpolateName = (template: string, firstName: string) =>
-    template.split("{first_name}").join(firstName);
-
-  const onSend = async () => {
-    if (eligibleRecipients.length === 0) {
-      toast.error("None of the selected clients have an email on file.");
-      return;
-    }
-    if (env.useMockData) {
-      // Mock-mode fallback — fan out via the local store so seeded demos
-      // still show the new email rows in Mailbox without a BE round-trip.
-      let count = 0;
-      for (const c of eligibleRecipients) {
-        const firstName = c.name.split(/\s+/)[0] ?? c.name;
-        const personalisedSubject = interpolateName(subject, firstName);
-        const personalisedBody = interpolateName(body, firstName);
-        const taskId = `batch-${c.id}`;
-        const draftId = actions.saveEmailDraft({
-          taskId,
-          clientId: c.id,
-          to: c.contactEmail ?? `${c.name} <client@example.com>`,
-          cc: "",
-          subject: personalisedSubject,
-          body: personalisedBody,
-          tone: "casual",
-          aiSources: [],
-          sendMethod: "cpa_send",
-          status: "draft",
-        });
-        actions.sendEmail(draftId);
-        count++;
-      }
-      toast.success(
-        `Sent ${count} ${count === 1 ? "request" : "requests"}` +
-          (ineligibleCount > 0
-            ? ` · ${ineligibleCount} skipped (no email)`
-            : ""),
-      );
-      onSent();
-      return;
-    }
-    // Real-mode — single BE proc handles fanout, lazy-creates tasks
-    // when needed, sends via Resend, persists email_drafts + activity.
-    try {
-      const result = await sendBatch.mutateAsync({
-        clientIds: eligibleRecipients.map((c) => c.id),
-        subject,
-        body,
-      });
-      const totalSkipped = ineligibleCount + result.skippedCount;
-      const skippedSummary = totalSkipped > 0 ? ` · ${totalSkipped} skipped` : "";
-      toast.success(
-        `Sent ${result.sentCount} ${result.sentCount === 1 ? "request" : "requests"}${skippedSummary}`,
-      );
-      onSent();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "send failed";
-      toast.error(`Couldn't send batch — ${message}`);
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-stretch justify-end bg-ink-900/40 backdrop-blur-[2px]"
-      onClick={onClose}
-    >
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="batch-file-request-title"
-        onClick={(e) => e.stopPropagation()}
-        className="bg-surface border-l border-line w-full max-w-[540px] outline-none flex flex-col h-full shadow-overlay"
-      >
-        <header className="flex items-start justify-between gap-3 px-region py-3 border-b border-line">
-          <div className="min-w-0 flex-1">
-            <div className="text-2xs uppercase tracking-wider font-semibold text-ink-500 mb-1">
-              Batch file request
-            </div>
-            <h2
-              id="batch-file-request-title"
-              className="text-sm font-semibold text-ink-900"
-            >
-              Send to {recipients.length}{" "}
-              {recipients.length === 1 ? "client" : "clients"}
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="text-ink-500 hover:text-ink-900 hover:bg-sunken transition-colors w-8 h-8 inline-flex items-center justify-center rounded shrink-0"
-          >
-            <X className="w-4 h-4" aria-hidden />
-          </button>
-        </header>
-
-        <div className="flex-1 overflow-y-auto">
-          <section className="px-region py-3 border-b border-line">
-            <h3 className="text-2xs uppercase tracking-wider text-ink-500 font-semibold mb-2">
-              Recipients
-            </h3>
-            <ul className="flex flex-wrap gap-1.5">
-              {recipients.map((c) => (
-                <li
-                  key={c.id}
-                  className="text-xs px-2 py-0.5 rounded-pill border border-line bg-canvas text-ink-700"
-                  title={c.contactEmail || "(no email on file)"}
-                >
-                  {c.name}
-                </li>
-              ))}
-            </ul>
-            <p className="text-2xs text-ink-400 mt-2">
-              {`{first_name}`} replaces with each client's first name
-              before sending.
-            </p>
-          </section>
-
-          <section className="px-region py-3 space-y-3">
-            <div>
-              <label
-                htmlFor="batch-subject"
-                className="block text-2xs uppercase tracking-wider text-ink-500 font-semibold mb-1"
-              >
-                Subject
-              </label>
-              <input
-                id="batch-subject"
-                type="text"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                maxLength={300}
-                className="w-full text-sm border border-line rounded px-2.5 py-1.5 bg-canvas text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 transition-shadow"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="batch-body"
-                className="block text-2xs uppercase tracking-wider text-ink-500 font-semibold mb-1"
-              >
-                Message
-              </label>
-              <textarea
-                id="batch-body"
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                rows={10}
-                maxLength={20000}
-                className="w-full text-sm bg-canvas border border-line rounded px-2.5 py-2 text-ink-900 leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 transition-shadow"
-              />
-            </div>
-          </section>
-        </div>
-
-        <footer className="flex items-center justify-between gap-2 px-region py-3 border-t border-line bg-canvas">
-          <span className="text-xs text-ink-500">
-            {ineligibleCount > 0 ? (
-              <>
-                <span className="text-warn-ink font-medium">
-                  {ineligibleCount}
-                </span>{" "}
-                of {recipients.length} skipped — no email on file
-              </>
-            ) : (
-              <>One email per recipient · personalised by name</>
-            )}
-          </span>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onClose}
-              disabled={isSending}
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              onClick={onSend}
-              disabled={
-                eligibleRecipients.length === 0 || !subject.trim() || isSending
-              }
-              className="bg-indigo hover:bg-indigo-hover text-white"
-            >
-              {isSending
-                ? `Sending ${eligibleRecipients.length}…`
-                : `Send ${eligibleRecipients.length}`}
-            </Button>
-          </div>
-        </footer>
-      </div>
-    </div>
-  );
-}
 
 const TIER_LABEL: Record<ClientTier, string> = {
   premium: "Premium",

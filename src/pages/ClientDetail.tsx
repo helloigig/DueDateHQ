@@ -61,6 +61,7 @@ import { ExportModal } from "../components/ExportModal";
 import { ExportClientsButton } from "../components/ExportClientsButton";
 import { PinClientButton } from "../components/Sidebar";
 import { BackLink } from "../components/ui/BackLink";
+import { PageContainer } from "../components/ui/PageContainer";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { STATE_NAMES, type StateCode } from "../types";
 import { bundleByName, type FilingBundle } from "../data/bundles";
@@ -135,6 +136,15 @@ export function ClientDetail() {
   const deadlines = deadlinesQuery.data ?? [];
   const archiveClientMut = useArchiveClient();
   const [tab, setTab] = useState<Tab>("todo");
+  // Tracks whether the user explicitly clicked a tab. Once true, the
+  // default-tab effect below stops auto-switching — Sarah's manual
+  // selection wins. Yuqi audit 2026-05-05: "if To Do is empty, default
+  // to Filings tab."
+  const tabExplicitRef = useRef(false);
+  const onTabChange = (next: Tab) => {
+    tabExplicitRef.current = true;
+    setTab(next);
+  };
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -143,6 +153,22 @@ export function ClientDetail() {
     AddDeadlinePrefill | undefined
   >(undefined);
   const [exportOpen, setExportOpen] = useState(false);
+
+  // Default tab — landing on To Do is the right answer when the client
+  // has active work to chase / confirm. When To Do would be empty (no
+  // active deadlines), Filings is what Sarah opens to answer "where is
+  // this client at." We auto-switch on first data load, but only if
+  // the user hasn't already clicked a tab — manual selection wins.
+  useEffect(() => {
+    if (tabExplicitRef.current) return;
+    if (!deadlinesQuery.data) return;
+    const hasActive = deadlinesQuery.data.some(
+      (d) => d.status !== "completed" && d.status !== "filed_extension",
+    );
+    if (!hasActive) {
+      setTab("filings");
+    }
+  }, [deadlinesQuery.data]);
 
   useEffect(() => {
     if (searchParams.get("addDeadline") === "1") {
@@ -176,7 +202,7 @@ export function ClientDetail() {
   if (clientQuery.isLoading) return <PageSkeleton title="Loading client…" />;
   if (clientQuery.error) {
     return (
-      <div className="max-w-4xl mx-auto px-4 md:px-6 py-6">
+      <PageContainer variant="wide">
         <ErrorState
           title="Couldn't load this client."
           message={
@@ -186,18 +212,18 @@ export function ClientDetail() {
           }
           onRetry={() => clientQuery.refetch()}
         />
-      </div>
+      </PageContainer>
     );
   }
 
   if (!client) {
     return (
-      <div className="max-w-4xl mx-auto px-4 md:px-6 py-10">
+      <PageContainer variant="wide">
         <Link to="/clients" className="text-sm text-ink-500 hover:underline">
           ‹ Clients
         </Link>
         <p className="mt-6 text-ink-700">Client not found.</p>
-      </div>
+      </PageContainer>
     );
   }
 
@@ -229,7 +255,7 @@ export function ClientDetail() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 md:px-6 py-6">
+    <PageContainer variant="wide">
       <BackLink fallback="/clients" fallbackLabel="Clients" />
 
 
@@ -239,17 +265,16 @@ export function ClientDetail() {
           wrapping client name on narrow viewports. */}
       <div className="mt-3 flex flex-col sm:flex-row sm:items-start gap-3">
         <div className="flex-1 min-w-0">
+          {/* Row 1: identity only — name + entity + state chips + archived
+              flag. Yuqi audit 2026-05-05: the previous header crowded the
+              first line with "Working on: TX FRANCHISE, 941" in info-blue,
+              competing with the name itself. Mercury T2 says one accent per
+              viewport; the working-on data is context, not headline, so
+              it moves to the meta line below in neutral type. */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Title typography matches PageHeader (text-display, 22/600).
-                Inline h1 (not <PageHeader>) because the badge cluster needs
-                to wrap on the same line as the name. */}
             <h1 className="text-display font-semibold text-ink-900 leading-7 tracking-[-0.01em]">
               {client.name}
             </h1>
-            {/* Entity-type badge — replaces the old comma-separated meta
-                line. The dot-separated `s_corp · Texas · active · Added —`
-                pattern was decorative noise; the data lives in the badge
-                row and AI summary below. */}
             <span
               className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line"
               title="Entity type"
@@ -260,35 +285,21 @@ export function ClientDetail() {
               primary={client.primaryState}
               nexus={client.nexusStates}
             />
-            {/* "Working on" badge — the filings the firm is currently
-                executing for this client. Pulls from active (not-completed,
-                not-extended) deadlines, deduped by formType. Caps at 3 +
-                "+N more" so a packed roster doesn't break the line. */}
-            {workingOnFormTypes.length > 0 && (
-              <span
-                className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-info-bg text-info-ink border border-info-border"
-                title="Active filings the firm is currently executing"
-              >
-                Working on: {workingOnFormTypes.slice(0, 3).join(", ")}
-                {workingOnFormTypes.length > 3 && ` +${workingOnFormTypes.length - 3}`}
-              </span>
-            )}
             {client.status === "archived" && (
               <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-500">
                 Archived
               </span>
             )}
           </div>
-          {/* Engagement meta line — replaces the dropped Engagement tab.
-              Surfaces the contract scope axes the user reads at-a-glance:
-              tier · service packages · open deadline counts · since.
-              All read-only; deeper edits live in the modals (Edit /
-              service package settings). */}
-          {/* Engagement meta — discrete fields (Tier / Packages / Open
-              deadlines / Since). Per DESIGN.md §Don'ts: middle dots are for
-              within-field metadata strings, not for separating discrete
-              fields. Use whitespace (gap-section) and let label tone carry
-              the structure. */}
+          {/* Row 2: meta line — Tier · Packages · Open deadlines · Working
+              on · Since. All neutral type, label-in-ink-400 / value-in-
+              ink-700 pattern. Packages hides entirely when empty (the
+              "— none assigned" stub was decorative noise — the absence is
+              its own information). Working on lives here as text, not as a
+              colored badge — see PRD pressure test: "is this a state
+              announcement (color)? or context (text)?" Filings-in-flight
+              is context; the chase / overdue / waiting states get color
+              elsewhere on the page. */}
           <div className="mt-2 text-xs text-ink-500 flex items-baseline flex-wrap gap-x-section gap-y-1">
             <span>
               <span className="text-ink-400">Tier</span>{" "}
@@ -296,7 +307,7 @@ export function ClientDetail() {
                 {client.tier ?? "standard"}
               </span>
             </span>
-            {client.servicePackages.length > 0 ? (
+            {client.servicePackages.length > 0 && (
               <span className="inline-flex items-baseline gap-1">
                 <span className="text-ink-400">
                   {client.servicePackages.length === 1
@@ -306,11 +317,6 @@ export function ClientDetail() {
                 {client.servicePackages.map((p) => (
                   <PackageChip key={p} packageName={p} client={client} />
                 ))}
-              </span>
-            ) : (
-              <span>
-                <span className="text-ink-400">Packages</span>{" "}
-                <span className="text-ink-500">— none assigned</span>
               </span>
             )}
             <span>
@@ -323,6 +329,19 @@ export function ClientDetail() {
                 ).length}
               </span>
             </span>
+            {workingOnFormTypes.length > 0 && (
+              <span
+                className="inline-flex items-baseline gap-1 min-w-0"
+                title="Active filings the firm is currently executing"
+              >
+                <span className="text-ink-400 shrink-0">Working on</span>
+                <span className="text-ink-700 truncate">
+                  {workingOnFormTypes.slice(0, 3).join(", ")}
+                  {workingOnFormTypes.length > 3 &&
+                    ` +${workingOnFormTypes.length - 3}`}
+                </span>
+              </span>
+            )}
             <span>
               <span className="text-ink-400">Since</span>{" "}
               <span className="text-ink-700">{addedAtLabel}</span>
@@ -381,7 +400,7 @@ export function ClientDetail() {
         ).map(([key, label, Icon]) => (
           <button
             key={key}
-            onClick={() => setTab(key)}
+            onClick={() => onTabChange(key)}
             className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm ${
               tab === key
                 ? "text-ink-900 border-b-2 border-ink-900 font-medium"
@@ -424,7 +443,7 @@ export function ClientDetail() {
                 <button
                   key={key}
                   onClick={() => {
-                    setTab(key);
+                    onTabChange(key);
                     setOverflowOpen(false);
                   }}
                   className={`w-full text-left px-3 py-1.5 text-sm hover:bg-sunken ${
@@ -445,7 +464,7 @@ export function ClientDetail() {
             client={client}
             allDeadlines={clientDeadlines}
             onAddDeadline={() => setAddDeadlineOpen(true)}
-            onOpenDocuments={() => setTab("documents")}
+            onOpenDocuments={() => onTabChange("documents")}
           />
         )}
         {/* Engagement tab retired 2026-05-05 — see type Tab comment.
@@ -455,7 +474,7 @@ export function ClientDetail() {
             client={client}
             allDeadlines={clientDeadlines}
             onAddDeadline={() => setAddDeadlineOpen(true)}
-            onOpenDocuments={() => setTab("documents")}
+            onOpenDocuments={() => onTabChange("documents")}
           />
         )}
         {tab === "filings" && (
@@ -529,7 +548,7 @@ export function ClientDetail() {
         title={`Export — ${client.name}`}
         onClose={() => setExportOpen(false)}
       />
-    </div>
+    </PageContainer>
   );
 }
 
@@ -1277,25 +1296,49 @@ function ToDoTab({
         </section>
       )}
 
-      {/* 🚨 STILL WAITING ON CLIENT — primary, bordered, always-expanded. */}
+      {/* 🚨 STILL WAITING ON CLIENT — primary surface when populated, calm
+          neutral panel when empty. Yuqi audit 2026-05-05: yellow tint on
+          a 0-item section is a category error — yellow is the page's
+          chase/overdue signal, and Sarah will train herself to ignore it
+          if it appears even when nothing is waiting. The panel keeps its
+          identity (heading, count, add-deadline action) regardless, but
+          the warning palette only fires when the count is non-zero. */}
       <section
         aria-labelledby="todo-still-waiting-heading"
-        className="rounded-md border-2 border-warn-border bg-warn-bg/30 overflow-hidden"
+        className={`rounded-md overflow-hidden ${
+          stillWaiting.length > 0
+            ? "border-2 border-warn-border bg-warn-bg/30"
+            : "border border-line bg-surface"
+        }`}
       >
-        <header className="flex items-baseline gap-2 px-4 py-3 border-b border-warn-border">
+        <header
+          className={`flex items-baseline gap-2 px-4 py-3 border-b ${
+            stillWaiting.length > 0 ? "border-warn-border" : "border-line"
+          }`}
+        >
           <h3
             id="todo-still-waiting-heading"
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-warn-ink"
+            className={`inline-flex items-center gap-1.5 text-sm font-semibold ${
+              stillWaiting.length > 0 ? "text-warn-ink" : "text-ink-700"
+            }`}
           >
             <Siren className="w-4 h-4" aria-hidden />
             Still waiting on client
           </h3>
-          <span className="text-2xs text-warn-ink/80 tabular-nums">
+          <span
+            className={`text-2xs tabular-nums ${
+              stillWaiting.length > 0 ? "text-warn-ink/80" : "text-ink-500"
+            }`}
+          >
             {stillWaiting.length} item{stillWaiting.length === 1 ? "" : "s"}
           </span>
           <button
             onClick={onAddDeadline}
-            className="ml-auto text-2xs px-2 py-0.5 rounded border border-warn-border text-warn-ink hover:bg-warn-bg/60"
+            className={`ml-auto text-2xs px-2 py-0.5 rounded border ${
+              stillWaiting.length > 0
+                ? "border-warn-border text-warn-ink hover:bg-warn-bg/60"
+                : "border-line text-ink-700 hover:bg-sunken"
+            }`}
           >
             + Add deadline
           </button>
@@ -1588,37 +1631,44 @@ function ClientAiInsightsCard({ clientId }: { clientId: string }) {
   })();
   const showChurnRisk = churnRiskScore >= 2 && !isNewClient;
 
+  // Yuqi audit 2026-05-05: the previous empty-state rendered a full-width
+  // info-blue banner reading "AI insights unlock once you import a
+  // prior-year return for this client." That banner sat between the
+  // header meta line and the tab strip on every client without imported
+  // priors — pure visual weight, zero state communicated. The "import a
+  // prior return" prompt belongs in the import wizard, not glued to
+  // every client detail page in info-blue. Hide entirely when nothing to
+  // show; let the page breathe.
   if (open.length === 0 && facts.length === 0 && !showChurnRisk) {
-    return (
-      <div className="mt-4 bg-info-bg border border-info-border rounded-md px-4 py-2 text-xs text-info-ink">
-        AI insights unlock once you import a prior-year return for this client.
-      </div>
-    );
+    return null;
   }
 
   return (
     <div className="mt-4 space-y-2">
       {/* Layer B: advisory triggers (cross-year-insighter) — these are the "wages doubled
           → 401k convo" / "Schedule E disappeared → did the property sell?"
-          surfaces. The lever for moving from preparer to advisor (Pattern 4). */}
+          surfaces. The lever for moving from preparer to advisor (Pattern 4).
+          Yuqi audit 2026-05-05: was rendered in info-blue, which crashed
+          into the warn-yellow used for chase / overdue elsewhere on the
+          page (two competing accents). Now neutral surface + line border —
+          the heading "Advisory opportunities" + the content carry meaning;
+          color reserved for state ("needs your attention"), not for category. */}
       {advisoryTriggers.length > 0 && (
-        <div className="bg-info-bg/40 border border-info-border rounded-md overflow-hidden">
-          <header className="px-4 py-2 border-b border-info-border bg-info-bg/60 flex items-center gap-2">
-            <span className="text-2xs uppercase tracking-wider text-info-ink font-semibold">
+        <div className="bg-surface border border-line rounded-md overflow-hidden">
+          <header className="px-4 py-2 border-b border-line bg-sunken/40 flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 text-2xs uppercase tracking-wider text-ink-700 font-semibold">
+              <Sparkles className="w-3 h-3 text-ink-500" aria-hidden />
               Advisory opportunities
             </span>
-            <span className="text-2xs text-info-ink/70">
+            <span className="text-2xs text-ink-500">
               {advisoryTriggers.length} open
             </span>
           </header>
-          <ul className="divide-y divide-info-border/40">
+          <ul className="divide-y divide-line">
             {advisoryTriggers.slice(0, 4).map((i) => (
               <li key={i.id} className="px-4 py-2.5">
                 <p className="text-sm text-ink-900 font-medium">{i.title}</p>
                 <p className="text-xs text-ink-700 mt-0.5">{i.detail}</p>
-                <p className="text-2xs italic text-info-ink/80 mt-1">
-                  This is the kind of opportunity advisory work is built on.
-                </p>
               </li>
             ))}
           </ul>
@@ -1838,7 +1888,7 @@ function ClientAiSummary({ client }: { client: Client }) {
 
   if (editing) {
     return (
-      <section className="mt-2 bg-info-bg border border-info-border rounded-md p-3">
+      <section className="mt-2 bg-sunken/40 border border-line rounded-md p-3">
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -1884,15 +1934,20 @@ function ClientAiSummary({ client }: { client: Client }) {
     );
   }
 
+  // Yuqi audit 2026-05-05: previously rendered in info-blue (bg-info-bg/40
+  // border-info-border/60), which fought the warn-yellow used for chase /
+  // overdue and read like a system warning rather than a contextual note.
+  // The override is supposed to be a quiet annotation the partner left for
+  // themselves — render it as the visual equivalent of a margin note, not
+  // a banner. Sparkles icon retained as the "AI-touched / overridable"
+  // hint; everything else neutral.
   return (
-    <section className="mt-2 bg-info-bg/40 border border-info-border/60 rounded-md p-3 flex items-start gap-2">
+    <section className="mt-2 flex items-start gap-2 text-sm text-ink-700 leading-relaxed">
       <Sparkles
-        className="w-3.5 h-3.5 text-info-ink shrink-0 translate-y-0.5"
+        className="w-3.5 h-3.5 text-ink-400 shrink-0 translate-y-0.5"
         aria-hidden
       />
-      <p className="flex-1 text-sm text-ink-700 leading-relaxed italic">
-        {summary}
-      </p>
+      <p className="flex-1 italic">{summary}</p>
       <button
         onClick={() => {
           setDraft(summary);

@@ -189,15 +189,18 @@ export function Sidebar() {
                 )}
                 <Icon className="w-4 h-4 shrink-0" aria-hidden />
                 {!collapsed && <span className="flex-1">{label}</span>}
-                {/* Alerts caption — reflects the # of CLIENTS the active
-                    announcements touch, not the raw alert count. The CPA
-                    asks "how many of MY clients does today's news affect?"
-                    not "how many press releases came in." */}
+                {/* Alerts caption — # of CLIENTS the active announcements
+                    touch (not raw alert count). Yuqi audit 2026-05-05: the
+                    bare number "9+" was confusing — what does it count?
+                    Title now spells it out so hover disambiguates. */}
                 {!collapsed && to === "/alerts" && alertsAffectingCount > 0 && (
                   <CountBadge
                     count={alertsAffectingCount}
                     tone="danger"
                     className="ml-auto"
+                    title={`${alertsAffectingCount} ${
+                      alertsAffectingCount === 1 ? "client" : "clients"
+                    } affected by active alerts`}
                   />
                 )}
                 {collapsed && to === "/alerts" && alertsAffectingCount > 0 && (
@@ -210,10 +213,20 @@ export function Sidebar() {
                     count={activeClientsCount}
                     tone="neutral"
                     className="ml-auto"
+                    title={`${activeClientsCount} active ${
+                      activeClientsCount === 1 ? "client" : "clients"
+                    } (archived not counted)`}
                   />
                 )}
                 {!collapsed && to === "/mail" && inboxCount > 0 && (
-                  <CountBadge count={inboxCount} tone="neutral" className="ml-auto" />
+                  <CountBadge
+                    count={inboxCount}
+                    tone="neutral"
+                    className="ml-auto"
+                    title={`${inboxCount} ${
+                      inboxCount === 1 ? "item" : "items"
+                    } needing review (confirms + chase reminders due)`}
+                  />
                 )}
                 {collapsed && to === "/mail" && inboxCount > 0 && (
                   <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-info-solid" />
@@ -262,22 +275,21 @@ export function Sidebar() {
           )}
         </NavLink>
 
-        {/* Toggle */}
+        {/* Toggle — icon-only in both modes. Yuqi audit 2026-05-05: the
+            expanded variant carried "Collapse" text that added noise
+            without information; the icon + tooltip + aria-label carry
+            the affordance. Aligns with the Pin button collapse on the
+            ClientDetail header — secondary tools become glyphs. */}
         <button
           onClick={() => setCollapsed((v) => !v)}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className={`mt-1 w-full flex items-center rounded-md text-sm text-ink-400 hover:bg-sunken hover:text-ink-700 ${
-            collapsed ? "justify-center py-2" : "gap-3 pl-3 pr-3 py-2"
-          }`}
+          className="mt-1 w-full flex items-center justify-center rounded-md text-sm text-ink-400 hover:bg-sunken hover:text-ink-700 py-2"
         >
           {collapsed ? (
             <PanelLeftOpen className="w-4 h-4 shrink-0" aria-hidden />
           ) : (
-            <>
-              <PanelLeftClose className="w-4 h-4 shrink-0" aria-hidden />
-              <span className="text-2xs">Collapse</span>
-            </>
+            <PanelLeftClose className="w-4 h-4 shrink-0" aria-hidden />
           )}
         </button>
       </div>
@@ -611,18 +623,23 @@ export function PinClientButton({ clientId }: { clientId: string }) {
       title={pinned ? "Unpin from sidebar" : "Pin to sidebar"}
       aria-label={pinned ? "Unpin from sidebar" : "Pin to sidebar"}
       aria-pressed={pinned}
-      className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors ${
+      // Icon-only — sits in the client-detail action cluster alongside
+      // Export / Edit / Archive (text labels). Yuqi audit 2026-05-05: the
+      // "Pin"/"Pinned" text was visual weight without information; the icon
+      // + tooltip + aria-label carry the affordance just as well, and the
+      // canonical CTA-vs-secondary hierarchy is clearer when secondary
+      // tools collapse to glyphs.
+      className={`inline-flex items-center justify-center w-8 h-8 rounded-md transition-colors ${
         pinned
           ? "text-ink-900 bg-sunken hover:bg-sunken/70"
           : "text-ink-500 hover:text-ink-900 hover:bg-sunken"
       }`}
     >
       {pinned ? (
-        <PinOff className="w-3.5 h-3.5" aria-hidden />
+        <PinOff className="w-4 h-4" aria-hidden />
       ) : (
-        <Pin className="w-3.5 h-3.5" aria-hidden />
+        <Pin className="w-4 h-4" aria-hidden />
       )}
-      <span>{pinned ? "Pinned" : "Pin"}</span>
     </button>
   );
 }
