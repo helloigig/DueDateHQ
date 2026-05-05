@@ -82,8 +82,8 @@ export function BlockingAlertsDialog({
         {showSnoozeReason ? (
           <AlertDialogFooter align="end">
             <div className="flex-1 min-w-0">
-              <label className="block text-xs font-medium text-ink-700 mb-1">
-                Why are you snoozing? (optional, helps us tune alerting)
+              <label className="block text-xs font-medium text-ink-700 mb-1 whitespace-nowrap">
+                Why are you snoozing? <span className="text-ink-400 font-normal">(optional)</span>
               </label>
               <textarea
                 data-autofocus
