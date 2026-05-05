@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { History, Link2, Check, Target, FileText, AlertTriangle } from "lucide-react";
+import { History, Link2, Check, Target, FileText, AlertTriangle, CalendarClock } from "lucide-react";
 import { actions } from "../data/store";
 import { trpc } from "../lib/api/client";
 import { useAnnouncement, useAnnouncements } from "../hooks/useAnnouncements";
@@ -330,6 +330,44 @@ export function AnnouncementDetail() {
                 ` · Effective ${formatLongDate(ann.effectiveDate)}`}{" "}
               · Detected {formatLongDate(ann.detectedAt.slice(0, 10))}
             </div>
+
+            {/* Plain-English summary — Yuqi audit 2026-05-05: previously
+                only visible inside the collapsed "What the alert says"
+                evidence section, so users opening the detail page saw
+                only the title + chips and felt the alert was missing
+                description. Surface it here as the primary read so the
+                first thing after the headline is what it means. */}
+            {ann.summary && (
+              <p className="mt-3 text-sm text-ink-700 leading-relaxed">
+                {ann.summary}
+              </p>
+            )}
+
+            {/* Deadline-shift signal — when the alert is type
+                disaster_extension (or any alert that carries a
+                newDeadline), surface the new date as a calm, prominent
+                strip. Yuqi audit 2026-05-05: "if there is a deadline
+                shift or extension, there should be a bottom text
+                section of Deadline shifts to Jun 17, 2026." Already
+                rendered in StateAlertCard; mirroring here so the
+                detail page tells the same story. */}
+            {ann.newDeadline && (
+              <div className="mt-3 inline-flex items-center gap-1.5 text-sm bg-sunken/60 border border-line rounded-md px-3 py-1.5 text-ink-700">
+                <CalendarClock className="w-3.5 h-3.5 text-ink-500 shrink-0" aria-hidden />
+                <span>
+                  Deadline shifts to{" "}
+                  <span className="font-medium text-ink-900">
+                    {formatLongDate(ann.newDeadline)}
+                  </span>
+                  {ann.oldDeadline && (
+                    <span className="text-ink-500">
+                      {" "}
+                      (was {formatLongDate(ann.oldDeadline)})
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
 
             <div className="mt-3 flex items-center gap-x-section gap-y-1 flex-wrap text-sm">
               <a

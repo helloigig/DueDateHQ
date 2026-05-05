@@ -58,6 +58,18 @@ const corsAllowlist = env.CORS_ORIGIN.split(",")
 const corsAllowAll = corsAllowlist.length === 1 && corsAllowlist[0] === "*";
 const LOCALHOST_RE = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
+// Vercel preview deployments — every push to a feature branch generates a
+// fresh preview URL like:
+//   https://due-date-hq-git-{branch}-together2024.vercel.app
+//   https://due-date-hq-{deployment-hash}-together2024.vercel.app
+// Without this, every new preview branch fails CORS until someone updates
+// the Fly CORS_ORIGIN secret + redeploys — which makes design review
+// unworkable. Production (`due-date-hq.vercel.app`, `duedatehq.space`)
+// stays in the explicit env allowlist; this regex only matches the
+// project + team suffix so other Vercel apps can't piggyback.
+const VERCEL_PREVIEW_RE =
+  /^https:\/\/due-date-hq-[a-z0-9-]+-together2024\.vercel\.app$/;
+
 app.use(
   "*",
   cors({
@@ -65,6 +77,7 @@ app.use(
       if (!origin) return "*";
       if (corsAllowAll) return origin;
       if (LOCALHOST_RE.test(origin)) return origin;
+      if (VERCEL_PREVIEW_RE.test(origin)) return origin;
       return corsAllowlist.includes(origin) ? origin : null;
     },
     credentials: true,

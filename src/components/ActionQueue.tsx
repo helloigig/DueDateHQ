@@ -380,10 +380,13 @@ function ClientGroupRowView({ row }: { row: ClientGroupRow }) {
                 nothing (the parent <button> just toggles expand), so
                 users hit a dead end. The verb is already restated on
                 the action line below; here we render it as inline
-                metadata in muted text so it reads as "next action:
-                Send" — a status, not a CTA. */}
+                metadata in muted text.
+                Yuqi audit 2026-05-05 — "next:" was ambiguous (could
+                read as "next deadline" or "next reminder"). Switched
+                to "next step:" so the meta line says exactly what it
+                is: the next action you'll take on this row. */}
             <span className="ml-auto inline-flex items-center gap-1 text-2xs text-ink-400">
-              next:
+              next step:
               <PrimaryIcon className="w-3 h-3" aria-hidden />
               <span className="font-medium text-ink-500">{primaryVerb}</span>
             </span>
