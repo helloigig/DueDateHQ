@@ -5,9 +5,12 @@ import { clients as seedClients } from "./mockClients";
 
 /**
  * Per PRD §7.4 Method A: forwarding addresses follow the format
- * `firstname-formname-{4charToken}@duedatehq.com`. Token is unguessable,
+ * `firstname-formname-{4charToken}@duedatehq.space`. Token is unguessable,
  * revocable on task completion, and unique per task. We seed deterministic
  * tokens so a refresh leaves the URLs stable.
+ *
+ * TLD note: production MX is duedatehq.space (Postmark). Never .com — that
+ * domain is not ours, and any address rendered with .com would bounce.
  */
 function makeForwardingEmail(clientName: string, formType: string, taskId: string): string {
   const first = clientName
@@ -25,7 +28,7 @@ function makeForwardingEmail(clientName: string, formType: string, taskId: strin
     .toString(36)
     .slice(-4)
     .padStart(4, "x");
-  return `${first || "client"}-${form || "task"}-${token}@duedatehq.com`;
+  return `${first || "client"}-${form || "task"}-${token}@duedatehq.space`;
 }
 
 function targetDate(officialDueDate: string, days: number): string {

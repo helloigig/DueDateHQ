@@ -465,7 +465,7 @@ export interface Task {
   internalTargetDate: string;
   clientPrepDate?: string;
   status: TaskStatus;
-  /** Per-task forwarding address — `firstname-form-{4charToken}@duedatehq.com`. */
+  /** Per-task forwarding address — `firstname-form-{4charToken}@duedatehq.space`. */
   forwardingEmail: string;
   /** Display name of the preparer. Real-mode joins also resolve `assignedUserId`. */
   assignedUser: string;

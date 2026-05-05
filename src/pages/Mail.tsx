@@ -237,7 +237,7 @@ export function Mail() {
             {remindersOutQuery.isLoading
               ? "loading…"
               : remindersOutQuery.error
-                ? `backend error: ${remindersOutQuery.error.message.slice(0, 60)}`
+                ? "couldn't load reminders — try refresh"
                 : remindersAggregate
                   ? `${remindersAggregate.count} across ${remindersAggregate.uniqueClients} client${remindersAggregate.uniqueClients === 1 ? "" : "s"} · oldest ${remindersAggregate.oldest}d · ${remindersAggregate.overSeven} sent > 7d ago`
                   : env.useMockData
@@ -330,9 +330,9 @@ export function Mail() {
               {inboxQuery.isLoading
                 ? "loading inbound classifier feed"
                 : inboxQuery.error
-                  ? `backend error: ${inboxQuery.error.message.slice(0, 60)}`
+                  ? "couldn't load inbox — try refresh"
                   : liveInbox.length > 0
-                    ? `live inbound feed · ${liveInbox.length} items from BE`
+                    ? `${liveInbox.length} new inbound item${liveInbox.length === 1 ? "" : "s"}`
                     : env.useMockData
                       ? "showing example data (mock mode)"
                       : "no inbound mail yet"}
