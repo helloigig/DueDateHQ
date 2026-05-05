@@ -29,8 +29,20 @@ const dailyDigestSettings = z.object({
   days: z.array(z.enum(DAYS)).min(1),
 });
 
+/**
+ * Default settings for users who haven't touched their preferences. The
+ * scheduler also reads this fallback (see daily-digest-scheduler.ts) so
+ * the on-by-default behavior is consistent whether the user has visited
+ * Settings → Notifications or not.
+ *
+ * Decision (2026-05-04): default ON. The morning digest is the most
+ * load-bearing "AI is working for me" surface — gating it behind an
+ * opt-in toggle nobody clicks would mean nobody gets it. Users who
+ * actively dislike the email can disable in Settings; that's a one-
+ * click off, vs the zero-click-on we'd otherwise need to sell.
+ */
 const DEFAULT_SETTINGS: z.infer<typeof dailyDigestSettings> = {
-  enabled: false,
+  enabled: true,
   sendHour: 7,
   days: ["mon", "tue", "wed", "thu", "fri"],
 };
