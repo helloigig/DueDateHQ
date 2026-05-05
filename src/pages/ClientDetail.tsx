@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   Link,
   useNavigate,
@@ -721,16 +722,30 @@ function NotesTab({ client }: { client: Client }) {
     });
   }, [notes]);
 
-  const onAdd = () => {
+  const onAdd = async () => {
     const body = draft.trim();
     if (!body) return;
     if (env.useMockData) {
       actions.addNote(client.id, body);
-    } else {
-      addNoteMutation.mutate({ clientId: client.id, body });
+      toast.success("Note added");
+      setDraft("");
+      return;
     }
-    setDraft("");
+    // Real mode — await the BE so a 4xx surfaces as an error toast
+    // instead of silently dropping the draft text. Yuqi audit
+    // 2026-05-05: was previously fire-and-forget + clear-the-textarea,
+    // which destroyed the user's typing on a network failure.
+    try {
+      await addNoteMutation.mutateAsync({ clientId: client.id, body });
+      toast.success("Note added");
+      setDraft("");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Couldn't save the note.";
+      toast.error(`Add note failed — ${message}`);
+    }
   };
+  const isAddingNote = addNoteMutation.isPending;
 
   return (
     <div className="space-y-4">
@@ -751,10 +766,10 @@ function NotesTab({ client }: { client: Client }) {
           </span>
           <button
             onClick={onAdd}
-            disabled={!draft.trim()}
+            disabled={!draft.trim() || isAddingNote}
             className="text-xs px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40"
           >
-            Add note
+            {isAddingNote ? "Saving…" : "Add note"}
           </button>
         </div>
       </div>

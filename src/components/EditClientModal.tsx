@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { actions } from "../data/store";
 import type { Client, EntityType, StateCode } from "../types";
 import { STATE_NAMES } from "../types";
@@ -70,7 +71,8 @@ export function EditClientModal({
     JSON.stringify(nexus.sort()) !==
       JSON.stringify([...client.nexusStates].sort());
 
-  const commitSave = () => {
+  const isSaving = updateClientMut.isPending;
+  const commitSave = async () => {
     const patch = {
       name: name.trim(),
       entityType: entity,
@@ -80,18 +82,26 @@ export function EditClientModal({
       contactPhone: phone.trim() || undefined,
     };
     if (env.useMockData) {
-      // Optimistic local update so the UI feels instant; the modal close
-      // triggers a re-render of the detail page which reads from the
-      // mock store.
       actions.updateClient(client.id, patch);
-    } else {
-      // Real mode: hit BE clients.update so the change persists. Cache
-      // invalidation in the hook re-fetches both clients.list and
-      // clients.get so the detail header + roster table refresh.
-      updateClientMut.mutate({ id: client.id, patch });
+      toast.success(`${name.trim()} updated`);
+      setMigrationOpen(false);
+      onClose();
+      return;
     }
-    setMigrationOpen(false);
-    onClose();
+    // Real mode — await the mutation so a 4xx surfaces as an error
+    // toast instead of silently dropping the user's edits. Yuqi audit
+    // 2026-05-05: was previously fire-and-forget, network failures
+    // looked exactly like a successful save.
+    try {
+      await updateClientMut.mutateAsync({ id: client.id, patch });
+      toast.success(`${name.trim()} updated`);
+      setMigrationOpen(false);
+      onClose();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Couldn't save the client.";
+      toast.error(`Update failed — ${message}`);
+    }
   };
 
   const onSave = () => {
@@ -235,10 +245,14 @@ export function EditClientModal({
           </button>
           <button
             onClick={onSave}
-            disabled={!canSave}
+            disabled={!canSave || isSaving}
             className="text-sm px-3 py-1.5 rounded font-medium text-white bg-indigo hover:bg-indigo-hover disabled:opacity-40"
           >
-            {stateOrEntityChanged ? "Review changes" : "Save changes"}
+            {isSaving
+              ? "Saving…"
+              : stateOrEntityChanged
+                ? "Review changes"
+                : "Save changes"}
           </button>
         </div>
       </div>
