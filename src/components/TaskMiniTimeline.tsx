@@ -1,7 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, AlertOctagon, Pencil, X } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Sparkles, AlertOctagon, Pencil, X, Circle, Ban, CheckCircle2, AlertCircle } from "lucide-react";
+import type { LucideProps } from "lucide-react";
 import type { Task, ChecklistItem } from "../types";
 import { trpc } from "../lib/api/client";
+import { MILESTONE_STATUS_META } from "../lib/statusMeta";
+import { StatusPill } from "./ui/StatusPill";
+
+const MILESTONE_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
+  Circle, Pencil, Ban, CheckCircle2, AlertCircle,
+};
 
 // TaskMiniTimeline — per IA v0.7 amendment §3.4.
 //
@@ -419,20 +426,19 @@ function Waypoint({
           aria-label={`${wp.label} actions`}
         >
           <div className="font-semibold text-ink-900 mb-1 capitalize">
-            {wp.label} ·{" "}
-            <span
-              className={
-                wp.status === "done"
-                  ? "text-ok-ink"
-                  : wp.status === "in_progress"
-                    ? "text-warn-ink"
-                    : wp.status === "overdue" || wp.status === "blocked"
-                      ? "text-danger-ink"
-                      : "text-ink-500"
-              }
-            >
-              {wp.status.replace("_", " ")}
-            </span>
+            {wp.label}
+          </div>
+          <div className="mb-1">
+            {(() => {
+              const m = MILESTONE_STATUS_META[wp.status];
+              const Icon = m ? MILESTONE_ICON_MAP[m.icon] : undefined;
+              return (
+                <StatusPill variant={m?.variant ?? "neutral"} size="xs">
+                  {Icon && <Icon size={11} aria-hidden />}
+                  {m?.label ?? wp.status.replace("_", " ")}
+                </StatusPill>
+              );
+            })()}
           </div>
           {wp.targetDate && (
             <div className="text-ink-500 mb-1.5">
