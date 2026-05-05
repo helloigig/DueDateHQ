@@ -815,6 +815,14 @@ export const appRouter = t.router({
     assign: t.procedure
       .input(jsonPassthrough)
       .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    /** Bulk preparer-assignment companion to `assign` — used by the
+     *  Timeline batch toolbar to fan one preparer onto N selected
+     *  rows in a single round-trip. */
+    assignBulk: t.procedure
+      .input(jsonPassthrough)
+      .mutation(
+        async (): Promise<{ ok: true; count: number }> => NOT_IMPL(),
+      ),
     defer: t.procedure
       .input(jsonPassthrough)
       .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),

@@ -711,8 +711,34 @@ export const mockAdapter = {
     },
     fleetStack: async (_input?: { waitingOnly?: boolean; limit?: number }) => {
       await delay();
-      // Flatten everything we've synthesized so far for the cross-client view
-      return Array.from(mockMilestoneStore.values()).flat();
+      // Flatten everything we've synthesized so far for the cross-client view.
+      // Decorate each milestone with the parent task's assignee so the
+      // Timeline assignee column has data in mock mode. Mock store keeps
+      // a display name on the task; we map it to the session userId since
+      // the mock firm has exactly one user.
+      const flat = Array.from(mockMilestoneStore.values()).flat();
+      const session = sessionOrDefault();
+      const { tasks } = getState();
+      return flat.map((m) => {
+        const task = tasks.find((t) => t.id === m.taskId);
+        const isMine =
+          task?.assignedUser && task.assignedUser !== "Unassigned"
+            ? task.assignedUser === session.userName
+            : false;
+        const assignedUserId = task?.assignedUserId ?? (isMine ? session.userId : null);
+        const assigneeName =
+          assignedUserId === session.userId
+            ? session.userName
+            : (task?.assignedUser && task.assignedUser !== "Unassigned"
+                ? task.assignedUser
+                : null);
+        return {
+          ...m,
+          assignedUserId,
+          assigneeName,
+          assigneeEmail: assignedUserId === session.userId ? session.userEmail : null,
+        };
+      });
     },
     detectBlockers: async (input: { taskId: string }) => {
       await delay(400);
@@ -1750,6 +1776,26 @@ export const mockAdapter = {
         reviewer: resolveName(reviewerUserId),
       });
       return { ok: true as const };
+    },
+    assignBulk: async ({
+      taskIds,
+      preparerUserId,
+    }: {
+      taskIds: string[];
+      preparerUserId: string | null;
+    }) => {
+      await delay();
+      const session = sessionOrDefault();
+      const name =
+        preparerUserId === null
+          ? null
+          : preparerUserId === session.userId
+            ? session.userName
+            : preparerUserId;
+      for (const id of taskIds) {
+        actions.assignTask(id, { preparer: name });
+      }
+      return { ok: true as const, count: taskIds.length };
     },
     defer: async ({
       id,

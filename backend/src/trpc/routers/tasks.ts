@@ -309,6 +309,83 @@ export const tasksRouter = router({
     }),
 
   /**
+   * Bulk preparer-assignment companion to `assign`. Used by the Timeline
+   * batch toolbar — selecting N rows + picking one team member fans the
+   * write into a single round-trip (vs. N separate `assign` calls). Only
+   * mutates `assignedUserId`; reviewer assignment stays per-task because
+   * the Timeline UI doesn't surface a reviewer affordance at the
+   * batch level. Pass `preparerUserId: null` to un-assign every selected
+   * task at once.
+   */
+  assignBulk: firmProcedure
+    .input(
+      z.object({
+        taskIds: z.array(z.string().uuid()).min(1).max(200),
+        preparerUserId: z.string().uuid().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Validate the assignment target belongs to this firm. Single
+      // SELECT covers every row in `taskIds`.
+      if (input.preparerUserId !== null) {
+        const found = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(
+            and(
+              eq(users.id, input.preparerUserId),
+              eq(users.firmId, ctx.firmId),
+            ),
+          );
+        if (found.length === 0) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "user_not_in_firm",
+          });
+        }
+      }
+
+      // Verify every task belongs to this firm before mutating. Catches
+      // cross-firm IDs that slipped past the FE filter (also safe under
+      // RLS since the UPDATE is firm-scoped, but we want a clean count).
+      const owned = await db
+        .select({ id: tasks.id })
+        .from(tasks)
+        .where(eq(tasks.firmId, ctx.firmId));
+      const allowed = new Set(owned.map((r) => r.id));
+      const valid = input.taskIds.filter((id) => allowed.has(id));
+      if (valid.length === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "no_owned_tasks" });
+      }
+
+      const actorLabel = ctx.dbUser.displayName ?? ctx.dbUser.email;
+      const verb = input.preparerUserId
+        ? `Preparer reassigned (bulk)`
+        : `Preparer un-assigned (bulk)`;
+
+      await db.transaction(async (tx) => {
+        for (const id of valid) {
+          await tx
+            .update(tasks)
+            .set({
+              assignedUserId: input.preparerUserId,
+              updatedAt: sql`now()`,
+            })
+            .where(eq(tasks.id, id));
+          await tx.insert(activityEvents).values({
+            firmId: ctx.firmId,
+            taskId: id,
+            eventType: "task_reassigned",
+            actorKind: "user",
+            actorUserId: ctx.dbUser.id,
+            description: `${actorLabel}: ${verb}`,
+          });
+        }
+      });
+      return { ok: true as const, count: valid.length };
+    }),
+
+  /**
    * Defer the working date — Task-level wrapper that cascades to the
    * underlying deadline (deadline-as-field per v0.8 §1.5 collapse).
    * `officialDueDate` stays put: the jurisdiction's hard date is

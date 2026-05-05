@@ -8,7 +8,7 @@
  */
 
 import { TRPCError } from "@trpc/server";
-import { and, asc, eq } from "drizzle-orm";
+import { aliasedTable, and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { firmProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
@@ -20,6 +20,7 @@ import {
   taskMilestones,
   taskMilestoneEvents,
   tasks,
+  users,
 } from "../../db/schema.js";
 import {
   detectMilestoneBlockers,
@@ -85,6 +86,9 @@ export const taskMilestonesRouter = router({
       // names ("Apex Fund · 1040") instead of "Task b3bee883". Without
       // these joins the Timeline page falls back to UUID prefixes —
       // accurate but unreadable.
+      // assignee — left-joined alias on `users` so unassigned rows still
+      // come through. Drives the Timeline assignee column.
+      const assignee = aliasedTable(users, "assignee");
       const rows = await db
         .select({
           id: taskMilestones.id,
@@ -100,11 +104,15 @@ export const taskMilestonesRouter = router({
           officialDueDate: deadlines.officialDueDate,
           clientId: clients.id,
           clientName: clients.name,
+          assignedUserId: tasks.assignedUserId,
+          assigneeName: assignee.displayName,
+          assigneeEmail: assignee.email,
         })
         .from(taskMilestones)
         .innerJoin(tasks, eq(tasks.id, taskMilestones.taskId))
         .innerJoin(deadlines, eq(deadlines.id, tasks.deadlineId))
         .innerJoin(clients, eq(clients.id, deadlines.clientId))
+        .leftJoin(assignee, eq(assignee.id, tasks.assignedUserId))
         .where(eq(taskMilestones.firmId, ctx.firmId))
         .limit(limit);
       return rows;
