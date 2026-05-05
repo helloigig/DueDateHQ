@@ -1,4 +1,4 @@
-import { Sparkles, Snowflake, Calendar, Bell, X, AlertTriangle, FileText, Star } from "lucide-react";
+import { Sparkles, Snowflake, Calendar, Bell, AlertTriangle, FileText, Star } from "lucide-react";
 import type {
   AiInsight,
   ChecklistItem,
@@ -202,14 +202,18 @@ export function AiInsightsPanel({
         </div>
       )}
 
+      {/* Substrate-only callout — collapsed to a single quiet line.
+          Yuqi audit 2026-05-05: was a 4-line verbose block that ate
+          right-rail real estate every time the user opened a task on
+          a fresh client. The "import a prior return to unlock" path
+          is one click away in Settings; we don't need to repeat the
+          marketing copy on every page. */}
       {!hasHistory && (
-        <div className="px-4 py-4 text-xs text-ink-500 bg-info-bg border-b border-info-border">
-          <p className="text-info-ink font-medium">Substrate-only mode</p>
-          <p className="mt-1">
-            Personalized predictions unlock once you import a prior-year return
-            for {client.name}. The dashboard widget below the activity timeline
-            walks you through the layered import.
-          </p>
+        <div className="px-4 py-2 text-2xs text-info-ink bg-info-bg/50 border-b border-info-border">
+          Substrate-only mode ·{" "}
+          <span className="text-ink-500">
+            Import {client.name}'s prior return for personalized predictions.
+          </span>
         </div>
       )}
 
@@ -314,10 +318,10 @@ export function AiInsightsPanel({
           </div>
         )}
 
-      <footer className="px-4 py-2 text-2xs text-ink-400 bg-sunken/40 flex items-center gap-1">
-        <X className="w-2.5 h-2.5" aria-hidden /> AI never decides — it
-        surfaces.
-      </footer>
+      {/* "AI never decides — it surfaces" mantra removed from every
+          task page (Yuqi audit 2026-05-05). It was decoration appearing
+          identically on every card; the mantra belongs in onboarding /
+          help, not on every daily surface. */}
     </aside>
   );
 }

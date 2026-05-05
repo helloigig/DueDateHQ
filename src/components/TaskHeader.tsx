@@ -200,12 +200,22 @@ export function TaskHeader({
         <TaskActions task={task} />
       </div>
 
-      {/* Forwarding email — Method A per PRD §7.4 */}
+      {/* Forwarding strip — Method A per PRD §7.4. Yuqi audit
+          2026-05-05 said "messy": previous version had 5 elements
+          competing on one line (label + address + Copy + microcopy +
+          3 buttons). Slimmed to: address + Copy on the left, dev /
+          export buttons on the right. The "Replies route here..."
+          microcopy moved into a tooltip on the address itself — the
+          info is still discoverable but doesn't fight the address for
+          the eye. Simulate-inbound gated to mock mode (debug only). */}
       <div className="mt-4 pt-3 border-t border-line flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
         <span className="text-ink-500 uppercase tracking-wider font-semibold">
           Forwarding
         </span>
-        <code className="font-mono text-ink-900 bg-sunken px-2 py-1 rounded">
+        <code
+          className="font-mono text-ink-900 bg-sunken px-2 py-1 rounded"
+          title="Replies + forwarded docs route to this address. AI sorts attachments and flags them for your review."
+        >
           {task.forwardingEmail}
         </code>
         <button
@@ -223,19 +233,17 @@ export function TaskHeader({
             </>
           )}
         </button>
-        <span className="text-ink-400 ml-1">
-          Replies route here. Documents are sorted automatically and flagged
-          for your review.
-        </span>
         <span className="ml-auto flex items-center gap-2">
           <CoverSheetButton taskId={task.id} />
-          <button
-            onClick={() => simulateInboundDocument(task.id, client.name)}
-            className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken inline-flex items-center gap-1.5"
-            title="Simulate a client reply with attached document — fires the document.received event"
-          >
-            <Inbox className="w-3 h-3" aria-hidden /> Simulate inbound
-          </button>
+          {env.useMockData && (
+            <button
+              onClick={() => simulateInboundDocument(task.id, client.name)}
+              className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken inline-flex items-center gap-1.5"
+              title="Mock-mode helper: simulates a client reply with attached document"
+            >
+              <Inbox className="w-3 h-3" aria-hidden /> Simulate inbound
+            </button>
+          )}
           <button
             onClick={() => {
               exportAuditTrailJson(task);
