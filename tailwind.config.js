@@ -113,8 +113,11 @@ export default {
       width: {
         // The "co-pilot pane" width — used by /alerts (right pane) and
         // anywhere else a side workspace pane lives. One named token so
-        // visual rebalancing is a single edit.
-        pane: "440px",
+        // visual rebalancing is a single edit. Matches TaskPanel's 640px
+        // drawer so the two parallel side-panel surfaces feel consistent
+        // and the alert disposition footer + context metadata fit on one
+        // line at typical desktop viewports.
+        pane: "640px",
       },
 
       keyframes: {
