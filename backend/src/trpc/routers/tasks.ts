@@ -517,6 +517,50 @@ export const checklistsRouter = router({
     }),
 
   /**
+   * All checklist items across all tasks for one client. Yuqi audit
+   * 2026-05-06: the client detail's "Still waiting on client" section
+   * was reading from todoItems.list (a different aggregation that
+   * only surfaces active chase loops). For a client whose items are
+   * still `not_requested` or whose tasks aren't in any urgency
+   * bucket, todoItems returned empty even though the underlying
+   * checklist items existed — the task page then disagreed with the
+   * client page ("1 of 1 items waiting" vs "Nothing waiting").
+   *
+   * This endpoint joins checklist_items → tasks → deadlines → clients
+   * so the FE can read the canonical per-client checklist directly,
+   * with each row tagged with its task identity for grouping.
+   */
+  listForClient: firmProcedure
+    .input(z.object({ clientId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const rows = await db
+        .select({
+          item: checklistItems,
+          taskId: tasks.id,
+          taskFormType: deadlines.formType,
+          taskJurisdiction: deadlines.jurisdiction,
+          taskOfficialDueDate: deadlines.officialDueDate,
+        })
+        .from(checklistItems)
+        .innerJoin(tasks, eq(tasks.id, checklistItems.taskId))
+        .innerJoin(deadlines, eq(deadlines.id, tasks.deadlineId))
+        .where(
+          and(
+            eq(checklistItems.firmId, ctx.firmId),
+            eq(deadlines.clientId, input.clientId),
+          ),
+        )
+        .orderBy(asc(deadlines.adjustedDueDate), asc(checklistItems.sortOrder));
+      return rows.map((r) => ({
+        ...r.item,
+        taskId: r.taskId,
+        taskFormType: r.taskFormType,
+        taskJurisdiction: r.taskJurisdiction,
+        taskOfficialDueDate: r.taskOfficialDueDate,
+      }));
+    }),
+
+  /**
    * Add a custom checklist item to a task. Records the author in
    * `addedByUserId` so the row is identifiably user-added (and thus
    * deletable via `deleteCustom`). Sort order goes to the end.

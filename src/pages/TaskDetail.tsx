@@ -1,7 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { CheckCircle2, FileDown, X } from "lucide-react";
-import { BackLink } from "../components/ui/BackLink";
 import { TaskHeader } from "../components/TaskHeader";
 import { TaskMiniTimeline } from "../components/TaskMiniTimeline";
 import { ChecklistList } from "../components/ChecklistList";
@@ -120,8 +119,9 @@ export function TaskDetail() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 space-y-5">
-      <BackLink fallback={`/clients/${client.id}`} fallbackLabel={client.name} />
-
+      {/* BackLink dropped 2026-05-06 — TaskHeader's breadcrumb already
+          gives the user where they are AND two back-targets. Two nav
+          rows stacked vertically was duplicate chrome. */}
       <TaskAlertContext task={task} client={client} />
 
       {/* Extension banner — visible only when the underlying deadline

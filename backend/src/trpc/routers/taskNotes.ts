@@ -14,9 +14,55 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { firmProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
-import { taskNotes, tasks, users } from "../../db/schema.js";
+import { deadlines, taskNotes, tasks, users } from "../../db/schema.js";
 
 export const taskNotesRouter = router({
+  /**
+   * Aggregate task notes across every task belonging to one client.
+   * Yuqi audit 2026-05-06: the client detail Notes tab used to show
+   * only client-spine notes — task-level judgment ("K-1 will be late
+   * for this 1040") was buried inside each task page, invisible from
+   * the client overview. This endpoint joins task_notes → tasks →
+   * deadlines so the client page can render a unified Notes feed
+   * (client-level + per-task) without N+1 queries.
+   */
+  listForClient: firmProcedure
+    .input(z.object({ clientId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const rows = await db
+        .select({
+          note: taskNotes,
+          authorName: users.displayName,
+          authorEmail: users.email,
+          taskFormType: deadlines.formType,
+          taskJurisdiction: deadlines.jurisdiction,
+          taskOfficialDueDate: deadlines.officialDueDate,
+        })
+        .from(taskNotes)
+        .innerJoin(tasks, eq(tasks.id, taskNotes.taskId))
+        .innerJoin(deadlines, eq(deadlines.id, tasks.deadlineId))
+        .leftJoin(users, eq(users.id, taskNotes.authorUserId))
+        .where(
+          and(
+            eq(taskNotes.firmId, ctx.firmId),
+            eq(deadlines.clientId, input.clientId),
+          ),
+        )
+        .orderBy(desc(taskNotes.pinned), desc(taskNotes.createdAt));
+      return rows.map((r) => ({
+        id: r.note.id,
+        taskId: r.note.taskId,
+        body: r.note.body,
+        pinned: r.note.pinned,
+        authorUserId: r.note.authorUserId,
+        authorName: r.authorName ?? r.authorEmail ?? "Unknown",
+        createdAt: r.note.createdAt.toISOString(),
+        taskFormType: r.taskFormType,
+        taskJurisdiction: r.taskJurisdiction,
+        taskOfficialDueDate: r.taskOfficialDueDate,
+      }));
+    }),
+
   listForTask: firmProcedure
     .input(z.object({ taskId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {

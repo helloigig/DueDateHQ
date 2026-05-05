@@ -49,7 +49,7 @@ import {
 } from "../hooks/useAiInsights";
 import { PageSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
-import { daysBetween, formatLongDate, parseDate, TODAY } from "../data/dateHelpers";
+import { formatLongDate, parseDate, TODAY } from "../data/dateHelpers";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import {
   AddDeadlineModal,
@@ -69,7 +69,6 @@ import type {
   ActivityEntry,
   ActivityType,
   Client,
-  ClientNote,
   Deadline,
 } from "../types";
 
@@ -723,18 +722,79 @@ function PackageDetailsPopover({
 
 function NotesTab({ client }: { client: Client }) {
   const [draft, setDraft] = useState("");
-  const notes = client.noteEntries ?? [];
+  const clientNotes = client.noteEntries ?? [];
   const addNoteMutation = useAddNote();
 
-  // Sort: pinned first, then newest. Search field removed per
-  // 2026-05-04 feedback — notes are short and few; the timeline is
-  // the search affordance. Cmd+F still works in-page if needed.
-  const sortedNotes = useMemo(() => {
-    return [...notes].sort((a, b) => {
+  // Yuqi audit 2026-05-06: the Notes tab used to show only client-spine
+  // notes — task-level judgment ("K-1 will be late for this 1040")
+  // was buried inside each task page, invisible from the client
+  // overview. Pull the per-client task-notes aggregation from the new
+  // BE endpoint so this surface shows EVERY note attached to ANY task
+  // for this client + the client-level notes, in one feed. Each note
+  // is tagged with its origin (Client · or Task formType) so the user
+  // can tell which scope a note lives at.
+  const taskNotesQuery = (
+    trpc.taskNotes as unknown as {
+      listForClient: {
+        useQuery: (input: { clientId: string }) => {
+          data?: Array<{
+            id: string;
+            taskId: string;
+            body: string;
+            pinned: boolean;
+            authorName: string;
+            createdAt: string;
+            taskFormType: string;
+            taskJurisdiction: string;
+          }>;
+        };
+      };
+    }
+  ).listForClient.useQuery({ clientId: client.id });
+  const taskLevelNotes = taskNotesQuery.data ?? [];
+
+  type FeedNote = {
+    id: string;
+    body: string;
+    pinned: boolean;
+    authorName: string;
+    createdAt: string;
+    /** "Client" for client-spine notes, or the task's display label
+     *  for per-task notes. Drives the small origin chip on each row. */
+    scope: { kind: "client" } | { kind: "task"; taskId: string; label: string };
+  };
+
+  const sortedNotes = useMemo<FeedNote[]>(() => {
+    const out: FeedNote[] = [];
+    for (const n of clientNotes) {
+      out.push({
+        id: n.id,
+        body: n.body,
+        pinned: n.pinned,
+        authorName: n.authorName,
+        createdAt: n.createdAt,
+        scope: { kind: "client" },
+      });
+    }
+    for (const n of taskLevelNotes) {
+      out.push({
+        id: n.id,
+        body: n.body,
+        pinned: n.pinned,
+        authorName: n.authorName,
+        createdAt: n.createdAt,
+        scope: {
+          kind: "task",
+          taskId: n.taskId,
+          label: [n.taskFormType, n.taskJurisdiction].filter(Boolean).join(" · "),
+        },
+      });
+    }
+    return out.sort((a, b) => {
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
       return b.createdAt.localeCompare(a.createdAt);
     });
-  }, [notes]);
+  }, [clientNotes, taskLevelNotes]);
 
   const onAdd = async () => {
     const body = draft.trim();
@@ -795,7 +855,11 @@ function NotesTab({ client }: { client: Client }) {
       ) : (
         <ul className="space-y-2">
           {sortedNotes.map((n) => (
-            <NoteItem key={n.id} note={n} clientId={client.id} />
+            <UnifiedNoteItem
+              key={`${n.scope.kind}-${n.id}`}
+              note={n}
+              clientId={client.id}
+            />
           ))}
         </ul>
       )}
@@ -803,11 +867,20 @@ function NotesTab({ client }: { client: Client }) {
   );
 }
 
-function NoteItem({
+type FeedNoteShape = {
+  id: string;
+  body: string;
+  pinned: boolean;
+  authorName: string;
+  createdAt: string;
+  scope: { kind: "client" } | { kind: "task"; taskId: string; label: string };
+};
+
+function UnifiedNoteItem({
   note,
   clientId,
 }: {
-  note: ClientNote;
+  note: FeedNoteShape;
   clientId: string;
 }) {
   const ts = new Date(note.createdAt);
@@ -817,7 +890,25 @@ function NoteItem({
         note.pinned ? "border-warn-border" : "border-line"
       }`}
     >
-      <div className="flex items-center gap-2 text-xs text-ink-500 mb-1">
+      <div className="flex items-center gap-2 text-xs text-ink-500 mb-1 flex-wrap">
+        {/* Origin chip — Client-spine notes get a quiet "Client" pill;
+            task-level notes get a chip with the task name that links
+            to TaskDetail. Yuqi audit 2026-05-06 — the Notes tab
+            previously hid task notes; this chip exposes which scope
+            each note lives at. */}
+        {note.scope.kind === "task" ? (
+          <Link
+            to={`/clients/${clientId}/tasks/${note.scope.taskId}`}
+            className="text-2xs px-1.5 py-0.5 rounded bg-info-bg/60 text-info-ink border border-info-border hover:bg-info-bg"
+            title="Open the task this note belongs to"
+          >
+            Task · {note.scope.label}
+          </Link>
+        ) : (
+          <span className="text-2xs px-1.5 py-0.5 rounded bg-sunken text-ink-500 border border-line">
+            Client
+          </span>
+        )}
         {note.pinned && (
           <span className="inline-flex items-center gap-1 text-warn-ink font-medium">
             <Pin className="w-3 h-3" aria-hidden />
@@ -827,20 +918,27 @@ function NoteItem({
         <span>{ts.toLocaleString("en-US")}</span>
         <span>·</span>
         <span>{note.authorName}</span>
-        <button
-          onClick={() => actions.toggleNotePin(clientId, note.id)}
-          className="ml-auto text-ink-400 hover:text-warn-ink"
-          title={note.pinned ? "Unpin" : "Pin"}
-        >
-          {note.pinned ? "Unpin" : "Pin"}
-        </button>
-        <button
-          onClick={() => actions.deleteNote(clientId, note.id)}
-          className="text-ink-400 hover:text-danger-ink"
-          title="Delete"
-        >
-          Delete
-        </button>
+        {/* Pin / Delete only available for client-spine notes here —
+            task notes are managed from their own task page (TaskNotesPanel)
+            so the per-scope mutation surface stays clean. */}
+        {note.scope.kind === "client" && (
+          <>
+            <button
+              onClick={() => actions.toggleNotePin(clientId, note.id)}
+              className="ml-auto text-ink-400 hover:text-warn-ink"
+              title={note.pinned ? "Unpin" : "Pin"}
+            >
+              {note.pinned ? "Unpin" : "Pin"}
+            </button>
+            <button
+              onClick={() => actions.deleteNote(clientId, note.id)}
+              className="text-ink-400 hover:text-danger-ink"
+              title="Delete"
+            >
+              Delete
+            </button>
+          </>
+        )}
       </div>
       <p className="text-sm text-ink-700 whitespace-pre-wrap">{note.body}</p>
     </li>
@@ -951,23 +1049,51 @@ function ActivityItem({ entry }: { entry: ActivityEntry }) {
 
 function ToDoTab({
   client,
-  allDeadlines,
+  allDeadlines: _allDeadlines,
   onAddDeadline,
 }: {
   client: Client;
+  /** @deprecated 2026-05-06 — the per-tab "Open deadlines" list was
+   *  dropped (it duplicated the Filings tab). Prop kept on the API
+   *  so existing callers don't break. */
   allDeadlines: Deadline[];
   onAddDeadline: () => void;
   onOpenDocuments: () => void;
 }) {
   const { checklistItems: storeChecklistItems, tasks: storeTasks } = useStore();
-  // ── Source-of-truth fix (2026-05-05) ───────────────────────────────────
-  // Today's Action Queue reads from trpc.todoItems.list (BE-aggregated).
-  // ToDoTab used to read from useStore().checklistItems which is empty
-  // in real mode, so the same client showed "7 items / Send 4 reminders"
-  // on Today and "0 items / Nothing waiting" here. Same query now powers
-  // both surfaces.
-  const todoQuery = trpc.todoItems.list.useQuery({ limit: 200 });
-  const liveTodoItems = todoQuery.data?.items ?? [];
+  // ── Source-of-truth fix (2026-05-06) ───────────────────────────────────
+  // Yuqi audit: task page said "1 of 1 items waiting", client page said
+  // "Nothing waiting on this client". They disagreed because the client
+  // page filtered todoItems.list — a chase-loop aggregation that
+  // returns empty for fresh clients whose items haven't been requested
+  // yet. The new checklists.listForClient endpoint joins
+  // checklist_items → tasks → deadlines and returns the canonical
+  // per-client checklist; both pages now read from the same source.
+  // FE router types are stale until BE redeploys; cast through unknown.
+  const checklistsQuery = (
+    trpc.checklists as unknown as {
+      listForClient: {
+        useQuery: (input: { clientId: string }) => {
+          data?: Array<{
+            id: string;
+            label: string;
+            state:
+              | "not_requested"
+              | "requested_waiting"
+              | "received_unreviewed"
+              | "received_confirmed"
+              | "received_issue"
+              | "not_applicable";
+            taskId: string;
+            taskFormType: string;
+            taskJurisdiction: string;
+            lastReminderAt?: string | null;
+          }>;
+        };
+      };
+    }
+  ).listForClient.useQuery({ clientId: client.id });
+  const liveChecklistItems = checklistsQuery.data ?? [];
   // arrival-timing rows include a per-checklist-item snapshot. Flatten across
   // every TodoItem that belongs to this client, attaching the parent
   // task metadata so the per-item rows can render formType/jurisdiction
@@ -989,41 +1115,17 @@ function ToDoTab({
   };
 
   const liveItems = useMemo<WaitingItem[]>(() => {
-    const out: WaitingItem[] = [];
-    for (const it of liveTodoItems) {
-      if (it.clientId !== client.id) continue;
-      const ci = (it as { checklistItems?: WaitingItem[] }).checklistItems;
-      if (ci && ci.length > 0) {
-        for (const c of ci) {
-          out.push({
-            id: c.id,
-            label: c.label,
-            state: c.state,
-            taskId: it.taskId,
-            taskName: it.task,
-            dueDate: it.dueDate,
-          });
-        }
-      } else if (
-        it.verb === "Confirm" ||
-        it.source === "mode_a_inbound" ||
-        it.source === "mode_c_anomaly"
-      ) {
-        // Confirm/anomaly TodoItems carry a single checklist item in
-        // their action; expose as one row.
-        out.push({
-          id: it.id,
-          label: it.action.replace(/^[^·]+·\s*/, ""),
-          state:
-            it.source === "mode_c_anomaly" ? "received_issue" : "received_unreviewed",
-          taskId: it.taskId,
-          taskName: it.task,
-          dueDate: it.dueDate,
-        });
-      }
-    }
-    return out;
-  }, [liveTodoItems, client.id]);
+    return liveChecklistItems.map((ci) => ({
+      id: ci.id,
+      label: ci.label,
+      state: ci.state,
+      taskId: ci.taskId,
+      taskName: [ci.taskFormType, ci.taskJurisdiction]
+        .filter(Boolean)
+        .join(" · "),
+      lastReminderAt: ci.lastReminderAt ?? undefined,
+    }));
+  }, [liveChecklistItems]);
 
   // Mock-mode fallback: read raw checklistItems from the store. Only
   // used when env.useMockData is true; real mode trusts the BE.
@@ -1290,101 +1392,13 @@ function ToDoTab({
         </section>
       )}
 
-      {/* Open deadlines — full per-task entry points so the CPA can pivot
-          from a deadline directly into its task detail. Each row carries:
-            • form + jurisdiction badge (federal vs state-specific)
-            • status pill (overdue / due-soon / on-track / waiting)
-            • the official due date AND the internal target date — both shift
-              together when a state alert moves the deadline, so the CPA sees
-              the buffer they have, not just the wall date
-            • countdown ("in 12 days", "8 days overdue") for at-a-glance triage
-          Rows are clickable when a Task exists for the deadline (1:1 at MVP). */}
-      <section className="bg-surface border border-line rounded-md p-4">
-        <header className="flex items-baseline gap-2 mb-2">
-          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
-            Open deadlines for this client
-          </h3>
-          <span className="text-2xs text-ink-500 tabular-nums">
-            {allDeadlines.filter(
-              (d) => d.status !== "completed" && d.status !== "filed_extension",
-            ).length}{" "}
-            open
-          </span>
-        </header>
-        <ul className="divide-y divide-line">
-          {allDeadlines
-            .filter(
-              (d) => d.status !== "completed" && d.status !== "filed_extension",
-            )
-            .slice(0, 8)
-            .map((d) => {
-              const task = tasksByIdMap.get(`t-${d.id}`) ??
-                Array.from(tasksByIdMap.values()).find((t) => t.deadlineId === d.id);
-              const days = daysBetween(TODAY, parseDate(d.officialDueDate));
-              const isOverdue = days < 0;
-              const isDueSoon = days >= 0 && days <= 7;
-              const countdown = isOverdue
-                ? `${Math.abs(days)}d overdue`
-                : days === 0
-                  ? "due today"
-                  : `in ${days}d`;
-              const pillClass = isOverdue
-                ? "bg-danger-bg text-danger-ink border border-danger-border"
-                : isDueSoon
-                  ? "bg-warn-bg text-warn-ink border border-warn-border"
-                  : "bg-sunken text-ink-700 border border-line";
-              const row = (
-                <div className="text-sm text-ink-900 flex items-baseline gap-3 py-1.5">
-                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-2xs font-semibold bg-sunken text-ink-700 border border-line shrink-0 uppercase">
-                    {d.jurisdiction}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="truncate">{d.form}</p>
-                    {task && (
-                      <p className="text-2xs text-ink-500 tabular-nums">
-                        Internal target {formatLongDate(task.internalTargetDate)}
-                      </p>
-                    )}
-                  </div>
-                  <span
-                    className={`text-2xs px-1.5 py-0.5 rounded tabular-nums shrink-0 ${pillClass}`}
-                  >
-                    {countdown}
-                  </span>
-                  <span className="text-xs text-ink-500 tabular-nums shrink-0 w-28 text-right">
-                    {formatLongDate(d.officialDueDate)}
-                  </span>
-                </div>
-              );
-              return (
-                <li key={d.id} className="first:pt-0 last:pb-0">
-                  {task ? (
-                    <Link
-                      to={`/clients/${client.id}/tasks/${task.id}`}
-                      className="block hover:bg-sunken/40 -mx-1 px-1 rounded"
-                      title="Open task detail"
-                    >
-                      {row}
-                    </Link>
-                  ) : (
-                    row
-                  )}
-                </li>
-              );
-            })}
-        </ul>
-        {allDeadlines.filter(
-          (d) => d.status !== "completed" && d.status !== "filed_extension",
-        ).length > 8 && (
-          <p className="text-2xs text-ink-500 mt-2">
-            +
-            {allDeadlines.filter(
-              (d) => d.status !== "completed" && d.status !== "filed_extension",
-            ).length - 8}{" "}
-            more open
-          </p>
-        )}
-      </section>
+      {/* "Open deadlines for this client" section dropped 2026-05-06 —
+          Yuqi audit: this list duplicated the Filings tab's "Filing
+          plan" section (same 4 deadlines, same client). To Do is for
+          chase-flow items (what does the client owe me); Filings is
+          for the deadline portfolio (what's the shape of the year).
+          Two clean concepts. The Tasks chip strip at the top of this
+          tab + the Filings tab cover the navigation surface. */}
 
       <p className="inline-flex items-center gap-1 text-2xs text-ink-400">
         <Check className="w-3 h-3" aria-hidden />
@@ -1779,16 +1793,16 @@ function ClientAiSummary({ client }: { client: Client }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const updateClientMut = useUpdateClient();
-  // Stub composer — picks a contextual placeholder based on tier so
-  // demos read naturally. Phase 2 replaces this with the real signal-
-  // composed sentence from the BE.
-  const placeholder =
-    client.tier === "premium"
-      ? "Premium engagement — fast responder, clean quarterly handoffs. Watch for K-1 lag in March."
-      : client.tier === "custom"
-        ? "Custom-scoped engagement — review the package details before kicking off the next filing."
-        : "Reliable filer — no recent flags. Insights will refine here as activity accumulates.";
-  const summary = client.aiSummaryOverride ?? placeholder;
+  // Yuqi audit 2026-05-06: the previous "Reliable filer — no recent
+  // flags. Insights will refine here as activity accumulates."
+  // placeholder is redundant with the existing "AI insights unlock
+  // once you import a prior-year return" label that already renders
+  // below. Drop the stub. Render this component ONLY when the user
+  // has explicitly authored an override; otherwise return null and
+  // let the AI-insights-unlock label do the talking.
+  const override = client.aiSummaryOverride;
+  if (!override && !editing) return null;
+  const summary = override ?? "";
 
   if (editing) {
     return (
