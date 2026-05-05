@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import type { Client, StateCode } from "../types";
 import { actions } from "../data/store";
 import { toIso, addDays, TODAY } from "../data/dateHelpers";
@@ -198,22 +199,33 @@ export function AddDeadlineModal({
     form === SYNTHETIC_OPTIONS.custom ? customForm.trim() : form;
   const canSave = resolvedForm.length > 0 && date.length > 0;
 
-  const onSave = () => {
+  const isSaving = quickAddMut.isPending;
+  const onSave = async () => {
     if (env.useMockData) {
       actions.addDeadline(client.id, resolvedForm, jurisdiction, date);
-    } else {
-      // Real mode hits deadlines.quickAdd. The BE inserts the row
-      // scoped to the firm, links it to the client, and the hook's
-      // onSuccess invalidates listForTriage + listForClient so both
-      // the dashboard queue and this client's Filings tab refresh.
-      quickAddMut.mutate({
+      toast.success(`${resolvedForm} added · due ${date}`);
+      onClose();
+      return;
+    }
+    // Real mode — await mutateAsync so we can surface success/error
+    // toasts and keep the modal open if the BE rejects (so the user
+    // doesn't lose their entry to a silent failure). Yuqi audit
+    // 2026-05-05: was previously fire-and-forget + close immediately,
+    // which meant a 4xx from the BE looked exactly like success.
+    try {
+      await quickAddMut.mutateAsync({
         clientId: client.id,
         form: resolvedForm,
         jurisdiction,
         officialDueDate: date,
       });
+      toast.success(`${resolvedForm} added · due ${date}`);
+      onClose();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Couldn't save the deadline.";
+      toast.error(`Add deadline failed — ${message}`);
     }
-    onClose();
   };
 
   const jurisdictionOptions: Array<"federal" | StateCode> = [
@@ -365,10 +377,10 @@ export function AddDeadlineModal({
           </button>
           <button
             onClick={onSave}
-            disabled={!canSave}
+            disabled={!canSave || isSaving}
             className="text-sm px-3 py-1.5 rounded font-medium text-white bg-indigo hover:bg-indigo-hover disabled:opacity-40"
           >
-            Add deadline
+            {isSaving ? "Saving…" : "Add deadline"}
           </button>
         </div>
       </div>
