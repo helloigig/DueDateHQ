@@ -8,6 +8,28 @@ import type { FederalFormDTO } from "../lib/api/router";
 import type { AddDeadlinePrefill } from "./AddDeadlineModal";
 
 /**
+ * Disambiguate quarterly/monthly federal forms (941 / 720 / 1099-NEC
+ * etc.) — the BE has the same `form` value on each deadline so a
+ * client with three 941s appears as "941 / 941 / 941" with only the
+ * due date to tell them apart. Compute a period suffix from the due
+ * date for known quarterly forms. Yuqi audit 2026-05-06 — "why are
+ * there three 941? you need to differentiate that".
+ */
+function periodSuffix(form: string, dueDate: string): string | null {
+  const formNumber = form.replace(/\s*\(.*\)\s*$/, "").trim().toUpperCase();
+  const month = parseInt(dueDate.slice(5, 7), 10);
+  // Form 941 (quarterly): due Apr / Jul / Oct / Jan-of-next-year
+  // covering Q1 / Q2 / Q3 / Q4 respectively. Same schedule for 720.
+  if (formNumber === "941" || formNumber === "720") {
+    if (month === 4) return "Q1";
+    if (month === 7) return "Q2";
+    if (month === 10) return "Q3";
+    if (month === 1) return "Q4";
+  }
+  return null;
+}
+
+/**
  * FilingsTab — surfaces the federal forms that apply to this client,
  * sourced from the BE `federal_forms` table via
  * `trpc.federalForms.applicabilityForClient`.
@@ -219,7 +241,23 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
                               ? "FED"
                               : d.jurisdiction.toUpperCase()}
                           </span>
-                          <span className="text-ink-900">{d.form}</span>
+                          <span className="text-ink-900">
+                            {d.form}
+                            {(() => {
+                              const period = periodSuffix(
+                                d.form,
+                                d.officialDueDate,
+                              );
+                              return period ? (
+                                <span
+                                  className="ml-1.5 text-2xs px-1.5 py-0.5 rounded bg-info-bg/60 text-info-ink border border-info-border tabular-nums"
+                                  title={`${period} of fiscal year`}
+                                >
+                                  {period}
+                                </span>
+                              ) : null;
+                            })()}
+                          </span>
                           <span className="text-2xs text-ink-400 ml-auto tabular-nums">
                             due {d.officialDueDate}
                           </span>
