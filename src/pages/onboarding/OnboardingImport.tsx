@@ -15,6 +15,7 @@ export function OnboardingImport() {
       totalSteps={3}
       title="Upload your client roster"
       subtitle="Drop a CSV. AI maps the columns; you confirm."
+      width="wide"
     >
       <ImportWithContinue />
     </OnboardingShell>
@@ -24,18 +25,16 @@ export function OnboardingImport() {
 /**
  * Wraps Import with a contextual "Continue" affordance that appears once the
  * roster has clients. Avoids stranding the user inside the inner Import flow.
+ *
+ * `chromeless` strips Import's own H1 + breadcrumb + container so the shell
+ * is the only visual frame.
  */
 function ImportWithContinue() {
   const { clients } = useStore();
   const hasClients = clients.length > 0;
   return (
     <>
-      {/* Render Import inline. The standalone Import page renders its own
-          card chrome on the preview region; wrapping it again here was
-          double-bordering the table and squeezing column widths. */}
-      <div className="-mt-4">
-        <Import />
-      </div>
+      <Import chromeless />
       {hasClients && (
         <div className="mt-4 bg-info-bg border border-info-border rounded-md px-4 py-3 flex items-center gap-3">
           <p className="text-sm text-info-ink flex-1">
@@ -44,7 +43,7 @@ function ImportWithContinue() {
           </p>
           <Link
             to="/onboarding/packages"
-            className="text-sm px-4 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover whitespace-nowrap"
+            className="text-sm px-4 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover whitespace-nowrap"
           >
             Continue →
           </Link>

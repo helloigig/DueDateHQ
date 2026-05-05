@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   CheckCircle2,
@@ -29,6 +30,7 @@ import { useStore } from "../../data/store";
 export function OnboardingDone() {
   const navigate = useNavigate();
   const { clients, deadlines, announcements, aiInsights, tasks } = useStore();
+  const [opening, setOpening] = useState(false);
 
   const stats = {
     clients: clients.filter((c) => c.status === "active").length,
@@ -43,6 +45,7 @@ export function OnboardingDone() {
   };
 
   const finish = () => {
+    setOpening(true);
     updateSession({ onboardingComplete: true });
     navigate("/", { replace: true });
   };
@@ -188,9 +191,20 @@ export function OnboardingDone() {
         <div className="flex items-center gap-3 pt-2">
           <button
             onClick={finish}
-            className="text-sm px-5 py-2 rounded-md bg-indigo text-white hover:bg-indigo-hover"
+            disabled={opening}
+            className="text-sm px-5 py-2 rounded-md bg-indigo text-white hover:bg-indigo-hover disabled:opacity-70 disabled:cursor-wait inline-flex items-center gap-2"
           >
-            Open dashboard
+            {opening ? (
+              <>
+                <span
+                  className="inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin"
+                  aria-hidden
+                />
+                Loading dashboard…
+              </>
+            ) : (
+              "Open dashboard"
+            )}
           </button>
           <p className="text-xs text-ink-500">
             Total elapsed: well under 5 minutes. Median triage session target:

@@ -30,7 +30,7 @@ export function OnboardingChoosePath() {
       {/* Primary — CSV upload */}
       <Link
         to="/onboarding/import"
-        className="block bg-surface border-2 border-line rounded-md p-6 hover:border-accent hover:shadow-pop transition-all group max-w-5xl"
+        className="block bg-surface border-2 border-line rounded-md p-6 hover:border-accent hover:shadow-pop transition-all group"
       >
         <div className="flex items-start gap-4">
           <span className="w-12 h-12 rounded-md bg-sunken border border-line flex items-center justify-center text-ink-700 shrink-0">
@@ -53,7 +53,7 @@ export function OnboardingChoosePath() {
       </Link>
 
       {/* 3-tile row — QuickBooks, Xero, Add manually */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 max-w-5xl">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
         <ConnectTile
           icon={<QboLogo />}
           title="Connect QuickBooks"
@@ -79,7 +79,7 @@ export function OnboardingChoosePath() {
       </div>
 
       {/* Demo + Skip on the same line */}
-      <div className="mt-8 pt-6 border-t border-line max-w-5xl flex items-center gap-6 text-xs">
+      <div className="mt-8 pt-6 border-t border-line flex items-center gap-6 text-xs">
         <Link
           to="/onboarding/demo"
           className="inline-flex items-center gap-1.5 text-ink-700 hover:text-ink-900"

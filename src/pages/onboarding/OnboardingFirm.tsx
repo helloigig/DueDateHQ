@@ -151,7 +151,7 @@ export function OnboardingFirm() {
       title="Set up your firm workspace"
       subtitle="Your account is created. Now we set up the firm — the tenant where your clients, deadlines, and filings live."
     >
-      <div className="space-y-6 max-w-md">
+      <div className="space-y-6">
         <Field label="Firm name">
           <input
             value={firmName}
@@ -218,7 +218,7 @@ export function OnboardingFirm() {
           disabled={
             !firmName.trim() || filingStates.length === 0 || bootstrap.isPending
           }
-          className="text-sm px-5 py-2 rounded bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40 disabled:cursor-not-allowed"
+          className="text-sm px-5 py-2 rounded-md bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {bootstrap.isPending ? "Creating workspace…" : "Continue"}
         </button>
@@ -260,7 +260,6 @@ function StateMultiSelect({
             return (
               <span
                 key={s}
-                title={meta?.name ?? s}
                 className={[
                   "inline-flex items-center gap-1 text-2xs font-medium rounded px-2 py-1",
                   isHome
@@ -278,7 +277,7 @@ function StateMultiSelect({
                     type="button"
                     onClick={() => onSetHome(s)}
                     className="underline opacity-60 hover:opacity-100"
-                    title="Make home state — this address goes on outbound emails"
+                    aria-label="Make home state — this address goes on outbound emails"
                   >
                     set home
                   </button>
@@ -287,7 +286,6 @@ function StateMultiSelect({
                   type="button"
                   onClick={() => onToggle(s)}
                   className="ml-0.5 opacity-60 hover:opacity-100"
-                  title="Remove"
                   disabled={selected.length === 1 && isHome}
                   aria-label={`Remove ${meta?.name ?? s}`}
                 >
@@ -328,11 +326,6 @@ function StateMultiSelect({
                     onMouseLeave={() =>
                       setHoverCode((h) => (h === code ? null : h))
                     }
-                    title={
-                      supported
-                        ? meta.name + (isHome ? " — home state" : "")
-                        : `${meta.name} — ${UNSUPPORTED_STATE_HINT}`
-                    }
                     aria-label={`${meta.name}${picked ? ", selected" : ""}${isHome ? ", home state" : ""}${!supported ? ", not yet supported" : ""}`}
                     aria-pressed={picked}
                     className={[
@@ -361,7 +354,10 @@ function StateMultiSelect({
         </div>
       </div>
 
-      {/* Hover hint — only when hovering, no resting copy */}
+      {/* Hover hint — only when hovering, no resting copy. Carries the
+          "unsupported" message that used to live in the native title
+          tooltip (which we dropped because it looked like a stray dark
+          tip floating off the map). */}
       <div className="text-2xs text-ink-500 min-h-[1.25em]">
         {hoveredState && (
           <>
@@ -369,6 +365,11 @@ function StateMultiSelect({
               {hoveredState.code}
             </span>{" "}
             · {hoveredState.name}
+            {!isSupportedState(hoveredState.code) && (
+              <span className="text-warn-ink ml-1.5">
+                — {UNSUPPORTED_STATE_HINT}
+              </span>
+            )}
           </>
         )}
       </div>
