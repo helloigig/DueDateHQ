@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   CalendarClock,
   ChevronLeft,
@@ -417,33 +417,54 @@ function CopilotPane({
                 {allAffected.map((c) => {
                   const isExcluded = excludedClientIds.has(c.id);
                   return (
-                    <button
+                    <span
                       key={c.id}
-                      type="button"
-                      onClick={() => onToggleExclusion(c.id)}
-                      className={cn(
-                        "group inline-flex items-center gap-1 rounded-pill border text-xs px-2 py-0.5 transition-colors",
-                        isExcluded
-                          ? "border-line bg-transparent text-ink-400 line-through hover:border-line-strong hover:text-ink-700 hover:no-underline"
-                          : "border-line bg-surface text-ink-700 hover:border-danger-border hover:text-danger-ink",
-                      )}
-                      title={
-                        isExcluded
-                          ? `Click to include ${c.name}`
-                          : `Click to exclude ${c.name} from this send`
-                      }
+                      className="inline-flex items-stretch rounded-pill border border-line overflow-hidden"
                     >
-                      <span className="truncate max-w-[110px]">{c.name}</span>
-                      <X
+                      {/* Click body → toggle include/exclude (existing
+                          behaviour). The arrow on the right opens
+                          ClientDetail in a new tab — no conflict
+                          with the chip toggle. Yuqi audit 2026-05-05:
+                          previously the chip was the only affordance,
+                          so users couldn't navigate from an alert to
+                          a specific affected client. */}
+                      <button
+                        type="button"
+                        onClick={() => onToggleExclusion(c.id)}
                         className={cn(
-                          "w-2.5 h-2.5 transition-opacity",
+                          "group inline-flex items-center gap-1 text-xs px-2 py-0.5 transition-colors",
                           isExcluded
-                            ? "rotate-45 text-ink-400"
-                            : "text-ink-400 opacity-0 group-hover:opacity-100",
+                            ? "bg-transparent text-ink-400 line-through hover:text-ink-700 hover:no-underline"
+                            : "bg-surface text-ink-700 hover:text-danger-ink",
                         )}
-                        aria-hidden
-                      />
-                    </button>
+                        title={
+                          isExcluded
+                            ? `Click to include ${c.name}`
+                            : `Click to exclude ${c.name} from this send`
+                        }
+                      >
+                        <span className="truncate max-w-[110px]">{c.name}</span>
+                        <X
+                          className={cn(
+                            "w-2.5 h-2.5 transition-opacity",
+                            isExcluded
+                              ? "rotate-45 text-ink-400"
+                              : "text-ink-400 opacity-0 group-hover:opacity-100",
+                          )}
+                          aria-hidden
+                        />
+                      </button>
+                      <Link
+                        to={`/clients/${c.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-1.5 border-l border-line bg-sunken/40 text-ink-400 hover:text-ink-900 hover:bg-sunken transition-colors text-2xs"
+                        title={`Open ${c.name} in a new tab`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        ↗
+                      </Link>
+                    </span>
                   );
                 })}
               </div>

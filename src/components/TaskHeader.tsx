@@ -8,6 +8,7 @@ import {
   FileDown,
   Package,
   Slash,
+  CalendarRange,
 } from "lucide-react";
 import type { Client, Task } from "../types";
 import { useStore } from "../data/store";
@@ -155,6 +156,18 @@ export function TaskHeader({
                 },
               )}
             />
+            {/* Cross-product jump — see this task in the cross-client
+                Timeline view, focused + scrolled into place. Yuqi
+                audit 2026-05-05 — the path from a single task to "what
+                else lands the same week" was missing. */}
+            <Link
+              to={`/timeline?focus=${task.officialDueDate}&clientId=${client.id}`}
+              className="text-2xs text-ink-500 hover:text-ink-900 hover:underline inline-flex items-center gap-1"
+              title="See what else lands this week across the firm"
+            >
+              <CalendarRange className="w-3 h-3" aria-hidden />
+              View in Timeline
+            </Link>
           </div>
           <div className="text-xs text-ink-500 mt-2 flex items-center flex-wrap gap-x-3 gap-y-1">
             <span>
