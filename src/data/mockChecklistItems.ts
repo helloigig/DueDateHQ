@@ -13,6 +13,8 @@ import { resolveFederalForm } from "./canonicalForm";
 interface TemplateItem {
   label: string;
   itemType: string;
+  /** Optional IRS PDF link surfaced as a per-item deep-link in ChecklistRow. */
+  source?: string;
 }
 
 const TEMPLATES: Record<string, TemplateItem[]> = {
@@ -68,6 +70,7 @@ function templateFor(form: string): TemplateItem[] {
     return canonical.requiredItems.map((item) => ({
       label: item.label,
       itemType: item.itemType,
+      source: item.source,
     }));
   }
 
@@ -138,6 +141,7 @@ function makeChecklistForTask(taskId: string, formType: string): ChecklistItem[]
       state,
       order: i,
       custom: false,
+      sourceUrl: item.source,
     };
     switch (state) {
       case "received_confirmed":

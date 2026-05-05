@@ -24,8 +24,8 @@
  *   - Filter by form / change kind / age
  *   - Bulk apply (e.g. all high-confidence in one click)
  */
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   Check,
   ExternalLink,
@@ -61,11 +61,31 @@ const CONFIDENCE_TONE: Record<string, string> = {
 };
 
 export function SettingsFederalFormsPanel() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusEventId = searchParams.get("event");
+  const focusedRowRef = useRef<HTMLLIElement | null>(null);
+
   const [includeReviewed, setIncludeReviewed] = useState(false);
   const queue = trpc.federalForms.recentChanges.useQuery({
     limit: 50,
     includeReviewed,
   });
+
+  // When deep-linked from /alerts/:id (form_change variant), scroll the
+  // matching row into view + flash a highlight ring. Strip the param after
+  // consuming so a refresh doesn't keep highlighting forever.
+  useEffect(() => {
+    if (!focusEventId || queue.isLoading) return;
+    if (focusedRowRef.current) {
+      focusedRowRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    const t = setTimeout(() => {
+      const next = new URLSearchParams(searchParams);
+      next.delete("event");
+      setSearchParams(next, { replace: true });
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [focusEventId, queue.isLoading, queue.data?.length]);
   const utils = trpc.useUtils();
   const applyMutation = trpc.federalForms.applyChangeEvent.useMutation({
     onSuccess: () => utils.federalForms.recentChanges.invalidate(),
@@ -148,8 +168,16 @@ export function SettingsFederalFormsPanel() {
               CONFIDENCE_TONE[event.notice.parseConfidence ?? "medium"] ??
               CONFIDENCE_TONE.medium;
             const isResolved = !!event.appliedAt;
+            const isFocused =
+              focusEventId !== null && String(event.eventId) === focusEventId;
             return (
-              <li key={event.eventId} className="px-4 py-3">
+              <li
+                key={event.eventId}
+                ref={isFocused ? focusedRowRef : null}
+                className={`px-4 py-3 transition-colors ${
+                  isFocused ? "bg-info-bg/40 ring-2 ring-info-border" : ""
+                }`}
+              >
                 <div className="flex items-baseline gap-2 flex-wrap">
                   <span className="text-sm font-mono font-semibold text-ink-900">
                     Form {event.form.formNumber}

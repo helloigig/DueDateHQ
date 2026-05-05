@@ -1205,6 +1205,11 @@ export const federalForms = pgTable("federal_forms", {
   dueDateRule: jsonb("due_date_rule"),
   notes: text("notes"),
   irsUrl: text("irs_url"),
+  /** Per-form checklist items (W-2, 1099-INT, K-1, …) with optional IRS
+   *  PDF source link + per-item confidence. Powers FilingsTab expandable
+   *  rows and Mode A inbound classifier's expected-itemType set. Shape:
+   *  [{ label, itemType, source?, confidence? }, …]. */
+  requiredItems: jsonb("required_items").notNull().default([]),
   extractionMethod: federalFormExtractionMethod("extraction_method")
     .notNull()
     .default("curated"),
