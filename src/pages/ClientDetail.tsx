@@ -67,12 +67,12 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { MultiSelectChip } from "../components/MultiSelectChip";
 import { cn } from "../lib/utils";
-import { ClientChip } from "../components/ClientChip";
-// PageContainer (from main, PR #133) for the 1080px page width.
-// StateChipGroup (also from main) dropped — ClientChip's `lg` variant
-// renders the state pill internally, so importing the standalone group
-// here is dead weight after the migration.
-import { PageContainer } from "../components/ui/PageContainer";
+// ClientChip is the canonical client-identity primitive (PR #135) used
+// across dense lists (Action Queue, Mail rows, Alerts chips). On THIS
+// page the client IS the page subject, so we render name + tier + state
+// as a labeled identity strip rather than a single chip — same data,
+// more readable layout for a header. The chip stays the canonical
+// rendering everywhere else.
 import { STATE_NAMES, type StateCode } from "../types";
 import { bundleByName, type FilingBundle } from "../data/bundles";
 import { resolveFederalForm } from "../data/canonicalForm";
