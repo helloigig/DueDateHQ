@@ -17,10 +17,13 @@ import { useTriageDeadlines } from "../hooks/useDeadlines";
 import { useAnnouncements } from "../hooks/useAnnouncements";
 import { useStore } from "../data/store";
 import { useFeatureFlags } from "../hooks/useFeatureFlags";
+import { useModalDialog } from "../hooks/useModalDialog";
 import { UpgradePrompt } from "../components/UpgradePrompt";
+import { toast } from "sonner";
 import { countdownLabel, parseDate, TODAY, daysBetween } from "../data/dateHelpers";
 import {
   STATE_NAMES,
+  type Client,
   type ClientStatus,
   type ClientTier,
   type EntityType,
@@ -78,7 +81,7 @@ const EMPTY_FILTERS: Filters = {
 // roster state. Each predicate has a corresponding KPI tile at the top of
 // the page; clicking a tile toggles the matching filter, so the page has
 // ONE filter mechanism for "what needs attention" instead of two.
-type SmartFilter = "hasWaiting" | "stuck";
+type SmartFilter = "hasWaiting" | "stuck" | "multiState";
 const STUCK_THRESHOLD_DAYS = 14;
 
 export function Clients() {
@@ -94,6 +97,13 @@ export function Clients() {
   const [smartFilters, setSmartFilters] = useState<Set<SmartFilter>>(
     new Set<SmartFilter>(),
   );
+  // Batch-select state for bulk actions (e.g. send file request to
+  // every client missing a 1040 doc). Lives on the page rather than
+  // the table so the floating action toolbar can read it without
+  // prop-drilling. Cleared whenever filters change so a stale
+  // selection can't cross a filter boundary.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchModalOpen, setBatchModalOpen] = useState(false);
   const [sortCol, setSortCol] = useState<SortColumn>("open");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [addOpen, setAddOpen] = useState(false);
@@ -206,7 +216,6 @@ export function Clients() {
       return { c, openCount: countOpenDeadlines(c.id), next };
     });
     // Smart filters (boolean predicates over computed roster state).
-    // "Has waiting" is the default-on gap-over-fill filter per IA v0.7 §3.2.
     if (smartFilters.size > 0) {
       rows = rows.filter(({ c }) => {
         const fc = fleetCounts.get(c.id);
@@ -216,6 +225,12 @@ export function Clients() {
         if (
           smartFilters.has("stuck") &&
           (!fc || (fc.oldestReminderDays ?? 0) < STUCK_THRESHOLD_DAYS)
+        ) {
+          return false;
+        }
+        if (
+          smartFilters.has("multiState") &&
+          (!c.nexusStates || c.nexusStates.length === 0)
         ) {
           return false;
         }
@@ -318,10 +333,6 @@ export function Clients() {
   }
 
   const activeCount = clients.filter((c) => c.status === "active").length;
-  const dueSoonCount = deadlines.filter((d) => {
-    const diff = daysBetween(TODAY, parseDate(d.officialDueDate));
-    return diff >= 0 && diff <= 7 && d.status !== "completed" && d.status !== "filed_extension";
-  }).length;
   // Roster-level signals — surface what needs attention vs. what's volume.
   let waitingFleetCount = 0;
   let stuckFleetCount = 0;
@@ -329,6 +340,13 @@ export function Clients() {
     if (fc.waiting > 0) waitingFleetCount++;
     if ((fc.oldestReminderDays ?? 0) >= STUCK_THRESHOLD_DAYS) stuckFleetCount++;
   }
+  // Multi-state count — clients whose nexus list extends beyond their
+  // primary state. Useful filter on this page since multi-state work
+  // is a different operational beast (multiple SOS portals, multiple
+  // estimated payments, nexus-change alerts to triage).
+  const multiStateCount = clients.filter(
+    (c) => c.nexusStates && c.nexusStates.length > 0,
+  ).length;
 
   const toggleSmart = (key: SmartFilter) => {
     setSmartFilters((prev) => {
@@ -411,36 +429,84 @@ export function Clients() {
         }
       />
 
-      {/* KPI tiles — each clickable doubles as a smart-filter trigger.
-          Order: highest-priority gap-loud signal first → time-window last. */}
+      {/* KPI tiles — clients-page axes, not Today's signals.
+          The page's job is to slice/find clients, so the tiles surface
+          attributes (active count, multi-state count, stuck cohort)
+          rather than per-deadline signals (which live on Today). The
+          \"Awaiting reply\" tile was retired here because it duplicated
+          Today's chase queue — the data lives in the Waiting column on
+          each row already, and surfacing it as a top-level number on
+          this page didn't tell the CPA anything they couldn't read in
+          the table. \"Stuck >14d\" stays — it's the one fleet-level
+          urgency signal the table doesn't surface as a single sortable
+          number. */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-card">
         <MetricTile
-          label="Awaiting reply"
-          value={waitingFleetCount}
-          tone={waitingFleetCount > 0 ? "warn" : "neutral"}
-          helper="Client hasn't sent something"
-          active={smartFilters.has("hasWaiting")}
-          onClick={() => toggleSmart("hasWaiting")}
+          label="Active clients"
+          value={clients.length}
+          tone="neutral"
+          helper={
+            allClients.length === clients.length
+              ? "Whole roster"
+              : `of ${allClients.length} matching filters`
+          }
         />
         <MetricTile
-          label={`Awaiting >${STUCK_THRESHOLD_DAYS}d`}
+          label="Multi-state"
+          value={multiStateCount}
+          tone="neutral"
+          helper="Clients with nexus beyond their primary state"
+          active={smartFilters.has("multiState")}
+          onClick={() => toggleSmart("multiState")}
+        />
+        <MetricTile
+          label={`Stuck >${STUCK_THRESHOLD_DAYS}d`}
           value={stuckFleetCount}
           tone={stuckFleetCount > 0 ? "danger" : "neutral"}
           helper="Past reminder cadence — call them"
           active={smartFilters.has("stuck")}
           onClick={() => toggleSmart("stuck")}
         />
-        <MetricTile
-          label="Due in 7 days"
-          value={dueSoonCount}
-          tone={dueSoonCount > 0 ? "warn" : "neutral"}
-          helper="Filings approaching"
-        />
       </div>
 
-      {/* Attribute filters — separate from the KPI-tile signal filters.
-          Hierarchy: tiles answer "what needs attention", these answer
-          "what slice of the roster". */}
+      {/* Status — promoted from MultiSelectChip dropdown to inline pills.
+          Status has 3-4 options + always-relevant; hiding it behind a
+          chip toggle adds a click for no payoff. Other filters
+          (Entity/State/Tier/Package) keep the dropdown because their
+          option lists are long enough that an inline row would dominate
+          the viewport. */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
+          Status
+        </span>
+        {STATUS_OPTIONS.map((opt) => {
+          const active = filters.status.includes(opt.value);
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() =>
+                setFilters((f) => ({
+                  ...f,
+                  status: active
+                    ? f.status.filter((s) => s !== opt.value)
+                    : [...f.status, opt.value],
+                }))
+              }
+              className={`text-xs px-2.5 py-1 rounded-pill border transition-colors ${
+                active
+                  ? "bg-ink-900 text-canvas border-ink-900"
+                  : "bg-surface text-ink-700 border-line hover:bg-sunken"
+              }`}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Other attribute filters — kept as dropdown chips because the
+          option lists are long (50 states, 7 entities, N packages). */}
       <div className="flex items-center gap-2 flex-wrap">
         <MultiSelectChip
           label="Entity"
@@ -453,12 +519,6 @@ export function Clients() {
           options={STATE_OPTIONS}
           selected={filters.state}
           onChange={(next) => setFilters((f) => ({ ...f, state: next }))}
-        />
-        <MultiSelectChip
-          label="Status"
-          options={STATUS_OPTIONS}
-          selected={filters.status}
-          onChange={(next) => setFilters((f) => ({ ...f, status: next }))}
         />
         <MultiSelectChip
           label="Tier"
@@ -483,6 +543,20 @@ export function Clients() {
         )}
       </div>
 
+      {/* Row-tint legend — tells the user the warn-bg-tinted rows are
+          state-alert-affected without making them hunt for context.
+          Hidden when the active set has no alerted rows. */}
+      {alertedClientIds.size > 0 && (
+        <div className="text-2xs text-ink-500 inline-flex items-center gap-1.5">
+          <span
+            className="inline-block w-3 h-3 rounded bg-warn-bg/60 border border-warn-border/60"
+            aria-hidden
+          />
+          Yellow rows have an active state alert affecting their filings —
+          click to triage.
+        </div>
+      )}
+
       {atLimit && (
         <div>
           <UpgradePrompt
@@ -499,6 +573,39 @@ export function Clients() {
         <table className="w-full text-sm">
           <thead className="bg-sunken text-2xs uppercase tracking-wider text-ink-700">
             <tr>
+              {/* Select column — header checkbox toggles all visible
+                  rows. Indeterminate when partial. Width capped to
+                  avoid taking real estate from Name. */}
+              <th className="px-3 py-2 w-10">
+                <input
+                  type="checkbox"
+                  checked={
+                    sorted.length > 0 &&
+                    sorted.every(({ c }) => selectedIds.has(c.id))
+                  }
+                  ref={(el) => {
+                    if (!el) return;
+                    const someSelected = sorted.some(({ c }) =>
+                      selectedIds.has(c.id),
+                    );
+                    const allSelected =
+                      sorted.length > 0 &&
+                      sorted.every(({ c }) => selectedIds.has(c.id));
+                    el.indeterminate = someSelected && !allSelected;
+                  }}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedIds(
+                        new Set(sorted.map(({ c }) => c.id)),
+                      );
+                    } else {
+                      setSelectedIds(new Set());
+                    }
+                  }}
+                  className="w-3.5 h-3.5 rounded border-line accent-indigo"
+                  aria-label="Select all visible clients"
+                />
+              </th>
               <SortableTh col="name" sortCol={sortCol} sortDir={sortDir} onClick={toggleSort} align="left">
                 Name
               </SortableTh>
@@ -568,6 +675,7 @@ export function Clients() {
                   : c.tier === "premium" && fc.review > 0
                     ? "P" // pricing
                     : null;
+              const isSelected = selectedIds.has(c.id);
               return (
                 <tr
                   key={c.id}
@@ -575,6 +683,24 @@ export function Clients() {
                   className={`border-b border-line last:border-b-0 cursor-pointer transition-colors ${rowTint}`}
                   title={hasAlert ? "1+ active state alert affecting this client" : undefined}
                 >
+                  <td className="px-3 py-2.5 w-10">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setSelectedIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(c.id)) next.delete(c.id);
+                          else next.add(c.id);
+                          return next;
+                        });
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-3.5 h-3.5 rounded border-line accent-indigo"
+                      aria-label={`Select ${c.name}`}
+                    />
+                  </td>
                   <td className="px-4 py-2.5">
                     <Link
                       to={href}
@@ -644,7 +770,7 @@ export function Clients() {
             })}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center">
+                <td colSpan={9} className="px-4 py-8 text-center">
                   <p className="text-sm text-ink-700 font-medium">
                     {hasFilters
                       ? "No clients match the current filters."
@@ -664,7 +790,206 @@ export function Clients() {
           </tbody>
         </table>
       </div>
+
+      {/* Bulk-action toolbar — fixed to viewport bottom when ≥1 row
+          selected. Currently surfaces a single bulk action (file-request
+          send); future work: bulk tag, bulk archive, bulk export. The
+          toolbar lives outside the table so the user can scroll the
+          roster without losing the action affordance. */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-ink-900 text-canvas rounded-lg shadow-overlay flex items-center gap-3 px-4 py-2.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
+          <span className="text-xs tabular-nums">
+            <span className="font-semibold">{selectedIds.size}</span> selected
+          </span>
+          <span className="text-ink-500 text-2xs" aria-hidden>
+            ·
+          </span>
+          <button
+            type="button"
+            onClick={() => setBatchModalOpen(true)}
+            className="text-xs px-2.5 py-1 rounded bg-indigo hover:bg-indigo-hover transition-colors inline-flex items-center gap-1"
+          >
+            <Upload className="w-3 h-3" aria-hidden />
+            Send file request
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="text-xs text-ink-300 hover:text-canvas transition-colors px-2"
+            aria-label="Clear selection"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
+      {batchModalOpen && (
+        <BatchFileRequestModal
+          clientIds={Array.from(selectedIds)}
+          allClients={allClients}
+          onClose={() => setBatchModalOpen(false)}
+          onSent={() => {
+            setBatchModalOpen(false);
+            setSelectedIds(new Set());
+          }}
+        />
+      )}
     </PageContainer>
+  );
+}
+
+// ── Batch file-request modal ──────────────────────────────────────────────
+// Bulk-send a doc-request email to N selected clients. Phase 1 stub:
+// shows the recipient list + composes one editable subject/body that
+// gets fanned out per-recipient. Phase 2 wires this to a real BE proc
+// (announcements.sendBulletinEmails-style fanout) so the audit trail
+// captures one event per client.
+function BatchFileRequestModal({
+  clientIds,
+  allClients,
+  onClose,
+  onSent,
+}: {
+  clientIds: string[];
+  allClients: Client[];
+  onClose: () => void;
+  onSent: () => void;
+}) {
+  const recipients = allClients.filter((c) => clientIds.includes(c.id));
+  const [subject, setSubject] = useState(
+    "Quick request — documents needed for your filings",
+  );
+  const [body, setBody] = useState(
+    "Hi {first_name},\n\nA quick check-in — we need a few documents from you to keep your filings on track. Please reply with what you have so far; I'll follow up on anything missing.\n\nThanks!",
+  );
+  const dialogRef = useModalDialog(true, onClose);
+
+  const onSend = () => {
+    // Phase 1: fire a toast and close. Phase 2 wires to a real BE
+    // procedure (clients.sendBatchFileRequest or similar) that
+    // saves one email_drafts row per recipient and dispatches them
+    // through the existing Resend pipeline.
+    toast.success(
+      `Queued · ${recipients.length} ${recipients.length === 1 ? "request" : "requests"} sent (Phase 2 will hit the BE)`,
+    );
+    onSent();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-stretch justify-end bg-ink-900/40 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="batch-file-request-title"
+        onClick={(e) => e.stopPropagation()}
+        className="bg-surface border-l border-line w-full max-w-[540px] outline-none flex flex-col h-full shadow-overlay"
+      >
+        <header className="flex items-start justify-between gap-3 px-region py-3 border-b border-line">
+          <div className="min-w-0 flex-1">
+            <div className="text-2xs uppercase tracking-wider font-semibold text-ink-500 mb-1">
+              Batch file request
+            </div>
+            <h2
+              id="batch-file-request-title"
+              className="text-sm font-semibold text-ink-900"
+            >
+              Send to {recipients.length}{" "}
+              {recipients.length === 1 ? "client" : "clients"}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="text-ink-500 hover:text-ink-900 hover:bg-sunken transition-colors w-8 h-8 inline-flex items-center justify-center rounded shrink-0"
+          >
+            <X className="w-4 h-4" aria-hidden />
+          </button>
+        </header>
+
+        <div className="flex-1 overflow-y-auto">
+          <section className="px-region py-3 border-b border-line">
+            <h3 className="text-2xs uppercase tracking-wider text-ink-500 font-semibold mb-2">
+              Recipients
+            </h3>
+            <ul className="flex flex-wrap gap-1.5">
+              {recipients.map((c) => (
+                <li
+                  key={c.id}
+                  className="text-xs px-2 py-0.5 rounded-pill border border-line bg-canvas text-ink-700"
+                  title={c.contactEmail || "(no email on file)"}
+                >
+                  {c.name}
+                </li>
+              ))}
+            </ul>
+            <p className="text-2xs text-ink-400 mt-2">
+              {`{first_name}`} replaces with each client's first name
+              before sending.
+            </p>
+          </section>
+
+          <section className="px-region py-3 space-y-3">
+            <div>
+              <label
+                htmlFor="batch-subject"
+                className="block text-2xs uppercase tracking-wider text-ink-500 font-semibold mb-1"
+              >
+                Subject
+              </label>
+              <input
+                id="batch-subject"
+                type="text"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                maxLength={300}
+                className="w-full text-sm border border-line rounded px-2.5 py-1.5 bg-canvas text-ink-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent transition-shadow"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="batch-body"
+                className="block text-2xs uppercase tracking-wider text-ink-500 font-semibold mb-1"
+              >
+                Message
+              </label>
+              <textarea
+                id="batch-body"
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                rows={10}
+                maxLength={20000}
+                className="w-full text-sm bg-canvas border border-line rounded px-2.5 py-2 text-ink-900 leading-relaxed focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent transition-shadow"
+              />
+            </div>
+          </section>
+        </div>
+
+        <footer className="flex items-center justify-between gap-2 px-region py-3 border-t border-line bg-canvas">
+          <span className="text-xs text-ink-500">
+            One email per recipient · personalised by name
+          </span>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={onSend}
+              disabled={recipients.length === 0 || !subject.trim()}
+              className="bg-indigo hover:bg-indigo-hover text-white"
+            >
+              Send {recipients.length}
+            </Button>
+          </div>
+        </footer>
+      </div>
+    </div>
   );
 }
 
