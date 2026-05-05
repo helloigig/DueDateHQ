@@ -21,6 +21,9 @@ import {
   Sparkles,
   X as XIcon,
   Check,
+  Plus,
+  GitBranch,
+  ArrowRight,
 } from "lucide-react";
 import { actions, useStore } from "../data/store";
 import { useImportHistory } from "../hooks/useImports";
@@ -51,7 +54,15 @@ import {
   useUpdateReminderTemplate,
 } from "../hooks/useReminderTemplates";
 import type { FirmSession } from "../data/session";
-import { BUNDLES } from "../data/bundles";
+import { BUNDLES, type FilingBundle } from "../data/bundles";
+import { ServicePackageModal } from "../components/ServicePackageModal";
+import { useCustomBundles } from "../hooks/useCustomBundles";
+import { useClients } from "../hooks/useClients";
+import {
+  useDependencyChains,
+  type DependencyChain,
+} from "../hooks/useDependencyChains";
+import { DependencyChainEditor } from "../components/DependencyChainEditor";
 import {
   computeEligibility,
   eligibilityLabel,
@@ -66,6 +77,7 @@ const NAV = [
   { to: "/settings/firm", label: "Firm", icon: Building2 },
   { to: "/settings/team", label: "Team", icon: Users2 },
   { to: "/settings/packages", label: "Service Packages", icon: Package },
+  { to: "/settings/dependencies", label: "Dependencies", icon: GitBranch },
   { to: "/settings/reminders", label: "Reminder Templates", icon: Mail },
   { to: "/settings/integrations", label: "Integrations", icon: Plug },
   { to: "/settings/imports", label: "Imports", icon: Upload },
@@ -108,6 +120,7 @@ export function Settings() {
           <Route index element={<ProfilePanel />} />
           <Route path="firm" element={<FirmPanel />} />
           <Route path="packages" element={<ServicePackagesPanel />} />
+          <Route path="dependencies" element={<DependenciesPanel />} />
           <Route path="reminders" element={<RemindersPanel />} />
           <Route path="integrations" element={<IntegrationsPanel />} />
           <Route path="billing" element={<BillingPanel />} />
@@ -1135,14 +1148,63 @@ function ImportsPanel() {
   );
 }
 
+type TeamRole = "owner" | "admin" | "member" | "viewer";
+
+const ROLE_DEF: Record<
+  TeamRole,
+  { label: string; tone: string; summary: string; details: string }
+> = {
+  owner: {
+    label: "Owner",
+    tone: "bg-ink-900 text-canvas",
+    summary: "Full access · manages users + billing",
+    details:
+      "Edit firm settings, invite/remove teammates, change plan, edit service packages and reminder templates, all client + task data. The first signup is automatically the Owner.",
+  },
+  admin: {
+    label: "Admin",
+    tone: "bg-info-bg text-info-ink border border-info-border",
+    summary: "Manages users · no billing",
+    details:
+      "All Member capabilities, plus invite/remove teammates and edit firm settings (service packages, reminder templates, federal-forms catalog reviewer). Cannot change the plan or update billing.",
+  },
+  member: {
+    label: "Member",
+    tone: "bg-sunken text-ink-700 border border-line",
+    summary: "Full data access · cannot manage users or billing",
+    details:
+      "See and act on every client and task. Send reminders, confirm docs, resolve flags, edit reminder templates. Cannot invite teammates, change plan, or modify firm settings.",
+  },
+  viewer: {
+    label: "Viewer",
+    tone: "bg-canvas text-ink-500 border border-line",
+    summary: "Read-only · audit trail consumer",
+    details:
+      "See client records, task progress, and the activity timeline. Cannot send emails, change states, edit templates, or invite teammates. Useful for auditors, advisors, or read-only stakeholders.",
+  },
+};
+
+interface PendingInvite {
+  id: string;
+  email: string;
+  role: TeamRole;
+  /** Optional client-id allowlist — empty array = all clients (default).
+   *  Phase 2 surface; only enforced once BE per-client ACL ships. */
+  clientAllowlist: string[];
+  invitedAt: string;
+}
+
 function TeamPanel() {
   const flags = useFeatureFlags();
   const session = useSession();
-  const [pending, setPending] = useState<
-    Array<{ id: string; email: string; role: "owner" | "member"; invitedAt: string }>
-  >([]);
+  const [pending, setPending] = useState<PendingInvite[]>([]);
   const [emailInput, setEmailInput] = useState("");
-  const [roleInput, setRoleInput] = useState<"owner" | "member">("member");
+  const [roleInput, setRoleInput] = useState<TeamRole>("member");
+  const [accessMode, setAccessMode] =
+    useState<"all_clients" | "specific_clients">("all_clients");
+  const [allowlist, setAllowlist] = useState<Set<string>>(new Set());
+  const clientsQuery = useClients();
+  const allClients = clientsQuery.data?.items ?? [];
 
   if (!flags.canInviteTeammates) {
     return <UpgradePrompt feature="Team invites" requiredTier="pro" />;
@@ -1155,16 +1217,28 @@ function TeamPanel() {
         id: `inv-${Date.now()}`,
         email: emailInput.trim(),
         role: roleInput,
+        clientAllowlist:
+          accessMode === "specific_clients" ? Array.from(allowlist) : [],
         invitedAt: new Date().toISOString(),
       },
       ...prev,
     ]);
     setEmailInput("");
+    setAllowlist(new Set());
+    setAccessMode("all_clients");
   };
 
   const revoke = (id: string) => {
     setPending((prev) => prev.filter((p) => p.id !== id));
   };
+
+  const toggleClient = (id: string) =>
+    setAllowlist((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   return (
     <>
@@ -1200,42 +1274,32 @@ function TeamPanel() {
       </Card>
 
       <Card
-        title="Roles at MVP"
-        description="Two roles only at this stage. Admin / Viewer / client-level access ship in Phase 2."
+        title="Roles"
+        description="Four roles cover every collaboration shape. Owner ↔ Member is the default; Admin and Viewer are the new tiers for larger firms."
       >
         <ul className="divide-y divide-line">
-          <li className="py-2.5 flex items-start gap-3">
-            <span className="text-2xs uppercase tracking-wide px-2 py-0.5 rounded bg-ink-900 text-canvas font-semibold mt-0.5">
-              Owner
-            </span>
-            <div className="flex-1 text-xs text-ink-700">
-              <p className="font-medium text-ink-900">Full access · manages users + billing</p>
-              <p className="text-ink-500 mt-0.5">
-                Edit firm settings, invite/remove teammates, change plan, edit
-                service packages and reminder templates, all client + task data.
-                The first signup is automatically the Owner.
-              </p>
-            </div>
-          </li>
-          <li className="py-2.5 flex items-start gap-3">
-            <span className="text-2xs uppercase tracking-wide px-2 py-0.5 rounded bg-sunken text-ink-700 border border-line font-semibold mt-0.5">
-              Member
-            </span>
-            <div className="flex-1 text-xs text-ink-700">
-              <p className="font-medium text-ink-900">Full data access · cannot manage users or billing</p>
-              <p className="text-ink-500 mt-0.5">
-                See and act on every client and task. Send reminders, confirm
-                docs, resolve flags, edit reminder templates. Cannot invite
-                teammates, change plan, or modify firm settings.
-              </p>
-            </div>
-          </li>
+          {(Object.keys(ROLE_DEF) as TeamRole[]).map((r) => {
+            const def = ROLE_DEF[r];
+            return (
+              <li key={r} className="py-2.5 flex items-start gap-3">
+                <span
+                  className={`text-2xs uppercase tracking-wide px-2 py-0.5 rounded font-semibold mt-0.5 shrink-0 ${def.tone}`}
+                >
+                  {def.label}
+                </span>
+                <div className="flex-1 text-xs text-ink-700">
+                  <p className="font-medium text-ink-900">{def.summary}</p>
+                  <p className="text-ink-500 mt-0.5">{def.details}</p>
+                </div>
+              </li>
+            );
+          })}
         </ul>
-        <p className="text-2xs text-ink-400 mt-3 pt-3 border-t border-line">
-          Phase 2 adds <span className="font-medium text-ink-700">Admin</span> (manage users, no billing) and{" "}
-          <span className="font-medium text-ink-700">Viewer</span> (read-only audit-trail consumer).
-          Per-client access restrictions also Phase 2. Multiple assignees per task
-          (preparer + reviewer roles) Phase 2.
+        <p className="text-2xs text-ink-400 mt-3 pt-3 border-t border-line leading-relaxed">
+          <span className="font-medium text-ink-700">Per-client access restrictions</span>{" "}
+          (e.g., a Member who can only see clients in California): scoped per invite below.
+          Server-side enforcement ships alongside; until then the UI scopes are advisory and
+          the audit log records every access for review.
         </p>
       </Card>
 
@@ -1279,11 +1343,14 @@ function TeamPanel() {
           <Field label="Role">
             <select
               value={roleInput}
-              onChange={(e) => setRoleInput(e.target.value as "owner" | "member")}
+              onChange={(e) => setRoleInput(e.target.value as TeamRole)}
               className="border border-line rounded px-2 py-1.5 text-sm bg-surface"
             >
-              <option value="member">Member</option>
-              <option value="owner">Owner</option>
+              {(Object.keys(ROLE_DEF) as TeamRole[]).map((r) => (
+                <option key={r} value={r}>
+                  {ROLE_DEF[r].label}
+                </option>
+              ))}
             </select>
           </Field>
           <button
@@ -1294,6 +1361,63 @@ function TeamPanel() {
             Send invite
           </button>
         </div>
+
+        <div className="mt-3 pt-3 border-t border-line">
+          <p className="text-2xs uppercase tracking-wide text-ink-500 font-semibold mb-1.5">
+            Client access scope
+          </p>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => setAccessMode("all_clients")}
+              className={`text-xs px-2.5 py-1 rounded border ${
+                accessMode === "all_clients"
+                  ? "bg-info-bg text-info-ink border-info-border"
+                  : "bg-surface border-line text-ink-700 hover:bg-sunken/40"
+              }`}
+            >
+              All clients
+            </button>
+            <button
+              type="button"
+              onClick={() => setAccessMode("specific_clients")}
+              className={`text-xs px-2.5 py-1 rounded border ${
+                accessMode === "specific_clients"
+                  ? "bg-info-bg text-info-ink border-info-border"
+                  : "bg-surface border-line text-ink-700 hover:bg-sunken/40"
+              }`}
+            >
+              Specific clients only ({allowlist.size})
+            </button>
+          </div>
+          {accessMode === "specific_clients" && (
+            <div className="mt-2 max-h-40 overflow-y-auto border border-line rounded bg-surface divide-y divide-line">
+              {allClients.length === 0 ? (
+                <p className="text-xs text-ink-500 italic px-3 py-2">
+                  No clients yet — invite first, scope later.
+                </p>
+              ) : (
+                allClients.map((c) => (
+                  <label
+                    key={c.id}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer hover:bg-sunken/40"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={allowlist.has(c.id)}
+                      onChange={() => toggleClient(c.id)}
+                      className="w-3.5 h-3.5 accent-info-solid"
+                    />
+                    <span className="text-ink-900 font-medium">{c.name}</span>
+                    <span className="text-ink-500">
+                      · {c.entityType} · {c.primaryState}
+                    </span>
+                  </label>
+                ))
+              )}
+            </div>
+          )}
+        </div>
       </Card>
 
       {pending.length > 0 && (
@@ -1302,27 +1426,43 @@ function TeamPanel() {
           description="They'll show up here until accepted or revoked."
         >
           <ul className="divide-y divide-line">
-            {pending.map((p) => (
-              <li
-                key={p.id}
-                className="py-2 flex items-center gap-3 text-sm"
-              >
-                <Users2 className="w-4 h-4 text-ink-400" aria-hidden />
-                <span className="text-ink-900">{p.email}</span>
-                <span className="text-2xs uppercase tracking-wide text-ink-500">
-                  {p.role}
-                </span>
-                <span className="text-2xs text-ink-400 ml-auto">
-                  {new Date(p.invitedAt).toLocaleDateString()}
-                </span>
-                <button
-                  onClick={() => revoke(p.id)}
-                  className="text-xs text-ink-500 hover:text-ink-900"
+            {pending.map((p) => {
+              const def = ROLE_DEF[p.role];
+              return (
+                <li
+                  key={p.id}
+                  className="py-2 flex items-center gap-3 text-sm flex-wrap"
                 >
-                  Revoke
-                </button>
-              </li>
-            ))}
+                  <Users2 className="w-4 h-4 text-ink-400 shrink-0" aria-hidden />
+                  <span className="text-ink-900">{p.email}</span>
+                  <span
+                    className={`text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded font-semibold ${def.tone}`}
+                  >
+                    {def.label}
+                  </span>
+                  {p.clientAllowlist.length > 0 ? (
+                    <span
+                      className="text-2xs px-1.5 py-0.5 rounded bg-warn-bg text-warn-ink border border-warn-border"
+                      title={`Limited to ${p.clientAllowlist.length} clients`}
+                    >
+                      {p.clientAllowlist.length} client
+                      {p.clientAllowlist.length === 1 ? "" : "s"}
+                    </span>
+                  ) : (
+                    <span className="text-2xs text-ink-400">all clients</span>
+                  )}
+                  <span className="text-2xs text-ink-400 ml-auto">
+                    {new Date(p.invitedAt).toLocaleDateString()}
+                  </span>
+                  <button
+                    onClick={() => revoke(p.id)}
+                    className="text-xs text-ink-500 hover:text-ink-900"
+                  >
+                    Revoke
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </Card>
       )}
@@ -1576,40 +1716,332 @@ function FirmPanel() {
   );
 }
 
-function ServicePackagesPanel() {
+function DependenciesPanel() {
+  const { systemChains, customChains, upsert, remove } = useDependencyChains();
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editing, setEditing] = useState<DependencyChain | null>(null);
+  const [isSystem, setIsSystem] = useState(false);
+
+  const open = (chain: DependencyChain | null, systemFlag = false) => {
+    setEditing(chain);
+    setIsSystem(systemFlag);
+    setEditorOpen(true);
+  };
+
   return (
-    <Card
-      title="Service Packages"
-      description="System-defined bundles you can apply to any client. Custom packages coming in P1."
-    >
-      <ul className="divide-y divide-line">
-        {BUNDLES.map((b) => (
-          <li key={b.id} className="py-3 flex items-start gap-3">
-            <Package className="w-4 h-4 text-ink-400 mt-0.5" aria-hidden />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-ink-900">{b.name}</p>
-              <p className="text-xs text-ink-500 mt-0.5">{b.description}</p>
-              <div className="flex flex-wrap gap-1 mt-1.5">
-                {b.entityTypes.map((e) => (
-                  <span
-                    key={e}
-                    className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-700"
-                  >
-                    {e}
-                  </span>
-                ))}
-              </div>
-            </div>
+    <>
+      <Card
+        title="System chains"
+        description="Pre-built relationships every firm gets Day-1. Click to inspect — they can't be edited (they encode the IRS-mandated waiting that's identical for every CPA)."
+      >
+        <ul className="divide-y divide-line">
+          {systemChains.map((c) => (
+            <ChainRow
+              key={c.id}
+              chain={c}
+              onClick={() => open(c, true)}
+              system
+            />
+          ))}
+        </ul>
+      </Card>
+
+      <Card
+        title="Custom chains"
+        description='"Wait for X before Y" rules specific to your firm. The system enforces them across every applicable client.'
+      >
+        {customChains.length === 0 ? (
+          <p className="text-sm text-ink-500">
+            No custom chains yet.{" "}
             <button
-              className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken"
-              title="Cloning is wireframe-only — backend wires this in P0"
+              className="text-info-ink hover:underline"
+              onClick={() => open(null)}
             >
-              Clone
+              Add the first one
             </button>
-          </li>
-        ))}
-      </ul>
-    </Card>
+            .
+          </p>
+        ) : (
+          <ul className="divide-y divide-line">
+            {customChains.map((c) => (
+              <ChainRow
+                key={c.id}
+                chain={c}
+                onClick={() => open(c)}
+              />
+            ))}
+          </ul>
+        )}
+        <div className="mt-3 pt-3 border-t border-line">
+          <button
+            onClick={() => open(null)}
+            className="text-xs inline-flex items-center gap-1 px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken"
+          >
+            <Plus className="w-3 h-3" aria-hidden />
+            New dependency chain
+          </button>
+        </div>
+      </Card>
+
+      <DependencyChainEditor
+        open={editorOpen}
+        initial={editing ?? undefined}
+        isSystemChain={isSystem}
+        onClose={() => {
+          setEditorOpen(false);
+          setEditing(null);
+          setIsSystem(false);
+        }}
+        onSave={upsert}
+        onDelete={remove}
+      />
+    </>
+  );
+}
+
+function ChainRow({
+  chain,
+  onClick,
+  system = false,
+}: {
+  chain: DependencyChain;
+  onClick: () => void;
+  system?: boolean;
+}) {
+  const refLabel = (r: { kind: string; ref: string }) => {
+    if (!r.ref) return "—";
+    if (r.kind === "form") return `Form ${r.ref}`;
+    if (r.kind === "milestone") return r.ref.replace(/_/g, " ");
+    return r.ref;
+  };
+  return (
+    <li
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      className="py-3 -mx-5 px-5 flex items-start gap-3 cursor-pointer hover:bg-sunken/40 rounded"
+    >
+      <GitBranch
+        className={`w-4 h-4 mt-0.5 ${system ? "text-ink-400" : "text-info-ink"}`}
+        aria-hidden
+      />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <p className="text-sm font-medium text-ink-900">{chain.name}</p>
+          {!system && (
+            <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-info-bg text-info-ink border border-info-border">
+              Custom
+            </span>
+          )}
+          <span
+            className={`text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded ${
+              chain.enforcement === "hard"
+                ? "bg-warn-bg text-warn-ink border border-warn-border"
+                : "bg-sunken text-ink-500 border border-line"
+            }`}
+          >
+            {chain.enforcement}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 mt-1.5 text-xs text-ink-700">
+          <span className="px-1.5 py-0.5 rounded bg-sunken">
+            {refLabel(chain.waitFor)}
+          </span>
+          <ArrowRight className="w-3 h-3 text-ink-400" aria-hidden />
+          <span className="px-1.5 py-0.5 rounded bg-sunken">
+            {refLabel(chain.blocks)}
+          </span>
+          {chain.bufferDays > 0 && (
+            <span className="text-2xs text-ink-500">
+              · {chain.bufferDays}d buffer
+            </span>
+          )}
+        </div>
+        {chain.description && (
+          <p className="text-xs text-ink-500 mt-1">{chain.description}</p>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function ServicePackagesPanel() {
+  const { bundles: customBundles, upsert, remove } = useCustomBundles();
+  const [modalState, setModalState] = useState<{
+    open: boolean;
+    mode: "view" | "edit" | "create";
+    bundle?: FilingBundle;
+    isSystem: boolean;
+  }>({ open: false, mode: "view", isSystem: false });
+
+  const closeModal = () =>
+    setModalState((s) => ({ ...s, open: false }));
+
+  const openView = (b: FilingBundle, isSystem: boolean) =>
+    setModalState({ open: true, mode: "view", bundle: b, isSystem });
+  const openEdit = (b: FilingBundle) =>
+    setModalState({ open: true, mode: "edit", bundle: b, isSystem: false });
+  const openCreate = () =>
+    setModalState({ open: true, mode: "create", isSystem: false });
+
+  return (
+    <>
+      <Card
+        title="System packages"
+        description="The 6 bundles ship with every firm Day-1. Click to preview, or clone to create a firm-custom version."
+      >
+        <ul className="divide-y divide-line">
+          {BUNDLES.map((b) => (
+            <li
+              key={b.id}
+              className="py-3 flex items-start gap-3 cursor-pointer hover:bg-sunken/40 -mx-5 px-5 rounded"
+              onClick={() => openView(b, true)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  openView(b, true);
+                }
+              }}
+            >
+              <Package className="w-4 h-4 text-ink-400 mt-0.5" aria-hidden />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-ink-900">{b.name}</p>
+                <p className="text-xs text-ink-500 mt-0.5">{b.description}</p>
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {b.entityTypes.map((e) => (
+                    <span
+                      key={e}
+                      className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-700"
+                    >
+                      {e}
+                    </span>
+                  ))}
+                  <span className="text-2xs px-1.5 py-0.5 rounded text-ink-500 normal-case tracking-normal">
+                    {b.templates.length}{" "}
+                    {b.templates.length === 1 ? "filing" : "filings"}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openView(b, true);
+                }}
+                className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken shrink-0"
+              >
+                Preview
+              </button>
+            </li>
+          ))}
+        </ul>
+      </Card>
+
+      <Card
+        title="Firm-custom packages"
+        description="Tweak a system package or build one from scratch. Custom packages appear alongside system ones in AddDeadlineModal."
+      >
+        {customBundles.length === 0 ? (
+          <p className="text-sm text-ink-500">
+            No custom packages yet. Clone a system package above, or{" "}
+            <button
+              className="text-info-ink hover:underline"
+              onClick={openCreate}
+            >
+              create one from scratch
+            </button>
+            .
+          </p>
+        ) : (
+          <ul className="divide-y divide-line">
+            {customBundles.map((b) => (
+              <li
+                key={b.id}
+                className="py-3 flex items-start gap-3 cursor-pointer hover:bg-sunken/40 -mx-5 px-5 rounded"
+                onClick={() => openEdit(b)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    openEdit(b);
+                  }
+                }}
+              >
+                <Package
+                  className="w-4 h-4 text-info-ink mt-0.5"
+                  aria-hidden
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-sm font-medium text-ink-900">
+                      {b.name}
+                    </p>
+                    <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-info-bg text-info-ink border border-info-border">
+                      Custom
+                    </span>
+                  </div>
+                  {b.description && (
+                    <p className="text-xs text-ink-500 mt-0.5">
+                      {b.description}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {b.entityTypes.map((e) => (
+                      <span
+                        key={e}
+                        className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-700"
+                      >
+                        {e}
+                      </span>
+                    ))}
+                    <span className="text-2xs px-1.5 py-0.5 rounded text-ink-500 normal-case tracking-normal">
+                      {b.templates.length}{" "}
+                      {b.templates.length === 1 ? "filing" : "filings"}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openEdit(b);
+                  }}
+                  className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken shrink-0"
+                >
+                  Edit
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="mt-3 pt-3 border-t border-line">
+          <button
+            onClick={openCreate}
+            className="text-xs inline-flex items-center gap-1 px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken"
+          >
+            <Plus className="w-3 h-3" aria-hidden />
+            New custom package
+          </button>
+        </div>
+      </Card>
+
+      <ServicePackageModal
+        open={modalState.open}
+        mode={modalState.mode}
+        bundle={modalState.bundle}
+        isSystemBundle={modalState.isSystem}
+        onClose={closeModal}
+        onSave={(b) => upsert(b)}
+        onDelete={(id) => remove(id)}
+      />
+    </>
   );
 }
 

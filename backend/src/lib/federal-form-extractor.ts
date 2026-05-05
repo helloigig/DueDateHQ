@@ -70,14 +70,26 @@ const EXTRACT_SYSTEM_PROMPT = `You produce structured metadata for an IRS tax fo
   } | null,
   "notes": "<1-2 sentences. Surface anything a CPA must remember — extension form, alternate due date, deposit-coupling, threshold rules. Never include time-of-day.>",
   "irsUrl": "https://www.irs.gov/forms-pubs/about-form-<slug>",
-  "confidence": <number 0..1>
+  "requiredItems": [
+    {
+      "label": "<plain-English: 'All W-2s (wage statements)', 'Schedule K-1s received', etc.>",
+      "itemType": "<stable_snake_case_key like wage_w2, 1099_int, k1_received>",
+      "source": "<optional IRS PDF URL — https://www.irs.gov/pub/irs-pdf/<slug>.pdf — empty string if no stable PDF>",
+      "confidence": <number 0..1, per-item>
+    }
+  ],
+  "confidence": <number 0..1, for the form metadata overall>
 }
 
 Rules:
 - entityTypes contains every entity type that commonly files THIS form. Empty array is invalid.
 - frequency must reflect how often a single filer files. "Q1 estimates" → quarterly, "annual return" → annual.
 - dueDateRule may be null when the due date depends on filer-specific facts (e.g. fiscal year end, date of death, transaction date). The notes field MUST explain it when null.
-- "confidence":
+- requiredItems: list the documents the CLIENT must provide for this form (NOT internal CPA workpapers). Examples: 1040 → W-2s, 1099-INT, K-1s, charitable receipts; 1120-S → year-end financials, payroll reports, fixed-asset additions. For pure transmittal forms (4868 extension, 1042 transmittal), return [].
+- requiredItems[].itemType: snake_case, stable, family-prefixed (1099_int, 1099_div, k1_received, wage_w2). Reuse common ones across forms — the FE matches templates by itemType.
+- requiredItems[].source: best-effort IRS PDF link for the recipient form (e.g. for "1099-INT" → https://www.irs.gov/pub/irs-pdf/f1099int.pdf). Empty string if uncertain.
+- requiredItems[].confidence: 0.9+ for items you'd bet on (W-2 on 1040), 0.6-0.9 if it depends on circumstances ("HSA statements only if HSA holder"), <0.6 if speculative.
+- "confidence" (top-level form metadata):
   - 0.85+ : you are confident this is a well-known IRS form with stable facts
   - 0.7-0.85 : you recognize the form but some metadata is best-guess
   - <0.7 : low confidence; admin must review before this becomes user-visible
@@ -163,7 +175,9 @@ export async function getOrExtractFederalForm(
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const result = await client.messages.create({
       model: HAIKU_MODEL,
-      max_tokens: 768,
+      // 1500 — bumped from 768 to fit requiredItems[] (up to ~15 items
+      // with per-item label + itemType + source + confidence).
+      max_tokens: 1500,
       system: [
         {
           type: "text",
@@ -203,6 +217,8 @@ export async function getOrExtractFederalForm(
   const status: "active" | "pending_review" =
     confidence >= 0.7 && !errorMsg ? "active" : "pending_review";
 
+  const requiredItems = normalizeRequiredItems(parsed?.requiredItems);
+
   const [row] = await db
     .insert(federalForms)
     .values({
@@ -217,6 +233,7 @@ export async function getOrExtractFederalForm(
       dueDateRule: (parsed?.dueDateRule ?? null) as DueDateRule | null,
       notes: parsed?.notes ?? null,
       irsUrl: parsed?.irsUrl?.trim() ? parsed.irsUrl : null,
+      requiredItems,
       extractionMethod: "llm",
       confidenceScore: confidence.toFixed(2),
       status,
@@ -281,6 +298,13 @@ export function normalizeFormNumber(raw: string): string | null {
   return trimmed.replace(/\s+/g, " ");
 }
 
+interface ParsedRequiredItem {
+  label?: string;
+  itemType?: string;
+  source?: string;
+  confidence?: number;
+}
+
 interface ParsedExtraction {
   formName?: string;
   category?: string;
@@ -289,7 +313,39 @@ interface ParsedExtraction {
   dueDateRule?: DueDateRule | null;
   notes?: string;
   irsUrl?: string;
+  requiredItems?: ParsedRequiredItem[];
   confidence?: number;
+}
+
+/** Sanitize the raw model array into the canonical jsonb shape. Drops
+ *  malformed entries (missing label or itemType), clamps confidence to
+ *  [0,1], strips junk from source. */
+function normalizeRequiredItems(
+  raw: ParsedRequiredItem[] | undefined,
+): Array<{ label: string; itemType: string; source?: string; confidence: number }> {
+  if (!Array.isArray(raw)) return [];
+  const out: Array<{
+    label: string;
+    itemType: string;
+    source?: string;
+    confidence: number;
+  }> = [];
+  for (const item of raw) {
+    const label = typeof item?.label === "string" ? item.label.trim() : "";
+    const itemType =
+      typeof item?.itemType === "string" ? item.itemType.trim() : "";
+    if (!label || !itemType) continue;
+    const source =
+      typeof item?.source === "string" && item.source.trim().startsWith("http")
+        ? item.source.trim()
+        : undefined;
+    const confidence =
+      typeof item?.confidence === "number"
+        ? Math.max(0, Math.min(1, item.confidence))
+        : 0.7;
+    out.push({ label, itemType, source, confidence });
+  }
+  return out;
 }
 
 function parseModelJson(text: string): ParsedExtraction | null {

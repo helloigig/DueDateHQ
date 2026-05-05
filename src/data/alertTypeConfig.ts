@@ -34,7 +34,7 @@ export type AlertActionKind =
   | "open_recompute_modal" // rate_change; recomputes estimate amounts
   | "open_nexus_check_modal" // nexus_change; per-client questionnaire + add filings
   | "route_admin_queue" // form_change (admin); navigate to reviewer queue
-  | "route_calendar_schedule"; // P2 — calendar integration placeholder
+  | "route_calendar_schedule"; // opens planning_call modal w/ calendar deep-links (Google, Outlook, .ics)
 
 export interface AlertTypeConfig {
   /** Humanized label for the type chip in the header. */

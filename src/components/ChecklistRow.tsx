@@ -10,6 +10,7 @@ import {
   MoreHorizontal,
   Trash2,
   Sparkles,
+  FileText,
 } from "lucide-react";
 import type { ChecklistItem, DocumentState } from "../types";
 import {
@@ -155,6 +156,19 @@ export function ChecklistRow({ item, onOpenEmailDraft }: Props) {
             <span className={`text-sm font-medium text-ink-900 ${labelStrike}`}>
               {item.label}
             </span>
+            {item.sourceUrl && (
+              <a
+                href={item.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-2xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-0.5 px-1 py-0.5 rounded hover:bg-sunken"
+                title={`Open IRS reference (${item.sourceUrl.split("/").pop()})`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FileText className="w-2.5 h-2.5" aria-hidden />
+                IRS PDF
+              </a>
+            )}
             {item.custom && (
               <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-500">
                 custom

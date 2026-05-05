@@ -472,4 +472,324 @@ export const FEDERAL_FORMS: CuratedFederalForm[] = [
       "File no later than 2 months and 15 days after the start of the tax year the election is to take effect. Late-election relief available under Rev. Proc. 2013-30.",
     irsUrl: "https://www.irs.gov/forms-pubs/about-form-2553",
   },
+
+  // ── Reconciliation pass 2026-05-05: ports the FE catalog (src/data/
+  // federalForms.ts, ~56 forms) into the BE seed so applicabilityForClient
+  // and AddDeadlineModal autocomplete return the same set on both sides.
+  // Keep this block in sync with the FE catalog when adding forms.
+
+  // Info return — payroll wrapper
+  {
+    formNumber: "W-3",
+    formName: "Transmittal of Wage and Tax Statements",
+    category: "info_return",
+    entityTypes: ["C-Corp", "S-Corp", "Partnership", "LLC", "Nonprofit"],
+    frequency: "annual",
+    dueDateRule: { type: "annual_fixed", month: 1, day: 31 },
+    notes:
+      "Cover sheet that totals all W-2s; filed with SSA together with the W-2 batch by Jan 31.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-w-3",
+  },
+
+  // Info return — sales of property
+  {
+    formNumber: "1099-S",
+    formName: "Proceeds From Real Estate Transactions",
+    category: "info_return",
+    entityTypes: ["C-Corp", "S-Corp", "Partnership", "LLC", "Individual"],
+    frequency: "annual",
+    dueDateRule: { type: "annual_fixed", month: 2, day: 15 },
+    notes:
+      "Recipient by Feb 15 (mirrors 1099-B). Required for most real-estate closings unless statutory exception applies.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-1099-s",
+  },
+
+  // Nonprofit — postcard + extension
+  {
+    formNumber: "990-N",
+    formName: "Electronic Notice (e-Postcard) for Tax-Exempt Organizations Not Required to File 990 or 990-EZ",
+    category: "nonprofit",
+    entityTypes: ["Nonprofit"],
+    frequency: "annual",
+    dueDateRule: { type: "annual_fixed", month: 5, day: 15 },
+    notes:
+      "For orgs with gross receipts ≤ $50K. e-Postcard only — no paper option. May 15 for calendar-year filers.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-990-n",
+  },
+  {
+    formNumber: "8868",
+    formName: "Application for Automatic Extension of Time To File an Exempt Organization Return",
+    category: "extension",
+    entityTypes: ["Nonprofit"],
+    frequency: "per_event",
+    dueDateRule: null,
+    notes:
+      "Filed alongside the 990 return it extends. Grants automatic 6-month extension; no statutory due date of its own.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-8868",
+  },
+
+  // International disclosures
+  {
+    formNumber: "5471",
+    formName: "Information Return of U.S. Persons With Respect to Certain Foreign Corporations",
+    category: "international",
+    entityTypes: ["C-Corp", "S-Corp", "Partnership", "LLC", "Individual"],
+    frequency: "annual",
+    dueDateRule: null,
+    notes:
+      "Attached to the filer's primary return (1040, 1120, etc.) — its due date follows the return. Multiple categories of filers; review instructions before each engagement.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-5471",
+  },
+  {
+    formNumber: "5472",
+    formName: "Information Return of a 25% Foreign-Owned U.S. Corporation or a Foreign Corporation Engaged in a U.S. Trade or Business",
+    category: "international",
+    entityTypes: ["C-Corp", "LLC"],
+    frequency: "annual",
+    dueDateRule: null,
+    notes:
+      "Attached to the corporation's 1120 (or pro-forma 1120 for foreign-owned single-member LLCs). Substantial penalties for non-filing — verify ownership chain annually.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-5472",
+  },
+  {
+    formNumber: "8865",
+    formName: "Return of U.S. Persons With Respect to Certain Foreign Partnerships",
+    category: "international",
+    entityTypes: ["Individual", "C-Corp", "S-Corp", "Partnership", "LLC"],
+    frequency: "annual",
+    dueDateRule: null,
+    notes:
+      "Attached to the filer's primary return; due date follows. Required for >10% interest or ≥50% control of a foreign partnership.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-8865",
+  },
+  {
+    formNumber: "8938",
+    formName: "Statement of Specified Foreign Financial Assets",
+    category: "international",
+    entityTypes: ["Individual", "C-Corp", "S-Corp", "Partnership"],
+    frequency: "annual",
+    dueDateRule: null,
+    notes:
+      "Attached to the primary return (1040, 1120, etc.). Threshold-driven by filing status and residency. Distinct from FinCEN-114 (FBAR) — both may be required.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-8938",
+  },
+  {
+    formNumber: "FinCEN-114",
+    formName: "Report of Foreign Bank and Financial Accounts (FBAR)",
+    category: "international",
+    entityTypes: ["Individual", "C-Corp", "S-Corp", "Partnership", "LLC"],
+    frequency: "annual",
+    dueDateRule: { type: "annual_fixed", month: 4, day: 15 },
+    notes:
+      "Filed electronically with FinCEN (BSA E-Filing System), not the IRS. Apr 15 with automatic Oct 15 extension. Threshold: aggregate foreign accounts > $10K.",
+    irsUrl: "https://bsaefiling.fincen.treas.gov/main.html",
+  },
+  {
+    formNumber: "1042-S",
+    formName: "Foreign Person's U.S. Source Income Subject to Withholding",
+    category: "international",
+    entityTypes: ["C-Corp", "S-Corp", "Partnership", "LLC"],
+    frequency: "annual",
+    dueDateRule: { type: "annual_fixed", month: 3, day: 15 },
+    notes:
+      "Both recipient copy AND IRS filing due Mar 15. Accompanied by Form 1042 transmittal.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-1042-s",
+  },
+
+  // IRA / specialty
+  {
+    formNumber: "8606",
+    formName: "Nondeductible IRAs",
+    category: "income",
+    entityTypes: ["Individual"],
+    frequency: "annual",
+    dueDateRule: { type: "annual_fixed", month: 4, day: 15 },
+    notes:
+      "Attached to 1040; required when nondeductible contributions are made or when basis is being recovered on distribution.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-8606",
+  },
+
+  // Depreciation / sales of business property
+  {
+    formNumber: "4562",
+    formName: "Depreciation and Amortization",
+    category: "income",
+    entityTypes: ["Individual", "C-Corp", "S-Corp", "Partnership", "LLC"],
+    frequency: "annual",
+    dueDateRule: null,
+    notes:
+      "Attached to the primary return; due date follows. Required when claiming depreciation/amortization, §179 expense, or listed-property deductions.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-4562",
+  },
+  {
+    formNumber: "8949",
+    formName: "Sales and Other Dispositions of Capital Assets",
+    category: "income",
+    entityTypes: ["Individual", "C-Corp", "S-Corp", "Partnership", "LLC", "Trust"],
+    frequency: "annual",
+    dueDateRule: null,
+    notes:
+      "Attached to 1040 / Schedule D (or 1041 / 1120 equivalents). Reports each capital-asset disposition before totals roll up to Schedule D.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-8949",
+  },
+  {
+    formNumber: "4797",
+    formName: "Sales of Business Property",
+    category: "income",
+    entityTypes: ["Individual", "C-Corp", "S-Corp", "Partnership", "LLC"],
+    frequency: "annual",
+    dueDateRule: null,
+    notes:
+      "Attached to the primary return; due date follows. Required for sales of §1231/1245/1250 property and involuntary conversions.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-4797",
+  },
+  {
+    formNumber: "8825",
+    formName: "Rental Real Estate Income and Expenses of a Partnership or an S Corporation",
+    category: "income",
+    entityTypes: ["S-Corp", "Partnership", "LLC"],
+    frequency: "annual",
+    dueDateRule: null,
+    notes:
+      "Attached to 1065 / 1120-S. Required when the entity holds rental real estate. Distinct from Schedule E (individuals).",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-8825",
+  },
+
+  // Election forms
+  {
+    formNumber: "8832",
+    formName: "Entity Classification Election",
+    category: "other",
+    entityTypes: ["LLC", "Partnership", "C-Corp"],
+    frequency: "per_event",
+    dueDateRule: null,
+    notes:
+      "Filed when an eligible entity elects to be classified differently than its default (e.g., LLC → C-Corp). Effective date is filer-chosen within statutory window.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-8832",
+  },
+  {
+    formNumber: "5558",
+    formName: "Application for Extension of Time to File Certain Employee Plan Returns",
+    category: "extension",
+    entityTypes: ["C-Corp", "S-Corp", "Partnership", "LLC", "Nonprofit"],
+    frequency: "per_event",
+    dueDateRule: null,
+    notes:
+      "Used to extend Form 5500 series and 8955-SSA. Must be filed by the original due date of the return being extended.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-5558",
+  },
+  {
+    formNumber: "4768",
+    formName: "Application for Extension of Time To File a Return and/or Pay U.S. Estate (and Generation-Skipping Transfer) Taxes",
+    category: "extension",
+    entityTypes: ["Individual"],
+    frequency: "per_event",
+    dueDateRule: null,
+    notes:
+      "Extends Form 706 by 6 months. Must be filed by the 706 due date (9 months after date of death).",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-form-4768",
+  },
+
+  // Schedules — workpapers attached to primary returns. Included so
+  // AddDeadlineModal autocomplete can match them when CPAs reference
+  // schedules by name; their dueDateRule is null (follows the parent).
+  {
+    formNumber: "SCHEDULE-A",
+    formName: "Schedule A (Form 1040) — Itemized Deductions",
+    category: "income",
+    entityTypes: ["Individual"],
+    frequency: "annual",
+    dueDateRule: null,
+    notes:
+      "Attached to 1040. Required when itemizing instead of taking the standard deduction.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-schedule-a-form-1040",
+  },
+  {
+    formNumber: "SCHEDULE-B",
+    formName: "Schedule B (Form 1040) — Interest and Ordinary Dividends",
+    category: "income",
+    entityTypes: ["Individual"],
+    frequency: "annual",
+    dueDateRule: null,
+    notes:
+      "Attached to 1040 when taxable interest or ordinary dividends exceed $1,500, or when foreign account questions apply.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-schedule-b-form-1040",
+  },
+  {
+    formNumber: "SCHEDULE-C",
+    formName: "Schedule C (Form 1040) — Profit or Loss From Business (Sole Proprietorship)",
+    category: "income",
+    entityTypes: ["Individual"],
+    frequency: "annual",
+    dueDateRule: null,
+    notes:
+      "Attached to 1040 for sole proprietors and single-member LLCs treated as disregarded entities.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-schedule-c-form-1040",
+  },
+  {
+    formNumber: "SCHEDULE-D",
+    formName: "Schedule D (Form 1040) — Capital Gains and Losses",
+    category: "income",
+    entityTypes: ["Individual"],
+    frequency: "annual",
+    dueDateRule: null,
+    notes:
+      "Attached to 1040. Totals roll up from Form 8949.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-schedule-d-form-1040",
+  },
+  {
+    formNumber: "SCHEDULE-E",
+    formName: "Schedule E (Form 1040) — Supplemental Income and Loss",
+    category: "income",
+    entityTypes: ["Individual"],
+    frequency: "annual",
+    dueDateRule: null,
+    notes:
+      "Attached to 1040. Reports rental real estate, royalties, partnership / S-Corp K-1 income, estate/trust income, and REMICs.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-schedule-e-form-1040",
+  },
+  {
+    formNumber: "SCHEDULE-SE",
+    formName: "Schedule SE (Form 1040) — Self-Employment Tax",
+    category: "income",
+    entityTypes: ["Individual"],
+    frequency: "annual",
+    dueDateRule: null,
+    notes:
+      "Attached to 1040 when net earnings from self-employment exceed $400.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-schedule-se-form-1040",
+  },
+  {
+    formNumber: "K-1-1065",
+    formName: "Schedule K-1 (Form 1065) — Partner's Share of Income, Deductions, Credits, etc.",
+    category: "info_return",
+    entityTypes: ["Partnership", "LLC"],
+    frequency: "annual",
+    dueDateRule: { type: "annual_fixed", month: 3, day: 15 },
+    notes:
+      "Issued to partners alongside the 1065 filing. Each partner reports their share on their personal return.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-schedule-k-1-form-1065",
+  },
+  {
+    formNumber: "K-1-1120-S",
+    formName: "Schedule K-1 (Form 1120-S) — Shareholder's Share of Income, Deductions, Credits, etc.",
+    category: "info_return",
+    entityTypes: ["S-Corp"],
+    frequency: "annual",
+    dueDateRule: { type: "annual_fixed", month: 3, day: 15 },
+    notes:
+      "Issued to shareholders alongside the 1120-S filing.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-schedule-k-1-form-1120-s",
+  },
+  {
+    formNumber: "K-1-1041",
+    formName: "Schedule K-1 (Form 1041) — Beneficiary's Share of Income, Deductions, Credits, etc.",
+    category: "info_return",
+    entityTypes: ["Trust"],
+    frequency: "annual",
+    dueDateRule: { type: "annual_fixed", month: 4, day: 15 },
+    notes:
+      "Issued to trust/estate beneficiaries alongside the 1041 filing.",
+    irsUrl: "https://www.irs.gov/forms-pubs/about-schedule-k-1-form-1041",
+  },
 ];
