@@ -92,8 +92,8 @@ export function ExportClientsButton(props: Props) {
         disabled={pending}
         className={
           props.compact
-            ? "inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border border-line text-ink-700 hover:bg-sunken disabled:opacity-50"
-            : "inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-line text-ink-700 hover:bg-sunken disabled:opacity-50"
+            ? "inline-flex items-center gap-1.5 h-7 text-xs px-2.5 rounded-md border border-line text-ink-700 hover:bg-sunken disabled:opacity-50"
+            : "inline-flex items-center gap-1.5 h-8 text-sm px-3 rounded-md border border-line text-ink-700 hover:bg-sunken disabled:opacity-50"
         }
         title={
           props.clientId
