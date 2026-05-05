@@ -263,4 +263,64 @@ export const reminderTemplates: ReminderTemplate[] = [
     system: true,
     active: true,
   },
+
+  // ── INACTIVE system template ──────────────────────────────────────
+  // Sarah turned this one off because her clients rarely have foreign
+  // accounts and the standard FBAR template was creating false-positive
+  // chases. The Reminders settings page should render it greyed out
+  // with an "active" toggle.
+  {
+    id: "rt-19",
+    name: "FBAR / FinCEN 114",
+    trigger: "T-30",
+    itemType: "fbar_fincen114",
+    deadlineClass: "individual_1040",
+    cadence: "once",
+    phase: 1,
+    subject: "FBAR (FinCEN 114) — foreign account reporting",
+    body:
+      "Hi {{client_name}},\n\nIf you held any foreign financial accounts in 2025 with an aggregate balance over $10K, we need to file FBAR (FinCEN 114). Reply yes/no and I'll handle the rest.\n\n{{cpa_signature}}",
+    system: true,
+    active: false,
+  },
+
+  // ── FIRM-CUSTOM templates ─────────────────────────────────────────
+  // Sarah authored these for her firm. system: false marks them as
+  // editable + deletable; templateKey is unset because they're not
+  // mapped to a backend system slot.
+
+  // Sarah's signature touch — annual "thank you" after filing.
+  {
+    id: "rt-c-001",
+    firmId: "firm-mitchell",
+    name: "Filed-and-thanks",
+    trigger: "post-file",
+    itemType: "post_filing",
+    deadlineClass: "individual_1040",
+    cadence: "once",
+    phase: 1,
+    subject: "All filed — thanks for trusting {{firm_name}} this year",
+    body:
+      "Hi {{client_name}},\n\nYour return is filed. We held back the standard chase emails for next year — if anything changes (new property, new income source, big life event), text or email me and we'll get ahead of it.\n\nThanks again,\n{{cpa_signature}}",
+    system: false,
+    active: true,
+  },
+
+  // Real-estate-investor packet — for clients with rental property.
+  // Promoted to Phase 2 for Lakeshore Realty's predictable cadence.
+  {
+    id: "rt-c-002",
+    firmId: "firm-mitchell",
+    name: "Rental property packet (firm-custom)",
+    trigger: "T-45",
+    itemType: "rental_property_packet",
+    deadlineClass: "individual_1040",
+    cadence: "once",
+    phase: 2,
+    subject: "Rental property packet — {{client_name}} 2025",
+    body:
+      "Hi {{client_name}},\n\nFor each rental this year, please send: (1) annual rent received, (2) expense summary or receipts, (3) capital improvements with dates, (4) any 1099-MISC for contractors paid $600+, (5) mortgage interest 1098.\n\nIf you use a property manager, their year-end statement covers all 5.\n\n{{cpa_signature}}",
+    system: false,
+    active: true,
+  },
 ];

@@ -1,4 +1,8 @@
-export const TODAY = new Date("2026-04-23T00:00:00");
+// Demo "now" — anchored so the seeded mock data (overdue / this-week /
+// alert detection times) always renders against a consistent reference.
+// Bumping this requires re-anchoring the dates inside src/data/mock*.ts
+// to keep the fresh / reminder / escalated / blocking tiers honest.
+export const TODAY = new Date("2026-05-05T00:00:00");
 
 export function parseDate(iso: string): Date {
   return new Date(iso + "T00:00:00");
@@ -21,7 +25,7 @@ export function addDays(d: Date, n: number): Date {
  * Hours between two ISO timestamps (a → b). Positive if b is after a.
  * Uses "now" = TODAY anchor so escalation is deterministic in demo.
  */
-const NOW_ANCHOR = new Date("2026-04-23T11:00:00Z"); // mid-morning Thursday
+const NOW_ANCHOR = new Date("2026-05-05T11:00:00Z"); // mid-morning Tuesday
 
 export function hoursSince(iso: string): number {
   const t = new Date(iso).getTime();

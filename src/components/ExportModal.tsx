@@ -377,7 +377,7 @@ export function ExportModal({
               active={recipient === "email_self"}
               onClick={() => setRecipient("email_self")}
               label="Email me"
-              hint="Sarah Chen"
+              hint="Sarah Mitchell"
             />
             <Card
               active={recipient === "email_coworker"}

@@ -80,13 +80,13 @@ const mockInboundReplies: MockInboundReply[] = (() => {
       id: "reply-mock-1",
       firmId: "firm-mock",
       taskId: null,
-      clientId: null,
+      clientId: "c-ca-03",
       gmailMessageId: "gmail-mock-1",
-      fromAddress: "sarah.mitchell@example.com",
+      fromAddress: "mark.sullivan@gmail.com",
       toAddress: "intake@duedatehq.space",
-      subject: "1040 NY — K-1 timing",
+      subject: "1040 (extension) — K-1 timing",
       bodyText:
-        "Hi! K-1 from my fund won't be ready until late July...",
+        "Hi Sarah — my K-1 from the partnership won't be ready until late July. Can we push the timeline a bit?",
       attachmentMetadata: [],
       topLevelClass: "client_reply",
       replyIntent: "timeline_pushback",
@@ -100,11 +100,11 @@ const mockInboundReplies: MockInboundReply[] = (() => {
       id: "reply-mock-2",
       firmId: "firm-mock",
       taskId: null,
-      clientId: null,
+      clientId: "c-ca-03",
       gmailMessageId: "gmail-mock-2",
-      fromAddress: "jordan.lee@example.com",
+      fromAddress: "mark.sullivan@gmail.com",
       toAddress: "intake@duedatehq.space",
-      subject: "S-Corp CA — IRA limit",
+      subject: "1040 (extension) — IRA limit",
       bodyText:
         "Quick question — what's the IRA contribution limit this year?",
       attachmentMetadata: [],
@@ -120,11 +120,11 @@ const mockInboundReplies: MockInboundReply[] = (() => {
       id: "reply-mock-3",
       firmId: "firm-mock",
       taskId: null,
-      clientId: null,
+      clientId: "c-ga-02",
       gmailMessageId: "gmail-mock-3",
-      fromAddress: "emily.hartfield@example.com",
+      fromAddress: "olivia.bennett@protonmail.com",
       toAddress: "intake@duedatehq.space",
-      subject: "1040 NY — W-2",
+      subject: "Q2 estimate (federal) — W-2",
       bodyText: "Attached: W-2 for 2025 (ADP via Acme Corp)",
       attachmentMetadata: [{ filename: "W2-2025.pdf", size: 12834 }],
       topLevelClass: "client_doc",
@@ -1685,7 +1685,10 @@ export const mockAdapter = {
       await delay();
       const u = currentUser();
       // Mirror the BE shape `{ members, invites }`. Mock-mode firm has
-      // exactly one member (the signed-in user); no pending invites.
+      // the signed-in owner plus a junior preparer (Maya Patel) so
+      // assignment/reviewer flows have a real second user to target.
+      // The deadline seeds carry `assignedUser: "Maya Patel"` on ~25% of
+      // rows; this list is what the FE reads to resolve those names.
       return {
         members: [
           {
@@ -1696,8 +1699,24 @@ export const mockAdapter = {
             timezone: u.timezone,
             lastActiveAt: u.lastActiveAt ?? null,
           },
+          {
+            id: "user-maya",
+            email: "maya@mitchellcpa.com",
+            displayName: "Maya Patel",
+            role: "member" as const,
+            timezone: "America/Los_Angeles",
+            lastActiveAt: "2026-05-05T10:42:00Z",
+          },
         ],
-        invites: [] as Array<{
+        invites: [
+          {
+            id: "inv-pending-1",
+            email: "alex@mitchellcpa.com",
+            role: "member" as const,
+            invitedAt: "2026-05-03T15:00:00Z",
+            expiresAt: "2026-05-10T15:00:00Z",
+          },
+        ] as Array<{
           id: string;
           email: string;
           role: "owner" | "member";

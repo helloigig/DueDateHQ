@@ -121,6 +121,57 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
     return set;
   }, [deadlines]);
 
+  // Active filings for this client, grouped by tax year + jurisdiction.
+  // Year sort order — Yuqi audit 2026-05-05: previously descending
+  // (newest first), which put 2027 above 2026 (current). Sarah's
+  // mental model: "current year first, then what's coming, then
+  // history." Sort: current → future ascending → past descending.
+  // Year is parsed once (officialDueDate is YYYY-MM-DD ISO), then we
+  // bucket relative to currentYear and concat the three groups.
+  //
+  // This useMemo MUST stay above the conditional early-returns below;
+  // moving it past a `return` triggers React's Rules-of-Hooks check the
+  // moment a render happens to skip past it ("Rendered more hooks than
+  // during the previous render"). Surfaced when Mark Sullivan's data
+  // grew from a single deadline to a multi-year extension lifecycle.
+  const currentYear = String(new Date().getFullYear());
+  const filingsByYear = useMemo(() => {
+    const m = new Map<
+      string,
+      { year: string; deadlines: Deadline[] }
+    >();
+    for (const d of deadlines) {
+      const year = d.officialDueDate.slice(0, 4);
+      const entry = m.get(year) ?? { year, deadlines: [] };
+      entry.deadlines.push(d);
+      m.set(year, entry);
+    }
+    // Always seed the current year so the "this year" structure is
+    // visible even when the client has zero deadlines. Yuqi audit
+    // 2026-05-05: "the filing should have the filing history, this
+    // year's filing and future filing... previously we had them, where
+    // are they?" — they were getting hidden when the year-bucket map
+    // was empty. Surface the current-year skeleton with an empty-state
+    // body so the user sees "yes, this is your 2026 plan; there's
+    // nothing in it yet" rather than just no section at all.
+    if (!m.has(currentYear)) {
+      m.set(currentYear, { year: currentYear, deadlines: [] });
+    }
+    const all = Array.from(m.values());
+    const current = all.filter((y) => y.year === currentYear);
+    const future = all
+      .filter((y) => y.year > currentYear)
+      .sort((a, b) => a.year.localeCompare(b.year)); // 2027 → 2028 → ...
+    const past = all
+      .filter((y) => y.year < currentYear)
+      .sort((a, b) => b.year.localeCompare(a.year)); // 2025 → 2024 → ...
+    return [...current, ...future, ...past];
+  }, [deadlines, currentYear]);
+
+  // Conditional early-returns + non-hook derived values follow. These
+  // were previously above the filingsByYear useMemo and triggered the
+  // Rules-of-Hooks violation when applicabilityQuery flipped state mid-
+  // render (loading → ready) on rich-data clients.
   if (applicabilityQuery.isLoading) {
     return (
       <div className="bg-surface border border-line rounded-lg p-6 text-center text-sm text-ink-500">
@@ -167,47 +218,6 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
   const reference = (catalogQuery.data ?? []).filter(
     (f) => !applicableNumbers.has(f.formNumber),
   );
-
-  // Active filings for this client, grouped by tax year + jurisdiction.
-  // Year sort order — Yuqi audit 2026-05-05: previously descending
-  // (newest first), which put 2027 above 2026 (current). Sarah's
-  // mental model: "current year first, then what's coming, then
-  // history." Sort: current → future ascending → past descending.
-  // Year is parsed once (officialDueDate is YYYY-MM-DD ISO), then we
-  // bucket relative to currentYear and concat the three groups.
-  const currentYear = String(new Date().getFullYear());
-  const filingsByYear = useMemo(() => {
-    const m = new Map<
-      string,
-      { year: string; deadlines: Deadline[] }
-    >();
-    for (const d of deadlines) {
-      const year = d.officialDueDate.slice(0, 4);
-      const entry = m.get(year) ?? { year, deadlines: [] };
-      entry.deadlines.push(d);
-      m.set(year, entry);
-    }
-    // Always seed the current year so the "this year" structure is
-    // visible even when the client has zero deadlines. Yuqi audit
-    // 2026-05-05: "the filing should have the filing history, this
-    // year's filing and future filing... previously we had them, where
-    // are they?" — they were getting hidden when the year-bucket map
-    // was empty. Surface the current-year skeleton with an empty-state
-    // body so the user sees "yes, this is your 2026 plan; there's
-    // nothing in it yet" rather than just no section at all.
-    if (!m.has(currentYear)) {
-      m.set(currentYear, { year: currentYear, deadlines: [] });
-    }
-    const all = Array.from(m.values());
-    const current = all.filter((y) => y.year === currentYear);
-    const future = all
-      .filter((y) => y.year > currentYear)
-      .sort((a, b) => a.year.localeCompare(b.year)); // 2027 → 2028 → ...
-    const past = all
-      .filter((y) => y.year < currentYear)
-      .sort((a, b) => b.year.localeCompare(a.year)); // 2025 → 2024 → ...
-    return [...current, ...future, ...past];
-  }, [deadlines, currentYear]);
 
   return (
     <div className="space-y-4">

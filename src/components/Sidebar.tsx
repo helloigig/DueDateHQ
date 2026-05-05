@@ -314,8 +314,8 @@ function UserAccountTrigger({ collapsed }: { collapsed: boolean }) {
   const session = useSession();
   const navigate = useNavigate();
 
-  const initials = session?.userInitials || "SC";
-  const name = session?.userName || "Sarah Chen";
+  const initials = session?.userInitials || "SM";
+  const name = session?.userName || "Sarah Mitchell";
   const email = session?.userEmail;
 
   return (
