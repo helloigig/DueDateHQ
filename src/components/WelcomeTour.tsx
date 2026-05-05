@@ -180,10 +180,10 @@ const SLIDES: ReadonlyArray<Slide> = [
           <Bell className="w-4 h-4 text-warn-ink shrink-0 mt-0.5" aria-hidden />
           <div className="text-xs">
             <p className="font-semibold text-warn-ink">
-              CA FTB extends Q1 estimated tax payment to June 17
+              California Franchise Tax Board extends Q1 estimated tax payment to June 17
             </p>
             <p className="text-warn-ink/80 mt-0.5">
-              Affects 14 of your clients · 4 hours ago · CA FTB Public Advisory
+              Affects 14 of your clients · 4 hours ago · California Franchise Tax Board Public Advisory
             </p>
           </div>
         </div>

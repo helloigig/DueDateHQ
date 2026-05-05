@@ -219,7 +219,7 @@ export const announcements: Announcement[] = [
     authority: "Florida Department of Revenue",
     title: "FL sales-tax filing deadline extended — hurricane prep",
     summary:
-      "Florida DOR has extended the June 20 sales-tax filing deadline to August 17 for businesses in 23 hurricane-prep counties. No penalty for filings made between the original and extended dates. Affected entities should not refile early returns.",
+      "Florida Department of Revenue has extended the June 20 sales-tax filing deadline to August 17 for businesses in 23 hurricane-prep counties. No penalty for filings made between the original and extended dates. Affected entities should not refile early returns.",
     issuanceDate: "2026-04-17",
     effectiveDate: "2026-06-20",
     detectedAt: "2026-04-17T13:00:00Z",
@@ -381,7 +381,7 @@ export const announcements: Announcement[] = [
     authority: "Florida Department of Revenue",
     title: "Tropical Storm Karina filing relief — 17 counties",
     summary:
-      "Florida DOR has postponed sales-tax and reemployment-tax filings for businesses in 17 counties impacted by Tropical Storm Karina. Returns originally due May 1 are postponed to July 1, 2026. Federal IRS counterpart pending.",
+      "Florida Department of Revenue has postponed sales-tax and reemployment-tax filings for businesses in 17 counties impacted by Tropical Storm Karina. Returns originally due May 1 are postponed to July 1, 2026. Federal IRS counterpart pending.",
     issuanceDate: "2026-04-18",
     effectiveDate: "2026-04-18",
     detectedAt: "2026-04-18T22:00:00Z",

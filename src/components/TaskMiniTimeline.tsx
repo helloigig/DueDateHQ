@@ -2,6 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Sparkles, AlertOctagon, Pencil, X } from "lucide-react";
 import type { Task, ChecklistItem } from "../types";
 import { trpc } from "../lib/api/client";
+// MILESTONE_STATUS_META + StatusPill (from main #151) intentionally NOT
+// imported here — the redesigned Waypoint + ActiveStagePanel use their
+// own coloring tied to the connector/progress story (filled green line
+// for done stages, indigo for selected, warn-yellow for in-progress).
+// Future tweaks that want the canonical status palette can pull it in;
+// today the local logic is more compact than routing through StatusPill.
 import { cn } from "../lib/utils";
 
 // TaskMiniTimeline — per IA v0.7 amendment §3.4.
@@ -457,6 +463,10 @@ function Waypoint({
   isConnectorBeforeFilled?: boolean;
   onSelect: () => void;
 }) {
+  // The prior popover state (hover/pinned/rootRef + outside-click
+  // listener) was removed when actions moved to the ActiveStagePanel
+  // below the strip. The dot is now a pure click-to-select affordance;
+  // no popover lives here anymore.
   const dotClasses = (() => {
     switch (wp.status) {
       case "done":
