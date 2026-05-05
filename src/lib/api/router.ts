@@ -333,6 +333,37 @@ export const appRouter = t.router({
     dismiss: t.procedure
       .input(jsonPassthrough)
       .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    /** Re-fire a previously dismissed/snoozed alert */
+    restore: t.procedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    /** Per-user triage-modal toggle (Settings → Notifications) */
+    getTriageSettings: t.procedure.query(
+      async (): Promise<{ enabled: boolean }> => NOT_IMPL(),
+    ),
+    updateTriageSettings: t.procedure
+      .input(z.object({ enabled: z.boolean() }))
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    /**
+     * Snapshot of "what's new since you were last here" — drives the
+     * triage modal + "What changed" banner. Returns alerts where:
+     *   - detected since user's previous last_active_at
+     *   - has at least one matched client
+     *   - not dismissed/snoozed/acknowledged
+     */
+    triageOnFirstLand: t.procedure.query(
+      async (): Promise<
+        Array<{
+          id: string;
+          stateCode: string;
+          authority: string;
+          title: string;
+          type: string;
+          detectedAt: string;
+          affectedClientCount: number;
+        }>
+      > => NOT_IMPL(),
+    ),
     markRead: t.procedure
       .input(jsonPassthrough)
       .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),

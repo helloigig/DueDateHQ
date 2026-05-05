@@ -14,6 +14,7 @@ import {
   firms,
   notifications,
   tasks,
+  users,
 } from "../../db/schema.js";
 import { sendEmail, fromAddressForFirm } from "../../lib/email-sender.js";
 import { captureException } from "../../lib/observability.js";
@@ -262,6 +263,166 @@ export const announcementsRouter = router({
         });
       return { ok: true as const };
     }),
+
+  /**
+   * Re-fire a previously dismissed or snoozed alert. Clears the
+   * `dismissedAt` / `dismissedReason` / `snoozedUntil` / `snoozeReason`
+   * fields on the firm-overlay row so the announcement appears in the
+   * default `activeOnly` list again.
+   *
+   * Drives the "Restore" affordance on /alerts (Show resolved → Restore)
+   * — the dogfooding ask was: "what if a CPA dismissed an alert and
+   * realizes later it should still be affecting them?" Without this,
+   * the dismiss is permanent and the only recovery is a DB write.
+   *
+   * Idempotent. No-op when the firm has no firm_announcement row for
+   * this announcement (i.e. it was never dismissed in the first place).
+   */
+  restore: firmProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await db
+        .update(firmAnnouncements)
+        .set({
+          dismissedAt: null,
+          dismissedReason: null,
+          snoozedUntil: null,
+          snoozeReason: null,
+        })
+        .where(
+          and(
+            eq(firmAnnouncements.announcementId, input.id),
+            eq(firmAnnouncements.firmId, ctx.firmId),
+          ),
+        );
+      return { ok: true as const };
+    }),
+
+  /**
+   * Per-user preference: should the triage modal fire on first-land?
+   * Defaults to true. Stored under `users.preferences.alertTriageModal`
+   * — see UserPreferences in schema.ts. The matching `<WhatChangedBanner>`
+   * always renders regardless; this toggle only governs the modal.
+   */
+  getTriageSettings: firmProcedure.query(async ({ ctx }) => {
+    const dbUser = await db.query.users.findFirst({
+      where: eq(users.id, ctx.dbUser.id),
+    });
+    const stored = (dbUser?.preferences as
+      | { alertTriageModal?: { enabled: boolean } }
+      | null)?.alertTriageModal;
+    return { enabled: stored?.enabled ?? true };
+  }),
+
+  updateTriageSettings: firmProcedure
+    .input(z.object({ enabled: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const dbUser = await db.query.users.findFirst({
+        where: eq(users.id, ctx.dbUser.id),
+      });
+      const next = {
+        ...((dbUser?.preferences as Record<string, unknown> | null) ?? {}),
+        alertTriageModal: { enabled: input.enabled },
+      };
+      await db
+        .update(users)
+        .set({ preferences: next })
+        .where(eq(users.id, ctx.dbUser.id));
+      return { ok: true as const };
+    }),
+
+  /**
+   * Snapshot of "what's new since you were last here" — drives the
+   * triage modal that fires on first /-page-land per session and the
+   * "What changed" banner above the action queue.
+   *
+   * Returns alerts where ALL of:
+   *   - announcement.detected_at > the user's previous last_active_at
+   *     (i.e. arrived while the user was away). For a brand-new user,
+   *     falls back to the last 24h.
+   *   - the firm has at least one matched client
+   *   - the firm hasn't dismissed/snoozed it
+   *   - the firm hasn't acknowledged it (read alerts no longer trigger)
+   *
+   * Cap at 10 — if the user has been away for weeks, we'd rather show
+   * the most recent 10 than fill a modal with backlog.
+   */
+  triageOnFirstLand: firmProcedure.query(async ({ ctx }) => {
+    // Anchor "since" off the user's previous lastActiveAt. If we don't
+    // have one (or it's stale by < 1 minute, meaning the auth tick
+    // already bumped it this session), fall back to the last 24h.
+    const cutoff =
+      ctx.dbUser.lastActiveAt &&
+      Date.now() - ctx.dbUser.lastActiveAt.getTime() > 60_000
+        ? ctx.dbUser.lastActiveAt
+        : new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const rows = await db
+      .select({
+        ann: announcements,
+      })
+      .from(announcements)
+      .innerJoin(
+        announcementMatches,
+        and(
+          eq(announcementMatches.announcementId, announcements.id),
+          eq(announcementMatches.firmId, ctx.firmId),
+        ),
+      )
+      .leftJoin(
+        firmAnnouncements,
+        and(
+          eq(firmAnnouncements.announcementId, announcements.id),
+          eq(firmAnnouncements.firmId, ctx.firmId),
+        ),
+      )
+      .where(
+        and(
+          sql`${announcements.detectedAt} > ${cutoff.toISOString()}::timestamptz`,
+          sql`${firmAnnouncements.dismissedAt} IS NULL`,
+          sql`${firmAnnouncements.acknowledgedAt} IS NULL`,
+          sql`(${firmAnnouncements.snoozedUntil} IS NULL OR ${firmAnnouncements.snoozedUntil} < now())`,
+        ),
+      )
+      .orderBy(desc(announcements.detectedAt))
+      .limit(10);
+
+    // Distinct on announcement id (the join can produce one row per
+    // matched client; we only want the announcement once with a count).
+    const seen = new Set<string>();
+    const distinct: Array<{
+      id: string;
+      stateCode: string;
+      authority: string;
+      title: string;
+      type: string;
+      detectedAt: string;
+      affectedClientCount: number;
+    }> = [];
+    for (const r of rows) {
+      if (seen.has(r.ann.id)) continue;
+      seen.add(r.ann.id);
+      const [count] = (await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(announcementMatches)
+        .where(
+          and(
+            eq(announcementMatches.announcementId, r.ann.id),
+            eq(announcementMatches.firmId, ctx.firmId),
+          ),
+        )) as Array<{ count: number }>;
+      distinct.push({
+        id: r.ann.id,
+        stateCode: r.ann.stateCode,
+        authority: r.ann.authority,
+        title: r.ann.title,
+        type: r.ann.type,
+        detectedAt: r.ann.detectedAt.toISOString(),
+        affectedClientCount: Number(count?.count ?? 0),
+      });
+    }
+    return distinct;
+  }),
 
   markRead: firmProcedure
     .input(z.object({ id: z.string().uuid() }))

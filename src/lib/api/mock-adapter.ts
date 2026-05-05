@@ -948,6 +948,49 @@ export const mockAdapter = {
       actions.dismissAnnouncement(id);
       return { ok: true as const };
     },
+    restore: async ({ id }: { id: string }) => {
+      await delay();
+      actions.restoreAnnouncement(id);
+      return { ok: true as const };
+    },
+    getTriageSettings: (() => {
+      // Persist across renders within the session — toggle survives
+      // until the demo workspace resets.
+      let mockTriagePref = { enabled: true };
+      return async () => {
+        await delay();
+        return mockTriagePref;
+      };
+    })(),
+    updateTriageSettings: async ({ enabled }: { enabled: boolean }) => {
+      await delay();
+      console.info("[mock] announcements.updateTriageSettings", { enabled });
+      return { ok: true as const };
+    },
+    triageOnFirstLand: async () => {
+      await delay();
+      // Mock: surface the un-dismissed announcements with affected
+      // clients. In real mode, the BE filters by the user's
+      // last_active_at; mock just returns the top few.
+      const state = getState();
+      return state.announcements
+        .filter(
+          (a) =>
+            !a.dismissed &&
+            !a.read &&
+            a.affectedClientIds.length > 0,
+        )
+        .slice(0, 5)
+        .map((a) => ({
+          id: a.id,
+          stateCode: a.stateCode,
+          authority: a.authority,
+          title: a.title,
+          type: a.type,
+          detectedAt: a.detectedAt,
+          affectedClientCount: a.affectedClientIds.length,
+        }));
+    },
     markRead: async ({ id }: { id: string }) => {
       await delay();
       actions.markAnnouncementRead(id);

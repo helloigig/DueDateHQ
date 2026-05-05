@@ -795,6 +795,7 @@ function NotificationsPanel() {
   return (
     <div className="space-y-6">
       <DailyDigestCard />
+      <AlertTriageCard />
       <Card
         title="In-app notifications"
         description="Controls what appears in the bell dropdown."
@@ -806,6 +807,48 @@ function NotificationsPanel() {
         </p>
       </Card>
     </div>
+  );
+}
+
+/**
+ * Settings card for the alert triage modal. The modal fires on first
+ * /-page-land per browser session when there are state alerts that
+ * arrived since the user's last_active_at and have at least one
+ * matched client. Toggle off when it becomes noise — the inline
+ * `<WhatChangedBanner>` on Dashboard continues to surface the same
+ * urgency without the modal interruption.
+ */
+function AlertTriageCard() {
+  const utils = trpc.useUtils();
+  const settingsQuery = trpc.announcements.getTriageSettings.useQuery();
+  const updateMut = trpc.announcements.updateTriageSettings.useMutation({
+    onSuccess: () => void utils.announcements.getTriageSettings.invalidate(),
+  });
+
+  const enabled = settingsQuery.data?.enabled ?? true;
+
+  return (
+    <Card
+      title="Triage on first land"
+      description={
+        enabled
+          ? "When you land on Today, a modal surfaces any state alerts that arrived while you were away. Click into Alerts or dismiss to continue. The What-Changed banner on Today shows the same content non-modally regardless of this toggle."
+          : "Off. New alerts since your last visit still appear as a banner on Today; we just don't open a modal."
+      }
+    >
+      <label className="flex items-center gap-3 text-sm">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => updateMut.mutate({ enabled: e.target.checked })}
+          disabled={updateMut.isPending}
+          className="w-4 h-4"
+        />
+        <span className="text-ink-900 font-medium">
+          Show triage modal on first land
+        </span>
+      </label>
+    </Card>
   );
 }
 
