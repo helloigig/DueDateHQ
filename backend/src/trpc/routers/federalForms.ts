@@ -23,7 +23,7 @@
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, gte, isNull } from "drizzle-orm";
 import { z } from "zod";
-import { firmProcedure, router } from "../init.js";
+import { firmProcedure, ownerProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
 import {
   clients,
@@ -62,6 +62,13 @@ const STATUS_VALUES = ["active", "pending_review", "deprecated"] as const;
 
 type FederalFormRow = typeof federalForms.$inferSelect;
 
+export interface FederalFormRequiredItemDTO {
+  label: string;
+  itemType: string;
+  source?: string;
+  confidence: number;
+}
+
 export interface FederalFormDTO {
   id: string;
   formNumber: string;
@@ -72,6 +79,7 @@ export interface FederalFormDTO {
   dueDateRule: unknown;
   notes: string | null;
   irsUrl: string | null;
+  requiredItems: FederalFormRequiredItemDTO[];
   extractionMethod: "curated" | "llm" | "federal_register";
   confidenceScore: number;
   status: "active" | "pending_review" | "deprecated";
@@ -90,6 +98,9 @@ function toDTO(r: FederalFormRow): FederalFormDTO {
     dueDateRule: r.dueDateRule,
     notes: r.notes,
     irsUrl: r.irsUrl,
+    requiredItems: Array.isArray(r.requiredItems)
+      ? (r.requiredItems as FederalFormRequiredItemDTO[])
+      : [],
     extractionMethod: r.extractionMethod,
     confidenceScore: Number(r.confidenceScore),
     status: r.status,
@@ -354,8 +365,8 @@ export const federalFormsRouter = router({
       }));
     }),
 
-  /** Mark a change event reviewed (admin reviewer flow). */
-  markChangeReviewed: firmProcedure
+  /** Mark a change event reviewed (admin reviewer flow — owner-gated). */
+  markChangeReviewed: ownerProcedure
     .input(
       z.object({
         eventId: z.number().int(),
@@ -380,16 +391,15 @@ export const federalFormsRouter = router({
 
   /**
    * Apply a parsed catalog change to the federal_forms catalog.
-   * Admin-only in production (TODO: wire users.role check). Optionally
-   * accepts userOverrides — when present, those values override the
-   * AI-parsed values for specific fields.
+   * Owner-gated. Optionally accepts userOverrides — when present, those
+   * values override the AI-parsed values for specific fields.
    *
    * In a transaction:
    *   1. Update federal_forms with the new values (per field).
    *   2. Mark federal_form_change_events.applied_at = now() + applied_by.
    *   3. Update federal_forms.last_change_check_at.
    */
-  applyChangeEvent: firmProcedure
+  applyChangeEvent: ownerProcedure
     .input(
       z.object({
         eventId: z.number().int(),
@@ -446,10 +456,10 @@ export const federalFormsRouter = router({
     }),
 
   /**
-   * Reject a parsed catalog change. Admin-only. Reason is required so
+   * Reject a parsed catalog change. Owner-gated. Reason is required so
    * the parser feedback loop can learn from rejections.
    */
-  rejectChangeEvent: firmProcedure
+  rejectChangeEvent: ownerProcedure
     .input(
       z.object({
         eventId: z.number().int(),

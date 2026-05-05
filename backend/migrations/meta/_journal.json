@@ -78,6 +78,20 @@
       "when": 1777596000000,
       "tag": "0010_client_ai_summary_override",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1777597000000,
+      "tag": "0011_user_preferences_daily_digest",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1777598000000,
+      "tag": "0012_federal_forms_required_items",
+      "breakpoints": true
     }
   ]
 }

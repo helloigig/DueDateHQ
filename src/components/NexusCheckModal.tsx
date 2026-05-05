@@ -9,9 +9,12 @@
  * Spec: docs/specs/alert-detail-nexus-change.md
  */
 import { useEffect, useMemo, useState } from "react";
-import { ShieldCheck, AlertTriangle, Loader2 } from "lucide-react";
-import type { Announcement } from "../types";
+import { ShieldCheck, AlertTriangle, Loader2, Pencil } from "lucide-react";
+import type { Announcement, Client, StateCode } from "../types";
 import { trpc } from "../lib/api/client";
+import { AddDeadlineModal, type AddDeadlinePrefill } from "./AddDeadlineModal";
+import { useClients } from "../hooks/useClients";
+import { TODAY, addDays, toIso } from "../data/dateHelpers";
 
 /** Slim recipient shape — covers both full Client objects from the
  *  store/clients router and the trimmed AffectedClient row used by
@@ -61,6 +64,20 @@ export function NexusCheckModal({
   const [activeIndex, setActiveIndex] = useState(0);
   const [allAnswers, setAllAnswers] = useState<Record<string, Record<string, boolean>>>({});
   const [allSelections, setAllSelections] = useState<Record<string, Set<string>>>({});
+
+  // Customize-before-add pivot: opens AddDeadlineModal with the suggested
+  // filing prefilled for this client. Lets the CPA tweak the date or
+  // jurisdiction before committing — closes the loop with §10's "Pre-
+  // population" prompt without auto-creating a deadline they didn't see.
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [customizePrefill, setCustomizePrefill] = useState<
+    AddDeadlinePrefill | null
+  >(null);
+  const clientsQuery = useClients();
+  const fullClient: Client | null = useMemo(() => {
+    const all = clientsQuery.data?.items ?? [];
+    return all.find((c) => c.id === recipients[activeIndex]?.id) ?? null;
+  }, [clientsQuery.data, recipients, activeIndex]);
 
   const activeClient = recipients[activeIndex] ?? null;
 
@@ -298,15 +315,36 @@ export function NexusCheckModal({
                         onChange={() => toggleFiling(f.formCode)}
                         className="w-4 h-4 accent-warn-solid"
                       />
-                      <div className="flex-1 text-sm">
-                        <span className="font-mono text-ink-900">{f.formCode}</span>
-                        <span className="text-ink-600 ml-2">{f.formName}</span>
+                      <div className="flex-1 text-sm min-w-0">
+                        <div className="flex items-baseline gap-2 flex-wrap">
+                          <span className="font-mono text-ink-900">{f.formCode}</span>
+                          <span className="text-ink-600">{f.formName}</span>
+                        </div>
+                        {f.caveat && (
+                          <span className="text-2xs text-warn-ink italic">
+                            [{f.caveat}]
+                          </span>
+                        )}
                       </div>
-                      {f.caveat && (
-                        <span className="text-2xs text-warn-ink italic shrink-0">
-                          [{f.caveat}]
-                        </span>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!fullClient) return;
+                          setCustomizePrefill({
+                            form: f.formCode,
+                            jurisdiction: stateCode as StateCode,
+                            date: toIso(addDays(TODAY, 60)),
+                            sourceNote: `From ${stateCode} nexus check — ${f.formName}. Edit the date if your client's tax-year filing schedule differs.`,
+                          });
+                          setCustomizeOpen(true);
+                        }}
+                        disabled={!fullClient}
+                        className="text-2xs inline-flex items-center gap-1 px-2 py-1 rounded border border-line text-ink-700 hover:bg-sunken disabled:opacity-50 shrink-0"
+                        title="Open AddDeadlineModal pre-filled for this client + state"
+                      >
+                        <Pencil className="w-2.5 h-2.5" aria-hidden />
+                        Customize
+                      </button>
                     </li>
                   );
                 })}
@@ -340,6 +378,15 @@ export function NexusCheckModal({
           </Button>
         </DialogFooter>
       </DialogContent>
+      <AddDeadlineModal
+        open={customizeOpen}
+        client={fullClient}
+        prefill={customizePrefill ?? undefined}
+        onClose={() => {
+          setCustomizeOpen(false);
+          setCustomizePrefill(null);
+        }}
+      />
     </Dialog>
   );
 }
