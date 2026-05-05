@@ -62,6 +62,7 @@ import {
   type AddDeadlinePrefill,
 } from "../components/AddDeadlineModal";
 import { FilingsTab } from "../components/FilingsTab";
+import { TaskPanel } from "../components/TaskPanel";
 import { EditClientModal } from "../components/EditClientModal";
 import { ExportModal } from "../components/ExportModal";
 import { ExportClientsButton } from "../components/ExportClientsButton";
@@ -608,6 +609,25 @@ export function ClientDetail() {
         {tab === "audit" && <ActivityTab client={client} />}
       </div>
 
+      {/* Task side panel — mounts when the URL carries `?task=:taskId`.
+          Yuqi audit 2026-05-05: "I am thinking to have the task as the
+          side panel to the Client detail page." Right-anchored 640px
+          drawer overlays the page; close clears the query param so the
+          back button + URL share work intuitively. The standalone
+          /clients/:id/tasks/:taskId route stays live as a deep-link
+          fallback for users who land on a task URL directly. */}
+      {searchParams.get("task") && (
+        <TaskPanel
+          clientId={client.id}
+          taskId={searchParams.get("task")!}
+          onClose={() => {
+            const next = new URLSearchParams(searchParams);
+            next.delete("task");
+            setSearchParams(next, { replace: true });
+          }}
+        />
+      )}
+
       <ConfirmDialog
         open={archiveOpen}
         title={`Archive ${client.name}?`}
@@ -1031,7 +1051,7 @@ function UnifiedNoteItem({
             each note lives at. */}
         {note.scope.kind === "task" ? (
           <Link
-            to={`/clients/${clientId}/tasks/${note.scope.taskId}`}
+            to={`/clients/${clientId}?task=${note.scope.taskId}`}
             className="text-2xs px-1.5 py-0.5 rounded bg-info-bg/60 text-info-ink border border-info-border hover:bg-info-bg"
             title="Open the task this note belongs to"
           >
@@ -1356,8 +1376,15 @@ function ToDoTab({
   const waitingGroups = useMemo(() => groupByTask(stillWaiting), [stillWaiting]);
   const reviewGroups = useMemo(() => groupByTask(needsReview), [needsReview]);
 
+  // Internal task links use ?task= query form so they open the side
+  // panel on this same client page (Yuqi audit 2026-05-05). Falls back
+  // to /clients/:id when no taskId. External task links (Action Queue,
+  // Mail, Alerts) still navigate to /clients/:id/tasks/:taskId; that
+  // route stays live as a deep-link fallback.
   const taskHref = (taskId?: string) =>
-    taskId ? `/clients/${client.id}/tasks/${taskId}` : `/clients/${client.id}`;
+    taskId
+      ? `/clients/${client.id}?task=${taskId}`
+      : `/clients/${client.id}`;
 
   /** Per-state human label shown on the right side of each item row.
    *  Mirrors the screenshot: "Waiting" / "Not requested" / "Unreviewed". */
@@ -1395,7 +1422,7 @@ function ToDoTab({
   const tasksOnPage = useMemo(() => {
     const seen = new Map<
       string,
-      { id: string; name: string; openCount: number }
+      { id: string; name: string; chaseCount: number; reviewCount: number }
     >();
     // (a) Seed from the canonical per-client task list. Real mode
     // pulls from BE via useTasksForClient; mock mode reads the store.
@@ -1408,33 +1435,50 @@ function ToDoTab({
         // the same fields. Compose a readable label either way.
         [t.formType, t.jurisdiction].filter(Boolean).join(" · ") ||
         "Task";
-      seen.set(t.id, { id: t.id, name: taskName, openCount: 0 });
+      seen.set(t.id, {
+        id: t.id,
+        name: taskName,
+        chaseCount: 0,
+        reviewCount: 0,
+      });
     }
-    // (b) Layer in open counts from the items list — only items the
-    // client owes (waiting / not requested / unreviewed / issue) count
-    // toward the badge.
+    // (b) Bucket open items into "chase" (client owes us) vs "review"
+    // (client sent, we owe a confirm/reject). Yuqi audit 2026-05-05:
+    // a single "X waiting" count conflated both buckets, which clashed
+    // with the "Still waiting on client" section name (that section
+    // shows ONLY the chase subset). Split into "X chase · Y review"
+    // so the chip matches the section vocabulary AND surfaces the
+    // review queue at a glance.
+    //   not_requested + requested_waiting → chase  (we're chasing the client)
+    //   received_unreviewed + received_issue → review  (waiting on CPA action)
     for (const ci of items) {
       if (!ci.taskId) continue;
-      const isOpen =
-        ci.state === "not_requested" ||
-        ci.state === "requested_waiting" ||
-        ci.state === "received_unreviewed" ||
-        ci.state === "received_issue";
-      if (!isOpen) continue;
+      const isChase =
+        ci.state === "not_requested" || ci.state === "requested_waiting";
+      const isReview =
+        ci.state === "received_unreviewed" || ci.state === "received_issue";
+      if (!isChase && !isReview) continue;
       const entry = seen.get(ci.taskId);
       if (entry) {
-        entry.openCount += 1;
+        if (isChase) entry.chaseCount += 1;
+        else entry.reviewCount += 1;
       } else {
         // Item references a task we didn't see in (a) — fall back to
         // the item's taskName so the chip still shows.
         seen.set(ci.taskId, {
           id: ci.taskId,
           name: ci.taskName ?? "Task",
-          openCount: 1,
+          chaseCount: isChase ? 1 : 0,
+          reviewCount: isReview ? 1 : 0,
         });
       }
     }
-    return Array.from(seen.values()).sort((a, b) => b.openCount - a.openCount);
+    return Array.from(seen.values()).sort(
+      (a, b) =>
+        b.chaseCount +
+        b.reviewCount -
+        (a.chaseCount + a.reviewCount),
+    );
   }, [items, remoteTasksList, storeTasks, client.id]);
 
   return (
@@ -1460,12 +1504,33 @@ function ToDoTab({
                 key={t.id}
                 to={taskHref(t.id)}
                 className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded border border-line bg-canvas text-ink-700 hover:bg-sunken hover:text-ink-900 hover:border-line-strong transition-colors"
-                title={`Open ${t.name}`}
+                title={
+                  t.chaseCount > 0 || t.reviewCount > 0
+                    ? `${t.name} — ${t.chaseCount} chasing client, ${t.reviewCount} awaiting your review`
+                    : `Open ${t.name}`
+                }
               >
                 <span className="font-medium">{t.name}</span>
-                {t.openCount > 0 && (
-                  <span className="text-2xs tabular-nums text-warn-ink bg-warn-bg/60 border border-warn-border px-1 py-0.5 rounded">
-                    {t.openCount}
+                {/* Split badge — "chase" subset (warn yellow, matches the
+                    Still-waiting-on-client section's palette) + "review"
+                    subset (info blue, matches the AI-confidence review
+                    palette). Each appears only when its count > 0; both
+                    hide when the task has no open work. The middle dot
+                    separates the two only when both are non-zero. */}
+                {t.chaseCount > 0 && (
+                  <span
+                    className="text-2xs tabular-nums text-warn-ink bg-warn-bg/60 border border-warn-border px-1 py-0.5 rounded"
+                    title={`${t.chaseCount} item${t.chaseCount === 1 ? "" : "s"} the client still owes you`}
+                  >
+                    {t.chaseCount} chase
+                  </span>
+                )}
+                {t.reviewCount > 0 && (
+                  <span
+                    className="text-2xs tabular-nums text-info-ink bg-info-bg/60 border border-info-border px-1 py-0.5 rounded"
+                    title={`${t.reviewCount} item${t.reviewCount === 1 ? "" : "s"} received from the client, awaiting your confirm/reject`}
+                  >
+                    {t.reviewCount} review
                   </span>
                 )}
               </Link>

@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ExternalLink, FileText, Sparkles, AlertTriangle, Check, ChevronRight, Mail, X } from "lucide-react";
+import { ExternalLink, FileText, Sparkles, AlertTriangle, Check, ChevronRight, Mail, X, Circle, Pencil, FileCheck, CalendarClock, PauseCircle, AlertCircle } from "lucide-react";
+import type { LucideProps } from "lucide-react";
 import { toast } from "sonner";
 import type { Client } from "../types";
 import type { Deadline, DeadlineStatus } from "../types";
@@ -13,6 +14,8 @@ import { useTasksForClient } from "../hooks/useTasks";
 import { useSelection } from "../hooks/useSelection";
 import { BatchChaseDrawer } from "./BatchChaseDrawer";
 import { formatLongDate } from "../data/dateHelpers";
+import { StatusPill } from "./ui/StatusPill";
+import { DEADLINE_STATUS_META } from "../lib/statusMeta";
 
 /**
  * Disambiguate quarterly/monthly federal forms (941 / 720 / 1099-NEC
@@ -121,6 +124,31 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
     return set;
   }, [deadlines]);
 
+  // Hoisted above early returns to satisfy Rules of Hooks — depends only
+  // on `deadlines` (prop) and `currentYear`, not on `applicability`.
+  const currentYear = String(new Date().getFullYear());
+  const filingsByYear = useMemo(() => {
+    const m = new Map<string, { year: string; deadlines: Deadline[] }>();
+    for (const d of deadlines) {
+      const year = d.officialDueDate.slice(0, 4);
+      const entry = m.get(year) ?? { year, deadlines: [] };
+      entry.deadlines.push(d);
+      m.set(year, entry);
+    }
+    if (!m.has(currentYear)) {
+      m.set(currentYear, { year: currentYear, deadlines: [] });
+    }
+    const all = Array.from(m.values());
+    const current = all.filter((y) => y.year === currentYear);
+    const future = all
+      .filter((y) => y.year > currentYear)
+      .sort((a, b) => a.year.localeCompare(b.year));
+    const past = all
+      .filter((y) => y.year < currentYear)
+      .sort((a, b) => b.year.localeCompare(a.year));
+    return [...current, ...future, ...past];
+  }, [deadlines, currentYear]);
+
   if (applicabilityQuery.isLoading) {
     return (
       <div className="bg-surface border border-line rounded-lg p-6 text-center text-sm text-ink-500">
@@ -167,47 +195,6 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
   const reference = (catalogQuery.data ?? []).filter(
     (f) => !applicableNumbers.has(f.formNumber),
   );
-
-  // Active filings for this client, grouped by tax year + jurisdiction.
-  // Year sort order — Yuqi audit 2026-05-05: previously descending
-  // (newest first), which put 2027 above 2026 (current). Sarah's
-  // mental model: "current year first, then what's coming, then
-  // history." Sort: current → future ascending → past descending.
-  // Year is parsed once (officialDueDate is YYYY-MM-DD ISO), then we
-  // bucket relative to currentYear and concat the three groups.
-  const currentYear = String(new Date().getFullYear());
-  const filingsByYear = useMemo(() => {
-    const m = new Map<
-      string,
-      { year: string; deadlines: Deadline[] }
-    >();
-    for (const d of deadlines) {
-      const year = d.officialDueDate.slice(0, 4);
-      const entry = m.get(year) ?? { year, deadlines: [] };
-      entry.deadlines.push(d);
-      m.set(year, entry);
-    }
-    // Always seed the current year so the "this year" structure is
-    // visible even when the client has zero deadlines. Yuqi audit
-    // 2026-05-05: "the filing should have the filing history, this
-    // year's filing and future filing... previously we had them, where
-    // are they?" — they were getting hidden when the year-bucket map
-    // was empty. Surface the current-year skeleton with an empty-state
-    // body so the user sees "yes, this is your 2026 plan; there's
-    // nothing in it yet" rather than just no section at all.
-    if (!m.has(currentYear)) {
-      m.set(currentYear, { year: currentYear, deadlines: [] });
-    }
-    const all = Array.from(m.values());
-    const current = all.filter((y) => y.year === currentYear);
-    const future = all
-      .filter((y) => y.year > currentYear)
-      .sort((a, b) => a.year.localeCompare(b.year)); // 2027 → 2028 → ...
-    const past = all
-      .filter((y) => y.year < currentYear)
-      .sort((a, b) => b.year.localeCompare(a.year)); // 2025 → 2024 → ...
-    return [...current, ...future, ...past];
-  }, [deadlines, currentYear]);
 
   return (
     <div className="space-y-4">
@@ -355,7 +342,7 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
                                 but the seed data may have them. */}
                             {taskId ? (
                               <Link
-                                to={`/clients/${client.id}/tasks/${taskId}`}
+                                to={`/clients/${client.id}?task=${taskId}`}
                                 className="flex-1 flex items-center gap-3 text-sm py-1.5 rounded hover:bg-sunken transition-colors group"
                                 title={`Open ${d.form} task →`}
                               >
@@ -731,65 +718,20 @@ function FormRow({
   );
 }
 
-/**
- * Status pill for a single deadline row in the "Filing plan" view.
- * Mercury palette per DESIGN.md T4 — color expresses state, not chrome.
- *
- * Mapping:
- *   not_started     → neutral (sunken)         — default; nothing to read into
- *   in_progress     → info (indigo)            — work happening
- *   completed       → ok (green)               — filed
- *   filed_extension → warn (amber)             — buys time but still open
- *   deferred        → neutral muted            — intentionally pushed
- *   overdue         → danger (red)             — past due, loud
- */
+const DEADLINE_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
+  Circle, Pencil, FileCheck, CalendarClock, PauseCircle, AlertCircle,
+};
+
 function FilingStatusPill({ status }: { status: DeadlineStatus }) {
-  const meta = STATUS_META[status];
+  const meta = DEADLINE_STATUS_META[status];
+  const Icon = DEADLINE_ICON_MAP[meta.icon];
   return (
-    <span
-      className={`text-2xs px-1.5 py-0.5 rounded shrink-0 ${meta.cls}`}
-      title={meta.title}
-    >
+    <StatusPill variant={meta.variant} size="xs" title={meta.title}>
+      {Icon && <Icon size={11} aria-hidden />}
       {meta.label}
-    </span>
+    </StatusPill>
   );
 }
-
-const STATUS_META: Record<
-  DeadlineStatus,
-  { label: string; cls: string; title: string }
-> = {
-  not_started: {
-    label: "Not started",
-    cls: "bg-sunken text-ink-500 border border-line",
-    title: "Work has not started on this filing.",
-  },
-  in_progress: {
-    label: "In progress",
-    cls: "bg-info-bg text-info-ink border border-info-border",
-    title: "Work in progress.",
-  },
-  completed: {
-    label: "Filed",
-    cls: "bg-ok-bg text-ok-ink border border-ok-border",
-    title: "Filing completed.",
-  },
-  filed_extension: {
-    label: "Extension filed",
-    cls: "bg-warn-bg text-warn-ink border border-warn-border",
-    title: "Extension filed — final return still owed.",
-  },
-  deferred: {
-    label: "Deferred",
-    cls: "bg-sunken text-ink-500 border border-line",
-    title: "Intentionally deferred.",
-  },
-  overdue: {
-    label: "Overdue",
-    cls: "bg-danger-bg text-danger-ink border border-danger-border",
-    title: "Past the official due date.",
-  },
-};
 
 function ReferenceSection({
   forms,

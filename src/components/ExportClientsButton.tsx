@@ -100,8 +100,8 @@ export function ExportClientsButton(props: Props) {
           props.iconOnly
             ? "inline-flex items-center justify-center w-8 h-8 rounded-md text-ink-500 hover:text-ink-900 hover:bg-sunken disabled:opacity-50 transition-colors"
             : props.compact
-              ? "inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border border-line text-ink-700 hover:bg-sunken disabled:opacity-50"
-              : "inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-line text-ink-700 hover:bg-sunken disabled:opacity-50"
+              ? "inline-flex items-center gap-1.5 h-7 text-xs px-2.5 rounded-md border border-line text-ink-700 hover:bg-sunken disabled:opacity-50"
+              : "inline-flex items-center gap-1.5 h-8 text-sm px-3 rounded-md border border-line text-ink-700 hover:bg-sunken disabled:opacity-50"
         }
         title={pending ? "Exporting…" : tooltip}
         aria-label={tooltip}

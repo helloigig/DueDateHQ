@@ -22,11 +22,12 @@ export type StateCode =
   | "PA"
   | "TX"
   // Decorative-only — referenced by mock announcements (OR PTE, MI
-  // corporate rate, WA B&O). The product won't generate filings here
-  // until seed-data.ts grows templates for them.
+  // corporate rate, WA B&O, NC penalty amnesty). The product won't
+  // generate filings here until seed-data.ts grows templates for them.
   | "OR"
   | "MI"
-  | "WA";
+  | "WA"
+  | "NC";
 
 export const STATE_NAMES: Record<StateCode, string> = {
   CA: "California",
@@ -42,6 +43,7 @@ export const STATE_NAMES: Record<StateCode, string> = {
   OR: "Oregon",
   MI: "Michigan",
   WA: "Washington",
+  NC: "North Carolina",
 };
 
 export type ClientStatus = "active" | "inactive" | "prospect" | "archived";

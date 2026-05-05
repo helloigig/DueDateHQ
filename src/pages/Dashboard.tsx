@@ -138,7 +138,12 @@ export function Dashboard() {
     return out;
   }, [firmRelevantAlerts]);
 
-  const alertsSnoozedToday = prefs.alerts_snoozed_until === toIso(TODAY);
+  // In mock/demo mode TODAY is a fixed constant (2026-04-23), so a single
+  // "Snooze for today" click would otherwise lock the modal off forever.
+  // Bypass the gate in mock mode so every fresh landing re-raises it.
+  const isMockMode = import.meta.env.VITE_USE_MOCK_DATA !== "false";
+  const alertsSnoozedToday =
+    !isMockMode && prefs.alerts_snoozed_until === toIso(TODAY);
   const showBlockingDialog =
     alertsByTier.blocking.length > 0 && !alertsSnoozedToday;
   const [blockingDismissed, setBlockingDismissed] = useState(false);

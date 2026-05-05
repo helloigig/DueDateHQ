@@ -103,7 +103,7 @@ export const STATE_FEED: Announcement[] = [
     authority: "California Franchise Tax Board",
     title: "PTE elective tax — Form 3804 election deadline moved to May 15",
     summary:
-      "CA FTB has moved the Pass-Through Entity elective tax election deadline from June 15 to May 15 effective the 2026 tax year. Affected entities should re-confirm election strategy before the new deadline.",
+      "California Franchise Tax Board has moved the Pass-Through Entity elective tax election deadline from June 15 to May 15 effective the 2026 tax year. Affected entities should re-confirm election strategy before the new deadline.",
     issuanceDate: "2026-04-21",
     effectiveDate: "2026-05-15",
     detectedAt: new Date().toISOString(),
@@ -155,7 +155,7 @@ export const STATE_FEED: Announcement[] = [
     authority: "California Franchise Tax Board",
     title: "Form 568 (LLC return) instructions revised for 2026",
     summary:
-      "CA FTB has updated the Form 568 instructions for tax year 2026 — Schedule IW receipts allocation language clarified. No change to filing deadline or amounts. Catalog metadata update queued for admin review.",
+      "California Franchise Tax Board has updated the Form 568 instructions for tax year 2026 — Schedule IW receipts allocation language clarified. No change to filing deadline or amounts. Catalog metadata update queued for admin review.",
     issuanceDate: "2026-04-24",
     effectiveDate: "2026-01-01",
     detectedAt: new Date().toISOString(),
