@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   CalendarClock,
+  Check,
   ChevronLeft,
   ChevronRight,
   Mail,
@@ -207,6 +208,7 @@ function CopilotPane({
   onAcknowledgeAdmin,
   onSnooze,
   onMarkNotApplicable,
+  onMarkResolved,
   isSending,
   isApplying,
   clientSource,
@@ -240,6 +242,12 @@ function CopilotPane({
   onAcknowledgeAdmin: (announcement: Announcement) => void;
   onSnooze: (announcement: Announcement) => void;
   onMarkNotApplicable: (announcement: Announcement) => void;
+  /** "I handled this" — moves the alert to Resolved without claiming it
+   *  was irrelevant. Distinct from `onMarkNotApplicable` which carries a
+   *  negative judgment. Use case: CPA already handled the alert out-of-
+   *  band (spoke to client by phone, sent emails via their normal client,
+   *  etc.) and just wants to close the loop here. */
+  onMarkResolved: (announcement: Announcement) => void;
   isSending: boolean;
   isApplying: boolean;
   clientSource: ReadonlyArray<{
@@ -690,6 +698,18 @@ function CopilotPane({
             <MoonStar className="w-3.5 h-3.5 text-ink-500" aria-hidden />
             Snooze until tomorrow
           </button>
+          {/* Manual "I handled this" path — for when the CPA finished the
+              alert out-of-band (phone call, email from their normal client,
+              etc.) and wants to close the loop here. Auto-resolve on the
+              in-app actions still happens; this is the explicit override. */}
+          <button
+            type="button"
+            onClick={() => onMarkResolved(a)}
+            className="inline-flex items-center gap-1.5 text-xs text-ok-ink hover:bg-ok-bg transition-colors px-2 py-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2"
+          >
+            <Check className="w-3.5 h-3.5" aria-hidden />
+            Mark resolved
+          </button>
           <button
             type="button"
             onClick={() => onMarkNotApplicable(a)}
@@ -1078,6 +1098,35 @@ export function Alerts() {
     [dismissMutation, handleComplete],
   );
 
+  // "I handled this" — positive close. Same underlying mutation as the
+  // dismiss flow (alerts move into the Resolved tab via `dismissed: true`)
+  // but with a distinct audit reason so we can tell "handled" apart from
+  // "not applicable" later. Pairs with the auto-resolve that fires on
+  // in-app actions (Send Email, Apply, Tag, etc.) — this is the manual
+  // override for cases the CPA closed out-of-band.
+  const handleMarkResolved = useCallback(
+    (a: Announcement) => {
+      dismissMutation.mutate(
+        { id: a.id, reason: "resolved" },
+        {
+          onSuccess: () => {
+            toast.success("Alert marked resolved · moved to Resolved tab", {
+              action: {
+                label: "Undo",
+                onClick: () => restoreMutation.mutate({ id: a.id }),
+              },
+            });
+            handleComplete(a.id, { resolve: false });
+          },
+          onError: (err) => {
+            toast.error(`Failed: ${err.message}`);
+          },
+        },
+      );
+    },
+    [dismissMutation, restoreMutation, handleComplete],
+  );
+
   const handleRunNexusCheck = useCallback(
     (a: Announcement) => {
       setNexusForAnnouncement(a);
@@ -1429,6 +1478,7 @@ export function Alerts() {
         onOpenRecompute={handleOpenRecompute}
         onSnooze={handleSnooze}
         onMarkNotApplicable={handleMarkNotApplicable}
+        onMarkResolved={handleMarkResolved}
         isSending={sendBulletinMutation.isPending}
         isApplying={batchAdjustMutation.isPending}
         clientSource={clientSource}
