@@ -1,12 +1,18 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ExternalLink, FileText, Sparkles, AlertTriangle, Check, ChevronRight } from "lucide-react";
+import { ExternalLink, FileText, Sparkles, AlertTriangle, Check, ChevronRight, Mail, X } from "lucide-react";
+import { toast } from "sonner";
 import type { Client } from "../types";
 import type { Deadline, DeadlineStatus } from "../types";
 import { trpc } from "../lib/api/client";
+import { actions } from "../data/store";
+import { env } from "../config";
 import type { FederalFormDTO } from "../lib/api/router";
 import type { AddDeadlinePrefill } from "./AddDeadlineModal";
 import { useTasksForClient } from "../hooks/useTasks";
+import { useSelection } from "../hooks/useSelection";
+import { BatchChaseDrawer } from "./BatchChaseDrawer";
+import { formatLongDate } from "../data/dateHelpers";
 
 /**
  * Disambiguate quarterly/monthly federal forms (941 / 720 / 1099-NEC
@@ -79,6 +85,19 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
     }
     return m;
   }, [tasks]);
+
+  // Batch select state — keyed on deadline.id. Drives the per-row
+  // checkbox column + the sticky bottom toolbar that appears when ≥1
+  // row is selected. Yuqi audit 2026-05-05: "Batch select on client:
+  // multi-select filings + send together." Single-client × multi-
+  // filings → one summary email; powered by BatchChaseDrawer with one
+  // recipient, where the {{context}} merge captures the filing list.
+  const filingsSelection = useSelection<Deadline>(
+    deadlines,
+    (d) => d.id,
+  );
+  const [batchDrawerOpen, setBatchDrawerOpen] = useState(false);
+  const selectedDeadlines = filingsSelection.selectedItems;
 
   // Catalog for "Reference" zone — every active federal form for the
   // entity type, including ones already covered. Filtered client-side
@@ -254,9 +273,23 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
                       .map((d) => {
                         const taskId = taskByDeadlineId.get(d.id);
                         const period = periodSuffix(d.form, d.officialDueDate);
+                        const isSelected = filingsSelection.has(d.id);
                         // Row interior — same layout whether the row is
                         // a Link or a plain <li>. Wrapping prevents drift
-                        // between the two render paths.
+                        // between the two render paths. Checkbox lives
+                        // OUTSIDE the Link wrapper so clicking it doesn't
+                        // navigate; e.stopPropagation guards the row click
+                        // path (mousedown captures via the Link's onClick).
+                        const checkbox = (
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => filingsSelection.toggle(d.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-3.5 h-3.5 rounded border-line accent-indigo shrink-0"
+                            aria-label={`Select ${d.form} for batch action`}
+                          />
+                        );
                         const interior = (
                           <>
                             <span
@@ -288,7 +321,11 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
                           </>
                         );
                         return (
-                          <li key={d.id}>
+                          <li
+                            key={d.id}
+                            className="flex items-center gap-2 px-2"
+                          >
+                            {checkbox}
                             {/* Row affordance — Yuqi audit 2026-05-05:
                                 "each filing row should click into task
                                 detail." When the deadline has an owning
@@ -299,7 +336,7 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
                             {taskId ? (
                               <Link
                                 to={`/clients/${client.id}/tasks/${taskId}`}
-                                className="flex items-center gap-3 text-sm px-2 py-1.5 rounded hover:bg-sunken transition-colors group"
+                                className="flex-1 flex items-center gap-3 text-sm py-1.5 rounded hover:bg-sunken transition-colors group"
                                 title={`Open ${d.form} task →`}
                               >
                                 {interior}
@@ -309,7 +346,7 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
                                 />
                               </Link>
                             ) : (
-                              <div className="flex items-center gap-3 text-sm px-2 py-1.5 text-ink-400">
+                              <div className="flex-1 flex items-center gap-3 text-sm py-1.5 text-ink-400">
                                 {interior}
                               </div>
                             )}
@@ -424,6 +461,117 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
           every 6h." which is internal implementation detail with zero
           user payoff. The Catalog admin link in the section header
           already carries the trust signal (curated + auditable). */}
+
+      {/* Sticky bottom toolbar — appears when ≥1 filing is selected.
+          Mirrors the /clients toolbar shape for consistency: pill-shaped
+          dark surface, count + primary action + Clear, fixed to viewport
+          bottom. Single primary action ("Send summary") for now; future
+          additions could include "Mark deferred" / "Reassign" / etc. */}
+      {filingsSelection.count > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-ink-900 text-canvas rounded-lg shadow-overlay flex items-center gap-3 px-4 py-2.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
+          <span className="text-xs tabular-nums">
+            <span className="font-semibold">{filingsSelection.count}</span>{" "}
+            {filingsSelection.count === 1 ? "filing" : "filings"} selected
+          </span>
+          <span className="text-ink-500 text-2xs" aria-hidden>
+            ·
+          </span>
+          <button
+            type="button"
+            onClick={() => setBatchDrawerOpen(true)}
+            className="text-xs px-2.5 py-1 rounded bg-indigo hover:bg-indigo-hover transition-colors inline-flex items-center gap-1"
+          >
+            <Mail className="w-3 h-3" aria-hidden />
+            Send summary email
+          </button>
+          <button
+            type="button"
+            onClick={() => filingsSelection.clear()}
+            className="text-xs text-ink-300 hover:text-canvas transition-colors px-2 inline-flex items-center gap-1"
+            aria-label="Clear selection"
+          >
+            <X className="w-3 h-3" aria-hidden />
+            Clear
+          </button>
+        </div>
+      )}
+
+      <BatchChaseDrawer
+        open={batchDrawerOpen}
+        intent="chase"
+        recipients={[
+          {
+            clientId: client.id,
+            clientName: client.name,
+            clientEmail: client.contactEmail,
+            // Format the selected filings as a multi-line bulleted list
+            // that drops cleanly into the {{context}} merge token. Each
+            // line: "• 1040 — due Apr 15, 2026". The drawer's default
+            // "chase" body just embeds {{context}} as-is, so this list
+            // becomes the body's call-out.
+            context: selectedDeadlines
+              .slice()
+              .sort((a, b) =>
+                a.officialDueDate.localeCompare(b.officialDueDate),
+              )
+              .map(
+                (d) =>
+                  `• ${d.form} — due ${formatLongDate(d.officialDueDate)}`,
+              )
+              .join("\n"),
+          },
+        ]}
+        seed={{
+          subject: `${client.name} — heads up on your upcoming filings`,
+          body:
+            "Hi {{client_name}},\n\nQuick heads up on the filings we're tracking for you:\n\n{{context}}\n\nWe'll be in touch as each one gets closer; reach out anytime if you have questions or anything's changed on your end.\n\n— The team at your CPA",
+        }}
+        onClose={() => setBatchDrawerOpen(false)}
+        onSend={async (payload) => {
+          // Single recipient — straightforward send. Mock-mode writes a
+          // draft + sends; real-mode could route through the same
+          // emails.send mutation per recipient pattern as the /clients
+          // batch-send. For now, mock-mode only since the "summary email"
+          // BE proc isn't carved out yet — flagged TODO.
+          if (env.useMockData) {
+            for (const r of payload.recipients) {
+              const draftId = actions.saveEmailDraft({
+                taskId: `filings-summary-${r.clientId}`,
+                clientId: r.clientId,
+                // Single-recipient drawer here — recipient is always
+                // `client`, so contactEmail comes off the prop. Falls
+                // back to a placeholder if the client has no email on
+                // file (the drawer also shows a warning strip in that
+                // case so the user knows it's a stub send).
+                to: client.contactEmail ?? `${r.clientName} <client@example.com>`,
+                cc: "",
+                subject: r.subject,
+                body: r.body,
+                tone: "casual",
+                aiSources: [],
+                sendMethod: "cpa_send",
+                status: "draft",
+              });
+              actions.sendEmail(draftId);
+            }
+            toast.success(
+              `Sent summary covering ${selectedDeadlines.length} ${
+                selectedDeadlines.length === 1 ? "filing" : "filings"
+              }`,
+            );
+          } else {
+            // TODO(real-mode): wire through to a generic emails.send
+            // proc that takes per-recipient subject + body. The
+            // /clients batch-send path uses sendBatchFileRequest;
+            // we'd want a sibling proc here for proper audit trail.
+            toast.info(
+              "Sending in real mode requires a backend deploy — coming next pass",
+            );
+          }
+          setBatchDrawerOpen(false);
+          filingsSelection.clear();
+        }}
+      />
     </div>
   );
 }
