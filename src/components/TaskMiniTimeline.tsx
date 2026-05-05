@@ -231,8 +231,11 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
       {/* Timeline strip — bigger dots, filled connector showing progress,
           status text always visible under each date. Click any dot to
           select that stage; selected stage's actions render in the
-          panel below. */}
-      <div className="flex items-start gap-1">
+          panel below. gap-0 (was gap-1): the prior 4px column gap left
+          a visible break in the connector line between adjacent dots,
+          since each waypoint only draws to its own column edge. With
+          gap-0 the columns butt up and the connectors meet seamlessly. */}
+      <div className="flex items-start gap-0">
         {waypoints.map((wp, i) => {
           const isActive =
             wp.status === "in_progress" ||
@@ -260,43 +263,68 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
         })}
       </div>
 
-      {/* Active-stage panel — always visible below the timeline;
-          replaces the floating-popover-on-hover pattern. Holds the
-          status pill + Mark done CTA + Override link for the currently-
-          selected stage (defaults to the active stage). One surface,
-          one set of controls. */}
+      {/* Active-stage panel — anchored under the selected dot via a
+          5-column grid that mirrors the timeline strip above. Each
+          column is empty except the one matching selectedIdx, which
+          renders the panel at a fixed 200px width centered in its
+          column. This way the panel "points to" the dot it represents
+          without any absolute-positioning math. Yuqi audit 2026-05-05
+          (round 5): "200px wide, center aligned to that node." */}
       {selectedWaypoint && (
-        <ActiveStagePanel
-          // Re-mounting on type change is what triggers the animation;
-          // Tailwind's `animate-in` runs on every fresh mount.
-          key={selectedWaypoint.type}
-          wp={selectedWaypoint}
-          slideDirection={slideDirection}
-          isMarkingDone={updateMilestone.isPending}
-          onMarkDone={
-            selectedWaypoint.ids && selectedWaypoint.ids.length > 0
-              ? async () => {
-                  try {
-                    await Promise.all(
-                      selectedWaypoint.ids!.map((id) =>
-                        updateMilestone.mutateAsync({
-                          id,
-                          status: "done",
-                        }),
-                      ),
-                    );
-                  } catch {
-                    // Error toast surfaces via the hook's onError.
+        <div
+          className="grid mt-3"
+          style={{
+            gridTemplateColumns: `repeat(${waypoints.length}, minmax(0, 1fr))`,
+          }}
+        >
+          {waypoints.map((wp, i) =>
+            i === selectedIdx ? (
+              <div
+                key={wp.type}
+                className="flex justify-center"
+                // Allows the 200px panel to overflow its column
+                // horizontally without clipping (when the column is
+                // narrower than 200px on small viewports).
+                style={{ overflow: "visible" }}
+              >
+                <ActiveStagePanel
+                  // Re-mounting on type change drives the slide animation.
+                  key={selectedWaypoint.type}
+                  wp={selectedWaypoint}
+                  slideDirection={slideDirection}
+                  isMarkingDone={updateMilestone.isPending}
+                  onMarkDone={
+                    selectedWaypoint.ids &&
+                    selectedWaypoint.ids.length > 0
+                      ? async () => {
+                          try {
+                            await Promise.all(
+                              selectedWaypoint.ids!.map((id) =>
+                                updateMilestone.mutateAsync({
+                                  id,
+                                  status: "done",
+                                }),
+                              ),
+                            );
+                          } catch {
+                            // Error toast surfaces via the hook's onError.
+                          }
+                        }
+                      : undefined
                   }
-                }
-              : undefined
-          }
-          onOverride={
-            selectedWaypoint.ids && selectedWaypoint.ids.length > 0
-              ? () => setEditing(selectedWaypoint)
-              : undefined
-          }
-        />
+                  onOverride={
+                    selectedWaypoint.ids &&
+                    selectedWaypoint.ids.length > 0
+                      ? () => setEditing(selectedWaypoint)
+                      : undefined
+                  }
+                />
+              </div>
+            ) : (
+              <div key={wp.type} />
+            ),
+          )}
+        </div>
       )}
 
       {editing && (
@@ -591,18 +619,6 @@ function ActiveStagePanel({
   slideDirection?: "left" | "right" | null;
 }) {
   const isFinished = wp.status === "done";
-  const tone = (() => {
-    if (wp.status === "overdue" || wp.status === "blocked") {
-      return "border-danger-border bg-danger-bg/40";
-    }
-    if (wp.status === "in_progress") {
-      return "border-warn-border bg-warn-bg/30";
-    }
-    if (wp.status === "done") {
-      return "border-ok-border bg-ok-bg/30";
-    }
-    return "border-line bg-sunken/30";
-  })();
   const headline = (() => {
     if (wp.status === "blocked") return `${wp.label} · blocked`;
     if (wp.status === "overdue") return `${wp.label} · overdue`;
@@ -611,9 +627,7 @@ function ActiveStagePanel({
     return `${wp.label} · not started`;
   })();
   // Animation classes: tailwindcss-animate's `animate-in slide-in-from-{dir}`
-  // primitives. We use a fixed pixel offset (16) so adjacent stage
-  // changes feel snappy; longer travels would benefit from a larger
-  // offset but at 5 stages the visual jump is small anyway.
+  // primitives. 200ms duration; offset 4 (16px) — snappy at 5 stages.
   const slideClass =
     slideDirection === "right"
       ? "animate-in slide-in-from-right-4 duration-200"
@@ -622,33 +636,33 @@ function ActiveStagePanel({
         : "";
 
   return (
+    // Yuqi audit 2026-05-05 (round 5): "remove the shadow behind edit
+    // collect. Don't need to write target Apr 16 again in the little
+    // card." Stripped the bordered + tinted panel chrome down to bare
+    // headline + missing-count + actions. The stage's target date is
+    // already visible under the dot in the strip above; repeating it
+    // here was duplicate ink. Width fixed 200px (Yuqi: "200px wide,
+    // center aligned to that node") so the panel reads as a column-
+    // aligned label rather than a full-width banner.
     <div
       className={cn(
-        "mt-3 px-3 py-2.5 rounded-md border text-xs",
-        tone,
+        "w-[200px] text-xs px-2 py-1.5 text-center",
         slideClass,
       )}
       aria-label={`${wp.label} stage actions`}
     >
-      <div className="flex items-baseline gap-2 flex-wrap">
-        <span className="font-semibold text-ink-900">{headline}</span>
-        {wp.targetDate && (
-          <span className="text-2xs text-ink-500 tabular-nums">
-            target {formatShort(wp.targetDate)}
-          </span>
-        )}
-        {wp.missingBadge && wp.missingBadge > 0 && (
-          <span className="text-2xs text-warn-ink font-medium">
-            · {wp.missingBadge} item
-            {wp.missingBadge === 1 ? "" : "s"} waiting
-          </span>
-        )}
-      </div>
+      <div className="font-semibold text-ink-900">{headline}</div>
+      {wp.missingBadge && wp.missingBadge > 0 && (
+        <div className="text-2xs text-warn-ink font-medium mt-0.5">
+          {wp.missingBadge} item
+          {wp.missingBadge === 1 ? "" : "s"} waiting
+        </div>
+      )}
       {wp.blockerReason && (
         <p className="mt-1 text-2xs text-danger-ink">{wp.blockerReason}</p>
       )}
       {(onMarkDone || onOverride) && (
-        <div className="mt-2 flex items-center gap-3 flex-wrap">
+        <div className="mt-2 flex items-center gap-3 flex-wrap justify-center">
           {onMarkDone && !isFinished && (
             <button
               type="button"
