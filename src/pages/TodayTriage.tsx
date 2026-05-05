@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { useAnnouncements } from "@/hooks/useAnnouncements";
 import {
   ArrowRight,
   CheckCircle2,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { StateBadge } from "@/components/ui/StateBadge";
 import { Button } from "@/components/ui/button";
 import { clients as MOCK_CLIENTS } from "@/data/mockClients";
 import { deadlines as MOCK_DEADLINES } from "@/data/mockDeadlines";
@@ -152,8 +154,38 @@ function buildTriageQueue(): TriageItem[] {
 
 export function TodayTriage() {
   const navigate = useNavigate();
-  const queue = useMemo(buildTriageQueue, []);
+  const [searchParams] = useSearchParams();
+  const fullQueue = useMemo(buildTriageQueue, []);
+
+  // /alerts hands off to /today/triage?alert=<id> when the CPA wants to
+  // walk the affected tasks one-by-one. Read the alert, filter the queue
+  // to just its affected clients, and surface a banner so the focused
+  // card never feels rootless. Falls back to the unfiltered queue when
+  // the id doesn't resolve (stale link / not loaded yet).
+  const announcementsQuery = useAnnouncements();
+  const alertId = searchParams.get("alert");
+  const alertForTriage = useMemo(
+    () =>
+      alertId
+        ? announcementsQuery.data?.find((a) => a.id === alertId) ?? null
+        : null,
+    [alertId, announcementsQuery.data],
+  );
+  const queue = useMemo(() => {
+    if (!alertForTriage) return fullQueue;
+    const affected = new Set(alertForTriage.affectedClientIds);
+    const filtered = fullQueue.filter((i) => affected.has(i.clientId));
+    // If the alert's affected clients aren't in the mock queue at all
+    // (demo data drift), fall back to the full queue rather than
+    // strand the user on an empty triage page.
+    return filtered.length > 0 ? filtered : fullQueue;
+  }, [alertForTriage, fullQueue]);
+
   const [cursor, setCursor] = useState(0);
+  // Reset cursor when the queue changes (e.g. alert filter activates).
+  useEffect(() => {
+    setCursor(0);
+  }, [alertId]);
   const [completed, setCompleted] = useState<Set<string>>(new Set());
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
 
@@ -277,7 +309,7 @@ export function TodayTriage() {
                 : `You handled ${completed.size} ${completed.size === 1 ? "item" : "items"} this session.`}
             </p>
             <Link
-              to="/design/today"
+              to="/"
               className="inline-flex items-center gap-1 text-sm font-medium text-ink-900 hover:text-ink-700"
             >
               Back to Today <ArrowRight className="w-4 h-4" />
@@ -294,6 +326,24 @@ export function TodayTriage() {
     <PageContainer variant="workshop">
       {/* ── Center stage: focused card ─────────────────────────── */}
       <section className="flex-1 min-w-0 flex flex-col bg-canvas overflow-hidden">
+        {alertForTriage && (
+          <div className="px-4 md:px-6 lg:px-8 py-2 bg-info-bg border-b border-info-border flex items-center gap-2 text-xs">
+            <Sparkles className="w-3.5 h-3.5 text-info-ink" aria-hidden />
+            <span className="text-info-ink inline-flex items-center gap-1.5 flex-wrap">
+              Triaging tasks affected by
+              <StateBadge code={alertForTriage.stateCode} size="sm" />
+              <span className="font-semibold">{alertForTriage.title}</span>
+              {" — "}
+              {queue.length} {queue.length === 1 ? "task" : "tasks"} in queue
+            </span>
+            <Link
+              to={`/alerts/${alertForTriage.id}`}
+              className="ml-auto text-info-ink hover:underline"
+            >
+              Back to alert →
+            </Link>
+          </div>
+        )}
         {/* Top progress bar */}
         <div className="px-4 md:px-6 lg:px-8 py-3 bg-surface border-b border-line flex items-center gap-3 sticky top-0 z-10">
           <button
@@ -332,14 +382,21 @@ export function TodayTriage() {
           >
             <ChevronRight className="w-4 h-4" aria-hidden />
           </button>
-          <Link
-            to="/design/today"
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== "undefined" && window.history.length > 1) {
+                window.history.back();
+              } else {
+                window.location.assign("/");
+              }
+            }}
             className="ml-auto inline-flex items-center gap-1 text-xs text-ink-500 hover:text-ink-900 transition-colors"
-            title="Back to Today (Esc)"
+            title="Back (Esc)"
           >
             <X className="w-3.5 h-3.5" aria-hidden />
             Exit triage
-          </Link>
+          </button>
         </div>
 
         {/* Focused card — center stage */}
@@ -355,9 +412,19 @@ export function TodayTriage() {
                   {current.authority}
                 </span>
               </div>
-              <h1 className="text-display font-semibold text-ink-900 leading-tight">
-                {current.form} · {jurisdictionLabel(current.jurisdiction)}
-              </h1>
+              <div className="flex items-center gap-3">
+                <StateBadge
+                  code={
+                    current.jurisdiction === "federal"
+                      ? "FED"
+                      : current.jurisdiction
+                  }
+                  size="md"
+                />
+                <h1 className="text-display font-semibold text-ink-900 leading-tight">
+                  {current.form}
+                </h1>
+              </div>
               <div className="mt-2 text-sm text-ink-700">
                 <span className="font-semibold text-ink-900">{current.clientName}</span>
                 <span className="text-ink-400"> · </span>
@@ -430,9 +497,10 @@ export function TodayTriage() {
                           {r.date.slice(5).replace("-", "/")}
                         </span>
                         <span className="flex-1 truncate text-ink-700">{r.form}</span>
-                        <span className="text-2xs uppercase tracking-wider text-ink-500 font-semibold shrink-0">
-                          {r.jurisdiction === "federal" ? "FED" : r.jurisdiction}
-                        </span>
+                        <StateBadge
+                          code={r.jurisdiction === "federal" ? "FED" : r.jurisdiction}
+                          size="sm"
+                        />
                       </li>
                     ))}
                   </ul>

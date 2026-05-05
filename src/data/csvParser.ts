@@ -111,6 +111,15 @@ const TARGETS: Array<{
   { target: "contact_email", patterns: [/email/i] },
   { target: "contact_phone", patterns: [/phone/i, /tel/i] },
   { target: "bundle", patterns: [/bundle/i, /package/i, /service/i] },
+  // Multi-state nexus list — comma/semicolon separated. Match before
+  // /state/ because the column header might be "nexus states".
+  { target: "nexus_states", patterns: [/nexus/i, /multi.?state/i] },
+  // Tier 0-3 — drives capacity weighting / sorting in dashboards.
+  { target: "tier", patterns: [/^tier$/i, /priority/i] },
+  // Free-text notes column — preserved verbatim.
+  { target: "notes", patterns: [/^notes?$/i, /memo/i, /comment/i] },
+  // Active / inactive / prospect / archived.
+  { target: "status", patterns: [/^status$/i, /^active$/i] },
 ];
 
 export function detectMapping(headers: string[]): FieldMapping[] {
@@ -146,6 +155,32 @@ function guessField(
   return null;
 }
 
+function parseNexusList(raw: string): StateCode[] {
+  if (!raw) return [];
+  return raw
+    .split(/[,;|/]/)
+    .map((s) => pickState(s))
+    .filter((s): s is StateCode => Boolean(s));
+}
+
+function parseTier(raw: string): "0" | "1" | "2" | "3" | null {
+  const k = raw.trim().toLowerCase().replace(/^tier\s*/i, "");
+  if (k === "0" || k === "1" || k === "2" || k === "3") return k;
+  return null;
+}
+
+function parseStatus(
+  raw: string,
+): "active" | "inactive" | "prospect" | "archived" | null {
+  const k = raw.trim().toLowerCase();
+  if (k === "active" || k === "yes" || k === "y" || k === "true") return "active";
+  if (k === "inactive" || k === "no" || k === "n" || k === "false")
+    return "inactive";
+  if (k === "prospect" || k === "lead") return "prospect";
+  if (k === "archived" || k === "deleted") return "archived";
+  return null;
+}
+
 export function rowsFromCsv(
   _headers: string[],
   rows: string[][],
@@ -162,6 +197,10 @@ export function rowsFromCsv(
   const emailIdx = indexOf("contact_email");
   const phoneIdx = indexOf("contact_phone");
   const bundleIdx = indexOf("bundle");
+  const nexusIdx = indexOf("nexus_states");
+  const tierIdx = indexOf("tier");
+  const notesIdx = indexOf("notes");
+  const statusIdx = indexOf("status");
 
   return rows
     .filter((r) => r.length > 0 && r.some((c) => c.trim().length > 0))
@@ -174,6 +213,16 @@ export function rowsFromCsv(
         phoneIdx >= 0 ? (r[phoneIdx] ?? "").trim() || undefined : undefined;
       const bundle =
         bundleIdx >= 0 ? (r[bundleIdx] ?? "").trim() || null : null;
+      const nexusStates =
+        nexusIdx >= 0 ? parseNexusList((r[nexusIdx] ?? "").trim()) : [];
+      const tier = tierIdx >= 0 ? parseTier(r[tierIdx] ?? "") : null;
+      const notes =
+        notesIdx >= 0 ? (r[notesIdx] ?? "").trim() : "";
+      // Default to "active" when status column is missing — matches the
+      // backend default for new clients. Recognized values: active /
+      // inactive / prospect / archived (plus yes/no boolean fallbacks).
+      const status =
+        statusIdx >= 0 ? parseStatus(r[statusIdx] ?? "") : "active";
 
       const entityType = pickEntity(entityRaw);
       const primaryState = pickState(stateRaw);
@@ -197,6 +246,10 @@ export function rowsFromCsv(
         email,
         phone,
         bundle,
+        nexusStates,
+        tier,
+        notes,
+        status,
         issues,
       };
     });

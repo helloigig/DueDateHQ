@@ -55,6 +55,8 @@ import { FilingsTab } from "../components/FilingsTab";
 import { EditClientModal } from "../components/EditClientModal";
 import { ExportModal } from "../components/ExportModal";
 import { ExportClientsButton } from "../components/ExportClientsButton";
+import { PinClientButton } from "../components/Sidebar";
+import { BackLink } from "../components/ui/BackLink";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { STATE_NAMES, type StateCode } from "../types";
 import { bundleByName, type FilingBundle } from "../data/bundles";
@@ -186,9 +188,8 @@ export function ClientDetail() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 md:px-6 py-6">
-      <Link to="/clients" className="text-sm text-ink-500 hover:underline">
-        ‹ Clients
-      </Link>
+      <BackLink fallback="/clients" fallbackLabel="Clients" />
+
 
       <div className="mt-3 flex items-start gap-3">
         <div className="flex-1 min-w-0">
@@ -225,6 +226,7 @@ export function ClientDetail() {
             </div>
           )}
         </div>
+        <PinClientButton clientId={client.id} />
         <ExportClientsButton clientId={client.id} />
         {/* Legacy ExportModal still mounted (deadline iCal/PDF surfaces) but
             no longer the default trigger — env.useMockData callers can still

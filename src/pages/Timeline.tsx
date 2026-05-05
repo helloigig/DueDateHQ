@@ -8,6 +8,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { PageContainer } from "../components/ui/PageContainer";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { StatusPill } from "../components/ui/StatusPill";
+import { StateBadge } from "../components/ui/StateBadge";
 import { FilterChip } from "../components/ui/FilterChip";
 import { Button } from "../components/ui/button";
 import {
@@ -858,36 +859,51 @@ function TaskTimelineRow({
             : "Example row — sign in and add a client to see your real tasks here"
         }
       >
-        {/* Identity — when nested, drop the client name (parent header has it) */}
-        <div className="w-56 shrink-0 min-w-0">
-          {!nested && (
-            <div className="flex items-center gap-2 mb-0.5">
-              <div className="text-sm font-semibold text-ink-900 truncate flex-1 min-w-0">
-                {t.client}
-              </div>
-              {t.tier && <TimelineTierPill tier={t.tier} />}
-            </div>
+        {/* Identity — state badge anchors the row visually so jurisdiction
+            reads at a glance (was previously buried inside `task` text).
+            When nested, the client name is on the parent header so we
+            drop it here to avoid duplication. */}
+        <div className="w-64 shrink-0 min-w-0 flex items-start gap-2.5">
+          {t.jurisdiction && (
+            <StateBadge
+              code={
+                t.jurisdiction === "federal"
+                  ? "FED"
+                  : t.jurisdiction.toUpperCase()
+              }
+              size="sm"
+            />
           )}
-          <div
-            className={cn(
-              "text-xs",
-              nested ? "text-ink-700" : "text-ink-500",
+          <div className="flex-1 min-w-0">
+            {!nested && (
+              <div className="flex items-center gap-2 mb-0.5">
+                <div className="text-sm font-semibold text-ink-900 truncate flex-1 min-w-0">
+                  {t.client}
+                </div>
+                {t.tier && <TimelineTierPill tier={t.tier} />}
+              </div>
             )}
-          >
-            <span className="truncate">{t.task}</span>
-            <span className="text-ink-400 mx-1">·</span>
-            {t.officialDueIso ? (
-              <DueDate
-                official={t.officialDueIso}
-                internal={t.internalDueIso}
-                formClass={t.formClass}
-                filed={t.currentStage === "file" && t.daysBehind === 0 && t.missingCount === 0}
-                inline
-                className="text-xs"
-              />
-            ) : (
-              <span className="text-ink-400">due {t.dueDate}</span>
-            )}
+            <div
+              className={cn(
+                "text-xs",
+                nested ? "text-ink-700" : "text-ink-500",
+              )}
+            >
+              <span className="truncate">{t.task}</span>
+              <span className="text-ink-400 mx-1">·</span>
+              {t.officialDueIso ? (
+                <DueDate
+                  official={t.officialDueIso}
+                  internal={t.internalDueIso}
+                  formClass={t.formClass}
+                  filed={t.currentStage === "file" && t.daysBehind === 0 && t.missingCount === 0}
+                  inline
+                  className="text-xs"
+                />
+              ) : (
+                <span className="text-ink-400">due {t.dueDate}</span>
+              )}
+            </div>
           </div>
         </div>
 
