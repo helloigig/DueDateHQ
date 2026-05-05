@@ -30,7 +30,7 @@ export function OnboardingChoosePath() {
       {/* Primary — CSV upload */}
       <Link
         to="/onboarding/import"
-        className="block bg-surface border-2 border-line rounded-md p-6 hover:border-accent hover:shadow-pop transition-all group"
+        className="block bg-surface border border-line rounded-md p-6 hover:bg-sunken hover:shadow-pop transition-all group"
       >
         <div className="flex items-start gap-4">
           <span className="w-12 h-12 rounded-md bg-sunken border border-line flex items-center justify-center text-ink-700 shrink-0">

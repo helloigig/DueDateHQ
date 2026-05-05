@@ -1195,6 +1195,414 @@ Rules removed from the active doc on **2026-05-03** after a reference audit agai
 
 If you find another rule in this doc that contradicts the references or shadcn primitives, raise it — the active doc should always reflect what we actually build.
 
+## Design substrate — 2026-05-05 OKLCH refresh (canonical)
+
+This section **supersedes** the hex-based color tokens in §Colors and the indigo next-action accent in T2 / §Components. Everything else in this doc — layout/spacing, typography ladder, modal/popover discipline, voice, accessibility, motion, Mercury inheritance principles, four-alert-surfaces, anatomy rules, 3-tier scan rule — remains in force.
+
+### What changed
+
+The product now sits on a **shadcn-format OKLCH semantic-token substrate**. Three meaningful shifts:
+
+1. **Next-action accent is green, not indigo.** `--primary: oklch(60% 0.2 120)` — a vibrant green at hue 120. Replaces `#5B5BD6` (indigo) wherever T2's "one accent, one viewport, one action" applies. Mercury's blue-indigo was an inherited reference choice; the product's own accent is now green-on-cool-neutral. Mercury's spacing/typography/density rules stand; the *color* of the next action does not.
+2. **Cool neutral hue is 286, not 220.** `oklch(* 0.01 286)` — a faintly purple-warmed cool gray ladder. Replaces the slate-family hex ladder. Reads slightly warmer than slate while staying explicitly non-blue.
+3. **Dark mode is first-class.** A complete `.dark` token set is required. Components must read from semantic tokens (`bg-background`, `text-foreground`, `border-border`) so the same DOM works in both modes.
+
+`components.json` flips `cssVariables: false → true`. `src/index.css` hosts the `:root` + `.dark` blocks. `tailwind.config.js` colors block becomes a thin shim that maps Tailwind names (`bg-canvas`, `text-ink-900`, `bg-indigo`) onto the OKLCH `--*` variables, so existing JSX continues to compile while underlying values shift; subsequent codemods rename to the semantic forms (`bg-background`, `text-foreground`, `bg-primary`).
+
+### Canonical token set
+
+```css
+:root {
+  /* Surfaces */
+  --background: oklch(98% 0 0);            /* page canvas — was #F8F9FB */
+  --card: oklch(96% 0.005 286);            /* card surface — was #FFFFFF (now slightly tinted) */
+  --popover: oklch(98% 0 0);               /* dropdown / popover surface */
+  --header: oklch(98% 0 0);                /* TopBar */
+  --footer: oklch(98% 0 0);                /* BottomTabBar / sticky footer */
+
+  /* Text */
+  --foreground: oklch(10% 0.01 286);       /* primary ink — was ink-900 #0F172A */
+  --card-foreground: oklch(10% 0.01 286);
+  --popover-foreground: oklch(10% 0.01 286);
+  --header-foreground: oklch(10% 0.01 286);
+  --footer-foreground: oklch(10% 0.01 286);
+  --muted-foreground: oklch(45% 0.01 286); /* secondary ink — was ink-500 #64748B */
+
+  /* Surfaces — secondary / muted / accent */
+  --secondary: oklch(92% 0.01 286);        /* sunken — was #F2F3F5 */
+  --secondary-foreground: oklch(10% 0.01 286);
+  --muted: oklch(92% 0.01 286);
+  --accent: oklch(92% 0.01 286);           /* accent surface — chip bg, hover row */
+  --accent-foreground: oklch(60% 0.2 120); /* GREEN ink on accent — soft-active chip pattern */
+
+  /* Primary — the next-action accent */
+  --primary: oklch(60% 0.2 120);           /* GREEN — was indigo #5B5BD6 */
+  --primary-foreground: oklch(98% 0 0);
+
+  /* Status — destructive only in OKLCH for now; warn/ok/info inherit Mercury hex */
+  --destructive: oklch(55% 0.2 20);        /* red — was #DC2626 */
+  --destructive-foreground: oklch(98% 0 0);
+
+  /* Lines */
+  --border: oklch(88% 0.01 286);           /* hairline — was line #E2E8F0 */
+  --input: oklch(88% 0.01 286);
+  --ring: oklch(60% 0.2 120);              /* focus ring — green */
+
+  /* Charts (5-step gradient from primary) */
+  --chart-1: oklch(60% 0.2 120);
+  --chart-2: oklch(50% 0.15 120);
+  --chart-3: oklch(45% 0.1 120);
+  --chart-4: oklch(40% 0.05 120);
+  --chart-5: oklch(35% 0.02 120);
+
+  /* Sidebar (own surface family) */
+  --sidebar: oklch(96% 0.005 286);
+  --sidebar-foreground: oklch(10% 0.01 286);
+  --sidebar-primary: oklch(60% 0.2 120);
+  --sidebar-primary-foreground: oklch(98% 0 0);
+  --sidebar-accent: oklch(92% 0.01 286);
+  --sidebar-accent-foreground: oklch(10% 0.01 286);
+  --sidebar-border: oklch(88% 0.01 286);
+  --sidebar-ring: oklch(60% 0.2 120);
+
+  /* Code surface (activity-log monospace, AI inference IDs, audit hashes) */
+  --code: oklch(98% 0 0);
+  --code-foreground: oklch(60% 0.2 120);
+  --code-highlight: oklch(94% 0.01 286);
+  --code-number: oklch(50% 0.15 120);
+  --code-selection: oklch(92% 0.01 286);
+  --code-border: oklch(88% 0.01 286);
+
+  --radius: 0.625rem;  /* 10px — page-default. cards = radius − 2px (8px). modals = radius + 2px (12px). */
+}
+
+.dark {
+  --background: oklch(10% 0.01 286);
+  --foreground: oklch(98% 0 0);
+  --card: oklch(12% 0.01 286);
+  --card-foreground: oklch(98% 0 0);
+  --popover: oklch(12% 0.01 286);
+  --popover-foreground: oklch(98% 0 0);
+  --primary: oklch(88% 0.2 120);            /* lighter green in dark mode */
+  --primary-foreground: oklch(10% 0.02 286);
+  --secondary: oklch(20% 0.02 286);
+  --secondary-foreground: oklch(98% 0 0);
+  --muted: oklch(20% 0.02 286);
+  --muted-foreground: oklch(60% 0.01 286);
+  --accent: oklch(25% 0.02 286);
+  --accent-foreground: oklch(88% 0.2 120);
+  --destructive: oklch(60% 0.2 20);
+  --destructive-foreground: oklch(98% 0 0);
+  --border: oklch(25% 0.02 286);
+  --input: oklch(25% 0.02 286);
+  --ring: oklch(88% 0.2 120);
+  --chart-1: oklch(88% 0.2 120);
+  --chart-2: oklch(70% 0.15 120);
+  --chart-3: oklch(60% 0.1 120);
+  --chart-4: oklch(50% 0.05 120);
+  --chart-5: oklch(40% 0.02 120);
+  --sidebar: oklch(10% 0.01 286);
+  --sidebar-foreground: oklch(98% 0 0);
+  --sidebar-primary: oklch(20% 0.02 286);
+  --sidebar-primary-foreground: oklch(98% 0 0);
+  --sidebar-accent: oklch(20% 0.02 286);
+  --sidebar-accent-foreground: oklch(98% 0 0);
+  --sidebar-border: oklch(25% 0.02 286);
+  --sidebar-ring: oklch(88% 0.2 120);
+  --header: oklch(10% 0.01 286);
+  --header-foreground: oklch(98% 0 0);
+  --footer: oklch(10% 0.01 286);
+  --footer-foreground: oklch(98% 0 0);
+  --code: oklch(12% 0.01 286);
+  --code-foreground: oklch(88% 0.2 120);
+  --code-highlight: oklch(18% 0.02 286);
+  --code-number: oklch(70% 0.15 120);
+  --code-selection: oklch(20% 0.02 286);
+  --code-border: oklch(25% 0.02 286);
+  --radius: 0.625rem;
+}
+```
+
+### Migration map (old hex → new OKLCH semantic)
+
+| Old token (hex) | New semantic | Old JSX class | New JSX class |
+|:---|:---|:---|:---|
+| `#F8F9FB` canvas | `--background` | `bg-canvas` | `bg-background` |
+| `#FFFFFF` surface | `--card` | `bg-surface` | `bg-card` |
+| `#F2F3F5` sunken | `--secondary` / `--accent` | `bg-sunken` | `bg-secondary` |
+| `#0F172A` ink-900 | `--foreground` | `text-ink-900` | `text-foreground` |
+| `#334155` ink-700 | (dark `--muted-foreground` ≈) | `text-ink-700` | `text-foreground/70` *or* keep alias |
+| `#64748B` ink-500 | `--muted-foreground` | `text-ink-500` | `text-muted-foreground` |
+| `#94A3B8` ink-400 | `text-muted-foreground/60` | `text-ink-400` | `text-muted-foreground/60` |
+| `#E2E8F0` line | `--border` | `border-line` | `border-border` |
+| `#5B5BD6` indigo | `--primary` (now GREEN) | `bg-indigo` | `bg-primary` |
+| `#ECECFE` indigo-soft | `--accent` (with `--accent-foreground` = green) | `bg-indigo-soft` | `bg-accent text-accent-foreground` |
+| `#3D3DAF` indigo-ink | `--accent-foreground` | `text-indigo-ink` | `text-accent-foreground` |
+| `#DC2626` danger-solid | `--destructive` | `bg-danger-solid` | `bg-destructive` |
+
+The `warn` / `ok` / `info` status families remain on Mercury hex tokens until the substrate widens; only `destructive` is in the OKLCH set. When extending: pick OKLCH triples in the same lightness/chroma family as `destructive` (~55% L × 0.2 C) at hues 60 (warn), 140 (ok — note: collides with primary 120, choose carefully), 240 (info).
+
+### Implementation contract
+
+1. `components.json`: flip `cssVariables: false → true`.
+2. `src/index.css`: paste the `:root` + `.dark` blocks as the canonical layer-base.
+3. `tailwind.config.js`: replace the hex `colors:` block with a token-pass-through. Tailwind names (`indigo`, `ink-900`, `canvas`, `surface`, `sunken`, `line`) become aliases that resolve to the same `--*` variables (existing JSX compiles unchanged on the day of the flip).
+4. `<ThemeProvider>` (new): adds/removes `.dark` on `<html>` based on user preference + `prefers-color-scheme`. Persisted in `localStorage` under `theme`.
+5. **Codemod pass** (after the substrate flip): every `bg-indigo*` / `text-indigo*` / `ring-indigo` / `border-indigo` migrates to `bg-primary` / `text-primary` / `ring-ring` / `border-primary`. Every `bg-accent` (legacy slate) migrates to `bg-foreground` (the few legitimate "near-black surface" cases) or `bg-primary` (where T2 applies). The slate-vs-indigo distinction collapses — there is one accent, and it is `--primary` (green).
+
+### Radius scale under `--radius: 0.625rem`
+
+| Element | Class | Computed |
+|:---|:---|:---|
+| Pills, status indicators, count badges | `rounded-full` | full |
+| Cards, buttons, inputs, dropdowns | `rounded-md` | `--radius − 2px` = 8px |
+| Modals, drawers, sheets | `rounded-lg` | `--radius` = 10px |
+| Floating help, large surfaces | `rounded-xl` | `--radius + 2px` = 12px |
+
+### Mercury-specific deep-audit additions (2026-05-05 reference batch)
+
+These extensions sit on top of the OKLCH substrate. Each is a primitive or pattern surfaced by the new Mercury reference shots (Reimbursements, Add Team Member modal, Users settings, Search palette, Tasks, Capital, Notifications).
+
+#### §Money typography — `<MoneyValue>`
+
+Mercury renders dollar amounts with **cents superscripted at 60% scale**, baseline-raised so the cents read as a footnote, not a co-equal number. `$50.25` becomes:
+
+```
+$50.25
+└──┘└─┘
+ │   └── 60% font-size · vertical-align 0.35em · opacity 0.7 · tabular-nums
+ └────── major value · font-weight 600 · tabular-nums · text-foreground (or text-primary on next-action rows)
+```
+
+Spec:
+
+| Property | Value |
+|:---|:---|
+| Major (whole dollars) | `text-display` (22px / 600) on KPI tiles · `text-body-lg` on row cells. `font-feature-settings: 'tnum' 1, 'zero' 1` |
+| Cents (`.NN`) | 60% of major · `vertical-align: 0.35em` · `opacity: 0.7` · same tnum/zero |
+| Negative sign | `-` precedes `$`, never parens. `text-destructive` when negative. |
+| Currency code (multi-currency) | `text-2xs uppercase tracking-wider text-muted-foreground` after cents. Hidden by default for USD. |
+| Zero amount | render `$0` (no `.00`). |
+| Em-dash for missing | render `—` in `text-muted-foreground/60` (no `$0`, no `N/A`). |
+
+Implementation: `src/components/ui/MoneyValue.tsx`. Used by `<MetricTile>` when `value` is monetary, by every table cell with a dollar figure, by every banner / pill that quotes an amount.
+
+When the row owns the queue's next action (e.g. "$2,200 due Apr 18" on an unpaid row), the major picks up `text-primary`; otherwise `text-foreground`.
+
+CSS reference:
+
+```css
+.money-major { font-feature-settings: 'tnum' 1, 'zero' 1; }
+.money-cents {
+  font-size: 0.6em;
+  vertical-align: 0.35em;
+  opacity: 0.7;
+  font-feature-settings: 'tnum' 1, 'zero' 1;
+}
+```
+
+#### §Avatar — pastel color variants
+
+Current `<Avatar>` ships `tone: neutral | primary` only (gray / black). Mercury uses **pastel-tinted bubbles hashed from the name** (mint / lavender / peach / sand / sky / rose / cream — 7 hues at uniform L=88% C=0.05) so dense lists feel populated without identical gray bubbles dulling the eye.
+
+Spec:
+
+| Property | Value |
+|:---|:---|
+| Light-mode palette | mint `oklch(88% 0.05 140)` · lavender `oklch(88% 0.05 280)` · peach `oklch(88% 0.05 40)` · sand `oklch(90% 0.04 80)` · sky `oklch(88% 0.05 220)` · rose `oklch(88% 0.05 340)` · cream `oklch(92% 0.03 90)` |
+| Dark-mode palette | same hues at L=30% C=0.05 (perceptual lightness uniformity) |
+| Initials ink | `text-foreground/80` — high enough to read, soft enough not to compete |
+| Hash function | `hashName(name) % 7` — same name → same bubble across renders. Stable across reloads. |
+| Disabled tone | `tone: neutral` returns to gray (placeholder / "not yet matched") |
+| Real photo | when uploaded, bubble background hidden; image fills the round/square shape |
+
+Where it shows: every list with people (Mail thread list, Clients table, ClientDetail header, Settings → Team), every chip with a person (`<ClientChip>`), every comment / activity-log entry with a participant.
+
+#### §Status pills — extended family (lavender, pink, peach)
+
+Mercury distinguishes "in-flight" states that aren't quite warning but aren't info. Three new variants:
+
+| Variant | Light bg / ink | Meaning |
+|:---|:---|:---|
+| `review` (NEW) | lavender `oklch(94% 0.04 280)` / `oklch(45% 0.15 280)` | Waiting on client (chase sent, not received_confirmed). Softer than `warn` (which means behind target). |
+| `attention` (NEW) | soft pink `oklch(94% 0.05 0)` / `oklch(50% 0.2 0)` | Action required, escalated, blocking decision pending. Softer than `danger` (which means overdue). |
+| `declined` (NEW) | peach `oklch(94% 0.05 40)` / `oklch(50% 0.2 40)` | Declined / rejected / not-applicable. Distinct from `danger` — the user said "no", not the system flagged "broken". |
+
+Existing `ok` / `warn` / `danger` / `info` / `neutral` / `accent` (now green) survive. Total of 9 pill variants — used sparingly per T4 ("status colors are pills, never paint").
+
+#### §FilterChip — soft-active variant
+
+Current `<FilterChip>` "active" state is the loud `bg-foreground text-background` (filter-is-on archetype). Mercury references show a quieter active state inside ambient chip groups: `bg-accent text-accent-foreground` (soft-secondary surface with green ink). Three intensity levels:
+
+| Variant | Active state | When |
+|:---|:---|:---|
+| `chip` (current loud) | `bg-foreground text-background` | KPI-tile-row filters where "this is on" must shout |
+| `chip-soft` (NEW) | `bg-accent text-accent-foreground` | Search palette filter chips, secondary filter rows, ambient chip groups |
+| `tab` (existing) | `text-foreground border-b-2 border-primary` | Page tabs (Alerts, Mail, Settings sub-nav). Underline carries the signal. |
+
+#### §NotificationCard — settings cluster pattern
+
+Mercury's Notifications settings page renders three "Important Updates" categories as compact cards in a row. Each card holds: title (`text-title` 16px/600), subtitle (`text-body text-muted-foreground`), `Edit` chevron link, and a row of channel pills (`Email`, `Push`) showing wired channels.
+
+Spec for `<NotificationCard>`:
+
+| Zone | Content |
+|:---|:---|
+| Title | `text-title` — domain name (Cash flow / Suspicious activity / Tasks and approvals) |
+| Subtitle | `text-body text-muted-foreground` — one-line reason |
+| Edit affordance | `<Button variant="link">Edit</Button>` + chevron — opens per-category settings drawer |
+| Channel pills | Inline `<StatusPill variant="ok" size="xs">Email</StatusPill>` per active channel |
+| Surface | `bg-card border border-border rounded-md p-region` — same as `<Card>` |
+
+Used wherever settings categorize notifications by channel (Settings → Notifications, Settings → Reminders).
+
+#### §Floating help affordance — `<HelpFab>`
+
+Mercury references all show a floating `?` IconButton in the **bottom-right corner**. Adopt as a global affordance:
+
+| Property | Value |
+|:---|:---|
+| Position | `fixed bottom-6 right-6 z-tooltip` (z=70) |
+| Size | 36×36, `rounded-full` |
+| Background | `bg-card border border-border shadow-pop` |
+| Icon | `<HelpCircle>` Lucide, 18px, `text-muted-foreground` |
+| Click | opens `<ShortcutsModal>` (existing) — keyboard shortcuts + "Send feedback" link |
+| Hide on | `/login`, `/signup`, `/onboarding/*`, `/magic-link` — the affordance is for in-product help only |
+
+Mercury's bottom-right also shows a "map" icon. **We do not adopt the map** — the sidebar IS the wayfinding (T5).
+
+#### §Header / Footer / Code surface tokens
+
+The OKLCH substrate adds three surface tokens not previously named: `--header`, `--footer`, `--code`. Bind them:
+
+- `--header` → TopBar background. Identical to `--background` in light mode; brings its own ink in dark mode.
+- `--footer` → BottomTabBar (mobile-only) and any sticky-bottom footer (Alerts disposition footer when promoted to sticky). Same as `--header` in light, distinct in dark.
+- `--code` → activity-log monospace strings (request IDs, AI inference IDs, audit-log diffs, the `· A` telemetry suffix in Settings → AI). New surface for any future debug / engineer-facing string.
+
+### What stays from Mercury inheritance
+
+- 8 / 16 / 24 / 48 spacing rhythm.
+- 22 / 18 / 14 / 13 / 12 / 11 typography ladder.
+- Cents-superscript money treatment (now formalized — see above).
+- Pill-vs-soft-rectangle shape rule (T3) — pills for indicators, `rounded-md` for actions.
+- 4 alert surfaces.
+- 3-tier scan rule.
+- Account entrance bottom-left.
+- Sidebar order: Today / Alerts / Timeline / Clients / Mail / Opportunities.
+- Modal / popover / dropdown discipline.
+- Voice & microcopy rules.
+- 44×44 minimum touch targets.
+
+### What's superseded by this substrate (logged in §Archive)
+
+- `#5B5BD6` indigo as "the next-action color." Replaced by `oklch(60% 0.2 120)` (primary green) via `--primary`.
+- The slate `accent` legacy back-compat note (user-avatar circle, user-menu trigger). The avatar uses `bg-foreground` (near-black ink) under the new substrate; the user-menu trigger uses `bg-secondary text-foreground` rest, `bg-accent` hover.
+- T2 example "indigo solid pill" — same principle (one accent, one viewport, one action), color flipped to green.
+- §Element states table's `bg-indigo` / `ring-indigo` references — read as `bg-primary` / `ring-ring` going forward.
+
+## Quiet register — 2026-05-05 refinement (canonical)
+
+This section **supersedes** several specific token / state choices in earlier sections. The product's overall taste shifts one notch quieter: no yellow, no thick lines, no dark borders, every element grouped. The principles below are mechanical — applied uniformly, the surface tightens without losing density.
+
+### Q1 · No yellow / amber
+
+The hex `warn` family (`bg #FFFBEB · border #FCD34D · ink #92400E · solid #D97706`) is **retired**. Yellow / golden tones read as caution-tape: loud, dated, and visually noisy on a calm canvas. Mercury's "Pending Review" (lavender) and "Declined" (peach) prove a quieter palette can carry the same urgency vocabulary without amber.
+
+**Replacement:** the `warn` semantic survives but its colors flip to **soft peach/coral** at oklch hue 25–35:
+
+| Token | Old (amber, retired) | New (peach, canonical) |
+|:------|:---------------------|:------------------------|
+| `--warn-bg` | `#FFFBEB` | `oklch(95% 0.04 35)` — pale peach |
+| `--warn-border` | `#FCD34D` | `oklch(85% 0.06 35)` — quiet peach edge |
+| `--warn-ink` | `#92400E` | `oklch(45% 0.15 30)` — warm rust-brown for contrast |
+| `--warn-solid` | `#D97706` | `oklch(60% 0.18 30)` — coral (only on icons / borders, never as a fill) |
+
+Where `warn` was used:
+
+| Surface | Old | New |
+|:--------|:----|:----|
+| "Behind target" pill on Timeline | amber tinted | peach tinted (same `<StatusPill variant="warn">`, repainted) |
+| "Still waiting on client" sub-zone (ClientDetail / TaskDetail) | amber-tinted bg | peach-tinted bg |
+| "Reminders out, awaiting reply" Mail card | amber-tinted bg | peach-tinted bg, OR migrate to `<StatusPill variant="review">` (lavender) since the semantic IS "waiting on client" |
+| "Stuck >14d" KPI tile value | amber ink | peach ink |
+| "OVERDUE -Nd" pill | already `danger` (red) ✓ | unchanged |
+| "What changed" banner status icon | amber circle | peach circle, OR demote to `info` (cool blue) since the banner is informational |
+
+**Don't replace yellow with another high-saturation hue.** The point is restraint, not a hue swap. Peach at oklch L=95 C=0.04 reads as a near-neutral with a warm shift — a "quiet alert." If a future signal genuinely needs higher urgency, it earns `danger` (red); there is no middle tier between calm peach and alarm red.
+
+### Q2 · No thick lines
+
+Borders carry hierarchy by *presence*, not by *weight*. The hairline (`1px`) is the only stroke that earns its keep.
+
+**Forbidden:**
+
+- `border-2`, `border-l-4`, `border-r-4`, `border-b-2`, `border-t-2` — anything thicker than 1px.
+- The 4px status left-rule on `<Banner>` (`border-l-4 border-warn-solid` and friends). Status banners now carry their signal via tinted bg + status-icon-prefix only. The left rule was decoration; it goes.
+
+**Permitted exceptions** (and only these — anything else is a finding):
+
+| Element | Stroke | Reason |
+|:--------|:-------|:-------|
+| Tab active marker | `border-b-1.5 border-primary` (1.5px hairline) | The tab underline is the canonical "you are here" mark for a tab cluster. 1px reads as a default border; 1.5px reads as intentional. Never 2px. |
+| Focus ring | `outline-2 outline-primary outline-offset-2` | Outline, not border — paints on top, doesn't shift layout. Required for keyboard a11y. |
+| Loud-archetype filter active state | `bg-foreground text-background` (no border at all) | Surface fill carries the signal; no border needed. |
+
+For everything else: 1px hairline, `--border` token, or no border at all.
+
+### Q3 · No dark borders
+
+Borders are `--border` (`oklch(88% 0.01 286)`) only. Two specific exceptions, both addressed by this rule:
+
+- `border-line-strong` (`#CBD5E1` ≈ `oklch(82% 0.01 286)`) on hover / hover-card states → **collapsed to `--border`**. Hover communicates via bg-shift (`bg-accent` or `bg-secondary`), never via a darker border. The visual delta of a 6% lightness shift on a 1px line is too subtle to register as feedback anyway; the surface fill does the work.
+- `border-foreground` / `border-ink-900` / `border-black` anywhere in the codebase → **forbidden as a border**. `--foreground` is the *darkest* surface in the palette; using it as a 1px stroke around a card or chip reads as harsh outline-art, not soft chrome. If a divider needs to read as "harder," promote to a `<CardDivider>` (1px `--border`) inside a `divide-y` group, or change the surface tint instead.
+
+The "selected/on" archetypes (§Element states) keep their existing definitions — `bg-foreground text-background` (loud filter) is a **surface fill**, not a border, so it survives Q3 unchanged.
+
+### Q4 · Grouping discipline (no orphans)
+
+Every visible element belongs to a zone. Zones nest into sections; sections compose the page. **An orphan — a stray pill, a lone button, a one-off chip floating between two unrelated cards — is a bug**, not a styling choice.
+
+**The grouping ladder (T1–T3 made structural):**
+
+| Tier | Example | Boundary |
+|:-----|:--------|:---------|
+| **Element** | A status pill, a button, a date label | None — elements never sit alone. They join a row. |
+| **Row** | A line of related elements (icon + label + meta + action) | Hairline `divide-y` if multiple rows; otherwise the row's parent zone provides the boundary. |
+| **Zone** | A semantically homogeneous group of rows (e.g. "Documents requested" inside TaskDetail) | The card surface (`<Card>`) or a sub-card (`<CardZone>` between dividers). |
+| **Section** | A semantically homogeneous group of zones (e.g. "Action queue" on Today) | A `<SectionHeader>` + the cards beneath. Whitespace at `gap-section` (48px) above and below. |
+| **Page** | The whole work surface | `<PageContainer>` + `<PageHeader>`. |
+
+**Failure modes (each is a Q4 violation):**
+
+- **Stray pill outside a zone.** A `Pro` pill in the TopBar that doesn't belong to a row, a card, or a header cluster — orphan. Either move it into the `<TopBar>` user-cluster zone or kill it.
+- **Banner outside a section.** A `<Banner>` rendered between two `<SectionHeader>`s with no zone-membership — orphan. Either nest it inside the section it modifies, or promote it to a Page-level slot above the first section.
+- **Lone button between cards.** A `+ Add deadline` button rendered standalone between two task cards, not anchored to a card header or footer — orphan. Anchor it to the section header (right-aligned), the empty-state CTA, or the parent card's action row.
+- **Sub-zone without a header.** A warn-tinted "Still waiting on client" sub-zone that has no eyebrow or count — readable but unnamed. Add `<SectionHeader>` (or a smaller eyebrow + count chip) so the zone announces itself.
+- **Cards in the void.** Two cards stacked in a column with no `<SectionHeader>` above and no `gap-section` below — they read as the same surface. Either group them under a section header or merge them.
+
+**The rule of thumb:** if you can point to an element and ask "what does this belong to?", and the answer isn't immediate, it's an orphan. Promote, anchor, or remove.
+
+### Q5 · Subtle, easy, confident
+
+The four words from the user direction make a compact taste filter. Apply them in this order when in doubt:
+
+1. **Subtle.** If two surfaces could read as one with a slight tonal shift, prefer the shift over a border.
+2. **Easy.** If a row asks the eye to scan more than three pieces of info before locking on the action, drop or move pieces until it doesn't.
+3. **Confident.** Pick one CTA per viewport and commit. No "or you could also" tertiary actions on a row that already has a primary.
+4. **Quiet.** When a tone could be loud (red), medium (peach), or quiet (neutral / lavender), default to the quietest tone the semantic allows.
+
+When these four conflict with a Mercury reference, this rule wins. Mercury's amber is loud; we go peach. Mercury's `bg-ink-900 text-white` filter pill is loud; we offer a `chip-soft` alternative. Mercury's bottom-right help fab is restrained; we keep it.
+
+### What this section supersedes
+
+| Earlier rule | Supersession |
+|:-------------|:-------------|
+| `warn` family colors (§Colors, status families) | Now peach (oklch h=30) — see Q1 table |
+| `<Banner>` "4px status left rule + tinted bg" (§Shared primitives reference) | Drops the left rule; tinted bg + leading status icon carry the signal alone |
+| `border-line-strong` on input/card hover (§Components > Inputs, §Element states) | Collapses to `--border`; hover state uses `bg-secondary` / `bg-accent` shift |
+| Tab underline `border-b-2` (FilterChip tab variant, §Components) | Tightens to `border-b-1.5 border-primary` |
+| §Don'ts: existing emoji / row-tinting / etc. rules | Unchanged — Q1–Q5 add to the Don't list rather than replacing it |
+
 ## Changelog
 
 - **2026-05-03** — Augmentation pass. Added §Brand Vocabulary, §The four alert surfaces, §Component anatomy rules, §Responsive behavior, §Voice & Microcopy, §Accessibility, §Motion, §Invisible correctness, §Shared primitives reference, §Implementation reference, §Devx note. Added Mercury-style indigo accent (`bg-indigo`) + pill radius (`rounded-pill`) as opt-in tokens for the next-action CTA. Added `text-display` / `text-title` / `text-body` / `text-label` / `text-caption` / `text-micro` semantic typography aliases. Created shared primitives: `<PageHeader>`, `<SectionHeader>`, `<Card>`, `<MetricTile>`, refreshed `<StatusPill>` to default `dot=false` (no decorative leading dot). Applied to Today (`/design/today`), Dashboard (`/`), Clients (`/clients`), Alerts (`/alerts`), Mail (`/mail`). Existing surfaces preserved — no functionality stripped, no routes changed.
@@ -1206,4 +1614,6 @@ If you find another rule in this doc that contradicts the references or shadcn p
 - **2026-05-03 (sidebar + Alerts UX pass)** — User direction. Sidebar restructured: (a) Alerts moved to position 2 (Today / Alerts / Timeline / Clients / Mail / Opportunities) so the differentiator surface is one keystroke from the inbox of work it generates; (b) Sarah Mitchell's account entrance pinned to bottom-left (Linear / Notion convention) and removed from TopBar — single account surface. Sidebar shell switched to **floating card** treatment (`my-3 ml-3 rounded-lg shadow-pop`, no right border) per user preference — anchored as a flex sibling so wayfinding stays reliable, but visually a card hovering over the canvas. Alerts page re-grouped into clearly-bordered scan zones: FeedCard now has Zone 1 ("what happened" — state, title, type, summary) + Zone 2 ("who/when affected" — divider + sunken sub-zone with chips + deadline shift); CopilotPane header has its own context strip with grouped meta (type · clients · deadline) below a hairline divider; new "Disposition" sub-zone groups escape hatches (Snooze + Mark not applicable) so they're findable but visually distinct from "do" actions. Lesson learned: density problems are usually **grouping** problems, not removal problems — section the page first, then audit each zone for decoration tax.
 - **2026-05-03 (Alerts critique pass + TopBar search + bell dedup)** — Acted on a self-critique of the shipped Alerts page. **Visual hierarchy fixes:** title moved to its own row (no type pill competing for the same line); type pill demoted to the meta line at `xs` size with the time pinned right; AFFECTS eyebrow + chips and the deadline shift now occupy separate visual rows in Zone 2 (calendar icon makes the deadline read as a temporal indicator). **CopilotPane:** middle-dot separators dropped from the meta strip in favor of `gap-3` whitespace (per DESIGN.md §Don't); "AI suggested actions" eyebrow lost its indigo + sparkles + redundant "AI" prefix → now just "Suggested actions" in `text-ink-500`; the email preview's nested-card chrome is gone (border-t divider only — DESIGN.md §Cards bans card-in-card); X close icon replaces the misleading right-chevron; the **Disposition section is now a sticky footer** above the composer (outside the scroll container) so escape hatches stay reachable. **Flow fixes:** session-scoped `handledIds` Set fades each acted-on card to `opacity-60` with a `Handled this session` ok-tinted chip; auto-advance navigates to the next un-handled alert in the active tab after every action; partial-selection chips inside the email action card let the CPA exclude individual clients with a click, with the Send CTA's count updating live (`Send 4` → `Send 3` once one chip is dropped). **TopBar search redesign:** flat sunken div replaced with a proper bordered input affordance (`bg-surface border border-line` rest, `border-line-strong` on hover, `focus-visible` indigo ring), `h-9` height matching shadcn input default, and the ⌘K hint is now a proper bordered chip on `bg-sunken`. **BellDropdown narrowed to non-alert notifications:** state-announcement alerts are no longer merged into the bell — that surface belongs to the sidebar Alerts badge + `/alerts` page (DESIGN.md §The four alert surfaces). Bell now scopes to bounces · team invites · extension approvals; one signal per concept. New §Triage queue patterns captures the three reusable shapes (handled-this-session fade, auto-advance after action, partial selection in batch actions, sticky disposition footer). Floating sidebar refined: collapsed mode (`w-14`) drops the float and goes flush with a `border-r border-line` — a 56px floating rail is decoration. Expanded keeps the lovely card.
 - **2026-05-05 (deep sweep — Mode A-F eradication, alert-verb wiring, modal pass)** — User direction "fix this for real" on the two carved-out exceptions plus a re-inspection of every surface. Net result: zero `Mode A-F` strings render in the product, and all six alertTypes now route to their canonical primary verb + modal. **Mode A-F sweep:** ran a bulk sed pass plus per-file cleanup across 39 files (154 references → 0 user-facing). Bulk substitutions: `Mode A` → `inbound-classifier`, `Mode B` → `arrival-timing`, `Mode C` → `anomaly-detector`, `Mode D` → `email-drafter`, `Mode E` → `cross-year-insighter`, `Mode F` → `state-monitor`; multi-letter forms (`Modes B/C/E`, `Mode A · D · F`) collapsed to the comma- or slash-form of the same names. Surfaces touched: TaskMiniTimeline tooltips (4), AiInsightsPanel section titles + footer, ChaseLoopStatus comments, JustHappenedStrip tooltips (2), InsightStrip `<title>`, ModeFHealth body + eval link, OAuthWireframeModal body, PriorYearUpload (2), TriageQueue blurbs (2), multistate ConfirmModal, ChecklistRow tooltip, TaskHeader, Insights `<span>` pill (now reads "Timing" / "Consistency" / "Cross-year" via runtime mapping), Signup, OnboardingDemo, ai-stub.ts dispatcher comment + per-function header comments, mock-adapter chase context, Settings AI-eval. **Settings AI eval re-design:** previous "Mode A | Classify inbound" pattern flipped to "**Classify inbound** ·`A`" — plain-English capability label primary, single-letter telemetry id as a `font-mono` opacity-60 suffix for engineer cross-reference. Card title → "AI capability eval"; description language updated to "each AI capability." Selector pills, drift sentences, and "What gets logged" footnotes all rewrote to the new pattern. **Phase2StatusCard** pause/resume button changed from `bg-accent` (slate) to `bg-indigo` so the next-action color is consistent with T2 across the whole product. **Settings inputs** (FirmPanel firm name / states / address / timezone, TeamPanel email + role) upgraded from the legacy `border border-line rounded px-2 py-1.5` to the spec `h-9 bg-sunken border border-line rounded-md px-3 py-2 focus-visible:bg-surface focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 hover:border-line-strong`. **Alert-type primary-verb wiring** (DESIGN.md §Alert-type primary verb taxonomy promoted to the canonical):  CopilotPane now dispatches per `alertType` — `disaster_extension` → "Move {N} deadlines to {date}" (was generic), `penalty_relief` → opens `<BatchTagModal>` ("Tag {N} clients for review at filing"), `pte_change` → opens `<SchedulePlanningCallModal>` ("Schedule planning call(s)"), `rate_change` → opens `<RecomputeEstimatesModal>` ("Recompute {N} estimates"), `nexus_change` → "Add filings for {N} clients" (was the generic "Run nexus check / Open"), `form_change` → admin-queue route (already correct). Each modal is mounted on the page with a single `*ForAnnouncement` state slot; `onConfirm` flips the alert handled and the auto-advance sweep moves to the next un-handled alert in the active tab. Browser-verified: `Tag 6 clients for review at filing`, `Schedule planning calls for 6 clients`, `Recompute 21 estimates + draft 7 emails` all open from the CopilotPane and their content matches the spec. **Modal hygiene pass:** all `bg-ink-900/40 backdrop-blur-sm` (4 px) → `bg-ink-900/40 backdrop-blur-[2px]` across QuickActionModal, ShortcutsModal, AddClientModal, AddDeadlineModal, EditClientModal, EmailBulletinEditModal, ChaseBundleModal, alert-dialog, sheet primitives. `bg-accent` selected-state on TaskAuditPackModal + ExportModal (format / recipient cards) replaced with the loud `bg-ink-900 text-surface` filter-is-on archetype per §Element states; same surfaces gained focus-visible indigo rings. **NexusCheckModal** "Notify only · Skip filings" middle-dot drift fixed → "Notify only, skip filings". **RecomputeEstimatesModal** "Recompute {N}" → "Recompute {N} estimates" (verb + object). **DESIGN.md change:** §Brand Vocabulary's Mode A-F callout rewrote to remove the Settings → AI exception — Settings now follows the same plain-English-primary rule with the letter id reduced to a small font-mono suffix; identifiers in source code (`ModeFHealth` component, `modeFHealth` tRPC router, `mode` column on AiInsight) are explicitly carved out as schema names that can't render to the user. **Verified:** dev server walked /, /clients, /timeline, /mail, /calendar, /opportunities, /settings + 5 sub-routes, /import — 14 routes, 0 console errors, 0 `Mode [A-F]` substrings in any rendered DOM textContent.
+- **2026-05-05 (quiet register refinement — Q1–Q5)** — User direction: tighten the visual register one notch quieter. Five mechanical rules added as §Quiet register: **Q1 No yellow / amber** (retire the `#FFFBEB / #FCD34D / #92400E / #D97706` warn family; replace with peach at oklch hue 30 — `bg oklch(95% 0.04 35)` / `border oklch(85% 0.06 35)` / `ink oklch(45% 0.15 30)` / `solid oklch(60% 0.18 30)`. Quiet alert tone, not a hue swap to another loud color); **Q2 No thick lines** (drop `border-l-4` status rule on `<Banner>`; tighten tab underline `border-b-2` → `border-b-1.5 border-primary`; forbid any stroke ≥ 2px except focus outlines and that single tab hairline); **Q3 No dark borders** (collapse `border-line-strong` to `--border` on hover — hover communicates via bg shift; forbid `border-foreground` / `border-ink-900` / `border-black` anywhere); **Q4 Grouping discipline** (every element joins a zone; orphans are bugs — Element → Row → Zone → Section → Page ladder formalized; named failure modes: stray pill, banner outside section, lone button between cards, sub-zone without header, cards in the void); **Q5 Subtle / easy / confident / quiet** (four-word taste filter — when in conflict with a Mercury reference, this rule wins; Mercury's amber goes peach, Mercury's loud filter pill gets a soft alternative). Net supersession across the doc: `warn` family colors flip; `<Banner>` loses left rule; input/card hover stops bumping border to strong; tab underline tightens. The audit pass following this section scores current code against Q1–Q5 in addition to the substrate flip.
+- **2026-05-05 (substrate flip — OKLCH + Mercury-deep additions)** — User direction: pasted a complete shadcn-format OKLCH `:root` + `.dark` token set as the new design substrate, and provided 7 fresh Mercury references (Reimbursements list, Add-team-member modal, Users settings, Search palette, Tasks list, Capital/Financing, Notifications settings) as the layout north star. **Substrate change:** the next-action accent flips from indigo `#5B5BD6` to **primary green** `oklch(60% 0.2 120)`. Cool neutral hue moves from 220 (slate) to 286 (faintly purple-warmed). Dark mode is now first-class — a complete `.dark` token set is required and components must read from semantic tokens (`bg-background`, `text-foreground`, `border-border`). `components.json` will flip `cssVariables: false → true`; `tailwind.config.js` colors block becomes a token-pass-through aliasing legacy names (`indigo`, `ink-900`, `canvas`, `surface`, `sunken`, `line`) onto the new `--*` variables so existing JSX compiles unchanged on flip day. **New active sections:** §Design substrate (canonical token table for `:root` + `.dark`, migration map old hex → new semantic, implementation contract, radius scale under `--radius: 0.625rem`). **New primitives spec'd** (implementation pending): `<MoneyValue>` (cents-superscript at 60% scale + 0.35em raise + 0.7 opacity, `tnum` + `zero` font features), Avatar pastel color hashing (7-hue palette at uniform L=88% C=0.05 — mint/lavender/peach/sand/sky/rose/cream), three new StatusPill variants (`review` lavender, `attention` soft pink, `declined` peach), FilterChip `chip-soft` variant (`bg-accent text-accent-foreground`), `<NotificationCard>` settings-cluster pattern (title + subtitle + Edit chevron + channel pills), `<HelpFab>` floating help affordance (bottom-right `?`, opens `<ShortcutsModal>`). **What stays from Mercury inheritance:** spacing rhythm, typography ladder, T3 pill-vs-soft-rectangle rule, T8 desk-not-stage, four-alert-surfaces, 3-tier scan rule, sidebar order, account entrance bottom-left, modal/popover discipline, voice rules, 44×44 touch targets. **Superseded** (logged in §Archive on this date): `#5B5BD6` indigo as next-action color (now green); slate `accent` legacy back-compat (collapses to `bg-foreground` for near-black surfaces or `bg-primary` for next-action). The doc now describes what a future codemod migrates the codebase TO; the audit pass that follows scores current code against this target.
 - **2026-05-05 (consistency sweep — every page, every state, every copy line)** — Full-product audit pass. Inventoried all 24 routes (Today, TodayTriage, Timeline, Calendar, Dashboard, Clients, ClientDetail, TaskDetail, Mail, Inbox, Alerts, AnnouncementList, AnnouncementDetail, Insights, Login + 6 auth pages, 7 onboarding steps, Import, Settings, Changes, Placeholder) and the chrome (AppShell, Sidebar, TopBar, BellDropdown, ChaseLoopStatus, ModeFHealth, JustHappenedStrip, AiInsightsPanel, TriageQueue, multistate ConfirmModal, OAuthWireframeModal, PriorYearUpload, ChecklistRow, TaskMiniTimeline, InsightStrip, FirstRunWelcome, CalendarGrid, TagPicker, OnboardingFirm) against the active doc. **Fixes shipped:** (a) **Mode A-F leakage** — replaced 18 user-facing references to "Mode A/B/C/D/E/F" with plain-English labels per the new mapping table in §Brand Vocabulary. The Settings → AI inference eval admin surface keeps the Mode letters as the documented exception (PRD §4.7 telemetry contract). (b) **Forbidden words** — "All caught up." → "No active alerts." in AnnouncementList; "Bundle" → "Service package" in Import table header + serviceBundles add-on descriptions; "Quiet morning" softened to "Nothing waiting on you." in ChaseLoopStatus. (c) **CTA color drift** — TaskActions "Mark complete" went slate (`bg-accent`) → indigo (`bg-indigo`); Clients alert-affected row tinting (`bg-warn-bg/30`) replaced with a per-row `<State alert>` warn-tinted pill in the name cell (T4 reaffirmed); Premium tier pill went slate → indigo soft (`bg-indigo-soft`). (d) **Focus rings** — all `ring-1 ring-accent` on inputs/textareas (TaskNotesPanel, EmailBulletinEditModal, ChaseBundleModal, Mail, Clients, ClientDetail, TagPicker) swapped to `ring-2 ring-indigo ring-offset-2` per §Element states. CalendarGrid today-cell ring went slate → indigo. OnboardingFirm selected-state painting switched from `bg-accent` to `bg-ink-900` (filter-is-on archetype, per §Element states). (e) **Custom `<h1>` drift** — Calendar refactored to `<PageHeader>`; Placeholder refactored to `<PageContainer>` + `<PageHeader>`; SettingsFederalFormsPanel section title swapped to `<SectionHeader>`; ClientDetail / TaskHeader / Import / Changes title h1's normalized to the canonical `text-display font-semibold leading-7 tracking-[-0.01em]` token stack (the explicit edge-case carved out in §Don't — when title needs to wrap badge clusters on the same row). (f) **Middle-dot separators** between discrete metrics — Timeline KPI row, ClientDetail engagement meta, TaskHeader assignees row, Calendar stats row, Alerts disposition footer all switched from `<span>·</span>` to `gap-section` whitespace. The valid use (separators inside a single metadata string like `Tax 2025 · Federal · LLC`) is preserved. (g) **Time-of-day** on AnnouncementDetail's "Detected" timestamp dropped — uses `formatLongDate(detectedAt.slice(0, 10))` per the dates-only invariant. (h) **Dialog backdrop** corrected from `backdrop-blur-sm` (4px) to `backdrop-blur-[2px]` (matches §Modals spec); overlay z-index moved from 50 to 40 to match the §z-index ladder (modal content stays at 50). (i) **Apply / Reject** verbs in SettingsFederalFormsPanel got their objects (`Apply change` / `Reject change`) per the verb + object microcopy rule. (j) **Alert-type primary verb taxonomy** — promoted from §Outstanding gap to §Alert-type primary verb taxonomy with the canonical mapping wired into `<CopilotPane>`: `disaster_extension` now reads "Move {N} deadlines to {date}" with CTA `Move {N}`, while non-disaster alerts with a `newDeadline` keep the generic phrasing. **No new routes, no new components.** Verified by booting the dev server and walking Today / Clients / Timeline / Mail / Alerts / Calendar / Opportunities / Settings / Import / ClientDetail / TaskDetail with zero console errors. New active rules in §Don'ts: "Don't paint status colors across a full row or card" + "Don't use the slate `accent` token for next-action CTAs or focus rings."

@@ -45,9 +45,11 @@ export default {
           ink: "#3D3DAF",
         },
 
-        // Status
+        // Status. `warn` flipped 2026-05-05 from amber → peach per DESIGN.md
+        // §Quiet register Q1 (no yellow). Same semantic ("approaching trouble"),
+        // quieter tone — Mercury "Declined" register, not caution-tape.
         danger: { bg: "#FEF2F2", border: "#FCA5A5", ink: "#B91C1C", solid: "#DC2626" },
-        warn:   { bg: "#FFFBEB", border: "#FCD34D", ink: "#92400E", solid: "#D97706" },
+        warn:   { bg: "#FFF1E6", border: "#F4C7AB", ink: "#9A3B12", solid: "#D87547" },
         ok:     { bg: "#ECFDF5", border: "#86EFAC", ink: "#047857", solid: "#059669" },
         info:   { bg: "#EFF6FF", border: "#93C5FD", ink: "#1D4ED8", solid: "#2563EB" },
       },

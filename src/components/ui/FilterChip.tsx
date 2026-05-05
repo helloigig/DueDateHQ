@@ -25,7 +25,9 @@ export const FilterChip = React.forwardRef<HTMLButtonElement, FilterChipProps>(
           ref={ref}
           type="button"
           className={cn(
-            "inline-flex items-center gap-1.5 px-3 h-9 -mb-px border-b-2 text-sm font-medium transition-colors",
+            // Q2: 1.5px hairline (was border-b-2). Tab marker reads as
+            // intentional without thickening to "stripe" weight.
+            "inline-flex items-center gap-1.5 px-3 h-9 -mb-px border-b-[1.5px] text-sm font-medium transition-colors",
             active
               ? "border-ink-900 text-ink-900 font-semibold"
               : "border-transparent text-ink-500 hover:text-ink-900",
@@ -58,7 +60,8 @@ export const FilterChip = React.forwardRef<HTMLButtonElement, FilterChipProps>(
           "inline-flex items-center gap-1.5 px-3 h-7 rounded-pill text-xs font-medium transition-colors whitespace-nowrap",
           active
             ? "bg-ink-900 text-surface"
-            : "bg-surface border border-line text-ink-700 hover:bg-sunken hover:border-line-strong",
+            // Q3: hover stays at border-line (no border-line-strong bump) — surface shift carries the feedback.
+            : "bg-surface border border-line text-ink-700 hover:bg-sunken",
           className,
         )}
         aria-pressed={active}

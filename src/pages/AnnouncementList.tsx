@@ -8,7 +8,6 @@ import {
   escalationTier,
   formatLongDate,
   hoursSince,
-  type EscalationTier,
 } from "../data/dateHelpers";
 import {
   CONFIDENCE_LABEL,
@@ -16,12 +15,9 @@ import {
   TOPIC_LABEL,
 } from "../data/announcementLabels";
 
-const TIER_BAR: Record<EscalationTier, string> = {
-  fresh: "border-l-info-solid",
-  reminder: "border-l-warn-solid",
-  escalated: "border-l-danger-solid",
-  blocking: "border-l-danger-solid",
-};
+// TIER_BAR (4px status left-rule on each card) was retired per DESIGN.md
+// §Quiet register Q2 (no thick lines). Tier still drives the row's status
+// pill on the right; the surface itself stays neutral.
 
 const CONFIDENCE_TONE = {
   high: "bg-ok-bg text-ok-ink",
@@ -113,7 +109,7 @@ export function AnnouncementList() {
               <li key={a.id}>
                 <Link
                   to={`/alerts/${a.id}`}
-                  className={`block bg-surface border border-line border-l-4 ${TIER_BAR[tier]} rounded-md p-4 hover:bg-sunken transition-colors`}
+                  className={`block bg-surface border border-line rounded-md p-4 hover:bg-sunken transition-colors`}
                 >
                   <div className="flex items-start gap-3">
                     <span className="inline-flex items-center justify-center px-2 py-0.5 rounded text-xs font-semibold bg-sunken text-ink-900 border border-line shrink-0 mt-0.5">

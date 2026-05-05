@@ -389,7 +389,7 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
       {/* GAP SURFACE — applicable forms with no deadline yet. Loud by
           design per `feedback_gap_over_fill`. */}
       {suggested.length > 0 && (
-        <section className="border-2 border-warn-border bg-warn-bg/30 rounded-md">
+        <section className="border border-warn-border bg-warn-bg/30 rounded-md">
           <header className="px-4 py-2 border-b border-warn-border/50 flex items-baseline gap-2">
             <Sparkles className="w-3.5 h-3.5 text-warn-ink" aria-hidden />
             <h4 className="text-xs uppercase tracking-wider text-warn-ink font-semibold">

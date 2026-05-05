@@ -514,8 +514,8 @@ export function ClientDetail() {
             onClick={() => onTabChange(key)}
             className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm ${
               tab === key
-                ? "text-ink-900 border-b-2 border-ink-900 font-medium"
-                : "text-ink-500 hover:text-ink-700"
+                ? "text-ink-900 border-b-[1.5px] border-ink-900 font-medium"
+                : "border-b-[1.5px] border-transparent text-ink-500 hover:text-ink-700"
             }`}
           >
             <Icon className="w-3.5 h-3.5" aria-hidden />
@@ -531,8 +531,8 @@ export function ClientDetail() {
             aria-expanded={overflowOpen}
             className={`px-3 py-2 text-sm ${
               tab === "documents" || tab === "contacts" || tab === "audit"
-                ? "text-ink-900 border-b-2 border-ink-900 font-medium"
-                : "text-ink-500 hover:text-ink-700"
+                ? "text-ink-900 border-b-[1.5px] border-ink-900 font-medium"
+                : "border-b-[1.5px] border-transparent text-ink-500 hover:text-ink-700"
             }`}
             title="More — Audit log, Documents, Contacts"
           >

@@ -134,7 +134,7 @@ function Header({
         onClick={() => setGroupByRegion(!groupByRegion)}
         className={`text-2xs uppercase tracking-wider px-2.5 py-1.5 rounded border ${
           groupByRegion
-            ? "bg-ink-900 text-canvas border-ink-900"
+            ? "bg-ink-900 text-canvas border-transparent"
             : "bg-canvas text-ink-700 border-line hover:bg-sunken"
         }`}
       >

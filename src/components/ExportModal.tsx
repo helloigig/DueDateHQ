@@ -465,7 +465,7 @@ function Card({
       disabled={disabled}
       className={`text-left px-3 py-2 rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 ${
         active
-          ? "border-ink-900 bg-ink-900 text-surface"
+          ? "border-transparent bg-ink-900 text-surface"
           : disabled
           ? "border-line bg-sunken text-ink-400 cursor-not-allowed"
           : "border-line bg-surface text-ink-700 hover:bg-sunken"
