@@ -1,27 +1,27 @@
-import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, CheckCircle2, Megaphone, Sparkles, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ChevronDown, Megaphone, Sparkles, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useSession, updateSession } from "@/data/session";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { DateLabel } from "@/components/ui/DateLabel";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { ActionQueueRow, type RowUrgency, type RowAction } from "@/components/today/ActionQueueRow";
+import { ActionQueue } from "@/components/ActionQueue";
 import { TimelineDayRow } from "@/components/today/TimelineDayRow";
 import { StateAlertCard, type AffectedClient } from "@/components/today/StateAlertCard";
 import { type DotStackUrgency } from "@/components/ui/DotStack";
 import { clients as MOCK_CLIENTS } from "@/data/mockClients";
 import { deadlines as MOCK_DEADLINES } from "@/data/mockDeadlines";
-import { TODAY, parseDate, daysBetween, addDays, toIso } from "@/data/dateHelpers";
+import { TODAY, addDays, toIso } from "@/data/dateHelpers";
 import {
   useAnnouncements,
   useDismissAnnouncement,
 } from "@/hooks/useAnnouncements";
 import { useTriageDeadlines } from "@/hooks/useDeadlines";
 import { useClients } from "@/hooks/useClients";
+import { trpc } from "@/lib/api/client";
 import { env } from "@/config";
 import type { Announcement, Deadline } from "@/types";
 import { cn } from "@/lib/utils";
@@ -40,16 +40,6 @@ import { cn } from "@/lib/utils";
  * so the Action Queue + Timeline reflect real shapes.
  */
 
-interface QueueItem {
-  id: string;
-  clientId: string;
-  clientName: string;
-  meta: string;
-  urgency: RowUrgency;
-  urgencyDays?: number;
-  action: RowAction;
-}
-
 interface ConfirmedItem {
   id: string;
   clientName: string;
@@ -62,69 +52,6 @@ interface TimelineDay {
   count: number;
   urgency: DotStackUrgency;
   label?: string;
-}
-
-function jurisdictionLabel(j: string): string {
-  if (j === "federal") return "Federal";
-  return j;
-}
-
-function buildQueue(
-  deadlines: ReadonlyArray<Deadline>,
-  clientList: ReadonlyArray<{
-    id: string;
-    name: string;
-    entityType: string;
-  }>,
-): QueueItem[] {
-  const clientById = new Map(clientList.map((c) => [c.id, c]));
-  const queue: QueueItem[] = [];
-  for (const d of deadlines) {
-    const c = clientById.get(d.clientId);
-    if (!c) continue;
-    const due = parseDate(d.officialDueDate);
-    const diff = daysBetween(TODAY, due);
-    let urgency: RowUrgency | null = null;
-    let urgencyDays: number | undefined;
-    let action: RowAction = "send";
-    if (d.status === "overdue" || diff < 0) {
-      urgency = "overdue";
-      urgencyDays = Math.abs(diff);
-    } else if (diff === 0) {
-      urgency = "due_today";
-      action = "review";
-    } else if (diff > 0 && diff <= 7 && d.status === "not_started") {
-      urgency = "due_soon";
-      urgencyDays = diff;
-    } else if (d.status === "in_progress") {
-      urgency = "awaiting_review";
-      action = "open";
-    }
-    if (!urgency) continue;
-    queue.push({
-      id: `${d.clientId}-${d.form}`,
-      clientId: c.id,
-      clientName: c.name,
-      meta: `${d.form} · ${jurisdictionLabel(d.jurisdiction)} · ${c.entityType}`,
-      urgency,
-      urgencyDays,
-      action,
-    });
-  }
-  // Sort: overdue first → due-today → others by date
-  return queue
-    .sort((a, b) => {
-      const order: Record<RowUrgency, number> = {
-        overdue: 0,
-        due_today: 1,
-        awaiting_review: 2,
-        due_soon: 3,
-        awaiting_client: 4,
-        ai_suggested: 5,
-      };
-      return order[a.urgency] - order[b.urgency];
-    })
-    .slice(0, 12); // cap demo at 12 rows
 }
 
 function buildTimeline(deadlines: ReadonlyArray<Deadline>): TimelineDay[] {
@@ -206,46 +133,12 @@ export function Today() {
         ? MOCK_CLIENTS
         : [];
 
-  const queue = useMemo(
-    () => buildQueue(deadlinesForBuild, clientsForBuild),
-    [deadlinesForBuild, clientsForBuild],
-  );
   const timeline = useMemo(
     () => buildTimeline(deadlinesForBuild),
     [deadlinesForBuild],
   );
   const confirmed = useMemo(buildConfirmedToday, []);
   const [confirmedExpanded, setConfirmedExpanded] = useState(false);
-
-  // Keyboard navigation for the Action Queue — v0m-triage-queue inheritance.
-  // j/k (or ↓/↑) move the cursor; Enter opens the focused client; Esc clears.
-  // Only fires when no input/textarea is focused so it doesn't fight typing.
-  const [queueCursor, setQueueCursor] = useState(0);
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const tag = (document.activeElement?.tagName ?? "").toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select") return;
-      if (queue.length === 0) return;
-      if (e.key === "j" || e.key === "ArrowDown") {
-        e.preventDefault();
-        setQueueCursor((i) => Math.min(queue.length - 1, i + 1));
-      } else if (e.key === "k" || e.key === "ArrowUp") {
-        e.preventDefault();
-        setQueueCursor((i) => Math.max(0, i - 1));
-      } else if (e.key === "Escape") {
-        setQueueCursor(0);
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [queue.length]);
-
-  // Scroll the focused row into view when the cursor moves.
-  useEffect(() => {
-    if (queue.length === 0) return;
-    const el = document.getElementById(`action-queue-row-${queueCursor}`);
-    el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [queueCursor, queue.length]);
 
   // State alerts — driven by real announcement data (mock-mode tRPC).
   // Renders as the v0u differentiator surface preview: cards on Today,
@@ -273,20 +166,27 @@ export function Today() {
 
   // First-action arc (Yuqi audit 2026-05-05): freshly-onboarded users
   // land on Today with a populated queue but no muscle memory. Surface a
-  // one-time banner pointing at the most-overdue client with a chaseable
-  // item — one click opens the EmailDraftModal. Dismissed (X) or
-  // satisfied (sent) → flips session.firstChaseDone permanently.
-  //
-  // Eligibility: only show when (a) onboarding is complete, (b) the user
-  // hasn't dismissed/satisfied it, and (c) the queue has at least one
-  // chase-eligible row. The "first chase target" is the queue's
-  // top-priority row (queue is already sorted by urgency).
+  // one-time banner pointing at the first item the action queue would
+  // emphasise. Reads the same trpc.todoItems.list source <ActionQueue/>
+  // uses below so the banner and the queue can never disagree.
+  // Dismissed (X) or satisfied (sent) → flips session.firstChaseDone
+  // permanently. Eligibility: onboardingComplete && !firstChaseDone &&
+  // at least one item.
   const session = useSession();
+  const todoQuery = trpc.todoItems.list.useQuery({ limit: 5 });
+  const firstTodo = todoQuery.data?.items?.[0] ?? null;
   const showFirstChaseHint =
     !!session?.onboardingComplete &&
     !session?.firstChaseDone &&
-    queue.length > 0;
-  const firstChaseTarget = showFirstChaseHint ? queue[0] : null;
+    firstTodo !== null;
+  const firstChaseTarget =
+    showFirstChaseHint && firstTodo
+      ? {
+          clientId: firstTodo.clientId,
+          clientName: firstTodo.client,
+          meta: firstTodo.task ?? firstTodo.action,
+        }
+      : null;
   const dismissFirstChase = () => {
     updateSession({ firstChaseDone: true });
   };
@@ -405,67 +305,18 @@ export function Today() {
         )}
       </section>
 
-      {/* Action Queue — gap-first dominant section */}
-      <section className="mb-section">
-        <SectionHeader
-          title="Action Queue"
-          meta={
-            queue.length === 0
-              ? "0 items"
-              : `${queueCursor + 1} of ${queue.length}`
-          }
-          action={
-            queue.length > 0 ? (
-              <span className="text-2xs text-ink-400 inline-flex items-center gap-1">
-                <kbd className="font-mono text-2xs border border-line bg-sunken px-1 py-0.5 rounded">j</kbd>
-                <kbd className="font-mono text-2xs border border-line bg-sunken px-1 py-0.5 rounded">k</kbd>
-                <span className="ml-0.5">to navigate</span>
-                <span className="text-ink-300 mx-1" aria-hidden>·</span>
-                <Link
-                  to="/today/triage"
-                  className="text-ink-700 hover:text-ink-900 underline underline-offset-[3px] decoration-[1.5px] ml-1"
-                >
-                  Triage mode →
-                </Link>
-              </span>
-            ) : undefined
-          }
-        />
-        {queue.length === 0 ? (
-          <EmptyState
-            icon={CheckCircle2}
-            title="Nothing to do today."
-            description="We'll surface chases, replies, and approvals here as they need your attention."
-          />
-        ) : (
-          <div className="border-t border-line" role="list">
-            {queue.map((item, i) => (
-              <ActionQueueRow
-                key={item.id}
-                domId={`action-queue-row-${i}`}
-                clientName={item.clientName}
-                meta={item.meta}
-                urgency={item.urgency}
-                urgencyDays={item.urgencyDays}
-                action={item.action}
-                focused={i === queueCursor}
-                onAction={() => {
-                  // Action button: route to the relevant surface. Send +
-                  // Review open the task detail (which hosts the email
-                  // composer + checklist confirms). Open routes to the
-                  // client's mailbox. mark_received / file open the task.
-                  navigate(`/clients/${item.clientId}`);
-                }}
-                onRowClick={() => {
-                  setQueueCursor(i);
-                  navigate(`/clients/${item.clientId}`);
-                }}
-                isLast={i === queue.length - 1}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+      {/* Action Queue — gap-first dominant section.
+          Yuqi audit 2026-05-05 / 2026-05-06: previously Today rendered
+          a flat ActionQueueRow per item with a "Send" button that
+          merely navigated to the client (no email composer, no
+          bundling). The full <ActionQueue/> component (PR #109)
+          carries the multi-select checkbox UX, the Send-N-as-one-
+          email bundle modal, and the real-mode BE wiring (saveDraft
+          + send). It existed but wasn't wired here. Swapped in
+          directly so the user actually gets a working Send + the
+          checkbox affordance. The component owns its own data fetch
+          (`trpc.todoItems.list`) and SectionHeader. */}
+      <ActionQueue />
 
       {/* Timeline — glance-view of next 14 days */}
       <section className="mb-section">

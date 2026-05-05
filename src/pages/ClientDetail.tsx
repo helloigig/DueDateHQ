@@ -1080,31 +1080,63 @@ function ToDoTab({
   const taskHref = (taskId?: string) =>
     taskId ? `/clients/${client.id}/tasks/${taskId}` : `/clients/${client.id}`;
 
-  // Derive the unique tasks from the items list — each task is a
-  // first-class navigable unit on this surface. Yuqi audit 2026-05-05:
-  // "you can't enter task from client" — items used to be flat with the
-  // task name buried as small subtitle, the task was never the click
-  // target. This strip surfaces tasks as the primary unit and a clear
-  // entry point to TaskDetail.
+  // Derive the unique tasks from BOTH:
+  //   (a) the full per-client task list (useTasksForClient / store tasks
+  //       in mock mode) — so every task shows, even ones without open
+  //       todoItems right now (Yuqi audit 2026-05-06: previously a
+  //       client with all-confirmed items had an empty Tasks strip
+  //       even though its tasks still existed).
+  //   (b) any items that DO have open todoItems — surfaces the
+  //       open-count badge on the matching chip.
+  // Each task is a first-class navigable unit on this surface;
+  // clicking → TaskDetail.
+  const remoteTasksList = useTasksForClient(
+    !env.useMockData ? client.id : undefined,
+  );
   const tasksOnPage = useMemo(() => {
-    const seen = new Map<string, { id: string; name: string; openCount: number }>();
+    const seen = new Map<
+      string,
+      { id: string; name: string; openCount: number }
+    >();
+    // (a) Seed from the canonical per-client task list. Real mode
+    // pulls from BE via useTasksForClient; mock mode reads the store.
+    const sourceTasks = env.useMockData
+      ? storeTasks.filter((t) => t.clientId === client.id)
+      : remoteTasksList;
+    for (const t of sourceTasks) {
+      const taskName =
+        // Live BE shape carries formType + jurisdiction; mock store has
+        // the same fields. Compose a readable label either way.
+        [t.formType, t.jurisdiction].filter(Boolean).join(" · ") ||
+        "Task";
+      seen.set(t.id, { id: t.id, name: taskName, openCount: 0 });
+    }
+    // (b) Layer in open counts from the items list — only items the
+    // client owes (waiting / not requested / unreviewed / issue) count
+    // toward the badge.
     for (const ci of items) {
       if (!ci.taskId) continue;
-      const entry = seen.get(ci.taskId) ?? {
-        id: ci.taskId,
-        name: ci.taskName ?? "Task",
-        openCount: 0,
-      };
       const isOpen =
         ci.state === "not_requested" ||
         ci.state === "requested_waiting" ||
         ci.state === "received_unreviewed" ||
         ci.state === "received_issue";
-      if (isOpen) entry.openCount += 1;
-      seen.set(ci.taskId, entry);
+      if (!isOpen) continue;
+      const entry = seen.get(ci.taskId);
+      if (entry) {
+        entry.openCount += 1;
+      } else {
+        // Item references a task we didn't see in (a) — fall back to
+        // the item's taskName so the chip still shows.
+        seen.set(ci.taskId, {
+          id: ci.taskId,
+          name: ci.taskName ?? "Task",
+          openCount: 1,
+        });
+      }
     }
     return Array.from(seen.values()).sort((a, b) => b.openCount - a.openCount);
-  }, [items]);
+  }, [items, remoteTasksList, storeTasks, client.id]);
 
   return (
     <div className="space-y-4">
