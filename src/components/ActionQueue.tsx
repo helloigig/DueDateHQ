@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   ChevronRight,
   ChevronDown,
@@ -17,9 +18,11 @@ import type {
   TodoVerb,
 } from "../data/mockTodoItems";
 import { env } from "../config";
+import { actions } from "../data/store";
 import { DateLabel } from "./ui/DateLabel";
 import { DotStack } from "./ui/DotStack";
 import { SectionHeader } from "./ui/SectionHeader";
+import { ChaseBundleModal, type ChaseItem } from "./ChaseBundleModal";
 import { cn } from "../lib/utils";
 import {
   buildQueueRows,
@@ -180,15 +183,17 @@ function aggregateChecklistStates(
 }
 
 // ── Client group row ──────────────────────────────────────────────────────
-// One row per client. Body shows aggregated verb counts + form list. Click
-// the row anywhere to expand inline; the chevron is just an icon (not a
-// pill button) so the whole row is the affordance. Clicking the client's
-// name itself navigates to the client detail page, distinct from the
-// expand interaction. Inside the expanded panel, each task lists its
-// checklist items as checkboxes (pre-checked) with a sticky "Send N"
-// bar at the bottom — closes the chase loop in one bundled email.
+// One row per client. The whole row is the expand button — chevron is a
+// passive icon, dots live at the bottom of the content as a status footer
+// (not a left-prefix that competes with the client name for first read).
+// Inside the expanded panel, each task lists its checklist items as
+// checkboxes (pre-checked for outstanding states); selection state is
+// lifted up to this component so a single "Send N" footer covers items
+// across all tasks for this client. Clicking Send opens the
+// ChaseBundleModal — one email, one composer, all selected items.
 function ClientGroupRowView({ row }: { row: ClientGroupRow }) {
   const [open, setOpen] = useState(false);
+  const [bundleOpen, setBundleOpen] = useState(false);
   const summary = summarizeClientGroup(row);
   const sendCount = row.verbCounts.Send ?? 0;
   const primaryVerb: TodoVerb =
@@ -203,33 +208,153 @@ function ClientGroupRowView({ row }: { row: ClientGroupRow }) {
   const checklistStates = aggregateChecklistStates(row.items);
   const itemCount = checklistStates.length;
 
+  // All chase-eligible items across all tasks in this group, flattened
+  // into a single shape the modal can consume. Indexed by composite
+  // taskId+itemId so checkbox state survives reorders.
+  const allChaseItems = useMemo<ChaseItem[]>(() => {
+    const out: ChaseItem[] = [];
+    for (const it of row.items) {
+      if (!it.checklistItems) continue;
+      for (const ci of it.checklistItems) {
+        if (
+          ci.state === "received_confirmed" ||
+          ci.state === "not_applicable"
+        ) {
+          continue;
+        }
+        out.push({
+          id: `${it.taskId ?? it.id}:${ci.id}`,
+          taskName: it.task ?? row.clientName,
+          taskId: it.taskId,
+          itemLabel: ci.label,
+          state: ci.state,
+        });
+      }
+    }
+    return out;
+  }, [row]);
+
+  // Lifted checkbox state — pre-checked for every chase-eligible item.
+  // The parent Send button reads this to know how many items to bundle.
+  const [checked, setChecked] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(allChaseItems.map((ci) => [ci.id, true])),
+  );
+  const checkedCount = Object.values(checked).filter(Boolean).length;
+  const includedChaseItems = allChaseItems.filter((ci) => checked[ci.id]);
+
+  // Real-mode bundled send wiring (PR B.5) — saves a draft scoped to
+  // the first task containing any checked item, then immediately sends
+  // it via the BE pipeline. The schema constrains email_drafts.taskId
+  // to a single task; bundling across tasks therefore lives in the
+  // body, not the FK. Phase 2 introduces multi-task drafts so the
+  // email_drafts row can fan out activity events across every linked
+  // task. Mock-mode keeps the in-memory store shortcut.
+  const saveDraftMut = trpc.emails.saveDraft.useMutation();
+  const sendEmailMut = trpc.emails.send.useMutation();
+  const liveClientQuery = trpc.clients.get.useQuery(
+    { id: row.clientId ?? "" },
+    { enabled: !env.useMockData && Boolean(row.clientId) },
+  );
+  const clientEmail = liveClientQuery.data?.contactEmail ?? undefined;
+
+  const onSendBundled = async (payload: {
+    subject: string;
+    body: string;
+    itemIds: string[];
+  }) => {
+    const firstTaskId = includedChaseItems.find((it) => it.taskId)?.taskId;
+    if (!firstTaskId) {
+      toast.error("Can't send — no linked task. Open the client to add one.");
+      return;
+    }
+    if (env.useMockData) {
+      const id = actions.saveEmailDraft({
+        taskId: firstTaskId,
+        clientId: row.clientId ?? "",
+        to: "client@example.com",
+        cc: "",
+        subject: payload.subject,
+        body: payload.body,
+        tone: "formal",
+        aiSources: [
+          {
+            kind: "substrate",
+            note: `bundled chase ${payload.itemIds.length} items`,
+          },
+        ],
+        sendMethod: "cpa_send",
+        status: "draft",
+      });
+      actions.sendEmail(id);
+      toast.success(
+        `Sent · ${payload.itemIds.length} ${payload.itemIds.length === 1 ? "item" : "items"} bundled into one email`,
+      );
+      setBundleOpen(false);
+      return;
+    }
+    // Real mode: persist + send through the BE. The chain is
+    // saveDraft → send so the activity_event row that emails.send
+    // writes uses the just-created draft id (clean audit trail).
+    if (!clientEmail) {
+      toast.error(
+        "Can't send — no email on file for this client. Add one in client detail.",
+      );
+      return;
+    }
+    try {
+      const draft = (await saveDraftMut.mutateAsync({
+        taskId: firstTaskId,
+        toAddress: clientEmail,
+        ccAddress: null,
+        subject: payload.subject,
+        body: payload.body,
+        tone: "default",
+        aiSources: {
+          kind: "bundled_chase",
+          itemCount: payload.itemIds.length,
+        },
+      } as never)) as { id: string };
+      await sendEmailMut.mutateAsync({ id: draft.id } as never);
+      toast.success(
+        `Sent · ${payload.itemIds.length} ${payload.itemIds.length === 1 ? "item" : "items"} bundled into one email`,
+      );
+      setBundleOpen(false);
+    } catch (err) {
+      const m = err instanceof Error ? err.message : "Send failed";
+      toast.error(`Send failed: ${m}`);
+    }
+  };
+
   return (
-    <li className="group bg-surface" data-deadline-row>
+    <li
+      className="group bg-surface focus-within:bg-canvas/60 transition-colors"
+      data-deadline-row
+    >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={open ? "Collapse client" : "Expand client"}
-        className="w-full text-left px-region py-3 flex items-start gap-3 hover:bg-sunken/40 transition-colors"
+        className={cn(
+          "w-full text-left px-region py-3 flex items-start gap-3 transition-colors",
+          // Real hover treatment: solid sunken on hover; a slightly
+          // brighter shade when expanded so the open state reads
+          // distinct without competing with row hover. Focus ring on
+          // keyboard nav. Active (mousedown) gets a subtle press tint.
+          "hover:bg-sunken active:bg-sunken-strong/80",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo/40",
+          open && "bg-canvas/70",
+        )}
       >
-        {/* DotStack — one dot per checklist item, color-coded by state.
-            Replaces the single-color UrgencyDot so the parent row tells
-            the chase-loop story without expanding. */}
-        <div className="pt-1.5 shrink-0">
-          <DotStack
-            states={checklistStates.map((c) => c.state)}
-            maxVisible={12}
-          />
-        </div>
         <div className="flex-1 min-w-0">
-          {/* Identity line — client name is a Link (navigates to client
-              detail) rendered inside the expand button via stopPropagation. */}
+          {/* Identity line — client name is a Link with stopPropagation
+              so navigating doesn't toggle the expand. */}
           <div className="flex items-center gap-2 text-xs text-ink-500 mb-0.5 flex-wrap">
             {row.clientId ? (
               <Link
                 to={`/clients/${row.clientId}`}
                 onClick={(e) => e.stopPropagation()}
-                className="font-medium text-ink-900 hover:underline"
+                className="font-medium text-ink-900 hover:underline focus-visible:outline-none focus-visible:underline"
               >
                 {row.clientName}
               </Link>
@@ -262,10 +387,21 @@ function ClientGroupRowView({ row }: { row: ClientGroupRow }) {
           <div className="text-xs text-ink-500 mt-0.5 line-clamp-1">
             {row.items[0].context}
           </div>
+
+          {/* Status footer — DotStack at the bottom of the row content,
+              not as a left prefix. Tells the chase-loop story without
+              competing with the client name for first read. */}
+          <div className="mt-2 flex items-center gap-2 text-2xs text-ink-500">
+            <DotStack
+              states={checklistStates.map((c) => c.state)}
+              maxVisible={12}
+            />
+            <span className="text-ink-400">{statusSummary(checklistStates)}</span>
+          </div>
         </div>
 
         {/* Chevron is decorative — the entire row is the expand button. */}
-        <span className="pt-1.5 shrink-0 text-ink-400">
+        <span className="pt-1.5 shrink-0 text-ink-400 group-hover:text-ink-700 transition-colors">
           {open ? (
             <ChevronDown className="w-4 h-4" aria-hidden />
           ) : (
@@ -275,16 +411,84 @@ function ClientGroupRowView({ row }: { row: ClientGroupRow }) {
       </button>
 
       {open && (
-        <div className="bg-sunken/30 border-t border-line">
-          <ul className="divide-y divide-line">
+        <div className="bg-sunken/40 border-t border-line">
+          <ul className="divide-y divide-line/60">
             {row.items.map((it) => (
-              <SubItemRow key={it.id} item={it} />
+              <SubItemRow
+                key={it.id}
+                item={it}
+                checked={checked}
+                onToggle={(id) =>
+                  setChecked((p) => ({ ...p, [id]: !p[id] }))
+                }
+              />
             ))}
           </ul>
+          {/* Parent-level Send bar — covers items across ALL tasks in
+              the group. Lifted above the per-task Send buttons because
+              one chase email per loop is the PRD §7.3 invariant. */}
+          {allChaseItems.length > 0 && (
+            <div className="px-region py-2.5 flex items-center justify-between border-t border-line bg-canvas/80">
+              <span className="text-xs text-ink-500">
+                {checkedCount === 0
+                  ? "Pick at least one item to send"
+                  : checkedCount === allChaseItems.length
+                    ? `All ${checkedCount} items selected`
+                    : `${checkedCount} of ${allChaseItems.length} selected`}
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setBundleOpen(true);
+                }}
+                disabled={checkedCount === 0}
+                className={cn(
+                  "inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded transition-colors",
+                  "bg-indigo text-white hover:bg-indigo-hover active:bg-indigo-hover/90",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo/40",
+                  "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-indigo",
+                )}
+              >
+                <Mail className="w-3 h-3" aria-hidden />
+                Send {checkedCount} in one email
+              </button>
+            </div>
+          )}
         </div>
       )}
+
+      <ChaseBundleModal
+        open={bundleOpen}
+        clientName={row.clientName}
+        items={includedChaseItems}
+        onClose={() => setBundleOpen(false)}
+        onSend={onSendBundled}
+      />
     </li>
   );
+}
+
+// Plain-language summary of a checklist-state distribution. Used in the
+// status footer beneath each parent row so the dot stack reads honest at
+// a glance ("3 awaiting client · 1 awaiting your review").
+function statusSummary(states: ChecklistItemSnapshot[]): string {
+  const counts = states.reduce<Record<string, number>>((acc, s) => {
+    acc[s.state] = (acc[s.state] ?? 0) + 1;
+    return acc;
+  }, {});
+  const parts: string[] = [];
+  if (counts.received_unreviewed)
+    parts.push(`${counts.received_unreviewed} awaiting your review`);
+  if (counts.received_issue)
+    parts.push(`${counts.received_issue} flagged`);
+  if (counts.requested_waiting)
+    parts.push(`${counts.requested_waiting} awaiting client`);
+  if (counts.not_requested)
+    parts.push(`${counts.not_requested} first reminder pending`);
+  if (counts.received_confirmed)
+    parts.push(`${counts.received_confirmed} confirmed`);
+  return parts.join(" · ");
 }
 
 // Color a checklist-item dot to match the canonical state palette
@@ -315,29 +519,32 @@ const CHECKLIST_STATE_LABEL: Record<
 };
 
 // Sub-item inside an expanded client group. For Mode B rows (with a
-// checklistItems snapshot), each checklist item renders as its own
-// row with a state dot — so the user can see "1 of 4 already
-// confirmed" without leaving Today. Other verbs render the legacy
-// single-row treatment.
-function SubItemRow({ item }: { item: QueueTodoItem }) {
+// checklistItems snapshot), each checklist item renders as a per-row
+// checkbox + state dot. Selection state is OWNED by the parent
+// ClientGroupRowView so a single Send bar at the bottom of the
+// expanded panel can bundle items across multiple tasks. The Send
+// button on this sub-row is gone — it would have promised a per-task
+// email, which contradicts the one-chase-loop-per-email invariant.
+//
+// Non-Mode-B verbs fall back to the legacy single-row treatment with
+// click-to-act behaviour.
+function SubItemRow({
+  item,
+  checked,
+  onToggle,
+}: {
+  item: QueueTodoItem;
+  checked: Record<string, boolean>;
+  onToggle: (id: string) => void;
+}) {
   const Icon = VERB_ICON[item.verb];
   const navigate = useNavigate();
-  const [checked, setChecked] = useState<Record<string, boolean>>(() => {
-    if (!item.checklistItems) return {};
-    // Pre-check items that aren't done — those are the candidates for
-    // the next bundled chase email. Confirmed/N/A start unchecked.
-    return Object.fromEntries(
-      item.checklistItems.map((c) => [
-        c.id,
-        c.state !== "received_confirmed" && c.state !== "not_applicable",
-      ]),
-    );
-  });
 
   if (item.checklistItems && item.checklistItems.length > 0) {
-    const checkedCount = Object.values(checked).filter(Boolean).length;
+    const taskScopedKey = (ciId: string) =>
+      `${item.taskId ?? item.id}:${ciId}`;
     return (
-      <li className="px-region py-2 pl-10 bg-surface">
+      <li className="px-region py-2.5 pl-10 bg-surface/60">
         {/* Task header — form name + due date + stage */}
         <div className="flex items-center gap-2 text-xs text-ink-500 mb-1.5 flex-wrap">
           {item.task && (
@@ -360,59 +567,53 @@ function SubItemRow({ item }: { item: QueueTodoItem }) {
         </div>
         {/* Per-checklist-item rows — checkboxes (pre-checked for outstanding) */}
         <ul className="space-y-1">
-          {item.checklistItems.map((ci) => (
-            <li
-              key={ci.id}
-              className="flex items-center gap-2 text-sm text-ink-900"
-            >
-              <input
-                type="checkbox"
-                checked={checked[ci.id] ?? false}
-                onChange={(e) =>
-                  setChecked((p) => ({ ...p, [ci.id]: e.target.checked }))
-                }
-                disabled={
-                  ci.state === "received_confirmed" ||
-                  ci.state === "not_applicable"
-                }
-                className="w-3.5 h-3.5 rounded border-line shrink-0 disabled:opacity-40"
-                aria-label={`Include ${ci.label} in next chase`}
-              />
-              <span
+          {item.checklistItems.map((ci) => {
+            const k = taskScopedKey(ci.id);
+            const disabled =
+              ci.state === "received_confirmed" ||
+              ci.state === "not_applicable";
+            const isChecked = !disabled && (checked[k] ?? false);
+            return (
+              <li
+                key={ci.id}
                 className={cn(
-                  "inline-block w-1.5 h-1.5 rounded-pill shrink-0",
-                  CHECKLIST_DOT_CLASS[ci.state],
+                  "flex items-center gap-2 text-sm rounded px-1.5 py-1 transition-colors",
+                  disabled
+                    ? "text-ink-400"
+                    : "text-ink-900 hover:bg-canvas cursor-pointer",
                 )}
-                aria-hidden
-              />
-              <span className="flex-1 truncate">{ci.label}</span>
-              <span className="text-2xs text-ink-500 shrink-0">
-                {CHECKLIST_STATE_LABEL[ci.state]}
-              </span>
-            </li>
-          ))}
+                onClick={() => {
+                  if (disabled) return;
+                  onToggle(k);
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => onToggle(k)}
+                  onClick={(e) => e.stopPropagation()}
+                  disabled={disabled}
+                  className={cn(
+                    "w-3.5 h-3.5 rounded border-line shrink-0 accent-indigo",
+                    disabled && "opacity-40 cursor-not-allowed",
+                  )}
+                  aria-label={`Include ${ci.label} in next chase`}
+                />
+                <span
+                  className={cn(
+                    "inline-block w-1.5 h-1.5 rounded-pill shrink-0",
+                    CHECKLIST_DOT_CLASS[ci.state],
+                  )}
+                  aria-hidden
+                />
+                <span className="flex-1 truncate">{ci.label}</span>
+                <span className="text-2xs text-ink-500 shrink-0">
+                  {CHECKLIST_STATE_LABEL[ci.state]}
+                </span>
+              </li>
+            );
+          })}
         </ul>
-        {/* Sticky-feeling action bar — sends one bundled email covering
-            the checked items. Wired through to the existing
-            navigateForItem path which opens the email composer
-            modal. */}
-        <div className="mt-2 pt-2 border-t border-line/60 flex items-center justify-between">
-          <span className="text-2xs text-ink-500">
-            {checkedCount} selected
-          </span>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigateForItem(item, navigate);
-            }}
-            disabled={checkedCount === 0}
-            className="text-xs px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1"
-          >
-            <Icon className="w-3 h-3" aria-hidden />
-            Send {checkedCount} {checkedCount === 1 ? "reminder" : "reminders"}
-          </button>
-        </div>
       </li>
     );
   }
@@ -422,7 +623,10 @@ function SubItemRow({ item }: { item: QueueTodoItem }) {
       <button
         type="button"
         onClick={() => navigateForItem(item, navigate)}
-        className="w-full text-left px-region py-2 pl-10 flex items-start gap-3 hover:bg-surface transition-colors"
+        className={cn(
+          "w-full text-left px-region py-2 pl-10 flex items-start gap-3 transition-colors",
+          "hover:bg-surface focus-visible:bg-surface focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-indigo/40",
+        )}
       >
         <UrgencyDot urgency={item.urgency} />
         <div className="flex-1 min-w-0">
