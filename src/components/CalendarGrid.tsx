@@ -169,7 +169,7 @@ export function CalendarGrid() {
                     <li key={t.id}>
                       <button
                         onClick={() =>
-                          navigate(`/clients/${client.id}/tasks/${t.id}`)
+                          navigate(`/clients/${client.id}?task=${t.id}`)
                         }
                         className={`block w-full text-left text-2xs px-1 py-0.5 rounded truncate hover:underline ${
                           overdue

@@ -227,7 +227,7 @@ export function TriageQueue({ onCountChange }: Props) {
         confirmWithUndo(it.checklist, setChecklistState);
         break;
       case "decision_flag":
-        navigate(`/clients/${it.client.id}/tasks/${it.task.id}`);
+        navigate(`/clients/${it.client.id}?task=${it.task.id}`);
         break;
       case "outgoing_reminder":
         setEmailIntent({
