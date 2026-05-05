@@ -1112,13 +1112,24 @@ function ToDoTab({
                         " · First reminder pending"}
                     </p>
                   </div>
+                  {/* Honest label: this navigates to TaskDetail (where
+                      the EmailDraftModal lives) — it does NOT compose
+                      from here. The arrow ↗ communicates the navigate.
+                      Earlier copy "Send reminder ↗" / "Request now ↗"
+                      promised an inline send the link can't deliver,
+                      so users hit a dead end. Once the per-row inline
+                      composer is wired, this can flip back to the
+                      action-verb labels with a real onClick. */}
                   <Link
                     to={taskHref(ci.taskId)}
                     className="text-2xs px-2 py-1 rounded border border-line bg-surface text-ink-700 hover:bg-sunken shrink-0"
+                    title={
+                      ci.state === "requested_waiting"
+                        ? "Open task to send a reminder"
+                        : "Open task to request this item"
+                    }
                   >
-                    {ci.state === "requested_waiting"
-                      ? "Send reminder ↗"
-                      : "Request now ↗"}
+                    Open task ↗
                   </Link>
                 </li>
               );
