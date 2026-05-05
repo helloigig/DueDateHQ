@@ -200,6 +200,11 @@ export function Mail() {
 
   return (
     <div className="max-w-[840px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      {/* PageHeader's `mb-card` already gives the subtitle enough air;
+          using a negative `-mt-section` on top of that pulled the
+          description up over the title text. Use the page header's
+          natural flow + a `mb-card` on the description for stable
+          spacing. */}
       <PageHeader
         title={
           <>
@@ -207,8 +212,9 @@ export function Mail() {
             Mail
           </>
         }
+        className="mb-2"
       />
-      <p className="text-sm text-ink-500 -mt-section mb-card">
+      <p className="text-sm text-ink-500 mb-card">
         Cross-client communication — AI classifies inbound; bytes stay in your
         email account.
       </p>
@@ -279,16 +285,22 @@ export function Mail() {
         )}
       </section>
 
-      {/* Tabs — Inbox / Outbox / Drafts / Issues */}
+      {/* Tabs — Inbox / Outbox / Drafts / Issues.
+          Counts: Inbox + Issues are LIVE (BE returns the row set we
+          render); Outbox + Drafts are intentionally count-less until
+          the firm-wide `emails.listSent` / `emails.listDrafts` BE
+          procedures land. We previously hardcoded 47/12 which was
+          mock-only — even on a fresh real-mode firm with zero sent
+          mail, those badges lit up. Quiet `—` is honest. */}
       <div className="border-b border-line mb-3 flex items-center gap-1" role="tablist">
         {(
           [
-            { id: "inbox" as Tab, label: "Inbox", Icon: InboxIcon, count: inboxCount },
-            { id: "outbox" as Tab, label: "Outbox", Icon: Send, count: 47 },
-            { id: "drafts" as Tab, label: "Drafts", Icon: FileEdit, count: 12 },
-            { id: "issues" as Tab, label: "Issues", Icon: AlertTriangle, count: issuesCount },
+            { id: "inbox" as Tab, label: "Inbox", Icon: InboxIcon, count: inboxCount, countLive: true },
+            { id: "outbox" as Tab, label: "Outbox", Icon: Send, count: 0, countLive: false },
+            { id: "drafts" as Tab, label: "Drafts", Icon: FileEdit, count: 0, countLive: false },
+            { id: "issues" as Tab, label: "Issues", Icon: AlertTriangle, count: issuesCount, countLive: true },
           ] as const
-        ).map(({ id, label, Icon, count }) => (
+        ).map(({ id, label, Icon, count, countLive }) => (
           <button
             key={id}
             role="tab"
@@ -302,7 +314,7 @@ export function Mail() {
           >
             <Icon className="w-4 h-4" aria-hidden />
             <span>{label}</span>
-            {count > 0 && (
+            {countLive && count > 0 && (
               <span className="text-2xs tabular-nums text-ink-400">({count})</span>
             )}
           </button>
@@ -467,11 +479,13 @@ export function Mail() {
       )}
 
       <p className="mt-6 text-2xs text-ink-400 leading-relaxed">
-        Per <Link to="/settings/integrations" className="underline">Method B (Gmail/Outlook OAuth)</Link>,
-        all inbound is classified by AI into 7 classes (client doc / client reply /
-        agency / 3rd-party data / payment / vendor / spam) and routed to the right
-        client × task. Bytes stay in your email — we hold extracted text + facts +
-        thumbnails. Full mail integration ships in Phase 3.
+        Per <Link to="/settings/integrations" className="underline">Method A (per-task forwarding)</Link> +{" "}
+        <Link to="/settings/integrations" className="underline">Method B (Gmail/Outlook OAuth)</Link> —
+        both Day 1 — inbound is classified by AI into 7 classes (client doc /
+        client reply / agency / 3rd-party data / payment / vendor / spam) and
+        routed to the right client × task. Bytes stay in your email; we hold
+        extracted text + facts + thumbnails. Outbox + Drafts views land in
+        Phase 1 once <code>emails.listSent</code> + <code>emails.listDrafts</code> are wired.
       </p>
 
       {linking && (
@@ -661,7 +675,8 @@ function IntentBadge({ intent }: { intent: string }) {
 function PlaceholderTab({ label }: { label: string }) {
   return (
     <div className="rounded-md border border-dashed border-line p-8 text-center text-sm text-ink-500">
-      {label} (mock data — full implementation Phase 3)
+      {label} — wiring lands in Phase 1 once the firm-wide listSent /
+      listDrafts BE procedures ship.
     </div>
   );
 }

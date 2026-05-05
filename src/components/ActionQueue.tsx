@@ -249,9 +249,18 @@ function ClientGroupRowView({ row }: { row: ClientGroupRow }) {
                 </span>
               </>
             )}
-            <span className="ml-auto inline-flex items-center gap-1 text-xs text-ink-700">
+            {/* Verb hint — muted metadata, NOT a button. Earlier this
+                rendered as `<icon> Send` in ink-700 on the right edge,
+                which read as a tappable Send affordance. Clicking did
+                nothing (the parent <button> just toggles expand), so
+                users hit a dead end. The verb is already restated on
+                the action line below; here we render it as inline
+                metadata in muted text so it reads as "next action:
+                Send" — a status, not a CTA. */}
+            <span className="ml-auto inline-flex items-center gap-1 text-2xs text-ink-400">
+              next:
               <PrimaryIcon className="w-3 h-3" aria-hidden />
-              <span className="font-medium">{primaryVerb}</span>
+              <span className="font-medium text-ink-500">{primaryVerb}</span>
             </span>
           </div>
 
