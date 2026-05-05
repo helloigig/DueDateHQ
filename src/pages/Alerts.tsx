@@ -5,6 +5,8 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
+  History,
   Mail,
   Megaphone,
   MoonStar,
@@ -23,6 +25,13 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/button";
 import { formatLongDate } from "@/data/dateHelpers";
+import {
+  CONFIDENCE_LABEL,
+  SOURCE_AUTHORITY_LABEL,
+  SOURCE_AUTHORITY_TOOLTIP,
+  TAX_TYPE_LABEL,
+  TOPIC_LABEL,
+} from "@/data/announcementLabels";
 import {
   useAnnouncements,
   useDismissAnnouncement,
@@ -184,6 +193,173 @@ function ActionRow({
         {cta}
       </Button>
     </article>
+  );
+}
+
+/**
+ * AlertContextSection — the "details a CPA needs to confirm the call"
+ * block at the top of the CopilotPane body. The card in the feed shows
+ * the headline; this surface carries the supporting detail so a CPA can
+ * verify before they act:
+ *   • Authority + type + issuance/effective dates + retroactive flag
+ *   • Full summary (no truncation)
+ *   • Counties · entity types · tax types as small chips when populated
+ *   • AI parse + match confidence (so low-confidence alerts loudly say
+ *     "verify against the source before acting")
+ *   • Prominent "Read official source" link to the issuing authority's
+ *     URL — the canonical primary source the CPA cites in their work
+ */
+function AlertContextSection({ announcement: a }: { announcement: Announcement }) {
+  const confidenceTone: Record<string, string> = {
+    high: "bg-ok-bg text-ok-ink",
+    medium: "bg-sunken text-ink-700",
+    low: "bg-warn-bg text-warn-ink",
+  };
+  const isLowConfidence =
+    a.parseConfidence === "low" || a.matchConfidence === "low";
+
+  return (
+    <section className="px-region pt-region pb-region">
+      {/* Authority line + type pill */}
+      <div className="flex items-center gap-2 flex-wrap text-xs">
+        <span className="font-medium text-ink-900">{a.authority}</span>
+        <span className="text-ink-300" aria-hidden>·</span>
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line">
+          {TOPIC_LABEL[a.type]}
+        </span>
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line">
+          {TAX_TYPE_LABEL[a.taxType]}
+        </span>
+        {a.retroactive && (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-warn-bg text-warn-ink border border-warn-border">
+            <History className="w-3 h-3" aria-hidden />
+            Retroactive
+          </span>
+        )}
+        <span
+          className="inline-flex items-center px-1.5 py-0.5 rounded bg-sunken text-ink-500 border border-line"
+          title={SOURCE_AUTHORITY_TOOLTIP[a.sourceAuthority]}
+        >
+          {SOURCE_AUTHORITY_LABEL[a.sourceAuthority]}
+        </span>
+      </div>
+
+      {/* Dates row — issuance / effective / new deadline. Renders only the
+          slots that are populated (effectiveDate + newDeadline are both
+          optional on the type). */}
+      <div className="mt-2 flex items-center gap-x-3 gap-y-1 flex-wrap text-xs text-ink-500">
+        <span>
+          Issued <span className="text-ink-700">{formatLongDate(a.issuanceDate)}</span>
+        </span>
+        {a.effectiveDate && (
+          <span>
+            Effective <span className="text-ink-700">{formatLongDate(a.effectiveDate)}</span>
+          </span>
+        )}
+        {a.newDeadline && (
+          <span className="inline-flex items-center gap-1">
+            <CalendarClock className="w-3 h-3 text-ink-500" aria-hidden />
+            Deadline shifts to{" "}
+            <span className="font-medium text-ink-900">
+              {formatLongDate(a.newDeadline)}
+            </span>
+            {a.oldDeadline && (
+              <span className="text-ink-400">
+                (was {formatLongDate(a.oldDeadline)})
+              </span>
+            )}
+          </span>
+        )}
+      </div>
+
+      {/* Full summary — the verbatim text the parser captured. No
+          truncation here; the feed card line-clamps to 2, this surface
+          shows the whole thing so a CPA can read what the announcement
+          actually says before they decide. */}
+      {a.summary && a.summary.trim() && (
+        <p className="mt-3 text-sm text-ink-900 leading-relaxed whitespace-pre-line">
+          {a.summary}
+        </p>
+      )}
+
+      {/* Scope chips — counties / entity types / taxes. These are the
+          "does this actually apply to my client" signal the CPA confirms
+          before sending anything. Each cluster only renders when populated. */}
+      {(a.counties.length > 0 ||
+        a.entityTypes.length > 0 ||
+        a.taxTypes.length > 0) && (
+        <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs">
+          {a.counties.length > 0 && (
+            <>
+              <dt className="text-ink-500 uppercase text-2xs tracking-wider font-semibold pt-0.5">
+                Counties
+              </dt>
+              <dd className="text-ink-700">{a.counties.join(", ")}</dd>
+            </>
+          )}
+          {a.entityTypes.length > 0 && (
+            <>
+              <dt className="text-ink-500 uppercase text-2xs tracking-wider font-semibold pt-0.5">
+                Entities
+              </dt>
+              <dd className="text-ink-700">{a.entityTypes.join(" · ")}</dd>
+            </>
+          )}
+          {a.taxTypes.length > 0 && (
+            <>
+              <dt className="text-ink-500 uppercase text-2xs tracking-wider font-semibold pt-0.5">
+                Taxes
+              </dt>
+              <dd className="text-ink-700">{a.taxTypes.join(" · ")}</dd>
+            </>
+          )}
+        </dl>
+      )}
+
+      {/* Source URL + AI confidence — the row CPAs use to decide whether
+          to trust the parse or click through and read the original. */}
+      <div className="mt-4 flex items-center gap-2 flex-wrap">
+        {a.sourceUrl && (
+          <a
+            href={a.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo hover:bg-sunken transition-colors px-2.5 py-1.5 rounded-md border border-line"
+          >
+            <ExternalLink className="w-3.5 h-3.5" aria-hidden />
+            Read official source
+          </a>
+        )}
+        <span
+          className={cn(
+            "text-2xs px-2 py-0.5 rounded",
+            confidenceTone[a.parseConfidence],
+          )}
+          title="AI parse confidence — how sure we are we extracted the announcement details correctly"
+        >
+          AI parse: {CONFIDENCE_LABEL[a.parseConfidence]}
+        </span>
+        <span
+          className={cn(
+            "text-2xs px-2 py-0.5 rounded",
+            confidenceTone[a.matchConfidence],
+          )}
+          title="AI match confidence — how sure we are this alert applies to the listed clients"
+        >
+          AI match: {CONFIDENCE_LABEL[a.matchConfidence]}
+        </span>
+      </div>
+
+      {isLowConfidence && (
+        <div className="mt-3 px-3 py-2 bg-warn-bg border border-warn-border rounded-md text-xs text-warn-ink flex items-start gap-2">
+          <span aria-hidden>⚠</span>
+          <span>
+            Low confidence — verify against the official source before
+            acting on this alert.
+          </span>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -356,9 +532,11 @@ function CopilotPane({
         </button>
       </div>
 
-      {/* ── Body zone: Suggested actions ─────────────────────── */}
+      {/* ── Body zone: Source & context, then suggested actions ── */}
       <div className="flex-1 overflow-y-auto">
-        <div className="px-region pt-3 pb-2">
+        <AlertContextSection announcement={a} />
+
+        <div className="px-region pt-3 pb-2 border-t border-line">
           <span className="text-2xs uppercase tracking-wider font-semibold text-ink-500">
             Suggested actions
           </span>
