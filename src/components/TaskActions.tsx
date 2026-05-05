@@ -163,39 +163,32 @@ export function TaskActions({ task }: Props) {
             <RotateCcw className="w-3.5 h-3.5" aria-hidden /> Re-open
           </button>
         ) : (
-          // Mark complete — primary CTA. The unlabeled "0/1" badge was
-          // opaque per Yuqi audit ("what does 0/1 mean?"). Count moves
-          // OUT of the button onto a quiet status line below it
-          // ("0 of 1 confirmed"); button itself is calm + scannable.
-          // Amber-bg low-confidence styling stays so the user still
-          // gets a visual warning when closing a task with un-received
-          // items.
-          <div className="flex flex-col items-stretch gap-0.5">
-            <button
-              onClick={onMarkComplete}
-              className={`text-sm px-3 py-1.5 rounded-md inline-flex items-center justify-center gap-1.5 ${
-                isLowConfidence
-                  ? "bg-warn-bg text-warn-ink border border-warn-border hover:bg-warn-bg/80"
-                  : "bg-indigo text-white hover:bg-indigo-hover"
-              }`}
-              title={
-                isLowConfidence
-                  ? `Only ${completionPct}% confirmed — you'll be asked to type to confirm`
-                  : "Close this task"
-              }
-            >
-              <Check className="w-3.5 h-3.5" aria-hidden /> Mark complete
-            </button>
-            {relevantItems.length > 0 && (
-              <span
-                className={`text-2xs text-center tabular-nums ${
-                  isLowConfidence ? "text-warn-ink" : "text-ink-500"
-                }`}
-              >
-                {confirmedItems.length} of {relevantItems.length} confirmed
-              </span>
-            )}
-          </div>
+          // Mark complete — primary CTA. Yuqi audit 2026-05-06: the
+          // "0 of 1 confirmed" line below the button created a
+          // hanging asymmetric column that wrecked the row alignment
+          // — and the amber low-confidence styling made the canonical
+          // CTA read like a warning. Both fixed:
+          //   • Button stays the canonical indigo regardless of
+          //     checklist state. The Dialog (opened on click) carries
+          //     the low-confidence guard rail with the typed-confirm
+          //     override; the button itself shouldn't second-guess
+          //     the user before they've even clicked.
+          //   • The "X of Y confirmed" count is dropped from this
+          //     row. The same number is already visible in the
+          //     "Still waiting on client · X of Y items" header on
+          //     the checklist section directly below — no need to
+          //     duplicate it on the button row and break alignment.
+          <button
+            onClick={onMarkComplete}
+            className="text-sm px-3 py-1.5 rounded-md inline-flex items-center gap-1.5 bg-indigo text-white hover:bg-indigo-hover"
+            title={
+              isLowConfidence
+                ? `Only ${completionPct}% confirmed — you'll be asked to type to confirm`
+                : "Close this task"
+            }
+          >
+            <Check className="w-3.5 h-3.5" aria-hidden /> Mark complete
+          </button>
         )}
 
         <ReassignPopover task={task} />
