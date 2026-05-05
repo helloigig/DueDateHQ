@@ -2213,6 +2213,7 @@ function IntegrationsPanel() {
 
   return (
     <>
+      <CalendarPushCard />
       <Card
         title="Connected sources"
         description="Each provider unlocks a specific capability — financial anchoring (QBO/Xero) or outbound email rerouting (Gmail/Outlook). Disconnect anytime."
@@ -2294,6 +2295,124 @@ function IntegrationsPanel() {
         </ul>
       </Card>
     </>
+  );
+}
+
+/**
+ * Push deadlines to the CPA's calendar. Different mental model from
+ * the Tier-0 pull integrations (QBO/Xero/Gmail/Outlook): instead of
+ * data coming IN to the dashboard, deadlines go OUT to the CPA's
+ * existing planning surface. Per the "integrate, don't attract"
+ * principle, calendar is the highest-priority push channel.
+ *
+ * Phase 1: one-way Google Calendar only. Outlook/Apple come later.
+ */
+function CalendarPushCard() {
+  const utils = trpc.useUtils();
+  const status = trpc.integrations.calendarStatus.useQuery();
+  const list = trpc.integrations.list.useQuery();
+  const startConnect = trpc.integrations.startConnect.useMutation({
+    onSuccess: (r) => {
+      if (r.authorizeUrl) window.location.href = r.authorizeUrl;
+    },
+  });
+  const disconnect = trpc.integrations.disconnect.useMutation({
+    onSuccess: () => {
+      void utils.integrations.calendarStatus.invalidate();
+      void utils.integrations.list.invalidate();
+    },
+  });
+  const syncNow = trpc.integrations.syncCalendarNow.useMutation({
+    onSuccess: () => void utils.integrations.calendarStatus.invalidate(),
+  });
+
+  const integration = list.data?.find((r) => r.kind === "google_calendar");
+  const s = status.data;
+  const connected = !!s?.connected;
+
+  return (
+    <Card
+      title="Push deadlines to your calendar"
+      description={
+        connected
+          ? "Filing deadlines mirror to your Google Calendar as all-day events with a 1-day-before reminder. Edits made here propagate; edits made in Calendar don't (yet)."
+          : "We don't replace your calendar — we feed it. Connect Google Calendar and every filing deadline becomes a calendar event, ordered by the same dates we track here."
+      }
+    >
+      {!connected ? (
+        <div className="space-y-3">
+          {startConnect.error && (
+            <p className="text-xs text-danger-ink">
+              Couldn't start: {startConnect.error.message}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={() =>
+              startConnect.mutate({
+                kind: "google_calendar",
+                redirectTo: window.location.href,
+              })
+            }
+            disabled={startConnect.isPending}
+            className="text-sm px-4 py-2 rounded bg-ink-900 text-white hover:opacity-90 disabled:opacity-40"
+          >
+            {startConnect.isPending ? "Opening Google…" : "Connect Google Calendar"}
+          </button>
+          <p className="text-2xs text-ink-400">
+            Outlook + Apple Calendar coming next quarter. Until then,
+            export an .ics from any client page if you need them today.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-baseline gap-3 text-sm">
+            <span className="text-ok-ink font-medium">✓ Connected</span>
+            <span className="text-ink-500">
+              {s?.syncedCount ?? 0} of {s?.totalOpen ?? 0} open deadlines synced
+            </span>
+            {s?.lastSyncedAt && (
+              <span className="text-2xs text-ink-400">
+                · last synced {new Date(s.lastSyncedAt).toLocaleString()}
+              </span>
+            )}
+          </div>
+          {s?.lastError && (
+            <p className="text-xs text-danger-ink bg-danger-bg/40 border border-danger-border/40 rounded px-2.5 py-1.5">
+              {s.lastError}
+            </p>
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => syncNow.mutate()}
+              disabled={syncNow.isPending}
+              className="text-xs px-3 py-1.5 rounded border border-line text-ink-700 hover:bg-canvas disabled:opacity-40"
+            >
+              {syncNow.isPending ? "Syncing…" : "Sync now"}
+            </button>
+            {syncNow.isSuccess && (
+              <span className="text-xs text-ink-500">
+                Pushed {syncNow.data.pushed} new · updated {syncNow.data.updated}
+                {syncNow.data.errors > 0
+                  ? ` · ${syncNow.data.errors} error(s)`
+                  : ""}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() =>
+                integration && disconnect.mutate({ id: integration.id })
+              }
+              disabled={disconnect.isPending || !integration}
+              className="ml-auto text-xs px-3 py-1.5 rounded border border-line text-ink-500 hover:text-danger-ink disabled:opacity-40"
+            >
+              Disconnect
+            </button>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
 

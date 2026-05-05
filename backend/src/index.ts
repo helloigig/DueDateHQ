@@ -24,6 +24,7 @@ import {
   startScraperScheduler,
 } from "./lib/scraper.js";
 import { startDailyDigestScheduler } from "./lib/daily-digest-scheduler.js";
+import { startCalendarSyncScheduler } from "./lib/calendar-sync.js";
 import {
   listFederalRegisterStatus,
   runFederalRegisterCycle,
@@ -390,6 +391,14 @@ if (env.NODE_ENV !== "test") {
   // users.preferences.dailyDigest.enabled.
   if (process.env.DAILY_DIGEST_DISABLED !== "1") {
     startDailyDigestScheduler();
+  }
+  // Google Calendar push — 4h cron tick, walks every firm with a
+  // connected google_calendar integration and pushes stale deadlines
+  // to the user's primary calendar. The assignBundle path also fires
+  // a fresh-write sync inline, so the cron's job is catch-up only.
+  // Set CALENDAR_SYNC_DISABLED=1 to suppress.
+  if (process.env.CALENDAR_SYNC_DISABLED !== "1") {
+    startCalendarSyncScheduler();
   }
 }
 
