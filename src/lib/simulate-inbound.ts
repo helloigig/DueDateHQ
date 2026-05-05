@@ -1,7 +1,7 @@
 /**
  * Wireframe-grade simulator for the Method A inbound flow (PRD §5.7 Stage 3).
  * Picks a `requested_waiting` (or `not_requested`) item on the task, runs
- * Mode A classify + Mode C anomaly check, dispatches `receiveDocument`.
+ * inbound-classifier classify + AI-flagged anomaly check, dispatches `receiveDocument`.
  */
 import { actions, getState } from "../data/store";
 import { classifyDocument, flagAnomaly } from "./ai-stub";

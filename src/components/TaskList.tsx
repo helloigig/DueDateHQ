@@ -95,7 +95,7 @@ interface TaskRowData {
   // missing-doc count + days remaining + historical chase-velocity. Once
   // the slip actually happens, isPastInternalTarget supersedes this.
   isAtRisk: boolean;
-  // Cross-year insights for this client (Mode E) tagged in
+  // Cross-year insights for this client (cross-year-insighter) tagged in
   insights: AiInsight[];
   // Active alerts affecting this client
   affectingAlerts: Announcement[];
@@ -870,7 +870,7 @@ function oneFact(row: TaskRowData, lead?: ChecklistItem): OneFact {
       : null;
     return {
       // Imperative phrasing — AI is suggesting an action, not just describing
-      // a state. PRD §4.3 Mode B: the "right time to ask" is the suggestion.
+      // a state. PRD §4.3 arrival-timing: the "right time to ask" is the suggestion.
       text: (
         <>
           <span className="font-medium text-ink-700">Send chase now</span>

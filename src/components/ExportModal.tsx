@@ -463,9 +463,9 @@ function Card({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`text-left px-3 py-2 rounded border transition-colors ${
+      className={`text-left px-3 py-2 rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 ${
         active
-          ? "border-accent bg-accent text-canvas"
+          ? "border-ink-900 bg-ink-900 text-surface"
           : disabled
           ? "border-line bg-sunken text-ink-400 cursor-not-allowed"
           : "border-line bg-surface text-ink-700 hover:bg-sunken"

@@ -33,8 +33,8 @@ export type BulkBatchRow = {
 
 export type QueueRow = ClientGroupRow | StateAlertRow | BulkBatchRow;
 
-// Mode F state alerts (verb=Apply) fan out to N clients — they're event-shaped,
-// not client-shaped, so they render as their own row. Mode D bulk drafts have
+// state-monitor state alerts (verb=Apply) fan out to N clients — they're event-shaped,
+// not client-shaped, so they render as their own row. email-drafter bulk drafts have
 // "N clients" as the client field — also not a single-client row.
 //
 // Heuristic: if `client` looks like "12 clients" / "8 clients", treat as
@@ -66,7 +66,7 @@ function earliestDue(items: QueueTodoItem[]): string | undefined {
 }
 
 function groupKey(item: QueueTodoItem): string {
-  // Live BE returns `clientId: ""` (empty string) for Mode F batch rows
+  // Live BE returns `clientId: ""` (empty string) for state-monitor batch rows
   // (carved out before this runs) and a UUID for everything else. Mock
   // adapter omits `clientId` entirely for some sources. Treat both empty
   // string and undefined as "no canonical id" → fall back to name keying

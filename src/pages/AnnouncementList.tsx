@@ -80,7 +80,7 @@ export function AnnouncementList() {
         </div>
       ) : allDismissed ? (
         <div className="mt-6 bg-surface border border-line rounded-md px-6 py-12 text-center">
-          <p className="text-sm text-ink-700 font-medium">All caught up.</p>
+          <p className="text-sm text-ink-700 font-medium">No active alerts.</p>
           <p className="text-xs text-ink-500 mt-1">
             Dismissed announcements are archived in Settings › Alerts.
           </p>

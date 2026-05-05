@@ -50,7 +50,7 @@ export function EmailBulletinEditModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 backdrop-blur-[2px]"
       onClick={onClose}
     >
       <div
@@ -97,7 +97,7 @@ export function EmailBulletinEditModal({
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               maxLength={300}
-              className="w-full text-sm border border-line rounded px-3 py-2 bg-canvas text-ink-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+              className="w-full text-sm border border-line rounded px-3 py-2 bg-canvas text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2"
             />
           </div>
           <div>
@@ -113,7 +113,7 @@ export function EmailBulletinEditModal({
               value={body}
               onChange={(e) => setBody(e.target.value)}
               maxLength={20_000}
-              className="w-full text-sm border border-line rounded px-3 py-2 bg-canvas text-ink-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent leading-relaxed"
+              className="w-full text-sm border border-line rounded px-3 py-2 bg-canvas text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 leading-relaxed"
             />
             <p className="text-2xs text-ink-400 mt-1 tabular-nums">
               {body.length} / 20,000

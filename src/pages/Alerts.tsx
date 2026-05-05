@@ -36,6 +36,9 @@ import type { Announcement } from "@/types";
 import { cn } from "@/lib/utils";
 import { EmailBulletinEditModal } from "@/components/EmailBulletinEditModal";
 import { NexusCheckModal } from "@/components/NexusCheckModal";
+import { BatchTagModal } from "@/components/BatchTagModal";
+import { SchedulePlanningCallModal } from "@/components/SchedulePlanningCallModal";
+import { RecomputeEstimatesModal } from "@/components/RecomputeEstimatesModal";
 import { ALERT_TYPE_CONFIG } from "@/data/alertTypeConfig";
 
 /**
@@ -182,6 +185,9 @@ function CopilotPane({
   onSendBulletin,
   onApplyDeadline,
   onRunNexusCheck,
+  onOpenTag,
+  onOpenPlanningCall,
+  onOpenRecompute,
   onAcknowledgeAdmin,
   onSnooze,
   onMarkNotApplicable,
@@ -205,6 +211,12 @@ function CopilotPane({
   ) => void;
   onApplyDeadline: (announcement: Announcement) => void;
   onRunNexusCheck: (announcement: Announcement) => void;
+  /** penalty_relief — tag clients for filing-time review. */
+  onOpenTag: (announcement: Announcement) => void;
+  /** pte_change — schedule planning call(s). */
+  onOpenPlanningCall: (announcement: Announcement) => void;
+  /** rate_change — recompute estimate amounts. */
+  onOpenRecompute: (announcement: Announcement) => void;
   /** form_change alerts route through admin reviewer queue. Clicking
    *  "Open" hands the alert off — we treat the handoff as the finishing
    *  action and resolve it (matches "Finished alert actions → Resolved"). */
@@ -496,12 +508,26 @@ function CopilotPane({
           </article>
           )}
 
+          {/* Deadline-shift action — verb is alertType-specific per
+              DESIGN.md §Outstanding gap. disaster_extension reads as
+              "Move N deadlines"; other types fall back to the generic
+              apply phrasing tied to the new date. */}
           {a.newDeadline && (
             <ActionRow
               icon={<CalendarClock className="w-3.5 h-3.5" aria-hidden />}
-              title={`Apply new ${formatLongDate(a.newDeadline)} deadline`}
-              description={`Move ${includedCount} affected ${includedCount === 1 ? "filing" : "filings"} · audit-trailed with the announcement source`}
-              cta={isApplying ? "Applying…" : "Apply"}
+              title={
+                a.type === "disaster_extension"
+                  ? `Move ${includedCount} ${includedCount === 1 ? "deadline" : "deadlines"} to ${formatLongDate(a.newDeadline)}`
+                  : `Apply new ${formatLongDate(a.newDeadline)} deadline`
+              }
+              description={`${includedCount} affected ${includedCount === 1 ? "filing" : "filings"} · audit-trailed with the announcement source`}
+              cta={
+                isApplying
+                  ? "Applying…"
+                  : a.type === "disaster_extension"
+                    ? `Move ${includedCount}`
+                    : "Apply"
+              }
               onClick={() => {
                 if (isApplying) return;
                 onApplyDeadline(a);
@@ -509,13 +535,47 @@ function CopilotPane({
             />
           )}
 
+          {/* Per-alertType primary verb — see DESIGN.md §Alert-type
+              primary verb taxonomy. Each type routes to its dedicated
+              modal; copy comes from ALERT_TYPE_CONFIG so this surface
+              and AlertActionBar stay in sync. */}
           {a.type === "nexus_change" && includedCount > 0 && (
             <ActionRow
               icon={<ShieldCheck className="w-3.5 h-3.5" aria-hidden />}
-              title="Run nexus check"
-              description={`Per-state questionnaire for ${includedCount} ${includedCount === 1 ? "client" : "clients"} · adds suggested filings on established`}
-              cta="Open"
+              title={`Add filings for ${includedCount} ${includedCount === 1 ? "client" : "clients"}`}
+              description={`Per-state questionnaire — adds suggested filings on established nexus.`}
+              cta={`Add filings`}
               onClick={() => onRunNexusCheck(a)}
+            />
+          )}
+
+          {a.type === "penalty_relief" && includedCount > 0 && (
+            <ActionRow
+              icon={<Sparkles className="w-3.5 h-3.5" aria-hidden />}
+              title={`Tag ${includedCount} ${includedCount === 1 ? "client" : "clients"} for review`}
+              description="Surfaces in each affected client's task at filing time so you remember to apply the relief."
+              cta={`Tag ${includedCount}`}
+              onClick={() => onOpenTag(a)}
+            />
+          )}
+
+          {a.type === "pte_change" && includedCount > 0 && (
+            <ActionRow
+              icon={<CalendarClock className="w-3.5 h-3.5" aria-hidden />}
+              title={`Schedule planning ${includedCount === 1 ? "call" : "calls"}`}
+              description={`Schedules a planning call task for ${includedCount} affected ${includedCount === 1 ? "client" : "clients"}.`}
+              cta="Schedule"
+              onClick={() => onOpenPlanningCall(a)}
+            />
+          )}
+
+          {a.type === "rate_change" && includedCount > 0 && (
+            <ActionRow
+              icon={<Sparkles className="w-3.5 h-3.5" aria-hidden />}
+              title={`Recompute ${includedCount} ${includedCount === 1 ? "estimate" : "estimates"}`}
+              description="Recomputes estimate amounts using the new rate; you review before sending."
+              cta="Recompute"
+              onClick={() => onOpenRecompute(a)}
             />
           )}
 
@@ -547,20 +607,22 @@ function CopilotPane({
         <div className="text-2xs uppercase tracking-wider font-semibold text-ink-400 mb-1.5">
           Disposition
         </div>
-        <div className="flex items-center gap-1 flex-wrap">
+        {/* Disposition footer — escape hatches in a labeled sub-zone.
+            Whitespace separates the verbs (gap-2); no middle dot between
+            distinct buttons. */}
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
             onClick={() => onSnooze(a)}
-            className="inline-flex items-center gap-1.5 text-xs text-ink-700 hover:text-ink-900 hover:bg-sunken transition-colors px-2 py-1 rounded"
+            className="inline-flex items-center gap-1.5 text-xs text-ink-700 hover:text-ink-900 hover:bg-sunken transition-colors px-2 py-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2"
           >
             <MoonStar className="w-3.5 h-3.5 text-ink-500" aria-hidden />
             Snooze until tomorrow
           </button>
-          <span className="text-ink-300 mx-1" aria-hidden>·</span>
           <button
             type="button"
             onClick={() => onMarkNotApplicable(a)}
-            className="inline-flex items-center gap-1.5 text-xs text-ink-700 hover:text-ink-900 hover:bg-sunken transition-colors px-2 py-1 rounded"
+            className="inline-flex items-center gap-1.5 text-xs text-ink-700 hover:text-ink-900 hover:bg-sunken transition-colors px-2 py-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2"
           >
             Mark not applicable
           </button>
@@ -654,10 +716,16 @@ export function Alerts() {
     subject: string;
     body: string;
   } | null>(null);
-  // Nexus modal state — set when the CopilotPane "Run nexus check" action
-  // is fired. Carries the announcement so the modal can derive state +
-  // affected clients itself.
+  // Per-alertType modal state. Each modal opens for one announcement and
+  // is dismissed by the parent. Keeping them as separate state slots (vs.
+  // a single discriminated union) reads more clearly at the JSX site.
   const [nexusForAnnouncement, setNexusForAnnouncement] =
+    useState<Announcement | null>(null);
+  const [tagForAnnouncement, setTagForAnnouncement] =
+    useState<Announcement | null>(null);
+  const [planningCallForAnnouncement, setPlanningCallForAnnouncement] =
+    useState<Announcement | null>(null);
+  const [recomputeForAnnouncement, setRecomputeForAnnouncement] =
     useState<Announcement | null>(null);
 
   // Session-scoped state.
@@ -982,6 +1050,78 @@ export function Alerts() {
     if (a) handleComplete(a.id);
   }, [nexusForAnnouncement, handleComplete]);
 
+  // penalty_relief — open the BatchTagModal. Confirm tags clients for
+  // filing-time review and (optionally) drafts notice emails. Closing the
+  // modal — confirmed or cancelled — flips the alert to handled.
+  const handleOpenTag = useCallback((a: Announcement) => {
+    setTagForAnnouncement(a);
+  }, []);
+  const handleTagConfirm = useCallback(
+    (input: { clientIds: string[]; expiresAt: string | null; composeEmail: boolean }) => {
+      const a = tagForAnnouncement;
+      if (!a) return;
+      // Phase 2 — wire to BE batchTag mutation. Phase 1: optimistic
+      // toast + handled.
+      toast.success(
+        `Tagged ${input.clientIds.length} ${input.clientIds.length === 1 ? "client" : "clients"} for filing-time review`,
+      );
+      setTagForAnnouncement(null);
+      handleComplete(a.id);
+    },
+    [tagForAnnouncement, handleComplete],
+  );
+
+  // pte_change — open the SchedulePlanningCallModal.
+  const handleOpenPlanningCall = useCallback((a: Announcement) => {
+    setPlanningCallForAnnouncement(a);
+  }, []);
+  const handlePlanningCallConfirm = useCallback(
+    (input: {
+      clientIds: string[];
+      suggestedWindow: "this_week" | "next_2_weeks" | "before_deadline";
+      composeEmail: boolean;
+    }) => {
+      const a = planningCallForAnnouncement;
+      if (!a) return;
+      const windowLabel =
+        input.suggestedWindow === "this_week"
+          ? "this week"
+          : input.suggestedWindow === "next_2_weeks"
+            ? "next 2 weeks"
+            : "before deadline";
+      toast.success(
+        `Planning ${input.clientIds.length === 1 ? "call" : "calls"} scheduled for ${windowLabel}`,
+      );
+      setPlanningCallForAnnouncement(null);
+      handleComplete(a.id);
+    },
+    [planningCallForAnnouncement, handleComplete],
+  );
+
+  // rate_change — open the RecomputeEstimatesModal.
+  const handleOpenRecompute = useCallback((a: Announcement) => {
+    setRecomputeForAnnouncement(a);
+  }, []);
+  const handleRecomputeConfirm = useCallback(
+    (input: {
+      selections: Array<{ clientId: string; estimateIds: string[] }>;
+      composeEmail: boolean;
+    }) => {
+      const a = recomputeForAnnouncement;
+      if (!a) return;
+      const total = input.selections.reduce(
+        (sum, s) => sum + s.estimateIds.length,
+        0,
+      );
+      toast.success(
+        `Recomputed ${total} ${total === 1 ? "estimate" : "estimates"}`,
+      );
+      setRecomputeForAnnouncement(null);
+      handleComplete(a.id);
+    },
+    [recomputeForAnnouncement, handleComplete],
+  );
+
   return (
     <PageContainer variant="workshop">
       {/* ── Center feed ──────────────────────────────────────────────── */}
@@ -1099,6 +1239,9 @@ export function Alerts() {
           handleComplete(a.id);
         }}
         onRunNexusCheck={handleRunNexusCheck}
+        onOpenTag={handleOpenTag}
+        onOpenPlanningCall={handleOpenPlanningCall}
+        onOpenRecompute={handleOpenRecompute}
         onSnooze={handleSnooze}
         onMarkNotApplicable={handleMarkNotApplicable}
         isSending={sendBulletinMutation.isPending}
@@ -1130,6 +1273,65 @@ export function Alerts() {
         }
         onClose={handleNexusClose}
         onConfirm={handleNexusConfirm}
+      />
+
+      {/* Per-alertType modals — each derives its own recipients from the
+          affected-clients set minus per-alert exclusions. Closing or
+          confirming flips the alert to handled (auto-advance kicks in). */}
+      <BatchTagModal
+        open={tagForAnnouncement !== null}
+        announcement={tagForAnnouncement}
+        recipients={
+          tagForAnnouncement
+            ? (affectedClientsFor(tagForAnnouncement, clientSource).filter(
+                (c) =>
+                  !(excludedByAlert.get(tagForAnnouncement.id) ?? new Set())
+                    .has(c.id),
+              ) as unknown as Parameters<typeof BatchTagModal>[0]["recipients"])
+            : []
+        }
+        onClose={() => setTagForAnnouncement(null)}
+        onConfirm={handleTagConfirm}
+      />
+      <SchedulePlanningCallModal
+        open={planningCallForAnnouncement !== null}
+        announcement={planningCallForAnnouncement}
+        recipients={
+          planningCallForAnnouncement
+            ? (affectedClientsFor(
+                planningCallForAnnouncement,
+                clientSource,
+              ).filter(
+                (c) =>
+                  !(
+                    excludedByAlert.get(planningCallForAnnouncement.id) ??
+                    new Set()
+                  ).has(c.id),
+              ) as unknown as Parameters<typeof SchedulePlanningCallModal>[0]["recipients"])
+            : []
+        }
+        onClose={() => setPlanningCallForAnnouncement(null)}
+        onConfirm={handlePlanningCallConfirm}
+      />
+      <RecomputeEstimatesModal
+        open={recomputeForAnnouncement !== null}
+        announcement={recomputeForAnnouncement}
+        recipients={
+          recomputeForAnnouncement
+            ? (affectedClientsFor(
+                recomputeForAnnouncement,
+                clientSource,
+              ).filter(
+                (c) =>
+                  !(
+                    excludedByAlert.get(recomputeForAnnouncement.id) ??
+                    new Set()
+                  ).has(c.id),
+              ) as unknown as Parameters<typeof RecomputeEstimatesModal>[0]["recipients"])
+            : []
+        }
+        onClose={() => setRecomputeForAnnouncement(null)}
+        onConfirm={handleRecomputeConfirm}
       />
     </PageContainer>
   );

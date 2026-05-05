@@ -18,7 +18,7 @@ import { cn } from "../lib/utils";
  *
  * Phase 1 sends a synthesised draft via the existing emails.send
  * pipeline (mock-mode falls through to actions.sendEmail). Phase 2
- * wires Mode D for AI body composition + tone matching.
+ * wires email-drafter for AI body composition + tone matching.
  */
 export interface ChaseItem {
   id: string;
@@ -173,7 +173,7 @@ export function ChaseBundleModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-stretch justify-end bg-ink-900/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-stretch justify-end bg-ink-900/40 backdrop-blur-[2px]"
       onClick={onClose}
     >
       <div
@@ -280,7 +280,7 @@ export function ChaseBundleModal({
                   setSubjectTouched(true);
                 }}
                 maxLength={300}
-                className="w-full text-sm border border-line rounded px-2.5 py-1.5 bg-canvas text-ink-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent transition-shadow"
+                className="w-full text-sm border border-line rounded px-2.5 py-1.5 bg-canvas text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 transition-shadow"
               />
             </div>
             <div>
@@ -299,7 +299,7 @@ export function ChaseBundleModal({
                 }}
                 rows={12}
                 maxLength={20000}
-                className="w-full text-sm bg-canvas border border-line rounded px-2.5 py-2 text-ink-900 leading-relaxed focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent transition-shadow"
+                className="w-full text-sm bg-canvas border border-line rounded px-2.5 py-2 text-ink-900 leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 transition-shadow"
               />
               <p className="mt-1 text-2xs text-ink-400 tabular-nums">
                 {body.length} / 20,000 · auto-composed from selected items;

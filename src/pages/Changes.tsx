@@ -90,7 +90,9 @@ export function Changes() {
 
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
         <section>
-          <h1 className="text-2xl font-semibold text-ink-900">
+          {/* Public landing — text-display matches the in-app PageHeader
+              token so type ladder stays consistent across surfaces. */}
+          <h1 className="text-display font-semibold text-ink-900 leading-7 tracking-[-0.01em]">
             State tax announcements — every authority, every change
           </h1>
           <p className="text-sm text-ink-500 mt-2 max-w-2xl">

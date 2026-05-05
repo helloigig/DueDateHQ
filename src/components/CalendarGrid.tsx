@@ -137,7 +137,7 @@ export function CalendarGrid() {
               className={[
                 "min-h-[88px] border-r border-b border-line p-1.5 last-of-row:border-r-0",
                 inMonth ? "bg-surface" : "bg-sunken/40",
-                isToday ? "ring-1 ring-inset ring-accent" : "",
+                isToday ? "ring-1 ring-inset ring-indigo" : "",
               ].join(" ")}
             >
               <div className="flex items-baseline gap-1.5 mb-1">

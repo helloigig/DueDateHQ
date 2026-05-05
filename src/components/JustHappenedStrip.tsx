@@ -8,8 +8,8 @@ import { env } from "../config";
 // JustHappenedStrip — overnight-diff triage row.
 //
 // Three counts the CPA wants to drain in seconds before they start chasing:
-//   • to confirm  — Mode A inbound, AI-classified, you rubber-stamp
-//   • issues      — Mode C anomaly flags, needs your eye
+//   • to confirm  — AI-classified inbound, AI-classified, you rubber-stamp
+//   • issues      — AI-flagged anomaly flags, needs your eye
 //   • replies     — client wrote back (pushback / question intents)
 //
 // Same trpc.todoItems feed as ActionQueue (React Query dedupes, no extra
@@ -59,7 +59,7 @@ export function JustHappenedStrip() {
           icon={<CheckCircle2 className="w-3.5 h-3.5" aria-hidden />}
           tone="success"
           label={`${counts.confirm} to confirm`}
-          tooltip="Mode A — AI classified inbound documents; rubber-stamp to mark received"
+          tooltip="AI classified inbound documents; rubber-stamp to mark received"
         />
       )}
       {counts.issues > 0 && (
@@ -68,7 +68,7 @@ export function JustHappenedStrip() {
           icon={<AlertTriangle className="w-3.5 h-3.5" aria-hidden />}
           tone="warn"
           label={`${counts.issues} ${counts.issues === 1 ? "issue" : "issues"} flagged`}
-          tooltip="Mode C — AI flagged an anomaly that needs your judgment"
+          tooltip="AI flagged an anomaly that needs your judgment"
         />
       )}
       {counts.replies > 0 && (

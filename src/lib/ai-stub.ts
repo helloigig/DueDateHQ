@@ -9,15 +9,16 @@
  *     trpc.ai.* procedures, which call Anthropic Claude with prompt
  *     caching and log every call to ai_inferences.
  *
- * Five modes (PRD §4.3):
- *   - Mode A: classifyDocument        (real LLM in real mode)
- *   - Mode B: arrivalTiming           (always deterministic — history math)
- *   - Mode C: flagAnomaly             (always deterministic — statistical)
- *   - Mode D: draftEmail              (real LLM in real mode)
- *   - Mode E: crossYearInsights       (always deterministic — set diff)
+ * Five AI capabilities (PRD §4.3):
+ *   - inbound-classifier: classifyDocument        (real LLM in real mode)
+ *   - arrival-timing: arrivalTiming           (always deterministic — history math)
+ *   - anomaly-detector: flagAnomaly             (always deterministic — statistical)
+ *   - email-drafter: draftEmail              (real LLM in real mode)
+ *   - cross-year-insighter: crossYearInsights       (always deterministic — set diff)
  *
- * Modes B/C/E stay deterministic because their existing logic is
- * meaningful and cheap. Modes A/D need real LLM for product feel.
+ * Arrival-timing / anomaly-detector / cross-year-insighter stay
+ * deterministic because their existing logic is meaningful and cheap.
+ * Inbound-classifier and email-drafter need a real LLM for product feel.
  */
 
 import type {
@@ -50,7 +51,7 @@ function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-// -------- Mode A — classify inbound document --------
+// -------- inbound-classifier — classify inbound document --------
 
 export async function classifyDocument(input: {
   filename: string;
@@ -95,7 +96,7 @@ export async function classifyDocument(input: {
   });
 }
 
-// -------- Mode B — per-client arrival timing --------
+// -------- arrival-timing — per-client arrival timing --------
 
 export interface ArrivalPrediction {
   windowStart?: string; // MM-DD
@@ -117,7 +118,7 @@ export function arrivalTiming(
     return {
       confidence: "low",
       source: "substrate",
-      detail: `No prior history for ${itemType}. Mode B will sharpen once 1+ year is imported.`,
+      detail: `No prior history for ${itemType}. Predictions sharpen once 1+ year is imported.`,
     };
   }
   const monthDays = matches.map((f) => f.observedDate!.slice(5));
@@ -135,7 +136,7 @@ export function arrivalTiming(
   };
 }
 
-// -------- Mode C — anomaly flag --------
+// -------- anomaly-detector — anomaly flag --------
 
 export interface AnomalyFlag {
   flag: boolean;
@@ -163,7 +164,7 @@ export function flagAnomaly(
   };
 }
 
-// -------- Mode D — draft outbound email --------
+// -------- email-drafter — draft outbound email --------
 
 interface DraftEmailInput {
   task: Task;
@@ -334,11 +335,11 @@ export async function draftEmail(
   });
 }
 
-// -------- Mode E — cross-year insights --------
+// -------- cross-year-insighter — cross-year insights --------
 
 /**
  * Detects items that disappeared from the current year's checklist but
- * appeared in 2+ prior years. Mode E flagship use-case (PRD §4.3 Mode E).
+ * appeared in 2+ prior years. cross-year-insighter flagship use-case (PRD §4.3 cross-year-insighter).
  */
 export function crossYearInsights(
   clientId: string,

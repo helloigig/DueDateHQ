@@ -196,7 +196,7 @@ export default function App() {
           <Route path="timeline" element={<Timeline />} />
           <Route path="mail" element={<Mail />} />
           {/* /legacy/dashboard — old Dashboard view without ActionQueue +
-              Mode F Health. Kept reachable during the v0.7-amendment
+              state-monitor Health. Kept reachable during the v0.7-amendment
               transition so CPAs can A/B compare and we have a rollback
               path. Same component, branched on location.pathname. */}
           <Route path="legacy/dashboard" element={<Dashboard />} />

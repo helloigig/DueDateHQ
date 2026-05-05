@@ -2,13 +2,13 @@ import type { ImportedFact } from "../types";
 import { clients as seedClients } from "./mockClients";
 
 /**
- * 2-3 prior years of facts per client. Powers Mode B (per-client arrival
- * timing) and Mode C (anomaly thresholds) and Mode E (cross-year insights)
+ * 2-3 prior years of facts per client. Powers arrival-timing (per-client arrival
+ * timing) and anomaly-detector (anomaly thresholds) and cross-year-insighter (cross-year insights)
  * per PRD §6.6 Import Tier 3.
  *
  * Distribution chosen so a handful of clients show realistic patterns:
  * - One client (c-ca-03 / Mark Sullivan) has 5 years of Schedule E that
- *   disappears this year — Mode E flagship insight.
+ *   disappears this year — cross-year-insighter flagship insight.
  * - W-2 clients have stable Feb arrival timing.
  * - K-1 partnerships arrive in early August.
  */
@@ -85,7 +85,7 @@ export const importedFacts: ImportedFact[] = (() => {
       all.push(...makeFactsForClient(client.id, e));
     }
   }
-  // Special case for Mode E: c-ca-03 (Mark Sullivan) has 5 years of
+  // Special case for cross-year-insighter: c-ca-03 (Mark Sullivan) has 5 years of
   // Schedule E that the current return lacks. The cross-year insight
   // surfaces "Did the property sell?"
   for (const year of [2024, 2023, 2022, 2021, 2020]) {

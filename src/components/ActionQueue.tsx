@@ -150,7 +150,7 @@ function navigateForItem(
   else navigate("/mail");
 }
 
-// Aggregate every checklist-item state across a client-group row. Mode B
+// Aggregate every checklist-item state across a client-group row. arrival-timing
 // items carry the snapshot; other verbs (Confirm/Discuss/Apply) don't,
 // so we synthesize a state from the verb so each item still contributes
 // one dot. Keeps the dot count = item count, which is what the user
@@ -527,7 +527,7 @@ const CHECKLIST_STATE_LABEL: Record<
   not_applicable: "N/A",
 };
 
-// Sub-item inside an expanded client group. For Mode B rows (with a
+// Sub-item inside an expanded client group. For arrival-timing rows (with a
 // checklistItems snapshot), each checklist item renders as a per-row
 // checkbox + state dot. Selection state is OWNED by the parent
 // ClientGroupRowView so a single Send bar at the bottom of the
@@ -688,7 +688,7 @@ function SubItemRow({
 }
 
 // ── State alert row ───────────────────────────────────────────────────────
-// Mode F state-event row. Different shape: event headline + affected count.
+// state-monitor state-event row. Different shape: event headline + affected count.
 // Pinned to the top of the queue. The cascade (alert → mutates Task →
 // mutates outstanding TodoItems → re-ranks queue) happens upstream; this
 // row is the "go act on it" entry point.
@@ -728,7 +728,7 @@ function StateAlertRowView({ row }: { row: StateAlertRow }) {
 }
 
 // ── Bulk batch row ────────────────────────────────────────────────────────
-// Mode D "approve all" batches — multi-client by design (not a single-client
+// email-drafter "approve all" batches — multi-client by design (not a single-client
 // chase, so doesn't fit the client-group model). One row, one approve action.
 function BulkBatchRowView({ row }: { row: BulkBatchRow }) {
   const item = row.item;

@@ -5,7 +5,7 @@ import { useStore } from "../data/store";
 import { useState } from "react";
 
 /**
- * Pattern 4 — the advisory awakening (PRD §2.7). Proactive Mode E insight
+ * Pattern 4 — the advisory awakening (PRD §2.7). Proactive cross-year-insighter insight
  * cards on the dashboard. The product *invites* the senior partner to see
  * the AI surface as the lever for Layer B revenue: "advisory" not "data".
  *
@@ -40,7 +40,7 @@ export function InsightStrip() {
         </span>
         <span
           className="ml-2 inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full border border-info-border bg-info-bg text-info-ink"
-          title="Mode E (cross-year insights) — AI surfaced these from your client history."
+          title="Cross-year insights surfaced from your client history."
         >
           <Sparkles className="w-3 h-3" aria-hidden />
           AI surfaced

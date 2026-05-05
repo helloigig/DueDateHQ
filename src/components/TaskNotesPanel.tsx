@@ -83,7 +83,7 @@ export function TaskNotesPanel({ taskId }: Props) {
           onChange={(e) => setDraft(e.target.value)}
           rows={2}
           placeholder="Add a note for this task — context, judgment, decisions…"
-          className="w-full text-sm border border-line rounded px-2 py-1.5 bg-surface resize-y focus:outline-none focus:ring-2 focus:ring-accent/30"
+          className="w-full text-sm border border-line rounded px-2 py-1.5 bg-surface resize-y focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2"
           onKeyDown={(e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
               e.preventDefault();

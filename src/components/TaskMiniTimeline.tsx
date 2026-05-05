@@ -14,11 +14,11 @@ import { trpc } from "../lib/api/client";
 // target_date, completed_date, status (not_started / in_progress / blocked /
 // done / overdue).
 //
-// Wired to live BE: trpc.taskMilestones.listForTask returns Mode B-proposed
+// Wired to live BE: trpc.taskMilestones.listForTask returns arrival-timing-proposed
 // milestones when present; falls back to heuristic derivation from existing
-// Task fields when no rows exist (lets the timeline render before Mode B has
+// Task fields when no rows exist (lets the timeline render before arrival-timing has
 // proposed). The "Propose dates" button calls trpc.taskMilestones.proposeForTask
-// which runs Mode B + inserts 5 rows. Once proposed, the heuristic stops
+// which runs arrival-timing + inserts 5 rows. Once proposed, the heuristic stops
 // firing and live data drives the visualization.
 
 type Status = "done" | "in_progress" | "not_started" | "overdue" | "blocked";
@@ -31,7 +31,7 @@ type Waypoint = {
   // count badge — shows missing checklist items at the current stage
   // per `feedback_gap_over_fill` (mini-timeline waypoint badge for waiting)
   missingBadge?: number;
-  // Mode E blocker reason — shown in tooltip + tinted dot when status=blocked
+  // cross-year-insighter blocker reason — shown in tooltip + tinted dot when status=blocked
   blockerReason?: string;
   // Persisted milestone id — present only for live BE rows (not heuristic).
   // Drives the edit affordance: when id is set, the waypoint is clickable
@@ -89,10 +89,10 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
     const blocked = result.decisions.filter((d) => d.shouldBlock).length;
     setLastBlockerSummary(
       result.appliedCount > 0
-        ? `Mode E flagged ${blocked} milestone${blocked === 1 ? "" : "s"} as blocked`
+        ? `Flagged ${blocked} milestone${blocked === 1 ? "" : "s"} as blocked`
         : blocked > 0
-          ? "Mode E confirmed existing blocks; no new flags"
-          : "Mode E found no blockers — on track",
+          ? "Existing blocks confirmed; no new flags"
+          : "No blockers found — on track",
     );
     setTimeout(() => setLastBlockerSummary(null), 8000);
   };
@@ -115,10 +115,10 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
             <>
               <span
                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-info-bg/60 text-info-ink"
-                title="Mode B proposed dates persisted to task_milestones (PRD §9.4.1)"
+                title="AI proposed target dates for this filing"
               >
                 <Sparkles className="w-3 h-3" aria-hidden />
-                Mode B
+                AI dates
               </span>
               <button
                 type="button"
@@ -129,7 +129,7 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
                     ? "border-danger-border bg-danger-bg/40 text-danger-ink"
                     : "border-line text-ink-700 hover:bg-sunken"
                 } disabled:opacity-50`}
-                title="Run Mode E to detect at-risk milestones (yellow zone — proposal only; you can dismiss)"
+                title="Detect at-risk milestones — AI proposal only; you can dismiss"
               >
                 <AlertOctagon className="w-3 h-3" aria-hidden />
                 {detectBlockers.isPending
@@ -145,7 +145,7 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
               onClick={() => proposeForTask.mutate({ taskId: task.id })}
               disabled={proposeForTask.isPending}
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-line text-ink-700 hover:bg-sunken disabled:opacity-50"
-              title="Run Mode B to propose target dates per milestone (yellow zone — you review)"
+              title="Propose target dates per milestone — AI proposal only; you review"
             >
               <Sparkles className="w-3 h-3" aria-hidden />
               {proposeForTask.isPending ? "proposing…" : "Propose dates"}

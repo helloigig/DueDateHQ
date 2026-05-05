@@ -182,7 +182,7 @@ export function PriorYearUpload() {
               </select>
               <span className="text-2xs text-ink-400 mt-1 block">
                 When bound, the extracted facts are written to this
-                client's prior-year history (Mode E uses them).
+                client's prior-year history (used for cross-year insights).
               </span>
             </label>
 
@@ -299,7 +299,7 @@ export function PriorYearUpload() {
                   title={
                     !clientId
                       ? "Bind to a client above before committing"
-                      : "Write extracted facts to imported_facts (Mode E memory)"
+                      : "Write extracted facts to client's prior-year history"
                   }
                 >
                   <Check className="w-3 h-3 inline mr-1" aria-hidden />

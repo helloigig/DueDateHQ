@@ -7,7 +7,7 @@ import { useStore } from "../data/store";
 /**
  * Firm-wide digest panel on Dashboard. One click → consolidated chase
  * emails for every client with pending docs. Each digest aggregates
- * ALL of one client's open tasks into one Mode D draft instead of
+ * ALL of one client's open tasks into one AI-drafted instead of
  * sending N emails per client (one per task).
  *
  * The CPA reviews each digest before send — no auto-send. Phase 2

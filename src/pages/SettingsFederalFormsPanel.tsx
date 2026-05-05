@@ -44,6 +44,7 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import { Button } from "../components/ui/button";
+import { SectionHeader } from "../components/ui/SectionHeader";
 
 const CHANGE_KIND_LABEL: Record<string, string> = {
   due_date_change: "Due date change",
@@ -86,8 +87,8 @@ export function SettingsFederalFormsPanel() {
   return (
     <section className="space-y-4">
       <header>
-        <h2 className="text-lg font-semibold text-ink-900">Federal forms catalog</h2>
-        <p className="text-sm text-ink-500 mt-1">
+        <SectionHeader title="Federal forms catalog" />
+        <p className="-mt-region text-sm text-ink-500">
           Federal Register polling detected the changes below. Apply to update
           the catalog (drives FilingsTab + AddDeadlineModal); reject if the AI
           parsed wrong. Source notices link out for verification.
@@ -216,7 +217,7 @@ export function SettingsFederalFormsPanel() {
                       }}
                     >
                       <Check className="w-3.5 h-3.5 mr-1" aria-hidden />
-                      Apply
+                      Apply change
                     </Button>
                     <Button
                       size="sm"
@@ -229,7 +230,7 @@ export function SettingsFederalFormsPanel() {
                       }
                     >
                       <X className="w-3.5 h-3.5 mr-1" aria-hidden />
-                      Reject
+                      Reject change
                     </Button>
                   </div>
                 )}

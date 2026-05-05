@@ -32,7 +32,7 @@ const delay = (ms = 150) =>
 
 // In-memory mock store for taskMilestones — survives across calls within a
 // page session, cleared on reload. Supports `proposeForTask` round-trips so
-// TaskMiniTimeline can demo the Mode B propose flow without a backend.
+// TaskMiniTimeline can demo the arrival-timing propose flow without a backend.
 type MockMilestoneRow = {
   id: string;
   firmId: string;
@@ -563,8 +563,8 @@ export const mockAdapter = {
         return "normal";
       };
 
-      // Sources 1-3: checklist-derived (Mode A inbound, Mode C anomaly,
-      // Mode B reminder due). One pass over checklistItems.
+      // Sources 1-3: checklist-derived (AI-classified inbound, AI-flagged anomaly,
+      // arrival-timing reminder due). One pass over checklistItems.
       for (const ci of checklistItems) {
         const task = taskById.get(ci.taskId);
         if (!task) continue;
@@ -587,7 +587,7 @@ export const mockAdapter = {
             dueDate: due,
             action: `Resolve flag · ${ci.label}`,
             context:
-              ci.flagReason ?? "Mode C flagged anomaly — review before confirming",
+              ci.flagReason ?? "AI flagged anomaly — review before confirming",
             stageLabel: "Review",
             urgency: urgencyBucket(score),
             urgencyScore: Math.round(score),
@@ -662,7 +662,7 @@ export const mockAdapter = {
         }
       }
 
-      // Source 6: Mode F alert — active firm announcements.
+      // Source 6: state-monitor alert — active firm announcements.
       const activeAlerts = announcements.filter(
         (a) => !a.dismissed && (a.affectedClientIds?.length ?? 0) > 0,
       );
@@ -698,7 +698,7 @@ export const mockAdapter = {
     },
   },
 
-  // taskMilestones — mock simulates Mode B target_date proposals so the FE
+  // taskMilestones — mock simulates arrival-timing target_date proposals so the FE
   // round-trip works in mock mode. proposeForTask synthesizes 5 substrate-
   // default milestones (per PRD §4.2 cold-start: -90/-60/-21/-7/0 days from
   // due_date) and stashes them in mockMilestoneStore so subsequent listForTask
@@ -722,7 +722,7 @@ export const mockAdapter = {
       }
       // Heuristic-only mock: block any not-done milestone whose target_date
       // is in the past. Mirrors the backend heuristic fallback so dev
-      // demos see meaningful Mode E behavior without an API key.
+      // demos see meaningful cross-year-insighter behavior without an API key.
       const todayMs = Date.now();
       let appliedCount = 0;
       const decisions = existing.map((m) => {
@@ -1947,7 +1947,7 @@ export const mockAdapter = {
         inferenceId: 0,
       };
     },
-    /** Mock Mode B — returns the deterministic stub's window. Real
+    /** Mock arrival-timing — returns the deterministic stub's window. Real
      *  BE calls Claude with prior arrival dates. */
     predictArrivalTiming: async () => {
       await delay();
@@ -1959,7 +1959,7 @@ export const mockAdapter = {
         inferenceId: 0,
       };
     },
-    /** Mock Mode C — returns no-anomaly. Real BE has the contextual
+    /** Mock anomaly-detector — returns no-anomaly. Real BE has the contextual
      *  judgment branch. */
     detectAnomaly: async () => {
       await delay();
@@ -1972,7 +1972,7 @@ export const mockAdapter = {
         inferenceId: 0,
       };
     },
-    /** Mock Mode E — returns one example insight so the FE flow has
+    /** Mock cross-year-insighter — returns one example insight so the FE flow has
      *  shape to render. Real BE generates from multi-year context. */
     generateCrossYearInsights: async () => {
       await delay(400);
@@ -2058,8 +2058,8 @@ export const mockAdapter = {
         p95LatencyMs: 2400,
       };
     },
-    /** Multi-mode overview mock — 6 modes with realistic-shape data. Mode A
-     *  (classify) has highest volume; Mode F (state alerts) has lowest. */
+    /** Multi-mode overview mock — 6 modes with realistic-shape data. inbound-classifier
+     *  (classify) has highest volume; state-monitor (state alerts) has lowest. */
     summaryAll: async () => {
       await delay();
       // Hand-tuned shape so the all-modes table looks realistic in demos.

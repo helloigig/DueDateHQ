@@ -999,7 +999,7 @@ export const actions = {
   },
 
   /** Simulate an inbound document arriving via Method A forwarding (PRD §5.7
-   *  Stage 3-4). AI classifies (Mode A) and runs anomaly check (Mode C).
+   *  Stage 3-4). AI classifies (inbound-classifier) and runs anomaly check (anomaly-detector).
    *  State moves to `received_unreviewed` (or `received_issue` for severe
    *  anomalies). Activity timeline records the inbound + AI inferences. */
   receiveDocument(
@@ -1045,7 +1045,7 @@ export const actions = {
         appendActivity(
           task.clientId,
           "document_flagged",
-          `Mode C flag: ${payload.flagReason}`,
+          `anomaly-detector flag: ${payload.flagReason}`,
           task.deadlineId
         );
       }
@@ -1315,7 +1315,7 @@ export const actions = {
     const task = state.tasks.find((t) => t.id === draft.taskId);
     if (task) {
       // If this email was tied to a checklist item, flip that item to
-      // requested_waiting (Mode D send → state transition).
+      // requested_waiting (email-drafter send → state transition).
       if (draft.checklistItemId) {
         state = {
           ...state,
@@ -1427,7 +1427,7 @@ export const actions = {
     emit();
   },
 
-  /** Resolve a Mode E AI insight. */
+  /** Resolve a cross-year-insighter AI insight. */
   resolveInsight(
     insightId: string,
     action: "ask_client" | "schedule_advisory" | "mark_known" | "snooze"
@@ -1445,7 +1445,7 @@ export const actions = {
     appendActivity(
       insight.clientId,
       "ai_inferred",
-      `Mode E insight: ${action.replace(/_/g, " ")} — "${insight.title}"`
+      `cross-year-insighter insight: ${action.replace(/_/g, " ")} — "${insight.title}"`
     );
     emit();
   },

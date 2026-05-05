@@ -415,8 +415,8 @@ export type AiConfidence = "high" | "medium" | "low";
 
 /**
  * One row in the per-task checklist (Layer 3). Each row's lifecycle is one
- * of the six DocumentStates. AI-related fields are populated when AI Mode A
- * (classifier on inbound) or Mode C (anomaly detector) has run.
+ * of the six DocumentStates. AI-related fields are populated when AI inbound-classifier
+ * (classifier on inbound) or anomaly-detector (anomaly detector) has run.
  */
 export interface ChecklistItem {
   id: string;
@@ -428,11 +428,11 @@ export interface ChecklistItem {
   custom: boolean;
   /** Set when state moved to `received_*`. */
   receivedAt?: string;
-  /** AI's classification confidence on the inbound document (Mode A applied to inbound). */
+  /** AI's classification confidence on the inbound document (inbound-classifier applied to inbound). */
   aiConfidence?: AiConfidence;
   /** AI's guess of what document this is, e.g. "W-2 from ADP". */
   aiClassification?: string;
-  /** Mode C anomaly flag. */
+  /** AI-flagged anomaly flag. */
   flagReason?: string;
   flagSeverity?: "low" | "medium" | "high";
   /** Set on `received_confirmed`. PRD §5.3 invariant: only "cpa" allowed here. */
@@ -508,7 +508,7 @@ export interface AiSource {
 }
 
 /**
- * Mode D output. Lives at Layer 4. Always has the CPA CC'd (PRD §7.2).
+ * email-drafter output. Lives at Layer 4. Always has the CPA CC'd (PRD §7.2).
  */
 export interface EmailDraft {
   id: string;
@@ -548,24 +548,24 @@ export interface AiInference {
 
 /**
  * Per-client per-year facts pulled from prior tax software / QBO. Powers
- * Modes A/B/C/E (PRD §6.6 Import Tier 3 unlocks this). The store seeds
- * 2-3 prior years per client so Mode B/C/E have realistic baselines.
+ * AI capabilities (PRD §6.6 Import Tier 3 unlocks this). The store seeds
+ * 2-3 prior years per client so arrival-timing / anomaly / cross-year have realistic baselines.
  */
 export interface ImportedFact {
   id: string;
   clientId: string;
   year: number;
   itemType: string; // "wage_w2", "k1", "schedule_e", etc.
-  /** ISO date the document arrived in the prior year. Drives Mode B. */
+  /** ISO date the document arrived in the prior year. Drives arrival-timing. */
   observedDate?: string;
-  /** Numeric value when relevant (Mode C anomaly threshold). */
+  /** Numeric value when relevant (AI-flagged anomaly threshold). */
   observedAmount?: number;
   /** Free-text note. */
   note?: string;
 }
 
 /**
- * AI insight cards shown in the AI insights panel (Mode E + Mode B aggregates).
+ * AI insight cards shown in the AI insights panel (cross-year-insighter + arrival-timing aggregates).
  * Cold-start fallback per PRD §4.2 when no ImportedFact exists.
  */
 export interface AiInsight {

@@ -130,7 +130,7 @@ export function TaskActions({ task }: Props) {
         ) : (
           <button
             onClick={onMarkComplete}
-            className="text-sm px-3 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover inline-flex items-center gap-1.5"
+            className="text-sm px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover inline-flex items-center gap-1.5"
           >
             <Check className="w-3.5 h-3.5" aria-hidden /> Mark complete
           </button>

@@ -382,7 +382,7 @@ export function defaultActionsForState(
       if (handlers.onChase)
         out.push({
           label: "Send chase email",
-          description: "Mode B suggested chase template",
+          description: "arrival-timing suggested chase template",
           emphasis: "primary",
           onClick: handlers.onChase,
         });

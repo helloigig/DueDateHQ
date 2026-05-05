@@ -25,7 +25,7 @@ import { confirmWithUndo } from "../lib/confirmWithUndo";
 
 interface Props {
   item: ChecklistItem;
-  /** Opens the email draft modal (Mode D). Caller wires from the parent. */
+  /** Opens the email draft modal (email-drafter). Caller wires from the parent. */
   onOpenEmailDraft: (
     itemId: string,
     intent: "send_reminder" | "ask_client" | "request_initial"
@@ -346,7 +346,7 @@ function ConfidencePill({ confidence }: { confidence: "high" | "medium" | "low" 
   return (
     <span
       className={`text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded border ${styles} animate-ddhq-ai-shimmer`}
-      title="AI confidence per Mode A classification (PRD §4.3)"
+      title="AI confidence on inbound classification"
     >
       AI {confidence}
     </span>

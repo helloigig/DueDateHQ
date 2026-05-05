@@ -1,12 +1,12 @@
 // Mock TodoItem feed for Phase 1 prototype — per PRD §4.8 + §9.6 + IA §3.1.
 //
 // TodoItem is a *computed view* (not a stored row) aggregating from 9 sources:
-//   1. Mode A — auto-checklist + inbound classification
-//   2. Mode B — per-client arrival timing
-//   3. Mode C — sanity check anomaly flags
-//   4. Mode D — draft outbound emails
-//   5. Mode E — cross-year insights / opportunities
-//   6. Mode F — state change monitoring
+//   1. inbound-classifier — auto-checklist + inbound classification
+//   2. arrival-timing — per-client arrival timing
+//   3. anomaly-detector — sanity check anomaly flags
+//   4. email-drafter — draft outbound emails
+//   5. cross-year-insighter — cross-year insights / opportunities
+//   6. state-monitor — state change monitoring
 //   7. InboundReply intent (per §5.8: pushback / question / etc.)
 //   8. DeliveryEvent bounces
 //   9. Manual TaskNote
@@ -68,7 +68,7 @@ export type MockTodoItem = {
     | "alert_detail"
     | "opportunity_detail"
     | "bounce_modal";
-  // Mode B bundled rows only — per-checklist-item snapshots used by
+  // arrival-timing bundled rows only — per-checklist-item snapshots used by
   // the FE DotStack + inline expand. Other sources leave undefined.
   checklistItems?: ChecklistItemSnapshot[];
 };
@@ -97,14 +97,14 @@ export const MOCK_TODO_ITEMS: MockTodoItem[] = [
     task: "1065 Partner Forms",
     dueDate: "Mar 15",
     action: "Send K-1 reminder · 11d unsent · draft ready",
-    context: "Mode B says client K-1 typically arrives Aug 6; we're past pattern window",
+    context: "arrival-timing says client K-1 typically arrives Aug 6; we're past pattern window",
     stageLabel: "Collect",
     daysBehind: 11,
     urgency: "high",
     urgencyScore: 250,
     surface: "email_draft_modal",
   },
-  // High — Mode C anomaly flag
+  // High — AI-flagged anomaly flag
   {
     id: "todo-3",
     source: "mode_c_anomaly",
@@ -112,7 +112,7 @@ export const MOCK_TODO_ITEMS: MockTodoItem[] = [
     client: "Emily Hartfield",
     task: "1040 NY",
     dueDate: "Apr 15",
-    action: "Confirm 1099-INT $1,240 · Mode C flag: -33% YoY",
+    action: "Confirm 1099-INT $1,240 · anomaly-detector flag: -33% YoY",
     context: "Last year: $1,860. Could be account closed (real change) or wrong year (issue).",
     stageLabel: "Review",
     urgency: "high",
@@ -133,7 +133,7 @@ export const MOCK_TODO_ITEMS: MockTodoItem[] = [
     urgencyScore: 180,
     surface: "task_detail",
   },
-  // Medium — Mode F alert
+  // Medium — state-monitor alert
   {
     id: "todo-5",
     source: "mode_f_alert",
@@ -145,7 +145,7 @@ export const MOCK_TODO_ITEMS: MockTodoItem[] = [
     urgencyScore: 150,
     surface: "alert_detail",
   },
-  // Medium — Mode A inbound classified, awaiting confirm
+  // Medium — AI-classified inbound classified, awaiting confirm
   {
     id: "todo-6",
     source: "mode_a_inbound",
@@ -154,7 +154,7 @@ export const MOCK_TODO_ITEMS: MockTodoItem[] = [
     task: "1040 Federal",
     dueDate: "Apr 15",
     action: "Confirm W-2 from ADP · received Mon",
-    context: "Mode A high confidence · ImportedFact: wages $98K (consistent with 2024 $95K)",
+    context: "inbound-classifier high confidence · ImportedFact: wages $98K (consistent with 2024 $95K)",
     stageLabel: "Review",
     urgency: "medium",
     urgencyScore: 120,
@@ -168,24 +168,24 @@ export const MOCK_TODO_ITEMS: MockTodoItem[] = [
     client: "Daniel O'Brien",
     task: "1040 (extension)",
     action: "Client asked: what's the IRA contribution limit this year?",
-    context: "Open Mode D draft to reply, or mark for follow-up",
+    context: "Open AI-drafted to reply, or mark for follow-up",
     urgency: "medium",
     urgencyScore: 100,
     surface: "email_draft_modal",
   },
-  // Normal — Mode E opportunity
+  // Normal — cross-year-insighter opportunity
   {
     id: "todo-8",
     source: "mode_e_opportunity",
     verb: "Discuss",
     client: "Emily Hartfield",
-    action: "Discuss RSU vesting · Mode E detected wages doubled YoY",
+    action: "Discuss RSU vesting · cross-year-insighter detected wages doubled YoY",
     context: "Layer B advisory trigger · est. revenue uplift $450 from 1hr advisory call",
     urgency: "normal",
     urgencyScore: 60,
     surface: "opportunity_detail",
   },
-  // Normal — Mode D batch
+  // Normal — email-drafter batch
   {
     id: "todo-9",
     source: "mode_d_draft_ready",
