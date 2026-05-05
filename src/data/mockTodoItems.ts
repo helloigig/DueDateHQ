@@ -30,6 +30,20 @@ export type TodoSource =
 
 export type TodoVerb = "Send" | "Confirm" | "Apply" | "Discuss";
 
+export type ChecklistItemState =
+  | "not_requested"
+  | "requested_waiting"
+  | "received_unreviewed"
+  | "received_confirmed"
+  | "received_issue"
+  | "not_applicable";
+
+export type ChecklistItemSnapshot = {
+  id: string;
+  label: string;
+  state: ChecklistItemState;
+};
+
 export type MockTodoItem = {
   id: string;
   source: TodoSource;
@@ -54,6 +68,9 @@ export type MockTodoItem = {
     | "alert_detail"
     | "opportunity_detail"
     | "bounce_modal";
+  // Mode B bundled rows only — per-checklist-item snapshots used by
+  // the FE DotStack + inline expand. Other sources leave undefined.
+  checklistItems?: ChecklistItemSnapshot[];
 };
 
 export const MOCK_TODO_ITEMS: MockTodoItem[] = [

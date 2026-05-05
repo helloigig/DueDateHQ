@@ -82,6 +82,24 @@ const TIER_WEIGHT: Record<string, number> = {
   basic: 0.7,
 };
 
+// Per-checklist-item snapshot returned alongside Mode B bundled rows.
+// The FE renders a DotStack (one dot per item, color-coded by state)
+// so the CPA reads at-a-glance how the chase loop is progressing
+// — "1 of 4 received and waiting your confirm" beats "4 things
+// outstanding". Items are kept in stable order (matching the bundled
+// ChecklistItems for that task) so dot positions are meaningful.
+type ChecklistItemSnapshot = {
+  id: string;
+  label: string;
+  state:
+    | "not_requested"
+    | "requested_waiting"
+    | "received_unreviewed"
+    | "received_confirmed"
+    | "received_issue"
+    | "not_applicable";
+};
+
 type TodoItem = {
   id: string;
   source: string;
@@ -103,6 +121,10 @@ type TodoItem = {
     | "alert_detail"
     | "opportunity_detail"
     | "bounce_modal";
+  // Mode B bundled rows only — populated with one entry per outstanding
+  // checklist item folded into this row. Other sources leave this
+  // undefined.
+  checklistItems?: ChecklistItemSnapshot[];
 };
 
 function urgencyBucket(score: number): "high" | "medium" | "normal" {
@@ -303,7 +325,7 @@ export const todoItemsRouter = router({
           : null;
         const reminderText = daysSinceReminder != null
           ? `last sent ${daysSinceReminder}d ago`
-          : "not yet requested";
+          : "First reminder pending";
         const labels = bucket.map((r) => r.ci.label);
         const actionText =
           bucket.length === 1
@@ -332,6 +354,16 @@ export const todoItemsRouter = router({
           urgency: urgencyBucket(score),
           urgencyScore: Math.round(score),
           surface: "email_draft_modal",
+          // Per-item snapshot for the FE DotStack. Sort order:
+          // sortOrder asc (matches ChecklistItem display ordering).
+          checklistItems: bucket
+            .slice()
+            .sort((a, b) => (a.ci.sortOrder ?? 0) - (b.ci.sortOrder ?? 0))
+            .map((r) => ({
+              id: r.ci.id,
+              label: r.ci.label,
+              state: r.ci.state,
+            })),
         });
       }
 
