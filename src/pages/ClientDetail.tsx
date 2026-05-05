@@ -6,7 +6,6 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import {
-  Handshake,
   ClipboardList,
   Brain,
   Sparkles,
@@ -29,7 +28,6 @@ import {
   FileText,
   AlertTriangle,
   Bot,
-  Calendar,
   Pause,
   type LucideIcon,
 } from "lucide-react";
@@ -50,7 +48,7 @@ import {
 } from "../hooks/useAiInsights";
 import { PageSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
-import { bucketOf, daysBetween, formatLongDate, parseDate, TODAY } from "../data/dateHelpers";
+import { daysBetween, formatLongDate, parseDate, TODAY } from "../data/dateHelpers";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import {
   AddDeadlineModal,
@@ -74,18 +72,28 @@ import type {
   Deadline,
 } from "../types";
 
-// IA v0.7 §3.3 — five tabs (Engagement default + Habits + Predictions + To
-// Do + Mailbox). Audit log + Documents + Contacts were day-1 surfaces in
-// v0.6; v0.7 demotes them to the overflow menu since the rich tabs cover
-// every primary daily flow.
+// IA v0.8 amendment 2026-05-05 — Engagement tab retired.
+//
+// The Engagement tab showed: a 5-dot relationship-score gauge (stub
+// heuristic, decorative), tier/packages/since meta (now in header
+// meta line), notes pointer (already in primary tab strip), and the
+// same open-deadline list that To Do already shows. Three views of
+// four deadlines under three tabs was redundancy, not separation.
+// Tier + since + deadline counts now live as a meta line under the
+// client name; the gauge is gone (it was measuring nothing real).
+//
+// Tab strip: To Do | Filings | Mailbox | Notes
+// Held over for deep-link compatibility but routed via overflow menu:
+// documents / contacts / audit.
+//
+// Engagement tab key still mapped for `?tab=engagement` URLs that
+// existed in the wild — it silently aliases to "todo".
 type Tab =
   | "todo"
-  | "engagement"
   | "filings"
   | "mailbox"
   | "notes"
-  // Held over from v0.7 §3.3 so existing deep links keep working —
-  // routed via the overflow menu rather than the primary strip.
+  | "engagement"
   | "documents"
   | "contacts"
   | "audit";
@@ -164,21 +172,6 @@ export function ClientDetail() {
   }, [searchParams, setSearchParams]);
 
   const clientDeadlines = deadlines;
-
-  // The v0.7 Engagement tab only needs the "upcoming" bucket (used to count
-  // how many deadlines are coming this quarter). The full deadline triage
-  // bucketing lives on the Today + Timeline destinations now.
-  const upcoming = useMemo(() => {
-    const out: Deadline[] = [];
-    for (const d of clientDeadlines) {
-      if (d.status === "completed" || d.status === "filed_extension") continue;
-      const bucket = bucketOf(d.officialDueDate);
-      if (bucket === "overdue" || bucket === "this_week" || bucket === "this_month") {
-        out.push(d);
-      }
-    }
-    return out.sort((a, b) => a.officialDueDate.localeCompare(b.officialDueDate));
-  }, [clientDeadlines]);
 
   if (clientQuery.isLoading) return <PageSkeleton title="Loading client…" />;
   if (clientQuery.error) {
@@ -279,26 +272,59 @@ export function ClientDetail() {
               </span>
             )}
           </div>
-          {/* AI behaviour summary — placeholder for now. Phase 2 wires
-              this to a server-side composer that derives the sentence
-              from activity_events: avg response time to chases, extension
-              history, mode A confidence rates, pushback frequency, etc.
-              The CPA can override the auto-text manually; the override
-              persists on `clients.ai_summary_override` (Phase 2 schema). */}
+          {/* Engagement meta line — replaces the dropped Engagement tab.
+              Surfaces the contract scope axes the user reads at-a-glance:
+              tier · service packages · open deadline counts · since.
+              All read-only; deeper edits live in the modals (Edit /
+              service package settings). */}
+          <div className="mt-2 text-xs text-ink-500 flex items-center flex-wrap gap-x-2 gap-y-1">
+            <span>
+              <span className="text-ink-400">Tier</span>{" "}
+              <span className="text-ink-700 font-medium capitalize">
+                {client.tier ?? "standard"}
+              </span>
+            </span>
+            <span className="text-ink-300" aria-hidden>·</span>
+            {client.servicePackages.length > 0 ? (
+              <span className="inline-flex items-center gap-1">
+                <span className="text-ink-400">
+                  {client.servicePackages.length === 1
+                    ? "Package"
+                    : "Packages"}
+                </span>
+                {client.servicePackages.map((p) => (
+                  <PackageChip key={p} packageName={p} client={client} />
+                ))}
+              </span>
+            ) : (
+              <span>
+                <span className="text-ink-400">Packages</span>{" "}
+                <span className="text-ink-500">— none assigned</span>
+              </span>
+            )}
+            <span className="text-ink-300" aria-hidden>·</span>
+            <span>
+              <span className="text-ink-400">Open deadlines</span>{" "}
+              <span className="text-ink-700 font-medium tabular-nums">
+                {clientDeadlines.filter(
+                  (d) =>
+                    d.status !== "completed" &&
+                    d.status !== "filed_extension",
+                ).length}
+              </span>
+            </span>
+            <span className="text-ink-300" aria-hidden>·</span>
+            <span>
+              <span className="text-ink-400">Since</span>{" "}
+              <span className="text-ink-700">{addedAtLabel}</span>
+            </span>
+          </div>
+          {/* AI behaviour summary — placeholder until the BE composer
+              ships. Phase 2 derives the sentence from activity_events:
+              avg response time to chases, extension history, mode A
+              confidence rates, pushback frequency. Override persists
+              on clients.ai_summary_override. */}
           <ClientAiSummary client={client} />
-          {client.servicePackages.length > 0 && (
-            <div className="mt-3 flex items-center flex-wrap gap-1.5">
-              <span className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
-                Service package{client.servicePackages.length === 1 ? "" : "s"}:
-              </span>
-              {client.servicePackages.map((p) => (
-                <PackageChip key={p} packageName={p} client={client} />
-              ))}
-              <span className="text-2xs text-ink-400">
-                · {clientDeadlines.length} deadline{clientDeadlines.length === 1 ? "" : "s"} auto-generated · added {addedAtLabel}
-              </span>
-            </div>
-          )}
         </div>
         <PinClientButton clientId={client.id} />
         <ExportClientsButton clientId={client.id} />
@@ -334,7 +360,6 @@ export function ClientDetail() {
         {(
           [
             ["todo", "To Do", CircleCheck],
-            ["engagement", "Engagement", Handshake],
             ["filings", "Filings", ClipboardList],
             ["mailbox", "Mailbox", Mail],
             ["notes", "Notes", Brain],
@@ -409,13 +434,14 @@ export function ClientDetail() {
             onOpenDocuments={() => setTab("documents")}
           />
         )}
+        {/* Engagement tab retired 2026-05-05 — see type Tab comment.
+            Existing ?tab=engagement deep links silently route to todo. */}
         {tab === "engagement" && (
-          <EngagementTab
+          <ToDoTab
             client={client}
-            upcoming={upcoming}
             allDeadlines={clientDeadlines}
-            onSwitchToToDo={() => setTab("todo")}
-            onSwitchToNotes={() => setTab("notes")}
+            onAddDeadline={() => setAddDeadlineOpen(true)}
+            onOpenDocuments={() => setTab("documents")}
           />
         )}
         {tab === "filings" && (
@@ -878,329 +904,13 @@ function ActivityItem({ entry }: { entry: ActivityEntry }) {
 // element), green/yellow/red AI authority, Pattern 4 advisory awakening.
 // ─────────────────────────────────────────────────────────────────────
 
-type EngagementProps = {
-  client: Client;
-  upcoming: Deadline[];
-  allDeadlines: Deadline[];
-  onSwitchToToDo: () => void;
-  onSwitchToNotes: () => void;
-};
-
-function EngagementTab({
-  client,
-  upcoming,
-  allDeadlines,
-  onSwitchToToDo,
-  onSwitchToNotes,
-}: EngagementProps) {
-  const { checklistItems, tasks } = useStore();
-  const insights = useAiInsightsForClient(client.id);
-  const announcementsQuery = trpc.announcements.list.useQuery();
-  const announcements = announcementsQuery.data ?? [];
-
-  const taskIds = useMemo(
-    () => tasks.filter((t) => t.clientId === client.id).map((t) => t.id),
-    [tasks, client.id],
-  );
-  const taskIdSet = useMemo(() => new Set(taskIds), [taskIds]);
-
-  // Gap-over-fill computation: what is this client still owing me?
-  const waiting = useMemo(() => {
-    let count = 0;
-    let oldestDays: number | null = null;
-    const now = Date.now();
-    const taskCounts = new Map<string, number>();
-    for (const ci of checklistItems) {
-      if (!taskIdSet.has(ci.taskId)) continue;
-      if (ci.state !== "requested_waiting" && ci.state !== "not_requested") continue;
-      count++;
-      taskCounts.set(ci.taskId, (taskCounts.get(ci.taskId) ?? 0) + 1);
-      if (ci.lastReminderAt) {
-        const days = Math.floor(
-          (now - new Date(ci.lastReminderAt).getTime()) / (24 * 60 * 60 * 1000),
-        );
-        if (oldestDays == null || days > oldestDays) oldestDays = days;
-      }
-    }
-    return { count, oldestDays, taskCount: taskCounts.size };
-  }, [checklistItems, taskIdSet]);
-
-  const activeAlerts = announcements.filter(
-    (a) => !a.dismissed && a.affectedClientIds.includes(client.id),
-  );
-  const openInsights = insights.filter((i) => i.status === "open");
-  const noteCount = client.noteEntries?.length ?? 0;
-
-  // Relationship score — naive: 5 dots minus stuck-reminder penalty.
-  const relationshipScore = Math.max(
-    1,
-    5 - (waiting.oldestDays != null && waiting.oldestDays > 14 ? 2 : 0) -
-      (waiting.count > 5 ? 1 : 0),
-  );
-
-  // Relationship label (compact) — paired with the dot chip in the verdict.
-  const relationshipLabel =
-    relationshipScore <= 2
-      ? "Stuck"
-      : relationshipScore === 3
-        ? "Watch"
-        : "Healthy";
-
-  // Compose the next-deadline-shift sentence for each active alert. When the
-  // alert is a disaster_extension that already shifted a deadline on this
-  // client, we prefer that wording ("1040 deadline shifted Oct 15 → Feb 15")
-  // over the bare alert title — it's the actionable shape Sarah cares about.
-  const shiftedDeadlineForAlert = (annId: string) => {
-    const ann = activeAlerts.find((a) => a.id === annId);
-    if (!ann?.newDeadline) return null;
-    const match = allDeadlines.find(
-      (d) => d.officialDueDate === ann.newDeadline,
-    );
-    return match ? match.form : null;
-  };
-
-  // Pick the dominant signal for the primary verb. Order matches the user's
-  // mental priority: "what blocks this client → what just hit them → what
-  // could grow them → just open the to-do."
-  const primaryAction: { kind: "chase" | "alert" | "todo"; href?: string } =
-    waiting.count > 0
-      ? { kind: "chase" }
-      : activeAlerts.length > 0
-        ? { kind: "alert", href: `/alerts/${activeAlerts[0].id}` }
-        : { kind: "todo" };
-
-  return (
-    <div className="space-y-4">
-      {/* VERDICT BLOCK — the page's single most important thing. Compresses
-          gap (waiting items), shock (regulatory impact on this client), and
-          opportunity (Mode E insights) into three signal lines, with a
-          relationship chip in the corner and one primary verb at the bottom.
-          Replaces what used to be 5 co-equal cards (Services / Relationship /
-          Opportunities / Regulatory / Notes) competing for attention. */}
-      <section className="bg-surface border-2 border-line rounded-md p-4">
-        <header className="flex items-center gap-2 mb-3">
-          <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
-            Status — what's true today
-          </p>
-          <span className="ml-auto inline-flex items-baseline gap-1.5 text-xs">
-            <span
-              className="tabular-nums tracking-wider"
-              aria-label={`Relationship score ${relationshipScore} of 5`}
-              title={`Score ${relationshipScore} of 5 — falls when reminders stay unsent`}
-            >
-              {"●".repeat(relationshipScore)}
-              <span className="text-ink-300">
-                {"○".repeat(5 - relationshipScore)}
-              </span>
-            </span>
-            <span
-              className={
-                relationshipScore <= 2
-                  ? "text-danger-ink font-medium"
-                  : relationshipScore === 3
-                    ? "text-warn-ink"
-                    : "text-ok-ink"
-              }
-            >
-              {relationshipLabel}
-            </span>
-          </span>
-        </header>
-
-        <ul className="space-y-2">
-          {/* Gap signal */}
-          <li className="text-sm flex items-baseline gap-2">
-            {waiting.count > 0 ? (
-              <>
-                <Siren className="w-3.5 h-3.5 shrink-0 text-danger-ink translate-y-0.5" aria-hidden />
-                <span className="flex-1 min-w-0">
-                  <strong className="text-ink-900">
-                    Waiting on {client.name.split(" ")[0]}
-                  </strong>
-                  <span className="text-ink-700">
-                    {" — "}
-                    {waiting.count} item{waiting.count === 1 ? "" : "s"} across{" "}
-                    {waiting.taskCount} task{waiting.taskCount === 1 ? "" : "s"}
-                    {waiting.oldestDays != null && waiting.oldestDays > 0 && (
-                      <> · oldest {waiting.oldestDays}d unsent</>
-                    )}
-                  </span>
-                </span>
-              </>
-            ) : (
-              <>
-                <Check className="w-3.5 h-3.5 shrink-0 text-ok-ink translate-y-0.5" aria-hidden />
-                <span className="flex-1 text-ink-500">
-                  Nothing waiting on this client
-                </span>
-              </>
-            )}
-          </li>
-
-          {/* Shock signal — one line per active alert hitting this client */}
-          {activeAlerts.length > 0 ? (
-            activeAlerts.map((a) => {
-              const shiftedForm = shiftedDeadlineForAlert(a.id);
-              return (
-                <li
-                  key={a.id}
-                  className="text-sm flex items-baseline gap-2"
-                >
-                  <Calendar className="w-3.5 h-3.5 shrink-0 text-ink-500 translate-y-0.5" aria-hidden />
-                  <span className="flex-1 min-w-0">
-                    <strong className="text-ink-900">
-                      {a.stateCode}: {a.title}
-                    </strong>
-                    {a.oldDeadline && a.newDeadline && (
-                      <span className="text-ink-700">
-                        {" "}
-                        ·{" "}
-                        {shiftedForm ? `${shiftedForm} ` : ""}
-                        deadline shifted {formatLongDate(a.oldDeadline)} →{" "}
-                        {formatLongDate(a.newDeadline)}
-                      </span>
-                    )}
-                  </span>
-                  <Link
-                    to={`/alerts/${a.id}`}
-                    className="text-2xs text-accent hover:underline shrink-0"
-                  >
-                    Review →
-                  </Link>
-                </li>
-              );
-            })
-          ) : null}
-
-          {/* Opportunity signal — only when non-empty (zero-state was noise) */}
-          {openInsights.length > 0 && (
-            <li className="text-sm flex items-baseline gap-2">
-              <Sparkles className="w-3.5 h-3.5 shrink-0 text-info-ink translate-y-0.5" aria-hidden />
-              <span className="flex-1 min-w-0">
-                <strong className="text-ink-900">
-                  {openInsights[0].title}
-                </strong>
-                <span className="text-ink-700">
-                  {" "}
-                  · {openInsights[0].detail}
-                </span>
-                {openInsights.length > 1 && (
-                  <span className="text-ink-500">
-                    {" "}
-                    · +{openInsights.length - 1} more
-                  </span>
-                )}
-              </span>
-            </li>
-          )}
-        </ul>
-
-        {/* Primary verb — picks the dominant signal. Only one button — Yuqi's
-            "one entrance, one name" rule. Secondary detail still reachable
-            via tabs (To Do / Mailbox / etc.). */}
-        <div className="mt-4 pt-3 border-t border-line flex items-center gap-2">
-          {primaryAction.kind === "chase" && (
-            <button
-              onClick={onSwitchToToDo}
-              className="px-3 py-1.5 rounded bg-indigo text-white text-sm font-medium hover:bg-indigo-hover"
-            >
-              Send {waiting.count} reminder{waiting.count === 1 ? "" : "s"}
-            </button>
-          )}
-          {primaryAction.kind === "alert" && primaryAction.href && (
-            <Link
-              to={primaryAction.href}
-              className="px-3 py-1.5 rounded bg-indigo text-white text-sm font-medium hover:bg-indigo-hover"
-            >
-              Review {activeAlerts[0].stateCode} alert
-            </Link>
-          )}
-          {primaryAction.kind === "todo" && (
-            <button
-              onClick={onSwitchToToDo}
-              className="px-3 py-1.5 rounded border border-line text-ink-700 text-sm hover:bg-sunken"
-            >
-              Open To-Do
-            </button>
-          )}
-          <span className="text-2xs text-ink-500">
-            {primaryAction.kind === "chase"
-              ? "Open To-Do tab pre-filtered by waiting items"
-              : primaryAction.kind === "alert"
-                ? "Bundles email draft + deadline shift"
-                : "All tasks for this client"}
-          </span>
-        </div>
-      </section>
-
-      {/* REFERENCE STRIP — services, tier, packages, deadline counts, since.
-          Slimmed from a full card to a single condensed row. Pricing line
-          dropped (was a Phase-1 italic placeholder). */}
-      <section className="bg-surface border border-line rounded-md p-3 text-xs flex flex-wrap items-center gap-x-4 gap-y-1.5">
-        <span>
-          <span className="text-ink-500">Tier</span>{" "}
-          <span className="text-ink-900 font-medium capitalize">
-            {client.tier ?? "Standard"}
-          </span>
-        </span>
-        <span className="text-ink-300">·</span>
-        <span className="flex items-center gap-1">
-          <span className="text-ink-500">Packages</span>{" "}
-          {client.servicePackages.length > 0 ? (
-            client.servicePackages.map((p) => (
-              <span
-                key={p}
-                className="px-1.5 py-0.5 rounded border border-line bg-sunken/40 text-2xs"
-              >
-                {p}
-              </span>
-            ))
-          ) : (
-            <span className="text-ink-500">— none assigned</span>
-          )}
-        </span>
-        <span className="text-ink-300">·</span>
-        <span>
-          <span className="text-ink-500">Open deadlines</span>{" "}
-          <span className="text-ink-900 font-medium tabular-nums">
-            {
-              allDeadlines.filter(
-                (d) =>
-                  d.status !== "completed" && d.status !== "filed_extension",
-              ).length
-            }
-          </span>{" "}
-          <span className="text-ink-500">· {upcoming.length} upcoming</span>
-        </span>
-        <span className="text-ink-300">·</span>
-        <span>
-          <span className="text-ink-500">Since</span>{" "}
-          <span className="text-ink-900">{formatLongDate(client.addedAt)}</span>
-        </span>
-      </section>
-
-      {/* Notes pointer — full editor lives in the Notes tab. */}
-      <section className="bg-surface border border-line rounded-md p-4 flex items-baseline gap-3">
-        <div className="flex-1">
-          <h3 className="text-xs uppercase tracking-wider text-ink-500 font-semibold">
-            Notes
-          </h3>
-          <p className="text-sm text-ink-700 mt-0.5">
-            {noteCount > 0
-              ? `${noteCount} note${noteCount === 1 ? "" : "s"} — open the Notes tab to read or add.`
-              : "No notes yet. Use the Notes tab to capture firm memory about this client."}
-          </p>
-        </div>
-        <button
-          onClick={onSwitchToNotes}
-          className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken"
-        >
-          Open Notes →
-        </button>
-      </section>
-    </div>
-  );
-}
+// EngagementTab removed 2026-05-05 per dogfooding feedback —
+// the tab duplicated content already shown in To Do (gap signals)
+// and Filings (deadline counts), and the relationship score / verdict
+// block was reimplementable as inline meta on the client header. Tier,
+// packages, open deadlines and "since" now live in the meta line right
+// under the client name. Deep links with `?tab=engagement` are aliased
+// to `?tab=todo` (see resolveActiveTab below) for back-compat.
 
 // HabitsTab + PredictionsTab removed 2026-05-04 per IA amendment —
 // multi-year patterns + per-client expected timeline now live as
@@ -1220,22 +930,105 @@ function ToDoTab({
   onAddDeadline: () => void;
   onOpenDocuments: () => void;
 }) {
-  const { checklistItems, tasks } = useStore();
+  const { checklistItems: storeChecklistItems, tasks: storeTasks } = useStore();
+  // ── Source-of-truth fix (2026-05-05) ───────────────────────────────────
+  // Today's Action Queue reads from trpc.todoItems.list (BE-aggregated).
+  // ToDoTab used to read from useStore().checklistItems which is empty
+  // in real mode, so the same client showed "7 items / Send 4 reminders"
+  // on Today and "0 items / Nothing waiting" here. Same query now powers
+  // both surfaces.
+  const todoQuery = trpc.todoItems.list.useQuery({ limit: 200 });
+  const liveTodoItems = todoQuery.data?.items ?? [];
+  // Mode B rows include a per-checklist-item snapshot. Flatten across
+  // every TodoItem that belongs to this client, attaching the parent
+  // task metadata so the per-item rows can render formType/jurisdiction
+  // exactly the way Today's expanded panel does.
+  type WaitingItem = {
+    id: string;
+    label: string;
+    state:
+      | "not_requested"
+      | "requested_waiting"
+      | "received_unreviewed"
+      | "received_confirmed"
+      | "received_issue"
+      | "not_applicable";
+    taskId?: string;
+    taskName?: string;
+    dueDate?: string;
+    lastReminderAt?: string;
+  };
+
+  const liveItems = useMemo<WaitingItem[]>(() => {
+    const out: WaitingItem[] = [];
+    for (const it of liveTodoItems) {
+      if (it.clientId !== client.id) continue;
+      const ci = (it as { checklistItems?: WaitingItem[] }).checklistItems;
+      if (ci && ci.length > 0) {
+        for (const c of ci) {
+          out.push({
+            id: c.id,
+            label: c.label,
+            state: c.state,
+            taskId: it.taskId,
+            taskName: it.task,
+            dueDate: it.dueDate,
+          });
+        }
+      } else if (
+        it.verb === "Confirm" ||
+        it.source === "mode_a_inbound" ||
+        it.source === "mode_c_anomaly"
+      ) {
+        // Confirm/anomaly TodoItems carry a single checklist item in
+        // their action; expose as one row.
+        out.push({
+          id: it.id,
+          label: it.action.replace(/^[^·]+·\s*/, ""),
+          state:
+            it.source === "mode_c_anomaly" ? "received_issue" : "received_unreviewed",
+          taskId: it.taskId,
+          taskName: it.task,
+          dueDate: it.dueDate,
+        });
+      }
+    }
+    return out;
+  }, [liveTodoItems, client.id]);
+
+  // Mock-mode fallback: read raw checklistItems from the store. Only
+  // used when env.useMockData is true; real mode trusts the BE.
   const taskIds = useMemo(
-    () => tasks.filter((t) => t.clientId === client.id).map((t) => t.id),
-    [tasks, client.id],
+    () => storeTasks.filter((t) => t.clientId === client.id).map((t) => t.id),
+    [storeTasks, client.id],
   );
   const tasksByIdMap = useMemo(() => {
-    const m = new Map<string, (typeof tasks)[number]>();
-    for (const t of tasks) if (taskIds.includes(t.id)) m.set(t.id, t);
+    const m = new Map<string, (typeof storeTasks)[number]>();
+    for (const t of storeTasks) if (taskIds.includes(t.id)) m.set(t.id, t);
     return m;
-  }, [tasks, taskIds]);
+  }, [storeTasks, taskIds]);
   const taskIdSet = useMemo(() => new Set(taskIds), [taskIds]);
-
-  const items = useMemo(
-    () => checklistItems.filter((ci) => taskIdSet.has(ci.taskId)),
-    [checklistItems, taskIdSet],
+  const mockItems = useMemo<WaitingItem[]>(
+    () =>
+      storeChecklistItems
+        .filter((ci) => taskIdSet.has(ci.taskId))
+        .map((ci) => {
+          const task = tasksByIdMap.get(ci.taskId);
+          return {
+            id: ci.id,
+            label: ci.label,
+            state: ci.state,
+            taskId: ci.taskId,
+            taskName: task
+              ? [task.formType, task.jurisdiction].filter(Boolean).join(" · ")
+              : undefined,
+            lastReminderAt: ci.lastReminderAt ?? undefined,
+          };
+        }),
+    [storeChecklistItems, taskIdSet, tasksByIdMap],
   );
+  const items = env.useMockData ? mockItems : liveItems;
+
   const stillWaiting = items.filter(
     (ci) => ci.state === "requested_waiting" || ci.state === "not_requested",
   );
@@ -1246,21 +1039,17 @@ function ToDoTab({
     (ci) => ci.state === "received_confirmed" || ci.state === "not_applicable",
   ).length;
 
-  // Sort waiting by oldest reminder first (gap-over-fill).
+  // Sort waiting by oldest reminder first (gap-over-fill). Items
+  // without a lastReminderAt (i.e. not_requested) sort to the bottom
+  // since they haven't started the loop yet.
   const waitingSorted = [...stillWaiting].sort((a, b) => {
     const at = a.lastReminderAt ? new Date(a.lastReminderAt).getTime() : Infinity;
     const bt = b.lastReminderAt ? new Date(b.lastReminderAt).getTime() : Infinity;
     return at - bt;
   });
 
-  const taskLabel = (taskId: string) => {
-    const task = tasksByIdMap.get(taskId);
-    if (!task) return "—";
-    return [task.formType, task.jurisdiction].filter(Boolean).join(" · ") || taskId;
-  };
-
-  const taskHref = (taskId: string) =>
-    `/clients/${client.id}/tasks/${taskId}`;
+  const taskHref = (taskId?: string) =>
+    taskId ? `/clients/${client.id}/tasks/${taskId}` : `/clients/${client.id}`;
 
   return (
     <div className="space-y-4">
@@ -1317,18 +1106,30 @@ function ToDoTab({
                       {ci.label ?? "Item"}
                     </p>
                     <p className="text-2xs text-ink-500 truncate">
-                      {taskLabel(ci.taskId)}
+                      {ci.taskName ?? "—"}
                       {days != null && ` · last reminder ${days}d ago`}
-                      {ci.state === "not_requested" && " · not yet requested"}
+                      {ci.state === "not_requested" &&
+                        " · First reminder pending"}
                     </p>
                   </div>
+                  {/* Honest label: this navigates to TaskDetail (where
+                      the EmailDraftModal lives) — it does NOT compose
+                      from here. The arrow ↗ communicates the navigate.
+                      Earlier copy "Send reminder ↗" / "Request now ↗"
+                      promised an inline send the link can't deliver,
+                      so users hit a dead end. Once the per-row inline
+                      composer is wired, this can flip back to the
+                      action-verb labels with a real onClick. */}
                   <Link
                     to={taskHref(ci.taskId)}
                     className="text-2xs px-2 py-1 rounded border border-line bg-surface text-ink-700 hover:bg-sunken shrink-0"
+                    title={
+                      ci.state === "requested_waiting"
+                        ? "Open task to send a reminder"
+                        : "Open task to request this item"
+                    }
                   >
-                    {ci.state === "requested_waiting"
-                      ? "Send reminder ↗"
-                      : "Request now ↗"}
+                    Open task ↗
                   </Link>
                 </li>
               );
@@ -1362,8 +1163,7 @@ function ToDoTab({
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-ink-900 truncate">{ci.label}</p>
                   <p className="text-2xs text-ink-500 truncate">
-                    {taskLabel(ci.taskId)}
-                    {ci.flagReason && ` · AI flag: ${ci.flagReason}`}
+                    {ci.taskName ?? "—"}
                   </p>
                 </div>
                 <Link

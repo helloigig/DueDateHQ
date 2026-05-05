@@ -1,16 +1,21 @@
 interface Props {
   provider: "google" | "microsoft";
+  /** Always true today — SSO is on the roadmap, not yet wired.
+   *  Prop kept for the day OAuth lands so the call sites don't change. */
   disabled?: boolean;
   onClick?: () => void;
 }
 
 /**
- * Wireframe SSO button. Phase 2 affordance — currently disabled.
- * Per PRD §7.3 SSO is Team-tier Phase 2; Google + Microsoft are the
- * pragmatic individual-account providers (Sarah uses Gmail; many firms use
- * Outlook). The same OAuth surface backs Method B inbound (§7.4).
+ * SSO sign-in button. Currently always disabled — Google + Microsoft OAuth
+ * are on the roadmap (per PRD §7.3). Buttons are surfaced on the signin /
+ * signup pages so CPAs can see the option exists; the "Coming soon" badge
+ * sets honest expectations without asking them to click and discover the
+ * dead end.
+ *
+ * Same OAuth surface will eventually back Method B inbound (§7.4).
  */
-export function SsoButton({ provider, disabled, onClick }: Props) {
+export function SsoButton({ provider, disabled = true, onClick }: Props) {
   const label = provider === "google" ? "Google" : "Microsoft";
   return (
     <button
@@ -19,16 +24,21 @@ export function SsoButton({ provider, disabled, onClick }: Props) {
       onClick={onClick}
       title={
         disabled
-          ? `Sign in with ${label} — Phase 2`
+          ? `Sign in with ${label} — coming soon`
           : `Sign in with ${label}`
       }
-      className="relative flex items-center justify-center gap-2 px-3 py-2 rounded-md border border-line bg-surface text-sm text-ink-700 hover:bg-sunken disabled:opacity-50 disabled:cursor-not-allowed"
+      aria-label={
+        disabled
+          ? `Sign in with ${label} (coming soon)`
+          : `Sign in with ${label}`
+      }
+      className="relative flex items-center justify-center gap-2 px-3 py-2 rounded-md border border-line bg-surface text-sm text-ink-700 hover:bg-sunken disabled:opacity-60 disabled:cursor-not-allowed"
     >
       {provider === "google" ? <GoogleIcon /> : <MicrosoftIcon />}
       <span className="font-medium">{label}</span>
       {disabled && (
-        <span className="absolute -top-1.5 -right-1 text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-sunken text-ink-500 border border-line">
-          P2
+        <span className="absolute -top-1.5 -right-1 text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-sunken text-ink-500 border border-line whitespace-nowrap">
+          Soon
         </span>
       )}
     </button>

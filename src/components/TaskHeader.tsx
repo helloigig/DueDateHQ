@@ -29,9 +29,18 @@ interface Props {
   client: Client;
   /** Completion percentage 0-100 from the checklist; renders the progress ring. */
   completionPct?: number;
+  /** Open the Mode D email-draft modal in chase mode. The DeadlineChip
+   *  surfaces this when `recommendedAction === "chase"`. Wired by the
+   *  parent (TaskDetail) so the modal state stays at page scope. */
+  onChase?: () => void;
 }
 
-export function TaskHeader({ task, client, completionPct = 0 }: Props) {
+export function TaskHeader({
+  task,
+  client,
+  completionPct = 0,
+  onChase,
+}: Props) {
   const [copied, setCopied] = useState(false);
   const { deadlines } = useStore();
   const updateStatus = useUpdateTaskStatus();
@@ -117,43 +126,29 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
                   status: task.status,
                 }).recommendedAction,
                 {
-                  // Mode D chase flow isn't yet liftable from QuickActionModal;
-                  // suppress the chase action entirely from the chip until P1
-                  // wires it through (passing undefined removes the action).
-                  onChase: undefined,
-                  // Mark complete — confirm prompt matches <TaskActions/>'
-                  // canonical "Mark complete" handler (TaskActions.tsx:84-91).
-                  onSubmit: () => {
-                    if (
-                      window.confirm(
-                        `Mark ${task.formType} complete? This closes the task.`,
-                      )
-                    ) {
-                      updateStatus(task.id, "completed");
-                    }
-                  },
-                  // File extension — same confirm prompt as <TaskActions/>'
-                  // canonical "File extension" handler (TaskActions.tsx:103-111).
-                  // Routes through useFileExtensionForTask which cascades to
-                  // the deadline record (not just a free-form status write).
-                  onFileExtension: () => {
-                    if (
-                      window.confirm(
-                        `Mark extension filed for ${task.formType}? Cascades to the deadline.`,
-                      )
-                    ) {
-                      fileExtension(task.id);
-                    }
-                  },
-                  // Adjust-target — TaskMilestone drag-to-edit lands in P1.
-                  // For now point the CPA at the canonical Defer dialog in
-                  // <TaskActions/>' overflow menu, which is the only existing
-                  // way to push working dates without altering the legal date.
-                  onAdjustTarget: undefined,
-                  // View extension — informational only. The chip's primary
-                  // text already reads "Extension filed · IRS {date}"; this
-                  // popover entry is reserved for richer detail later.
-                  onViewExtension: undefined,
+                  // Chase opens the Mode D draft modal — handler lives on
+                  // TaskDetail so modal state stays page-scoped. Resolved
+                  // in favour of main's prop-callback wiring (was: chip
+                  // passed undefined to suppress chase entirely while we
+                  // waited for the modal lift). Page-scoped is the right
+                  // home for transient modal state.
+                  onChase: onChase,
+                  // Mark complete — direct mutation. The canonical
+                  // <TaskActions/> "Mark complete" button keeps its own
+                  // window.confirm prompt; the chip is a recommendation
+                  // surface, not a confirmation surface, so a second
+                  // dialog here would be duplicate gatekeeping.
+                  onSubmit: () => updateStatus(task.id, "completed"),
+                  // File extension routes through the dedicated mutation
+                  // (cascades to deadline) instead of a free-form status
+                  // write. Same hook as <TaskActions/>' overflow menu.
+                  onFileExtension: () => fileExtension(task.id),
+                  // onAdjustTarget intentionally omitted — the mini-timeline
+                  // below already exposes drag-the-waypoint as the canonical
+                  // editor; an extra button here was duplicate UX.
+                  // onViewExtension intentionally omitted — the ExtensionBanner
+                  // on TaskDetail already shows submitted/approved + new IRS
+                  // deadline above the header. No need to re-route here.
                 },
               )}
             />

@@ -490,27 +490,12 @@ function WorkspaceHeader({
               <Check className="w-3 h-3 text-ink-500" aria-hidden />
             </div>
 
-            <div className="border-t border-line my-1.5" />
-
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                alert(
-                  "Multi-firm membership ships in P1 (next quarter). Today, one user = one firm. If you need to manage two firms, sign up with a different email per firm — we'll merge them when membership lands.",
-                );
-              }}
-              className="w-full text-left px-3 py-2 text-xs text-ink-500 hover:bg-sunken hover:text-ink-900 flex items-center gap-2"
-            >
-              <span className="text-base leading-none">+</span>
-              <span>Add another firm…</span>
-              <span className="ml-auto text-2xs text-ink-400">P1</span>
-            </button>
-
-            <p className="px-3 pt-1 pb-1.5 text-2xs text-ink-400 leading-relaxed">
-              Bookkeepers, fractional CFOs, and merged firms get
-              firm-membership in the next quarter — see roadmap.
-            </p>
+            {/* "+ Add another firm…" entry intentionally omitted —
+                multi-firm membership is a roadmap item (1 user = 1 firm
+                today). The entry was a `window.alert(...)` stub which
+                broke the "every button does something real" contract.
+                When the multi-membership flow lands, restore the entry
+                here and wire it to the membership picker. */}
           </div>
         </>
       )}
