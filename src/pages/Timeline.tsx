@@ -1107,7 +1107,13 @@ function TaskTimelineRow({
           })}
         </div>
 
-        {/* Status pill — gap-loud (T4: as pill, never paint) */}
+        {/* Status pill — gap-loud (T4: as pill, never paint).
+            Yuqi audit 2026-05-05: "Ready" pill killed. Pills are for
+            non-default states; absence of a pill IS the "no problem"
+            signal. Showing "Ready" on every clean row trained the eye
+            to ignore the column entirely, then real "behind" / "waiting"
+            states had to fight for attention against a wall of green.
+            Now: behind = red pill, waiting = yellow pill, clean = nothing. */}
         <div className="w-44 shrink-0 flex items-center justify-end gap-2">
           {t.daysBehind > 0 ? (
             <StatusPill variant="danger" size="xs">
@@ -1117,11 +1123,7 @@ function TaskTimelineRow({
             <StatusPill variant="warn" size="xs">
               {t.missingCount} waiting
             </StatusPill>
-          ) : (
-            <StatusPill variant="ok" size="xs">
-              Ready
-            </StatusPill>
-          )}
+          ) : null}
           {/* Stage action — clicking opens a confirm Dialog. Stops
               propagation so the row's click-to-open-detail doesn't
               fire alongside. Title is the stage's "complete this step"

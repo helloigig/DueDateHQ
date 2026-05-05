@@ -384,7 +384,12 @@ export function Clients() {
   };
 
   return (
-    <PageContainer variant="wide" className="space-y-section">
+    // Yuqi audit 2026-05-05 — page wrapper was `space-y-section` (48px),
+    // which made every page-level block (header → tiles → filter row →
+    // table) feel disconnected. Clients is a dense control panel, not a
+    // calm digest like Today; tightening to `space-y-card` (24px) keeps
+    // the controls grouped without losing legible separation.
+    <PageContainer variant="wide" className="space-y-card">
       {/* Header — title meta carries the active-count, actions live inline so
           "Add client" + "Import CSV" sit on the same row as the page name. */}
       <PageHeader
@@ -458,16 +463,21 @@ export function Clients() {
 
       {/* KPI tiles — clients-page axes, not Today's signals.
           The page's job is to slice/find clients, so the tiles surface
-          attributes (active count, multi-state count, stuck cohort)
-          rather than per-deadline signals (which live on Today). The
-          \"Awaiting reply\" tile was retired here because it duplicated
-          Today's chase queue — the data lives in the Waiting column on
-          each row already, and surfacing it as a top-level number on
-          this page didn't tell the CPA anything they couldn't read in
-          the table. \"Stuck >14d\" stays — it's the one fleet-level
-          urgency signal the table doesn't surface as a single sortable
-          number. */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-card">
+          attributes (active count, stuck cohort) rather than per-
+          deadline signals (which live on Today). "Awaiting reply" was
+          retired previously (duplicated Today's chase queue).
+          "Stuck >14d" stays — fleet-level urgency signal the table
+          doesn't surface as a single sortable number.
+          Yuqi audit 2026-05-05: Multi-state tile now hides when zero
+          (was rendering "0 multi-state" which is uninformative — the
+          page already says "0 matches" via the filter behaviour, and
+          a zero count on a quick-filter tile just confuses Sarah).
+          Same conditional pattern as Dashboard's "Past official". */}
+      <div
+        className={`grid grid-cols-1 gap-card ${
+          multiStateCount > 0 ? "md:grid-cols-3" : "md:grid-cols-2"
+        }`}
+      >
         <MetricTile
           label="Active clients"
           value={clients.length}
@@ -478,14 +488,16 @@ export function Clients() {
               : `of ${allClients.length} matching filters`
           }
         />
-        <MetricTile
-          label="Multi-state"
-          value={multiStateCount}
-          tone="neutral"
-          helper="Clients with nexus beyond their primary state"
-          active={smartFilters.has("multiState")}
-          onClick={() => toggleSmart("multiState")}
-        />
+        {multiStateCount > 0 && (
+          <MetricTile
+            label="Multi-state"
+            value={multiStateCount}
+            tone="neutral"
+            helper="Clients with nexus beyond their primary state"
+            active={smartFilters.has("multiState")}
+            onClick={() => toggleSmart("multiState")}
+          />
+        )}
         <MetricTile
           label={`Stuck >${STUCK_THRESHOLD_DAYS}d`}
           value={stuckFleetCount}
