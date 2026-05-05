@@ -29,46 +29,48 @@ import { PageHeader } from "../components/ui/PageHeader";
 
 type Tab = "inbox" | "outbox" | "drafts" | "issues";
 
+// Static fallback rows shown when the live BE returns empty AND the user
+// is in mock mode. Names match real entries in src/data/mockClients.ts.
 const REMINDERS_OUT = [
   {
     daysSent: 11,
-    client: "Emily Hartfield",
-    task: "K-1 Apex Fund (1040 NY)",
-    address: "emily@hartfield.com",
+    client: "Acme Bayou LLC",
+    task: "K-1 from Apex Fund (1065)",
+    address: "rob@acmebayou.com",
   },
   {
     daysSent: 9,
-    client: "Marcus Chen",
-    task: "S-Corp books (S-Corp CA)",
-    address: "marcus@chen-llc.com",
+    client: "Pacific Ridge S-Corp",
+    task: "Shareholder distribution (CA 100S)",
+    address: "kyle@pacificridge.co",
   },
   {
     daysSent: 8,
-    client: "Apex Fund",
-    task: "1065 Partner Forms",
-    address: "ops@apexfund.com",
+    client: "Lakeshore Realty LLC",
+    task: "Rental property packet (1065)",
+    address: "ap@lakeshore-realty.com",
   },
 ];
 
 const INBOX_MOCK: InboxRow[] = [
   {
     intent: "timeline_pushback",
-    client: "Sarah Mitchell",
-    task: "1040 NY",
-    preview: "Hi! K-1 from my fund won't be ready until late July...",
+    client: "Mark Sullivan",
+    task: "1040 (extension)",
+    preview: "Hi Sarah — my K-1 from the partnership won't be ready until late July...",
     receivedHoursAgo: 3,
   },
   {
     intent: "question_asked",
-    client: "Jordan Lee",
-    task: "S-Corp CA",
+    client: "Mark Sullivan",
+    task: "1040 (extension)",
     preview: "Quick question — what's the IRA contribution limit this year?",
     receivedHoursAgo: 7,
   },
   {
     intent: "document_provided",
-    client: "Emily Hartfield",
-    task: "1040 NY",
+    client: "Olivia Bennett",
+    task: "Q2 estimate (federal)",
     preview: "Attached: W-2 for 2025 (ADP via Acme Corp)",
     receivedHoursAgo: 14,
   },

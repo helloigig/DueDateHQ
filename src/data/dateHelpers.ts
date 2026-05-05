@@ -1,8 +1,10 @@
 // `TODAY` and `NOW_ANCHOR` are mode-aware:
-//   • Mock mode (default / demo): pinned to 2026-04-23 so fixture data with
+//   • Mock mode (default / demo): pinned to 2026-05-05 so fixture data with
 //     known `detectedAt` / `dueDate` values lands in the intended bucket
 //     every time. Without this, demo escalation tiers, "behind plan" counts,
-//     and snooze gating drift as real time advances.
+//     and snooze gating drift as real time advances. Bumping this requires
+//     re-anchoring the dates inside src/data/mock*.ts to keep the
+//     fresh / reminder / escalated / blocking tiers honest.
 //   • Real mode (VITE_USE_MOCK_DATA=false): tracks actual local-day start
 //     and current UTC moment so escalation, deadline state, and snooze-
 //     until-tomorrow all advance day-to-day with real users' clocks.
@@ -13,7 +15,7 @@
 const isMockMode = import.meta.env.VITE_USE_MOCK_DATA !== "false";
 
 export const TODAY = isMockMode
-  ? new Date("2026-04-23T00:00:00")
+  ? new Date("2026-05-05T00:00:00")
   : (() => {
       const d = new Date();
       d.setHours(0, 0, 0, 0);
@@ -78,7 +80,7 @@ export function periodSuffix(
  * tier (fresh / reminder / escalated / blocking) advances day-to-day.
  */
 const NOW_ANCHOR = isMockMode
-  ? new Date("2026-04-23T11:00:00Z") // mid-morning Thursday
+  ? new Date("2026-05-05T11:00:00Z") // mid-morning Tuesday
   : new Date();
 
 export function hoursSince(iso: string): number {
