@@ -6,6 +6,7 @@ import {
   UserPlus,
   Check,
   Slash,
+  Paperclip,
 } from "lucide-react";
 import { useSelection } from "../hooks/useSelection";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -143,6 +144,7 @@ const STAGE_LABELS: Record<Stage, string> = {
 const MOCK_TIMELINES: TaskRow[] = [
   {
     taskId: "mock-task-apex",
+    clientId: "c-ca-01",
     client: "Apex Fund",
     task: "1065 Partner Forms",
     dueDate: "Mar 15",
@@ -161,6 +163,7 @@ const MOCK_TIMELINES: TaskRow[] = [
   },
   {
     taskId: "mock-task-hartfield",
+    clientId: "c-ca-01",
     client: "Emily Hartfield",
     task: "1040 NY",
     dueDate: "Apr 15",
@@ -179,6 +182,7 @@ const MOCK_TIMELINES: TaskRow[] = [
   },
   {
     taskId: "mock-task-chen",
+    clientId: "c-ca-01",
     client: "Marcus Chen",
     task: "S-Corp CA",
     dueDate: "Mar 31",
@@ -197,6 +201,7 @@ const MOCK_TIMELINES: TaskRow[] = [
   },
   {
     taskId: "mock-task-mitchell",
+    clientId: "c-ca-01",
     client: "Sarah Mitchell",
     task: "1040 TX",
     dueDate: "Apr 15",
@@ -215,6 +220,7 @@ const MOCK_TIMELINES: TaskRow[] = [
   },
   {
     taskId: "mock-task-lee",
+    clientId: "c-ca-01",
     client: "Jordan Lee",
     task: "1040 Federal",
     dueDate: "Apr 15",
@@ -236,6 +242,7 @@ const MOCK_TIMELINES: TaskRow[] = [
   // disambiguates the row label as "941 · Q2 · federal".
   {
     taskId: "mock-task-941-q2",
+    clientId: "c-ca-01",
     client: "Pacific Ridge Consulting",
     task: "941 · Q2 · federal",
     dueDate: "Jul 31",
@@ -254,6 +261,7 @@ const MOCK_TIMELINES: TaskRow[] = [
   },
   {
     taskId: "mock-task-941-q3",
+    clientId: "c-ca-01",
     client: "Pacific Ridge Consulting",
     task: "941 · Q3 · federal",
     dueDate: "Oct 31",
@@ -687,6 +695,66 @@ export function Timeline() {
   const [assigneeOverrides, setAssigneeOverrides] = useState<
     Map<string, { assignedUserId: string | null; assigneeName: string | null }>
   >(new Map());
+  // Local stage advance overlay — keyed by taskId. Mirrors the
+  // assigneeOverrides pattern so rows re-render the moment Confirm
+  // fires, instead of waiting on the BE refetch (and in mock mode,
+  // forever — there's no BE call yet for stage advance). Stores the
+  // new currentStage + the recomputed milestoneStatus array. Yuqi
+  // audit 2026-05-06: "if i select advance button, nothing happens"
+  // — the Confirm handler was a toast-only stub; the row stayed at
+  // the same stage so the user got no visual confirmation. Real BE
+  // wiring through `taskMilestones.update` lands when the fleetStack
+  // contract surfaces per-milestone IDs to the row level.
+  const [stageOverrides, setStageOverrides] = useState<
+    Map<
+      string,
+      {
+        currentStage: Stage;
+        milestoneStatus: ("done" | "in_progress" | "not_started")[];
+      }
+    >
+  >(new Map());
+  // Compute the post-advance shape for a row: marks the current stage
+  // done, flips the next stage to in_progress, returns the new
+  // (currentStage, milestoneStatus) tuple. When already at "file",
+  // marks file done and keeps currentStage="file" (caller treats it
+  // as "filed" — the row drops out of the active queue under the
+  // missingCount/daysBehind=0 path).
+  const computeAdvancedStage = useCallback(
+    (row: TaskRow): {
+      currentStage: Stage;
+      milestoneStatus: ("done" | "in_progress" | "not_started")[];
+    } => {
+      const stages: Stage[] = [
+        "initial_meeting",
+        "collect",
+        "prepare",
+        "review",
+        "file",
+      ];
+      const idx = stages.indexOf(row.currentStage);
+      const nextIdx = idx + 1;
+      const newStatus = [...row.milestoneStatus];
+      if (idx >= 0) newStatus[idx] = "done";
+      if (nextIdx < stages.length) newStatus[nextIdx] = "in_progress";
+      return {
+        currentStage: stages[nextIdx] ?? row.currentStage,
+        milestoneStatus: newStatus,
+      };
+    },
+    [],
+  );
+  const advanceStageLocal = useCallback(
+    (rows: TaskRow[]) => {
+      const next = new Map(stageOverrides);
+      for (const row of rows) {
+        if (!row.taskId) continue;
+        next.set(row.taskId, computeAdvancedStage(row));
+      }
+      setStageOverrides(next);
+    },
+    [stageOverrides, computeAdvancedStage],
+  );
   const applyOverride = useCallback(
     (taskIds: string[], userId: string | null, name: string | null) => {
       setAssigneeOverrides((prev) => {
@@ -736,22 +804,31 @@ export function Timeline() {
       : env.useMockData
         ? MOCK_TIMELINES
         : [];
-  // Layer the optimistic assignment overlay on top — applies to both
-  // mock fallback rows AND live ones for the brief window before the
-  // BE refetch lands.
+  // Layer the optimistic assignment + stage overlays on top — applies
+  // to both mock fallback rows AND live ones for the brief window
+  // before the BE refetch lands.
   const source = useMemo(() => {
-    if (assigneeOverrides.size === 0) return sourceRaw;
+    if (assigneeOverrides.size === 0 && stageOverrides.size === 0) {
+      return sourceRaw;
+    }
     return sourceRaw.map((t) => {
       if (!t.taskId) return t;
-      const override = assigneeOverrides.get(t.taskId);
-      if (!override) return t;
+      const aOv = assigneeOverrides.get(t.taskId);
+      const sOv = stageOverrides.get(t.taskId);
+      if (!aOv && !sOv) return t;
       return {
         ...t,
-        assignedUserId: override.assignedUserId,
-        assigneeName: override.assigneeName,
+        ...(aOv && {
+          assignedUserId: aOv.assignedUserId,
+          assigneeName: aOv.assigneeName,
+        }),
+        ...(sOv && {
+          currentStage: sOv.currentStage,
+          milestoneStatus: sOv.milestoneStatus,
+        }),
       };
     });
-  }, [sourceRaw, assigneeOverrides]);
+  }, [sourceRaw, assigneeOverrides, stageOverrides]);
 
   // Effective "behind" classifier — single source of truth for the bucket
   // split, the KPIs, and the filter chip. Combines the stored daysBehind
@@ -942,68 +1019,66 @@ export function Timeline() {
         />
       </div>
 
-      {/* Workflow-state chips — single source of truth via shared
-          FilterChip. Sit directly under the tiles so the eye reads
-          tiles → chips → MultiSelect filters → table, matching the
-          Clients page rhythm. */}
-      <div className="flex items-center gap-1 mb-card">
-        <FilterChip
-          active={filter === "all"}
-          count={kpis.active}
-          onClick={() => setFilter("all")}
-        >
-          All tasks
-        </FilterChip>
-        <FilterChip
-          active={filter === "waiting"}
-          count={kpis.waiting}
-          onClick={() => setFilter("waiting")}
-        >
-          Awaiting docs
-        </FilterChip>
-        <FilterChip
-          active={filter === "behind"}
-          count={kpis.behind}
-          onClick={() => setFilter("behind")}
-        >
-          Behind
-        </FilterChip>
-      </div>
-
-      {/* Attribute filters — second axis (jurisdiction / entity / tier).
-          Workflow chips above answer "what STATE?", these answer "what
-          SLICE of the fleet?" Multi-select; compose with the chips.
-          Mirrors the Clients page filter row (Entity / State / Tier /
-          Package) — sits below the workflow filter so the visual rhythm
-          tiles → workflow chips → attribute chips → table holds. */}
-      <div className="mb-region flex items-center gap-2 flex-wrap">
-        <MultiSelectChip
-          label="Jurisdiction"
-          options={jurisdictionOptions}
-          selected={attr.jurisdiction}
-          onChange={(next) => setAttr((a) => ({ ...a, jurisdiction: next }))}
-        />
-        <MultiSelectChip
-          label="Entity"
-          options={ENTITY_OPTIONS}
-          selected={attr.entity}
-          onChange={(next) => setAttr((a) => ({ ...a, entity: next }))}
-        />
-        <MultiSelectChip
-          label="Tier"
-          options={TIER_OPTIONS}
-          selected={attr.tier}
-          onChange={(next) => setAttr((a) => ({ ...a, tier: next }))}
-        />
-        {hasAttrFilters && (
-          <button
-            type="button"
-            onClick={() => setAttr(EMPTY_ATTR)}
-            className="text-xs text-ink-500 hover:text-ink-900 underline underline-offset-2 ml-1"
+      {/* Filter row — workflow chips left, attribute filters right.
+          Yuqi audit 2026-05-06: "have the all tasks/awaiting doc and
+          the jurisdiction/entity/tier filters on the same line, spaced
+          out." Single row reads as one cohesive control surface; the
+          gap between groups (justify-between) makes the "what STATE
+          vs. what SLICE" hierarchy obvious without a second line.
+          Wraps on narrower viewports so neither group ever truncates. */}
+      <div className="mb-region flex items-center justify-between gap-section flex-wrap">
+        <div className="flex items-center gap-1 flex-wrap">
+          <FilterChip
+            active={filter === "all"}
+            count={kpis.active}
+            onClick={() => setFilter("all")}
           >
-            Clear all
-          </button>
-        )}
+            All tasks
+          </FilterChip>
+          <FilterChip
+            active={filter === "waiting"}
+            count={kpis.waiting}
+            onClick={() => setFilter("waiting")}
+          >
+            Awaiting docs
+          </FilterChip>
+          <FilterChip
+            active={filter === "behind"}
+            count={kpis.behind}
+            onClick={() => setFilter("behind")}
+          >
+            Behind
+          </FilterChip>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <MultiSelectChip
+            label="Jurisdiction"
+            options={jurisdictionOptions}
+            selected={attr.jurisdiction}
+            onChange={(next) => setAttr((a) => ({ ...a, jurisdiction: next }))}
+          />
+          <MultiSelectChip
+            label="Entity"
+            options={ENTITY_OPTIONS}
+            selected={attr.entity}
+            onChange={(next) => setAttr((a) => ({ ...a, entity: next }))}
+          />
+          <MultiSelectChip
+            label="Tier"
+            options={TIER_OPTIONS}
+            selected={attr.tier}
+            onChange={(next) => setAttr((a) => ({ ...a, tier: next }))}
+          />
+          {hasAttrFilters && (
+            <button
+              type="button"
+              onClick={() => setAttr(EMPTY_ATTR)}
+              className="text-xs text-ink-500 hover:text-ink-900 underline underline-offset-2 ml-1"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Sections */}
@@ -1197,14 +1272,6 @@ export function Timeline() {
           />
           <button
             type="button"
-            disabled
-            className="text-xs px-2.5 py-1 rounded bg-sunken/20 text-ink-300 cursor-not-allowed inline-flex items-center gap-1"
-            title="Coming next pass — needs a team-member picker + tasks.assign mutation"
-          >
-            Assign to… (soon)
-          </button>
-          <button
-            type="button"
             onClick={() => timelineSelection.clear()}
             className="text-xs text-ink-300 hover:text-canvas transition-colors px-2 inline-flex items-center gap-1"
             aria-label="Clear selection"
@@ -1291,11 +1358,14 @@ export function Timeline() {
             <Button
               size="sm"
               onClick={() => {
-                // Phase-1 stub mirroring the single-row stage-action
-                // dialog: fires a per-row toast + an aggregate so the
-                // user gets row-level feedback for audit but doesn't
-                // miss the overall outcome. Real BE mutation lands
-                // when the single-row path gets wired (same TODO).
+                // Apply local stage override so each row visibly
+                // advances the moment Confirm fires. Real BE mutation
+                // (taskMilestones.update with status="done" on the
+                // current milestone, status="in_progress" on the
+                // next) lands when the fleetStack contract surfaces
+                // per-milestone IDs to the row level — until then,
+                // the FE-only override gives the user immediate
+                // confirmation that the action took.
                 let advancedCount = 0;
                 let filedCount = 0;
                 const stageList: Stage[] = [
@@ -1311,6 +1381,7 @@ export function Timeline() {
                   if (nextStage) advancedCount++;
                   else filedCount++;
                 }
+                advanceStageLocal(selectedTimelineRows);
                 const parts: string[] = [];
                 if (advancedCount > 0) {
                   parts.push(
@@ -1390,6 +1461,7 @@ export function Timeline() {
                 const verb = stageAction.nextStage
                   ? `${STAGE_LABELS[stageAction.row.currentStage]} marked done`
                   : "Marked filed";
+                advanceStageLocal([stageAction.row]);
                 toast.success(
                   `${verb} · ${stageAction.row.client} · ${stageAction.row.task}`,
                 );
@@ -1970,25 +2042,55 @@ function TaskTimelineRow({
           )}
         </div>
 
-        {/* Status pill — gap-loud (T4: as pill, never paint).
-            Yuqi audit 2026-05-05: "Ready" pill killed. Pills are for
-            non-default states; absence of a pill IS the "no problem"
-            signal. Showing "Ready" on every clean row trained the eye
-            to ignore the column entirely, then real "behind" / "waiting"
-            states had to fight for attention against a wall of green.
-            Now: behind = red pill, waiting = yellow pill, clean = nothing. */}
-        {/* Yuqi audit 2026-05-05: the right-column "Mark X done" button
-            was retired — its job is now done by clicking the current-
-            stage dot in the mini-timeline above. The status column
-            keeps its width so row alignment doesn't reflow. */}
-        <div className="w-44 shrink-0 flex items-center justify-end gap-2">
-          {t.daysBehind > 0 ? (
+        {/* Status pills — gap-loud (T4: as pill, never paint). Pills
+            render only for non-default states; absence IS the "no
+            problem" signal. Behind + missing-docs CAN coexist (a task
+            both past target AND awaiting files), so we render both
+            when both apply rather than picking one — the column
+            previously showed only the "louder" one and silently hid
+            the docs gap.
+            The docs pill is a real button: paperclip icon + "{N}
+            docs" reads as files (not an abstract count) and clicking
+            opens the same TaskPanel drawer the row-click does, where
+            ChecklistList renders the "Still waiting on client"
+            section first per gap-over-fill. Yuqi audit 2026-05-06:
+            "each of the file required for the task needs to be
+            tracked as well — where is the user going to track that?"
+            Answer: the TaskPanel checklist; this pill is its
+            entrypoint from the fleet view. */}
+        <div className="w-44 shrink-0 flex items-center justify-end gap-1.5">
+          {t.daysBehind > 0 && (
             <StatusPill variant="danger" size="xs">
               {t.daysBehind}d behind
             </StatusPill>
+          )}
+          {t.missingCount > 0 && navigable ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/clients/${t.clientId}?task=${t.taskId}`);
+              }}
+              onKeyDown={(e) => e.stopPropagation()}
+              title={`${t.missingCount} ${
+                t.missingCount === 1 ? "document" : "documents"
+              } still waiting from client. Click to open the file tracker.`}
+              aria-label={`Open file tracker — ${t.missingCount} ${
+                t.missingCount === 1 ? "document" : "documents"
+              } waiting`}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-pill border px-2 py-0.5 text-2xs font-medium tabular-nums transition-colors",
+                "bg-warn-bg border-warn-border text-warn-ink hover:bg-warn-bg/80 hover:border-warn-ink/40",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warn-border",
+              )}
+            >
+              <Paperclip className="w-3 h-3" aria-hidden />
+              {t.missingCount} {t.missingCount === 1 ? "doc" : "docs"}
+            </button>
           ) : t.missingCount > 0 ? (
             <StatusPill variant="warn" size="xs">
-              {t.missingCount} waiting
+              <Paperclip className="w-3 h-3" aria-hidden />
+              {t.missingCount} {t.missingCount === 1 ? "doc" : "docs"}
             </StatusPill>
           ) : null}
         </div>
