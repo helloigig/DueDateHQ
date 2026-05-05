@@ -14,6 +14,7 @@ import {
   Pin,
   PinOff,
   Check,
+  ChevronDown,
 } from "lucide-react";
 import { useAnnouncements } from "../hooks/useAnnouncements";
 import { useSession, signOut } from "../data/session";
@@ -476,9 +477,10 @@ function WorkspaceHeader({
             DueDateHQ
           </span>
         </div>
-        <span className="text-ink-400 group-hover:text-ink-700 text-xs shrink-0">
-          ⌄
-        </span>
+        <ChevronDown
+          className="w-4 h-4 shrink-0 text-ink-400 group-hover:text-ink-700"
+          aria-hidden
+        />
       </button>
 
       {/* Collapse toggle — top-right of the workspace header. Linear/
