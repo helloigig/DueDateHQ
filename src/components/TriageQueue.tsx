@@ -21,6 +21,7 @@ import type {
 import { TODAY, toIso } from "../data/dateHelpers";
 import { useAllOpenInsights } from "../hooks/useAiInsights";
 import { EmailDraftModal, type EmailDraftIntent } from "./EmailDraftModal";
+import { StateBadge } from "./ui/StateBadge";
 
 /**
  * The single most-important surface of the redesign. Replaces "scroll the
@@ -509,10 +510,9 @@ function PrimaryLine({ item }: { item: QueueItem }) {
       );
     case "alert":
       return (
-        <p className="text-sm text-ink-900">
-          <span className="font-medium">
-            {item.announcement.stateCode}: {item.announcement.title}
-          </span>
+        <p className="text-sm text-ink-900 flex items-center gap-1.5 flex-wrap">
+          <StateBadge code={item.announcement.stateCode} size="sm" />
+          <span className="font-medium">{item.announcement.title}</span>
         </p>
       );
     case "insight":

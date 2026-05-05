@@ -14,6 +14,17 @@ export interface DetectedRow {
   email: string;
   phone?: string;
   bundle: string | null;
+  /** Multi-state nexus (parsed from comma / semicolon list) — added for
+   *  schema parity per `feedback_no_manual_file_shuffle`. Optional:
+   *  rows without a nexus column fall back to undefined. */
+  nexusStates?: StateCode[];
+  /** Tier 0-3 — drives capacity weighting. Optional in CSV. */
+  tier?: "0" | "1" | "2" | "3" | null;
+  /** Free-text notes — preserved verbatim for CPA reference. */
+  notes?: string;
+  /** Active / inactive / prospect / archived. Defaults to "active" if
+   *  the CSV omits the column (matches backend default). */
+  status?: "active" | "inactive" | "prospect" | "archived" | null;
   issues: string[]; // ["state_unknown", "entity_ambiguous", "email_missing"]
 }
 
@@ -27,6 +38,10 @@ export type TargetField =
   | "contact_email"
   | "contact_phone"
   | "bundle"
+  | "nexus_states"
+  | "tier"
+  | "notes"
+  | "status"
   | "__ignored__"
   | string;
 
