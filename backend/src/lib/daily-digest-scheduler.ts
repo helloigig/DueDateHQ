@@ -27,7 +27,12 @@ import { db } from "../db/client.js";
 import { users, dailyDigestRuns } from "../db/schema.js";
 import type { UserPreferences } from "../db/schema.js";
 import { sendEmail } from "./email-out.js";
-import { generateDigest, isQuietDay, localDateFor } from "./daily-digest.js";
+import {
+  DEFAULT_DIGEST_PREFS,
+  generateDigest,
+  isQuietDay,
+  localDateFor,
+} from "./daily-digest.js";
 import { renderDailyDigest } from "./daily-digest-renderer.js";
 import { env } from "../env.js";
 import { captureException, log } from "./observability.js";
@@ -89,8 +94,12 @@ export async function runDigestTick(asOf: Date = new Date()): Promise<{
   let failed = 0;
 
   for (const u of candidates) {
-    const prefs = (u.preferences as UserPreferences | null)?.dailyDigest;
-    if (!prefs?.enabled) continue;
+    // Default ON: when a user hasn't customized preferences, fall back
+    // to DEFAULT_DIGEST_PREFS rather than skipping. Users who explicitly
+    // disabled (`enabled: false` set on a row) are still skipped.
+    const stored = (u.preferences as UserPreferences | null)?.dailyDigest;
+    const prefs = stored ?? DEFAULT_DIGEST_PREFS;
+    if (!prefs.enabled) continue;
     if (!isLocalSendWindow(asOf, u.timezone, prefs)) {
       skippedNotDue++;
       continue;

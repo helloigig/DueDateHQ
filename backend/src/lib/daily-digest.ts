@@ -94,6 +94,27 @@ export function isQuietDay(p: DigestPayload): boolean {
   return p.urgent.length === 0 && p.alerts.length === 0 && p.replies.length === 0;
 }
 
+/**
+ * Default digest settings — applied to users whose `users.preferences`
+ * is empty (or missing the `dailyDigest` key). Default ON so existing
+ * users receive the digest after deploy without each one having to
+ * visit Settings first; users who actively dislike the email can
+ * still toggle it off via `dailyDigest.updateSettings`.
+ *
+ * Kept here (not in the tRPC router) so the scheduler can import it
+ * without pulling in the router file. The router re-exports the same
+ * object via its own DEFAULT_SETTINGS const.
+ */
+export const DEFAULT_DIGEST_PREFS: {
+  enabled: boolean;
+  sendHour: number;
+  days: Array<"sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat">;
+} = {
+  enabled: true,
+  sendHour: 7,
+  days: ["mon", "tue", "wed", "thu", "fri"],
+};
+
 const DAY_MS = 86_400_000;
 
 /**
