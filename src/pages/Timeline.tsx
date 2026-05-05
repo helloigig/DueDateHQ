@@ -26,6 +26,7 @@ import { clients as MOCK_CLIENTS } from "../data/mockClients";
 import { useClients } from "../hooks/useClients";
 import type { ClientTier } from "../types";
 import { cn } from "../lib/utils";
+import { TODAY, parseDate, daysBetween } from "../data/dateHelpers";
 
 // Lookup row: clientId → entityType / tier / primaryState. Used to
 // enrich TaskRow with cross-axis filter dimensions (entity, tier,
@@ -240,6 +241,18 @@ function groupLiveMilestones(
     // Strip time component if present — DESIGN.md locked policy: dates only.
     const officialDueIso =
       dueIso && dueIso.length >= 10 ? dueIso.slice(0, 10) : undefined;
+    // Compute daysBehind from the operative target date (file milestone if
+    // present, otherwise official due). Hardcoded 0 was bucketing every
+    // task under "On track" — including ones the chip rendered as OVERDUE.
+    // File milestone done → 0 (no longer in the working pipeline). Otherwise
+    // positive when today is past the target.
+    const fileDone = milestoneStatus[stages.indexOf("file")] === "done";
+    let daysBehind = 0;
+    if (!fileDone && officialDueIso) {
+      const target = parseDate(officialDueIso);
+      const slip = daysBetween(target, TODAY);
+      if (slip > 0) daysBehind = slip;
+    }
     out.push({
       taskId,
       clientId: lead.clientId,
@@ -257,7 +270,7 @@ function groupLiveMilestones(
       // buffer (annual_return: -7d) until the field ships on milestones.
       formClass: "annual_return",
       currentStage,
-      daysBehind: 0,
+      daysBehind,
       missingCount: ms.filter((m) => m.status === "blocked" || m.status === "overdue").length,
       milestoneStatus,
       jurisdiction: lead.jurisdiction ?? lookup?.primaryState,
@@ -340,13 +353,36 @@ export function Timeline() {
         ? MOCK_TIMELINES
         : [];
 
+  // Effective "behind" classifier — single source of truth for the bucket
+  // split, the KPIs, and the filter chip. Combines the stored daysBehind
+  // (set when a non-File milestone slips, derived in groupLiveMilestones)
+  // with a freshness check against officialDueIso so a task whose file
+  // milestone hasn't completed yet but the legal deadline has passed never
+  // ends up under "On track" (the bug: MOCK_TIMELINES seeds had stale
+  // daysBehind=0 even when officialDueIso was clearly past TODAY).
+  const isBehind = (t: TaskRow): boolean => {
+    if (t.daysBehind > 0) return true;
+    const fileDone = t.milestoneStatus[4] === "done";
+    if (fileDone) return false;
+    if (!t.officialDueIso) return false;
+    return daysBetween(parseDate(t.officialDueIso), TODAY) > 0;
+  };
+  // Effective slip in days — used in the sort weight + the count rendering.
+  const effectiveDaysBehind = (t: TaskRow): number => {
+    if (t.daysBehind > 0) return t.daysBehind;
+    const fileDone = t.milestoneStatus[4] === "done";
+    if (fileDone || !t.officialDueIso) return 0;
+    const slip = daysBetween(parseDate(t.officialDueIso), TODAY);
+    return slip > 0 ? slip : 0;
+  };
+
   // KPIs across the full source (filter doesn't change them)
   const kpis = useMemo(() => {
     const active = source.length;
-    const behind = source.filter((t) => t.daysBehind > 0).length;
+    const behind = source.filter(isBehind).length;
     const waiting = source.filter((t) => t.missingCount > 0).length;
     const ready = source.filter(
-      (t) => t.daysBehind === 0 && t.missingCount === 0,
+      (t) => !isBehind(t) && t.missingCount === 0,
     ).length;
     return { active, behind, waiting, ready };
   }, [source]);
@@ -364,7 +400,7 @@ export function Timeline() {
   const filtered = useMemo(() => {
     let out = source;
     if (filter === "waiting") out = out.filter((t) => t.missingCount > 0);
-    if (filter === "behind") out = out.filter((t) => t.daysBehind > 0);
+    if (filter === "behind") out = out.filter(isBehind);
     if (attr.jurisdiction.length) {
       out = out.filter(
         (t) => t.jurisdiction && attr.jurisdiction.includes(t.jurisdiction),
@@ -389,15 +425,15 @@ export function Timeline() {
     () =>
       [...filtered].sort(
         (a, b) =>
-          b.missingCount * 10 + b.daysBehind * 5 -
-          (a.missingCount * 10 + a.daysBehind * 5),
+          b.missingCount * 10 + effectiveDaysBehind(b) * 5 -
+          (a.missingCount * 10 + effectiveDaysBehind(a) * 5),
       ),
     [filtered],
   );
 
   // Split sorted into Behind + On-track sections (gap > fill)
-  const behindList = sorted.filter((t) => t.daysBehind > 0);
-  const onTrackList = sorted.filter((t) => t.daysBehind === 0);
+  const behindList = sorted.filter(isBehind);
+  const onTrackList = sorted.filter((t) => !isBehind(t));
 
   return (
     <PageContainer variant="wide">
