@@ -1289,9 +1289,6 @@ export function Alerts() {
                     </button>
                     <span className="text-2xs text-ink-400">
                       Was dismissed
-                      {a.dismissedAt
-                        ? ` ${new Date(a.dismissedAt).toLocaleDateString()}`
-                        : ""}
                     </span>
                   </div>
                 )}
