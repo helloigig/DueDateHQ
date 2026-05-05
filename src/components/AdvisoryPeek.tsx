@@ -3,6 +3,7 @@ import { TrendingUp, ArrowRight, X } from "lucide-react";
 import { useStore } from "../data/store";
 import { useAllOpenInsights } from "../hooks/useAiInsights";
 import { useState } from "react";
+import { ClientChip } from "./ClientChip";
 
 const KEY = "duedatehq.advisory_peek_dismissed.v1";
 
@@ -45,16 +46,11 @@ export function AdvisoryPeek() {
       aria-label="Advisory opportunities"
     >
       <TrendingUp className="w-3.5 h-3.5 text-info-ink shrink-0" aria-hidden />
-      <div className="flex-1 min-w-0 text-xs">
-        <span className="text-ink-500 uppercase tracking-wider text-2xs font-semibold mr-2">
+      <div className="flex-1 min-w-0 text-xs inline-flex items-center flex-wrap gap-x-1 gap-y-0">
+        <span className="text-ink-500 uppercase tracking-wider text-2xs font-semibold mr-1">
           Advisory
         </span>
-        <button
-          onClick={() => navigate(`/clients/${client.id}`)}
-          className="text-ink-900 font-medium hover:underline"
-        >
-          {client.name}
-        </button>
+        <ClientChip client={client} size="sm" as="link" />
         <span className="text-ink-700"> · {lead.title}</span>
         {others > 0 && (
           <span className="text-ink-500 ml-1">

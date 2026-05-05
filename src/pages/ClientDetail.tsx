@@ -61,8 +61,12 @@ import { ExportModal } from "../components/ExportModal";
 import { ExportClientsButton } from "../components/ExportClientsButton";
 import { PinClientButton } from "../components/Sidebar";
 import { BackLink } from "../components/ui/BackLink";
+import { ClientChip } from "../components/ClientChip";
+// PageContainer (from main, PR #133) for the 1080px page width.
+// StateChipGroup (also from main) dropped — ClientChip's `lg` variant
+// renders the state pill internally, so importing the standalone group
+// here is dead weight after the migration.
 import { PageContainer } from "../components/ui/PageContainer";
-import { StateChipGroup } from "../components/StateChipGroup";
 import { STATE_NAMES, type StateCode } from "../types";
 import { bundleByName, type FilingBundle } from "../data/bundles";
 import { resolveFederalForm } from "../data/canonicalForm";
@@ -265,26 +269,29 @@ export function ClientDetail() {
           wrapping client name on narrow viewports. */}
       <div className="mt-3 flex flex-col sm:flex-row sm:items-start gap-3">
         <div className="flex-1 min-w-0">
-          {/* Row 1: identity only — name + entity + state chips + archived
-              flag. Yuqi audit 2026-05-05: the previous header crowded the
-              first line with "Working on: TX FRANCHISE, 941" in info-blue,
-              competing with the name itself. Mercury T2 says one accent per
-              viewport; the working-on data is context, not headline, so
-              it moves to the meta line below in neutral type. */}
+          {/* Row 1: identity. ClientChip (size="lg", showTier, showState)
+              is the canonical rendering of the name+tier+state triplet —
+              this is the migration target of PR #135; the standalone
+              StateChipGroup and the inline H1 it replaced are removed.
+              Entity-type badge + archived flag remain as siblings since
+              they're not part of the per-client identity tuple. The
+              "Working on" badge that used to live here was relocated to
+              the meta line below in PR #133 — it's context, not headline
+              (Mercury T2: one accent per viewport). */}
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-display font-semibold text-ink-900 leading-7 tracking-[-0.01em]">
-              {client.name}
-            </h1>
+            <ClientChip
+              client={client}
+              size="lg"
+              as="span"
+              showTier
+              showState
+            />
             <span
               className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line"
               title="Entity type"
             >
               {entityTypeDisplay(client.entityType)}
             </span>
-            <StateChipGroup
-              primary={client.primaryState}
-              nexus={client.nexusStates}
-            />
             {client.status === "archived" && (
               <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-500">
                 Archived
@@ -301,12 +308,11 @@ export function ClientDetail() {
               is context; the chase / overdue / waiting states get color
               elsewhere on the page. */}
           <div className="mt-2 text-xs text-ink-500 flex items-baseline flex-wrap gap-x-section gap-y-1">
-            <span>
-              <span className="text-ink-400">Tier</span>{" "}
-              <span className="text-ink-700 font-medium capitalize">
-                {client.tier ?? "standard"}
-              </span>
-            </span>
+            {/* Tier moved into the canonical ClientChip above (lg
+                variant with showTier renders the label inline next to
+                the name) — identity (name + tier + primary state)
+                lives in one place per the ClientChip primitive
+                contract. */}
             {client.servicePackages.length > 0 && (
               <span className="inline-flex items-baseline gap-1">
                 <span className="text-ink-400">
