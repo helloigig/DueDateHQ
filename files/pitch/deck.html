@@ -270,37 +270,29 @@
   .qthread-card .arrow-row .text b { color: var(--ink-900); }
   .qthread-card .ref { font-family: var(--font-mono); color: var(--ink-400); font-size: 1.2vmin; padding-top: 0.6vmin; border-top: 1px dashed var(--line); }
 
-  /* === SLIDE 9 (was 8): Other 2 interviews === */
-  .methodology-strip { display: grid; grid-template-columns: 2fr 1fr; gap: 2vmin; margin-bottom: 2vmin; padding-bottom: 1.8vmin; border-bottom: 1px solid var(--line); }
-  .questionnaire-block { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 1.5vmin 1.8vmin; }
-  .questionnaire-block .lbl { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); margin-bottom: 0.7vmin; text-transform: uppercase; }
-  .q-list { display: flex; flex-direction: column; gap: 0.4vmin; }
-  .q-item { display: grid; grid-template-columns: 2vmin 1fr; gap: 0.6vmin; align-items: baseline; font-size: 1.25vmin; color: var(--ink-700); line-height: 1.5; }
-  .q-item .qn { font-family: var(--font-mono); font-size: 1.2vmin; color: var(--indigo-ink); font-weight: 700; }
-  .funnel-block { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 1.5vmin 1.8vmin; display: flex; flex-direction: column; gap: 0.6vmin; }
-  .funnel-block .lbl { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); margin-bottom: 0.4vmin; text-transform: uppercase; }
-  .funnel-row { display: grid; grid-template-columns: 3vmin 1fr; gap: 0.7vmin; align-items: baseline; font-size: 1.2vmin; line-height: 1.4; }
-  .funnel-row .n { font-size: 1.5vmin; font-weight: 600; color: var(--ink-900); font-variant-numeric: tabular-nums; line-height: 1; }
+  /* === SLIDE 9: Other 2 interviews · cleaner === */
+  .methodology-strip { display: grid; grid-template-columns: 2fr 1fr; gap: 5vmin; margin-bottom: 3vmin; padding-bottom: 2.5vmin; border-bottom: 1px solid var(--line); }
+  .meth-block { display: flex; flex-direction: column; gap: 1.2vmin; }
+  .meth-block .lbl { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); text-transform: uppercase; }
+  .q-list { display: flex; flex-direction: column; gap: 0.6vmin; }
+  .q-item { display: grid; grid-template-columns: 2.4vmin 1fr; gap: 0.8vmin; align-items: baseline; font-size: 1.4vmin; color: var(--ink-700); line-height: 1.55; }
+  .q-item .qn { font-family: var(--font-mono); font-size: 1.25vmin; color: var(--indigo); font-weight: 700; }
+  .funnel-row { display: grid; grid-template-columns: 4.5vmin 1fr; gap: 1vmin; align-items: baseline; font-size: 1.4vmin; line-height: 1.55; padding: 0.5vmin 0; }
+  .funnel-row .n { font-size: 1.7vmin; font-weight: 700; color: var(--ink-900); font-variant-numeric: tabular-nums; line-height: 1; }
   .funnel-row .desc { color: var(--ink-700); }
-  .funnel-row .desc b { color: var(--ink-900); }
+  .funnel-row .desc b { color: var(--ink-900); font-weight: 600; }
   .funnel-row.miss .n { color: var(--ink-300); }
   .funnel-row.miss .desc { color: var(--ink-500); }
 
-  /* === SLIDE 9 (was): Other 2 interviews === */
-  .other-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3vmin; margin-top: 2.5vmin; align-items: stretch; }
-  .other-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.5vmin; display: flex; flex-direction: column; gap: 1.3vmin; }
+  .other-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5vmin; align-items: stretch; }
+  .other-card { display: flex; flex-direction: column; gap: 1.5vmin; }
   .other-card .badge { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); text-transform: uppercase; }
-  .other-card .name { font-size: 2.4vmin; font-weight: 600; color: var(--ink-900); letter-spacing: -0.015em; line-height: 1.1; }
-  .other-card .meta { font-family: var(--font-mono); font-size: 1.25vmin; color: var(--ink-500); letter-spacing: 0.04em; line-height: 1.55; }
-  .other-section { padding: 1vmin 1.3vmin; background: var(--canvas); border-radius: 6px; border-left: 2px solid var(--indigo); }
-  .other-section .lbl { font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.1em; color: var(--indigo-ink); margin-bottom: 0.4vmin; font-family: var(--font-mono); text-transform: uppercase; }
-  .other-section .text { font-size: 1.35vmin; color: var(--ink-700); line-height: 1.55; }
-  .other-section.confirmed { border-left-color: var(--ok-ink); }
-  .other-section.confirmed .lbl { color: var(--ok-ink); }
-  .other-section.new { border-left-color: var(--warn-ink); }
-  .other-section.new .lbl { color: var(--warn-ink); }
-  .auth-note { margin-top: 2vmin; padding: 1.3vmin 1.6vmin; background: var(--sunken); border-radius: 8px; font-size: 1.3vmin; color: var(--ink-700); line-height: 1.55; border-left: 3px solid var(--ink-300); }
-  .auth-note .strong { font-weight: 600; color: var(--ink-900); }
+  .other-card .name { font-size: 2.8vmin; font-weight: 600; color: var(--ink-900); letter-spacing: -0.02em; line-height: 1; }
+  .other-card .meta { font-family: var(--font-mono); font-size: 1.3vmin; color: var(--ink-500); letter-spacing: 0.04em; line-height: 1.6; padding-bottom: 1.2vmin; border-bottom: 1px solid var(--line); }
+  .other-section { padding: 0.5vmin 0; }
+  .other-section + .other-section { margin-top: 0.8vmin; padding-top: 1.2vmin; border-top: 1px dashed var(--line); }
+  .other-section .lbl { font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.1em; color: var(--indigo); margin-bottom: 0.5vmin; font-family: var(--font-mono); text-transform: uppercase; }
+  .other-section .text { font-size: 1.45vmin; color: var(--ink-700); line-height: 1.65; }
 
   /* === SLIDE 9: Insights === */
   .insights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.2vmin; margin-top: 2.5vmin; }
@@ -813,56 +805,56 @@
   <div class="micro eyebrow">另两次访谈 · questionnaire + 招募 funnel</div>
   <h2 class="h1">两段对话 · 加上不容易的招募过程。</h2>
   <div class="methodology-strip">
-    <div class="questionnaire-block">
-      <div class="lbl">Questionnaire · 5 个问题（INTERVIEWEE-ASK.md）</div>
+    <div class="meth-block">
+      <div class="lbl">Questionnaire · 5 个问题</div>
       <div class="q-list">
         <div class="q-item"><span class="qn">Q1</span><span>讲讲上周一早上 — 从打开电脑到午饭，时间花在哪里？</span></div>
         <div class="q-item"><span class="qn">Q2</span><span>这季度最近一次差点漏掉 deadline 是什么时候，出了什么问题？</span></div>
-        <div class="q-item"><span class="qn">Q3</span><span>你一般怎么知道州税务局发了延期或规则变化？最近的例子？</span></div>
-        <div class="q-item"><span class="qn">Q4</span><span>哪个工具你试过然后放弃了 — 具体是哪一刻决定不用了？</span></div>
+        <div class="q-item"><span class="qn">Q3</span><span>你一般怎么知道州税务局发了延期或规则变化？</span></div>
+        <div class="q-item"><span class="qn">Q4</span><span>哪个工具你试过然后放弃了 — 具体哪一刻决定不用了？</span></div>
         <div class="q-item"><span class="qn">Q5</span><span>如果只能自动化你一周里的一件事，会是哪件？</span></div>
       </div>
     </div>
-    <div class="funnel-block">
-      <div class="lbl">招募 funnel · 真实数字</div>
-      <div class="funnel-row"><span class="n">1</span><span class="desc"><b>Discord</b> r/TaxProChannel 私信 → L.（响应）</span></div>
-      <div class="funnel-row miss"><span class="n">30+</span><span class="desc"><b>LinkedIn</b> DM cold outreach → 无人回复</span></div>
-      <div class="funnel-row"><span class="n">1</span><span class="desc"><b>自有人脉</b>介绍 → M.（响应）</span></div>
-      <div class="funnel-row" style="margin-top: 0.5vmin; padding-top: 0.5vmin; border-top: 1px dashed var(--line);"><span class="n">~90'</span><span class="desc">每位语义访谈时长 · 非录像（隐私）</span></div>
+    <div class="meth-block">
+      <div class="lbl">招募 funnel</div>
+      <div class="funnel-row"><span class="n">1</span><span class="desc"><b>Discord</b> r/TaxProChannel → L.</span></div>
+      <div class="funnel-row miss"><span class="n">30+</span><span class="desc"><b>LinkedIn</b> DM 无人回复</span></div>
+      <div class="funnel-row"><span class="n">1</span><span class="desc"><b>自有人脉</b>介绍 → M.</span></div>
+      <div class="funnel-row"><span class="n">~90′</span><span class="desc">每位访谈时长 · 非录像（隐私）</span></div>
     </div>
   </div>
   <div class="other-grid">
     <div class="other-card">
       <div class="badge">访谈 02 · Solo CPA · Discord 招募</div>
       <div class="name">L.</div>
-      <div class="meta">3 年独立 · ~40 客户 · 跨 4 州<br>Stack: Excel + Gmail + Lacerte + QBO</div>
-      <div class="other-section confirmed">
-        <div class="lbl">确认了 · 供给侧框架</div>
-        <div class="text">Yan Jing 的供给侧框架在 40 客户级别一样成立。chase loop 是日常之痛，每次截止前 3 周吞掉一整个周末。Q1 答："周一早上 30+ 分钟拼凑上周的事。"</div>
-      </div>
-      <div class="other-section new">
-        <div class="lbl">新增 · 转化失败现场</div>
-        <div class="text">Q4 答：试用过 TaxDome 但放弃 — onboarding 太重，第 3 个客户导入就放弃了。「不愿为不需要的 80% 功能绑定一年。」</div>
+      <div class="meta">3 年独立 · ~40 客户 · 跨 4 州 · Excel + Gmail + Lacerte + QBO</div>
+      <div class="other-section">
+        <div class="lbl">确认 · 供给侧框架</div>
+        <div class="text">Yan Jing 的框架在 40 客户级别一样成立。chase loop 是日常之痛，每次截止前 3 周吞掉一个周末。Q1：「周一早上 30+ 分钟拼凑上周的事。」</div>
       </div>
       <div class="other-section">
-        <div class="lbl">决定了 · 落进产品</div>
+        <div class="lbl">新增 · 转化失败现场</div>
+        <div class="text">Q4：试过 TaxDome 但第 3 个客户导入就放弃。「不愿为不需要的 80% 功能绑一年。」</div>
+      </div>
+      <div class="other-section">
+        <div class="lbl">决定 · 落进产品</div>
         <div class="text">月付、无年锁；Onboarding Layer 1 必须 5 分钟见价值（CSV + 样例数据）— 不强制集成。</div>
       </div>
     </div>
     <div class="other-card">
       <div class="badge">访谈 03 · 小事务所 Accountant · 人脉介绍</div>
       <div class="name">M.</div>
-      <div class="meta">5 人事务所 · 2 年经验<br>分到 80 客户 · 仍在 ramp</div>
-      <div class="other-section confirmed">
-        <div class="lbl">确认了 · 知识转移痛</div>
-        <div class="text">小事务所内部知识转移是真实问题。partner 把客户「丢」给 junior，没人系统化记下每个客户去年怎么处理。Q5 答："替我记住 partner 没告诉我的事。"</div>
-      </div>
-      <div class="other-section new">
-        <div class="lbl">新增 · 焦虑的真实形状</div>
-        <div class="text">Q2 答："不知道自己不知道什么"。差点漏的不是技术性 deadline — 是 partner 没交代过的 client-specific 习惯（K-1 哪家基金延、谁需要提早问）。</div>
+      <div class="meta">5 人事务所 · 2 年经验 · 分到 80 客户 · 仍在 ramp</div>
+      <div class="other-section">
+        <div class="lbl">确认 · 知识转移痛</div>
+        <div class="text">partner 把客户「丢」给 junior，没人系统化记每个客户去年怎么处理的。Q5：「替我记住 partner 没告诉我的事。」</div>
       </div>
       <div class="other-section">
-        <div class="lbl">决定了 · 落进产品</div>
+        <div class="lbl">新增 · 焦虑的真实形状</div>
+        <div class="text">Q2：「不知道自己不知道什么」。差点漏的不是技术 deadline — 是 partner 没交代过的客户习惯。</div>
+      </div>
+      <div class="other-section">
+        <div class="lbl">决定 · 落进产品</div>
         <div class="text">Layer C「firm brain」从 P2 可选升级为 Year-5 retention 关键路径。partner 退休后他的 15 年判断不能丢。</div>
       </div>
     </div>
