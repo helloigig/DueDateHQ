@@ -104,6 +104,21 @@ export async function seedClientWithPackage(args: {
     inserted.map((t) => ({ firmId, taskId: t.id })),
   );
 
+  // 5. Calendar push — fire-and-forget. The CPA sees calendar events
+  // appear within seconds of finishing onboarding; failures are
+  // captured via integrations.lastError without blocking the chain.
+  // No-op when the firm hasn't connected Google Calendar.
+  if (dl.created > 0) {
+    void (async () => {
+      try {
+        const { syncFirmToGoogleCalendar } = await import("./calendar-sync.js");
+        await syncFirmToGoogleCalendar(firmId, { onlyStale: true });
+      } catch {
+        // already captured inside the sync function
+      }
+    })();
+  }
+
   return {
     deadlinesCreated: dl.created,
     tasksCreated: inserted.length,

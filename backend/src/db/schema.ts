@@ -317,6 +317,13 @@ export const deadlines = pgTable("deadlines", {
   // For nexus contraction cases: deadline marked kept-as-protective
   // through this filing year, then auto-disables.
   protectedAfterFilingYear: integer("protected_after_filing_year"),
+  // Google Calendar push state. Set when the calendar-sync helper
+  // creates an event for this deadline; null while the deadline lives
+  // only in the dashboard. The pair of fields is the de-duplication
+  // key for re-runs: if calendar_event_id is set, update; otherwise
+  // create. See backend/src/lib/calendar-sync.ts.
+  calendarEventId: text("calendar_event_id"),
+  calendarSyncedAt: timestamp("calendar_synced_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .default(sql`now()`),
@@ -772,6 +779,11 @@ export const integrationKind = pgEnum("integration_kind", [
   "gmail",
   "outlook",
   "stripe",
+  // Google Calendar push channel for deadlines. Reuses Gmail OAuth
+  // client credentials (same Google Cloud project) but with a calendar-
+  // events scope, so a CPA can connect Calendar without granting
+  // Gmail.Read. See backend/src/lib/oauth.ts PROVIDERS map.
+  "google_calendar",
 ]);
 
 export const integrationStatus = pgEnum("integration_status", [

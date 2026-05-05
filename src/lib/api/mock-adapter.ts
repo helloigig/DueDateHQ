@@ -1464,7 +1464,13 @@ export const mockAdapter = {
       await delay();
       return [] as Array<{
         id: string;
-        kind: "qbo" | "xero" | "gmail" | "outlook" | "stripe";
+        kind:
+          | "qbo"
+          | "xero"
+          | "gmail"
+          | "outlook"
+          | "stripe"
+          | "google_calendar";
         status: "connected" | "disconnected" | "error";
         externalAccountId: string | null;
         scope: string | null;
@@ -1482,6 +1488,7 @@ export const mockAdapter = {
         { kind: "gmail" as const, configured: false },
         { kind: "outlook" as const, configured: false },
         { kind: "stripe" as const, configured: false },
+        { kind: "google_calendar" as const, configured: false },
       ];
     },
     startConnect: async () => {
@@ -1516,6 +1523,25 @@ export const mockAdapter = {
         updated: 0,
         skipped: 0,
         errors: 0,
+      };
+    },
+    syncCalendarNow: async () => {
+      await delay(400);
+      // Mock mode: pretend we pushed everything to a fake calendar.
+      // Demo workspace has 12 open deadlines; render that as 12 pushed.
+      return { pushed: 12, updated: 0, skipped: 0, errors: 0 };
+    },
+    calendarStatus: async () => {
+      await delay();
+      // Connected-looking mock so the Settings card renders fully in
+      // demo mode. Real mode reads from the integrations table.
+      return {
+        connected: false,
+        connectedAt: null,
+        lastSyncedAt: null,
+        lastError: null,
+        syncedCount: 0,
+        totalOpen: 0,
       };
     },
   },
