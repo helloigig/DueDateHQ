@@ -338,7 +338,26 @@ export function Mail() {
                       : "no inbound mail yet"}
             </span>
           </p>
+          {/* Thread cluster counts — when one client sends multiple
+              messages, surface "+N more from this client" on the FIRST
+              message in the cluster so the user knows the conversation
+              is multi-message. Yuqi audit 2026-05-05: previously each
+              message read as standalone, hiding the back-and-forth. */}
+          {(() => null)()}
           {inbox.map((m, i) => {
+            // Count messages from the same client (by clientId when
+            // available, by display name as a fallback for unmatched).
+            const clusterKey = m.clientId ?? m.client;
+            const clusterCount = inbox.filter(
+              (x) => (x.clientId ?? x.client) === clusterKey,
+            ).length;
+            // Mark only the FIRST occurrence of each cluster — later
+            // messages get a smaller "↳ same thread" line so the
+            // hierarchy reads at a glance.
+            const isFirstInCluster =
+              inbox.findIndex(
+                (x) => (x.clientId ?? x.client) === clusterKey,
+              ) === i;
             const canOpenTask = Boolean(m.taskId);
             const hasActions = Boolean(m.id);
             const onClick = () => {
@@ -399,6 +418,22 @@ export function Mail() {
                   <span className="font-medium text-ink-900 text-sm">{m.client}</span>
                   <span className="text-ink-300 text-xs">·</span>
                   <span className="text-ink-600 text-xs">{m.task}</span>
+                  {clusterCount > 1 && isFirstInCluster && (
+                    <span
+                      className="text-2xs px-1.5 py-0.5 rounded bg-info-bg/60 text-info-ink border border-info-border"
+                      title={`${clusterCount - 1} other ${clusterCount === 2 ? "message" : "messages"} from this client below`}
+                    >
+                      thread · {clusterCount}
+                    </span>
+                  )}
+                  {clusterCount > 1 && !isFirstInCluster && (
+                    <span
+                      className="text-2xs text-ink-400"
+                      title="Same thread as the message above"
+                    >
+                      ↳ same thread
+                    </span>
+                  )}
                   <span className="ml-auto text-2xs text-ink-400 tabular-nums">
                     {m.receivedHoursAgo}h ago
                   </span>
@@ -425,6 +460,21 @@ export function Mail() {
                       <Check className="w-3 h-3" aria-hidden />
                       Mark actioned
                     </button>
+                    {/* Explicit Open-task affordance — row click already
+                        navigates, but the implicit click was an
+                        invisible affordance per Yuqi audit 2026-05-05.
+                        Surfaced as a real button so the path is
+                        discoverable and keyboard-reachable. */}
+                    {m.taskId && m.clientId && (
+                      <Link
+                        to={`/clients/${m.clientId}/tasks/${m.taskId}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="ml-auto inline-flex items-center gap-1 text-2xs px-2 py-0.5 rounded border border-line text-info-ink hover:bg-info-bg/60"
+                        aria-label="Open the task this reply belongs to"
+                      >
+                        Open task →
+                      </Link>
+                    )}
                   </footer>
                 )}
               </article>

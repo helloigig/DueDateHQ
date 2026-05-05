@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, CheckCircle2, Megaphone } from "lucide-react";
+import { ChevronDown, CheckCircle2, Megaphone, Sparkles, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useSession, updateSession } from "@/data/session";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { DateLabel } from "@/components/ui/DateLabel";
@@ -270,6 +271,26 @@ export function Today() {
     };
   }, [clientsForBuild]);
 
+  // First-action arc (Yuqi audit 2026-05-05): freshly-onboarded users
+  // land on Today with a populated queue but no muscle memory. Surface a
+  // one-time banner pointing at the most-overdue client with a chaseable
+  // item — one click opens the EmailDraftModal. Dismissed (X) or
+  // satisfied (sent) → flips session.firstChaseDone permanently.
+  //
+  // Eligibility: only show when (a) onboarding is complete, (b) the user
+  // hasn't dismissed/satisfied it, and (c) the queue has at least one
+  // chase-eligible row. The "first chase target" is the queue's
+  // top-priority row (queue is already sorted by urgency).
+  const session = useSession();
+  const showFirstChaseHint =
+    !!session?.onboardingComplete &&
+    !session?.firstChaseDone &&
+    queue.length > 0;
+  const firstChaseTarget = showFirstChaseHint ? queue[0] : null;
+  const dismissFirstChase = () => {
+    updateSession({ firstChaseDone: true });
+  };
+
   return (
     <PageContainer>
       {/* Page header — DESIGN.md §Typography display (22px / 600). Date inline
@@ -285,6 +306,46 @@ export function Today() {
           </>
         }
       />
+
+      {/* First-chase coach mark — appears once after import, dismisses
+          on send-or-X. The value is converting a fresh roster to the
+          actual daily verb (chase a client) before muscle memory has
+          formed. Quiet-tinted to read as a guide, not an alert. */}
+      {firstChaseTarget && (
+        <div className="mb-section border border-info-border bg-info-bg/40 rounded-md px-4 py-3 flex items-start gap-3">
+          <Sparkles
+            className="w-4 h-4 text-info-ink shrink-0 mt-0.5"
+            aria-hidden
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-ink-900 font-medium">
+              Try it: send your first chase to{" "}
+              <span className="text-info-ink">
+                {firstChaseTarget.clientName.split(/\s+/)[0]}
+              </span>
+            </p>
+            <p className="text-xs text-ink-500 mt-0.5">
+              {firstChaseTarget.meta} — most pressing item on your queue.
+              Open the client to draft the reminder.
+            </p>
+          </div>
+          <Link
+            to={`/clients/${firstChaseTarget.clientId}?tab=todo`}
+            onClick={dismissFirstChase}
+            className="text-xs px-2.5 py-1 rounded bg-indigo text-white hover:bg-indigo-hover shrink-0"
+          >
+            Open client
+          </Link>
+          <button
+            type="button"
+            onClick={dismissFirstChase}
+            className="text-ink-400 hover:text-ink-700 shrink-0 mt-0.5"
+            aria-label="Dismiss first-chase hint"
+          >
+            <X className="w-3.5 h-3.5" aria-hidden />
+          </button>
+        </div>
+      )}
 
       {/* State alerts — the v0.7 differentiator surface (v0u synthesis).
           One section per concept — replaces the prior hardcoded info banner.

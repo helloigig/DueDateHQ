@@ -1617,9 +1617,42 @@ function RemindersPanel() {
   const templates = useReminderTemplates();
   const update = useUpdateReminderTemplate();
   const session = useSession();
-  const { emailDrafts } = useStore();
+  const { emailDrafts, checklistItems } = useStore();
   const [editingId, setEditingId] = useState<string | null>(null);
   const editing = templates.find((t) => t.id === editingId) ?? null;
+
+  // Per-template "used by N items" backlink (Yuqi audit 2026-05-05).
+  // Builds AI trust by exposing the receipts: editing a template is no
+  // longer like editing a void — the CPA sees how many active checklist
+  // items would pick up the change. Match logic mirrors EmailDraftModal:
+  // direct itemType first, then family fallback ("1099_int" → "1099_any").
+  // Only counts items the client owes (not_requested + requested_waiting +
+  // received_issue) — confirmed/n/a items aren't candidates for a chase
+  // so including them would inflate the count.
+  const usageByTemplateId = useMemo(() => {
+    const out = new Map<string, number>();
+    const pending = checklistItems.filter(
+      (c) =>
+        c.state === "not_requested" ||
+        c.state === "requested_waiting" ||
+        c.state === "received_issue",
+    );
+    for (const t of templates) {
+      const tType = t.itemType;
+      if (!tType) {
+        out.set(t.id, 0);
+        continue;
+      }
+      const family = tType.endsWith("_any") ? tType.split("_")[0] : null;
+      const matchCount = pending.filter((ci) => {
+        if (ci.itemType === tType) return true;
+        if (family && ci.itemType.startsWith(`${family}_`)) return true;
+        return false;
+      }).length;
+      out.set(t.id, matchCount);
+    }
+    return out;
+  }, [templates, checklistItems]);
 
   // Compute eligibility once per render. Cheap — pure function over seed.
   const eligibilityById = useMemo(() => {
@@ -1666,6 +1699,7 @@ function RemindersPanel() {
           {templates.map((t) => {
             const elig = eligibilityById.get(t.id);
             const isPhase2 = t.phase === 2;
+            const usage = usageByTemplateId.get(t.id) ?? 0;
             return (
               <li key={t.id} className="py-3">
                 <div className="flex items-start gap-3">
@@ -1702,6 +1736,23 @@ function RemindersPanel() {
                           }`}
                         >
                           {eligibilityLabel(elig)}
+                        </span>
+                      )}
+                      {/* Usage backlink — "Used by N items" */}
+                      {usage > 0 ? (
+                        <span
+                          className="px-1.5 py-0.5 rounded bg-info-bg/60 text-info-ink border border-info-border tabular-nums normal-case tracking-normal"
+                          title={`${usage} active checklist item${usage === 1 ? "" : "s"} would receive this template's chase`}
+                        >
+                          Used by {usage}{" "}
+                          {usage === 1 ? "item" : "items"}
+                        </span>
+                      ) : (
+                        <span
+                          className="px-1.5 py-0.5 rounded bg-sunken text-ink-500 border border-line normal-case tracking-normal"
+                          title="No active items match this template's itemType"
+                        >
+                          Unused
                         </span>
                       )}
                     </div>
