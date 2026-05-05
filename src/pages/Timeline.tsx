@@ -7,7 +7,6 @@ import {
   Check,
   Slash,
 } from "lucide-react";
-import { ChevronRight, X as XIcon, ArrowRight } from "lucide-react";
 import { useSelection } from "../hooks/useSelection";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";

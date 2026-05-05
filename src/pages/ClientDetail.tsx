@@ -63,16 +63,10 @@ import { ExportClientsButton } from "../components/ExportClientsButton";
 import { PinClientButton } from "../components/Sidebar";
 import { BackLink } from "../components/ui/BackLink";
 import { PageContainer } from "../components/ui/PageContainer";
-import { PageHeader } from "../components/ui/PageHeader";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { MultiSelectChip } from "../components/MultiSelectChip";
 import { cn } from "../lib/utils";
 import { ClientChip } from "../components/ClientChip";
-// PageContainer (from main, PR #133) for the 1080px page width.
-// StateChipGroup (also from main) dropped — ClientChip's `lg` variant
-// renders the state pill internally, so importing the standalone group
-// here is dead weight after the migration.
-import { PageContainer } from "../components/ui/PageContainer";
 import { STATE_NAMES, type StateCode } from "../types";
 import { bundleByName, type FilingBundle } from "../data/bundles";
 import { resolveFederalForm } from "../data/canonicalForm";
@@ -348,99 +342,112 @@ export function ClientDetail() {
       <BackLink fallback="/clients" fallbackLabel="Clients" />
 
 
-      {/* Title row — same shape as Timeline's PageHeader. The h1 carries
-          just the client name; the muted suffix shows the open count
-          ("3 active") so the headline number is visible without scanning
-          to the stat strip below. Action group right-aligned. Yuqi audit
-          2026-05-05: "let's have the top section of the client page the
-          same structure as Timeline. Title, awaiting data, filter 1,
-          filter 2." */}
-      <PageHeader
-        title={client.name}
-        meta={
-          activeDeadlineCount > 0
-            ? `${activeDeadlineCount} active`
-            : "no active filings"
-        }
-        actions={
-          <>
-            <PinClientButton clientId={client.id} />
-            <ExportClientsButton clientId={client.id} />
-            <button
-              onClick={() => {
-                setAddDeadlinePrefill(undefined);
-                setAddDeadlineOpen(true);
-              }}
-              className="text-sm px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover inline-flex items-center gap-1.5"
-              title="Add a new deadline / task for this client"
+      {/* Header layout: stacks vertically on mobile (action group sits BELOW
+          the wrapping H1 + meta) and goes side-by-side at sm+ where there's
+          room. Without the breakpoint, the right-rail buttons crash into a
+          wrapping client name on narrow viewports.
+          Yuqi audit 2026-05-05: "the same structure as Timeline" was about
+          the /clients LIST page (sidebar primary), which already uses
+          PageHeader. ClientDetail intentionally keeps the inline ClientChip
+          cluster — name, tier, state pills, entity, archived all on one
+          row — so the per-client identity reads at a glance without a
+          second meta strip duplicating it. */}
+      <div className="mt-3 flex flex-col sm:flex-row sm:items-start gap-3">
+        <div className="flex-1 min-w-0">
+          {/* Row 1: identity. ClientChip (size="lg", showTier, showState)
+              is the canonical rendering of the name+tier+state triplet —
+              this is the migration target of PR #135. Entity-type badge,
+              StateChipGroup (for nexus states beyond primary), and the
+              archived flag remain as siblings since they're not part of
+              the per-client identity tuple. */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <ClientChip
+              client={client}
+              size="lg"
+              as="span"
+              showTier
+              showState
+            />
+            <span
+              className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line"
+              title="Entity type"
             >
-              <Plus className="w-3.5 h-3.5" aria-hidden />
-              Add deadline
-            </button>
-            <button
-              onClick={() => setEditOpen(true)}
-              className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40"
-            >
-              Edit
-            </button>
-            <button
-              onClick={() => setArchiveOpen(true)}
-              disabled={client.status === "archived"}
-              className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Archive
-            </button>
-          </>
-        }
-      />
-
-      {/* Identity strip — entity / state / tier / packages / archived /
-          since. All neutral type. Sits as a single horizontal line below
-          the title so the eye reads name → identity → contact → stats
-          → filters → tabs in a clean rhythm. "Since" hides when no
-          addedAt; "Open deadlines" dropped from this row entirely
-          (the active count moved into the title meta). */}
-      <div className="mb-region text-xs text-ink-500 flex items-baseline flex-wrap gap-x-section gap-y-1">
-        <span>
-          <span className="text-ink-400">Tier</span>{" "}
-          <span className="text-ink-700 font-medium capitalize">
-            {client.tier ?? "standard"}
-          </span>
-        </span>
-        <span>
-          <span className="text-ink-400">Entity</span>{" "}
-          <span className="text-ink-700 font-medium">
-            {entityTypeDisplay(client.entityType)}
-          </span>
-        </span>
-        <span className="inline-flex items-baseline gap-1">
-          <span className="text-ink-400">State</span>
-          <StateChipGroup
-            primary={client.primaryState}
-            nexus={client.nexusStates}
-          />
-        </span>
-        {client.servicePackages.length > 0 && (
-          <span className="inline-flex items-baseline gap-1">
-            <span className="text-ink-400">
-              {client.servicePackages.length === 1 ? "Package" : "Packages"}
+              {entityTypeDisplay(client.entityType)}
             </span>
-            {client.servicePackages.map((p) => (
-              <PackageChip key={p} packageName={p} client={client} />
-            ))}
-          </span>
-        )}
-        {addedAtLabel && (
-          <span>
-            <span className="text-ink-400">Since</span>{" "}
-            <span className="text-ink-700">{addedAtLabel}</span>
-          </span>
-        )}
-        {client.status === "archived" && (
-          <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-500">
-            Archived
-          </span>
-        )}
+            <StateChipGroup
+              primary={client.primaryState}
+              nexus={client.nexusStates}
+            />
+            {client.status === "archived" && (
+              <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-500">
+                Archived
+              </span>
+            )}
+          </div>
+          {/* Row 2: meta line — Tier · Packages · Since. Neutral type,
+              label-in-ink-400 / value-in-ink-700 pattern. Stays narrow
+              on purpose: Open-deadlines and Working-on belong to the
+              stat strip below (tone-coded numbers there are the
+              accent), so duplicating them here would dilute the strip's
+              signal. */}
+          <div className="mt-2 text-xs text-ink-500 flex items-baseline flex-wrap gap-x-section gap-y-1">
+            <span>
+              <span className="text-ink-400">Tier</span>{" "}
+              <span className="text-ink-700 font-medium capitalize">
+                {client.tier ?? "standard"}
+              </span>
+            </span>
+            {client.servicePackages.length > 0 && (
+              <span className="inline-flex items-baseline gap-1">
+                <span className="text-ink-400">
+                  {client.servicePackages.length === 1
+                    ? "Package"
+                    : "Packages"}
+                </span>
+                {client.servicePackages.map((p) => (
+                  <PackageChip key={p} packageName={p} client={client} />
+                ))}
+              </span>
+            )}
+            {addedAtLabel && (
+              <span>
+                <span className="text-ink-400">Since</span>{" "}
+                <span className="text-ink-700">{addedAtLabel}</span>
+              </span>
+            )}
+          </div>
+        </div>
+        {/* Action group — kept together as a single shrink-0 cluster so the
+            row can never collapse half its buttons. On mobile the parent
+            flex stacks this group below the title; at sm+ it sits inline. */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <PinClientButton clientId={client.id} />
+          <ExportClientsButton clientId={client.id} />
+          <button
+            onClick={() => {
+              setAddDeadlinePrefill(undefined);
+              setAddDeadlineOpen(true);
+            }}
+            className="text-sm px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover inline-flex items-center gap-1.5"
+            title="Add a new deadline / task for this client"
+          >
+            <Plus className="w-3.5 h-3.5" aria-hidden />
+            Add deadline
+          </button>
+          <button
+            onClick={() => setEditOpen(true)}
+            className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40"
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => setArchiveOpen(true)}
+            disabled={client.status === "archived"}
+            className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Archive
+          </button>
+        </div>
       </div>
 
       {/* Primary contact — only renders when we have at least one

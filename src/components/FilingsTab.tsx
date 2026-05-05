@@ -496,14 +496,6 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
           <span className="text-ink-500 text-2xs" aria-hidden>
             ·
           </span>
-          <button
-            type="button"
-            onClick={() => setBatchDrawerOpen(true)}
-            className="text-xs px-2.5 py-1 rounded bg-indigo hover:bg-indigo-hover transition-colors inline-flex items-center gap-1"
-          >
-            <Mail className="w-3 h-3" aria-hidden />
-            Send summary email
-          </button>
           {/* Visible-but-inactive in real mode (production / live BE) —
               hover tooltip explains "coming soon" instead of firing a
               click-to-toast pattern. The full sending flow (mock mode +
