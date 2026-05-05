@@ -355,7 +355,7 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
                                 but the seed data may have them. */}
                             {taskId ? (
                               <Link
-                                to={`/clients/${client.id}/tasks/${taskId}`}
+                                to={`/clients/${client.id}?task=${taskId}`}
                                 className="flex-1 flex items-center gap-3 text-sm py-1.5 rounded hover:bg-sunken transition-colors group"
                                 title={`Open ${d.form} task →`}
                               >

@@ -57,16 +57,24 @@ import {
   type AddDeadlinePrefill,
 } from "../components/AddDeadlineModal";
 import { FilingsTab } from "../components/FilingsTab";
+import { TaskPanel } from "../components/TaskPanel";
 import { EditClientModal } from "../components/EditClientModal";
 import { ExportModal } from "../components/ExportModal";
 import { ExportClientsButton } from "../components/ExportClientsButton";
 import { PinClientButton } from "../components/Sidebar";
 import { BackLink } from "../components/ui/BackLink";
 import { PageContainer } from "../components/ui/PageContainer";
+import { PageHeader } from "../components/ui/PageHeader";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { MultiSelectChip } from "../components/MultiSelectChip";
 import { cn } from "../lib/utils";
-import { ClientChip } from "../components/ClientChip";
+// Note — ClientChip (the canonical client-identity primitive from PR
+// #135) is intentionally NOT imported here. On dense lists (Action
+// Queue, Mail rows, Alerts chips) the chip is canonical because compact
+// shape wins. On THIS page the client IS the page subject, so we render
+// name + tier + state as a labeled identity strip rather than a single
+// chip — same data, more readable layout for a header. The chip stays
+// the canonical rendering everywhere else.
 import { STATE_NAMES, type StateCode } from "../types";
 import { bundleByName, type FilingBundle } from "../data/bundles";
 import { resolveFederalForm } from "../data/canonicalForm";
@@ -342,112 +350,99 @@ export function ClientDetail() {
       <BackLink fallback="/clients" fallbackLabel="Clients" />
 
 
-      {/* Header layout: stacks vertically on mobile (action group sits BELOW
-          the wrapping H1 + meta) and goes side-by-side at sm+ where there's
-          room. Without the breakpoint, the right-rail buttons crash into a
-          wrapping client name on narrow viewports.
-          Yuqi audit 2026-05-05: "the same structure as Timeline" was about
-          the /clients LIST page (sidebar primary), which already uses
-          PageHeader. ClientDetail intentionally keeps the inline ClientChip
-          cluster — name, tier, state pills, entity, archived all on one
-          row — so the per-client identity reads at a glance without a
-          second meta strip duplicating it. */}
-      <div className="mt-3 flex flex-col sm:flex-row sm:items-start gap-3">
-        <div className="flex-1 min-w-0">
-          {/* Row 1: identity. ClientChip (size="lg", showTier, showState)
-              is the canonical rendering of the name+tier+state triplet —
-              this is the migration target of PR #135. Entity-type badge,
-              StateChipGroup (for nexus states beyond primary), and the
-              archived flag remain as siblings since they're not part of
-              the per-client identity tuple. */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <ClientChip
-              client={client}
-              size="lg"
-              as="span"
-              showTier
-              showState
-            />
-            <span
-              className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line"
-              title="Entity type"
+      {/* Title row — same shape as Timeline's PageHeader. The h1 carries
+          just the client name; the muted suffix shows the open count
+          ("3 active") so the headline number is visible without scanning
+          to the stat strip below. Action group right-aligned. Yuqi audit
+          2026-05-05: "let's have the top section of the client page the
+          same structure as Timeline. Title, awaiting data, filter 1,
+          filter 2." */}
+      <PageHeader
+        title={client.name}
+        meta={
+          activeDeadlineCount > 0
+            ? `${activeDeadlineCount} active`
+            : "no active filings"
+        }
+        actions={
+          <>
+            <PinClientButton clientId={client.id} />
+            <ExportClientsButton clientId={client.id} />
+            <button
+              onClick={() => {
+                setAddDeadlinePrefill(undefined);
+                setAddDeadlineOpen(true);
+              }}
+              className="text-sm px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover inline-flex items-center gap-1.5"
+              title="Add a new deadline / task for this client"
             >
-              {entityTypeDisplay(client.entityType)}
+              <Plus className="w-3.5 h-3.5" aria-hidden />
+              Add deadline
+            </button>
+            <button
+              onClick={() => setEditOpen(true)}
+              className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => setArchiveOpen(true)}
+              disabled={client.status === "archived"}
+              className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Archive
+            </button>
+          </>
+        }
+      />
+
+      {/* Identity strip — entity / state / tier / packages / archived /
+          since. All neutral type. Sits as a single horizontal line below
+          the title so the eye reads name → identity → contact → stats
+          → filters → tabs in a clean rhythm. "Since" hides when no
+          addedAt; "Open deadlines" dropped from this row entirely
+          (the active count moved into the title meta). */}
+      <div className="mb-region text-xs text-ink-500 flex items-baseline flex-wrap gap-x-section gap-y-1">
+        <span>
+          <span className="text-ink-400">Tier</span>{" "}
+          <span className="text-ink-700 font-medium capitalize">
+            {client.tier ?? "standard"}
+          </span>
+        </span>
+        <span>
+          <span className="text-ink-400">Entity</span>{" "}
+          <span className="text-ink-700 font-medium">
+            {entityTypeDisplay(client.entityType)}
+          </span>
+        </span>
+        <span className="inline-flex items-baseline gap-1">
+          <span className="text-ink-400">State</span>
+          <StateChipGroup
+            primary={client.primaryState}
+            nexus={client.nexusStates}
+          />
+        </span>
+        {client.servicePackages.length > 0 && (
+          <span className="inline-flex items-baseline gap-1">
+            <span className="text-ink-400">
+              {client.servicePackages.length === 1 ? "Package" : "Packages"}
             </span>
-            <StateChipGroup
-              primary={client.primaryState}
-              nexus={client.nexusStates}
-            />
-            {client.status === "archived" && (
-              <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-500">
-                Archived
-              </span>
-            )}
-          </div>
-          {/* Row 2: meta line — Tier · Packages · Since. Neutral type,
-              label-in-ink-400 / value-in-ink-700 pattern. Stays narrow
-              on purpose: Open-deadlines and Working-on belong to the
-              stat strip below (tone-coded numbers there are the
-              accent), so duplicating them here would dilute the strip's
-              signal. */}
-          <div className="mt-2 text-xs text-ink-500 flex items-baseline flex-wrap gap-x-section gap-y-1">
-            <span>
-              <span className="text-ink-400">Tier</span>{" "}
-              <span className="text-ink-700 font-medium capitalize">
-                {client.tier ?? "standard"}
-              </span>
-            </span>
-            {client.servicePackages.length > 0 && (
-              <span className="inline-flex items-baseline gap-1">
-                <span className="text-ink-400">
-                  {client.servicePackages.length === 1
-                    ? "Package"
-                    : "Packages"}
-                </span>
-                {client.servicePackages.map((p) => (
-                  <PackageChip key={p} packageName={p} client={client} />
-                ))}
-              </span>
-            )}
-            {addedAtLabel && (
-              <span>
-                <span className="text-ink-400">Since</span>{" "}
-                <span className="text-ink-700">{addedAtLabel}</span>
-              </span>
-            )}
-          </div>
-        </div>
-        {/* Action group — kept together as a single shrink-0 cluster so the
-            row can never collapse half its buttons. On mobile the parent
-            flex stacks this group below the title; at sm+ it sits inline. */}
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <PinClientButton clientId={client.id} />
-          <ExportClientsButton clientId={client.id} />
-          <button
-            onClick={() => {
-              setAddDeadlinePrefill(undefined);
-              setAddDeadlineOpen(true);
-            }}
-            className="text-sm px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover inline-flex items-center gap-1.5"
-            title="Add a new deadline / task for this client"
-          >
-            <Plus className="w-3.5 h-3.5" aria-hidden />
-            Add deadline
-          </button>
-          <button
-            onClick={() => setEditOpen(true)}
-            className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40"
-          >
-            Edit
-          </button>
-          <button
-            onClick={() => setArchiveOpen(true)}
-            disabled={client.status === "archived"}
-            className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Archive
-          </button>
-        </div>
+            {client.servicePackages.map((p) => (
+              <PackageChip key={p} packageName={p} client={client} />
+            ))}
+          </span>
+        )}
+        {addedAtLabel && (
+          <span>
+            <span className="text-ink-400">Since</span>{" "}
+            <span className="text-ink-700">{addedAtLabel}</span>
+          </span>
+        )}
+        {client.status === "archived" && (
+          <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-500">
+            Archived
+          </span>
+        )}
       </div>
 
       {/* Primary contact — only renders when we have at least one
@@ -697,6 +692,25 @@ export function ClientDetail() {
         {tab === "contacts" && <ContactsTab client={client} />}
         {tab === "audit" && <ActivityTab client={client} />}
       </div>
+
+      {/* Task side panel — mounts when the URL carries `?task=:taskId`.
+          Yuqi audit 2026-05-05: "I am thinking to have the task as the
+          side panel to the Client detail page." Right-anchored 640px
+          drawer overlays the page; close clears the query param so the
+          back button + URL share work intuitively. The standalone
+          /clients/:id/tasks/:taskId route stays live as a deep-link
+          fallback for users who land on a task URL directly. */}
+      {searchParams.get("task") && (
+        <TaskPanel
+          clientId={client.id}
+          taskId={searchParams.get("task")!}
+          onClose={() => {
+            const next = new URLSearchParams(searchParams);
+            next.delete("task");
+            setSearchParams(next, { replace: true });
+          }}
+        />
+      )}
 
       <ConfirmDialog
         open={archiveOpen}
@@ -1402,8 +1416,15 @@ function ToDoTab({
     return at - bt;
   });
 
+  // Internal task links use ?task= query form so they open the side
+  // panel on this same client page (Yuqi audit 2026-05-05). Falls back
+  // to /clients/:id when no taskId. External task links (Action Queue,
+  // Mail, Alerts) still navigate to /clients/:id/tasks/:taskId; that
+  // route stays live as a deep-link fallback.
   const taskHref = (taskId?: string) =>
-    taskId ? `/clients/${client.id}/tasks/${taskId}` : `/clients/${client.id}`;
+    taskId
+      ? `/clients/${client.id}?task=${taskId}`
+      : `/clients/${client.id}`;
 
   // Derive the unique tasks from BOTH:
   //   (a) the full per-client task list (useTasksForClient / store tasks
@@ -1421,7 +1442,7 @@ function ToDoTab({
   const tasksOnPage = useMemo(() => {
     const seen = new Map<
       string,
-      { id: string; name: string; openCount: number }
+      { id: string; name: string; chaseCount: number; reviewCount: number }
     >();
     // (a) Seed from the canonical per-client task list. Real mode
     // pulls from BE via useTasksForClient; mock mode reads the store.
@@ -1434,33 +1455,50 @@ function ToDoTab({
         // the same fields. Compose a readable label either way.
         [t.formType, t.jurisdiction].filter(Boolean).join(" · ") ||
         "Task";
-      seen.set(t.id, { id: t.id, name: taskName, openCount: 0 });
+      seen.set(t.id, {
+        id: t.id,
+        name: taskName,
+        chaseCount: 0,
+        reviewCount: 0,
+      });
     }
-    // (b) Layer in open counts from the items list — only items the
-    // client owes (waiting / not requested / unreviewed / issue) count
-    // toward the badge.
+    // (b) Bucket open items into "chase" (client owes us) vs "review"
+    // (client sent, we owe a confirm/reject). Yuqi audit 2026-05-05:
+    // a single "X waiting" count conflated both buckets, which clashed
+    // with the "Still waiting on client" section name (that section
+    // shows ONLY the chase subset). Split into "X chase · Y review"
+    // so the chip matches the section vocabulary AND surfaces the
+    // review queue at a glance.
+    //   not_requested + requested_waiting → chase  (we're chasing the client)
+    //   received_unreviewed + received_issue → review  (waiting on CPA action)
     for (const ci of items) {
       if (!ci.taskId) continue;
-      const isOpen =
-        ci.state === "not_requested" ||
-        ci.state === "requested_waiting" ||
-        ci.state === "received_unreviewed" ||
-        ci.state === "received_issue";
-      if (!isOpen) continue;
+      const isChase =
+        ci.state === "not_requested" || ci.state === "requested_waiting";
+      const isReview =
+        ci.state === "received_unreviewed" || ci.state === "received_issue";
+      if (!isChase && !isReview) continue;
       const entry = seen.get(ci.taskId);
       if (entry) {
-        entry.openCount += 1;
+        if (isChase) entry.chaseCount += 1;
+        else entry.reviewCount += 1;
       } else {
         // Item references a task we didn't see in (a) — fall back to
         // the item's taskName so the chip still shows.
         seen.set(ci.taskId, {
           id: ci.taskId,
           name: ci.taskName ?? "Task",
-          openCount: 1,
+          chaseCount: isChase ? 1 : 0,
+          reviewCount: isReview ? 1 : 0,
         });
       }
     }
-    return Array.from(seen.values()).sort((a, b) => b.openCount - a.openCount);
+    return Array.from(seen.values()).sort(
+      (a, b) =>
+        b.chaseCount +
+        b.reviewCount -
+        (a.chaseCount + a.reviewCount),
+    );
   }, [items, remoteTasksList, storeTasks, client.id]);
 
   return (
@@ -1486,12 +1524,33 @@ function ToDoTab({
                 key={t.id}
                 to={taskHref(t.id)}
                 className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded border border-line bg-canvas text-ink-700 hover:bg-sunken hover:text-ink-900 hover:border-line-strong transition-colors"
-                title={`Open ${t.name}`}
+                title={
+                  t.chaseCount > 0 || t.reviewCount > 0
+                    ? `${t.name} — ${t.chaseCount} chasing client, ${t.reviewCount} awaiting your review`
+                    : `Open ${t.name}`
+                }
               >
                 <span className="font-medium">{t.name}</span>
-                {t.openCount > 0 && (
-                  <span className="text-2xs tabular-nums text-warn-ink bg-warn-bg/60 border border-warn-border px-1 py-0.5 rounded">
-                    {t.openCount}
+                {/* Split badge — "chase" subset (warn yellow, matches the
+                    Still-waiting-on-client section's palette) + "review"
+                    subset (info blue, matches the AI-confidence review
+                    palette). Each appears only when its count > 0; both
+                    hide when the task has no open work. The middle dot
+                    separates the two only when both are non-zero. */}
+                {t.chaseCount > 0 && (
+                  <span
+                    className="text-2xs tabular-nums text-warn-ink bg-warn-bg/60 border border-warn-border px-1 py-0.5 rounded"
+                    title={`${t.chaseCount} item${t.chaseCount === 1 ? "" : "s"} the client still owes you`}
+                  >
+                    {t.chaseCount} chase
+                  </span>
+                )}
+                {t.reviewCount > 0 && (
+                  <span
+                    className="text-2xs tabular-nums text-info-ink bg-info-bg/60 border border-info-border px-1 py-0.5 rounded"
+                    title={`${t.reviewCount} item${t.reviewCount === 1 ? "" : "s"} received from the client, awaiting your confirm/reject`}
+                  >
+                    {t.reviewCount} review
                   </span>
                 )}
               </Link>
@@ -1529,13 +1588,11 @@ function ToDoTab({
             <Siren className="w-4 h-4" aria-hidden />
             Still waiting on client
           </h3>
-          <span
-            className={`text-2xs tabular-nums ${
-              stillWaiting.length > 0 ? "text-warn-ink/80" : "text-ink-500"
-            }`}
-          >
-            {stillWaiting.length} item{stillWaiting.length === 1 ? "" : "s"}
-          </span>
+          {/* Count badge dropped 2026-05-05 — the per-task chips above
+              now carry the "chase" subset count (matches the items
+              rendered in this section), so duplicating it on the
+              section header was redundant. The list itself is the
+              count when expanded. */}
           <button
             onClick={onAddDeadline}
             className={`ml-auto text-2xs px-2 py-0.5 rounded border ${
