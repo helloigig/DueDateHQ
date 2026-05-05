@@ -29,7 +29,12 @@ import { integrations } from "../db/schema.js";
 import { log, captureException } from "./observability.js";
 import { encryptToken, decryptToken } from "./encryption.js";
 
-export type ProviderKind = "qbo" | "xero" | "gmail" | "outlook";
+export type ProviderKind =
+  | "qbo"
+  | "xero"
+  | "gmail"
+  | "outlook"
+  | "google_calendar";
 
 interface ProviderConfig {
   authorizeUrl: string;
@@ -81,6 +86,20 @@ const PROVIDERS: Record<ProviderKind, ProviderConfig> = {
     // is required for inbound polling.
     scopes: ["offline_access", "Mail.Send", "Mail.Read"],
     envPrefix: "OUTLOOK",
+  },
+  google_calendar: {
+    authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+    tokenUrl: "https://oauth2.googleapis.com/token",
+    // Calendar-events ONLY. The CPA can connect Calendar without
+    // granting Gmail read access — important because a lot of firms
+    // are uncomfortable letting a SaaS read their entire inbox even
+    // when they're fine with it writing to their calendar.
+    scopes: ["https://www.googleapis.com/auth/calendar.events"],
+    // Reuses GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET — same Google Cloud
+    // project, same OAuth client. Set GOOGLE_CALENDAR_CLIENT_ID/SECRET
+    // separately if you want a distinct OAuth client (e.g. for branding
+    // the consent screen differently).
+    envPrefix: "GMAIL",
   },
 };
 
@@ -171,7 +190,11 @@ export function startConnect(
     (input.scopes ?? conf.cfg.scopes).join(" "),
   );
   // Provider-specific quirks
-  if (input.provider === "gmail") {
+  if (input.provider === "gmail" || input.provider === "google_calendar") {
+    // `access_type=offline` + `prompt=consent` are how Google issues a
+    // refresh token. Without these, the refresh token only comes on the
+    // *first* consent — subsequent re-grants return null and the sync
+    // breaks an hour later when the access token expires.
     url.searchParams.set("access_type", "offline");
     url.searchParams.set("prompt", "consent");
   }

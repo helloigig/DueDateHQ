@@ -1209,7 +1209,13 @@ export const appRouter = t.router({
       async (): Promise<
         Array<{
           id: string;
-          kind: "qbo" | "xero" | "gmail" | "outlook" | "stripe";
+          kind:
+            | "qbo"
+            | "xero"
+            | "gmail"
+            | "outlook"
+            | "stripe"
+            | "google_calendar";
           status: "connected" | "disconnected" | "error";
           externalAccountId: string | null;
           scope: string | null;
@@ -1223,7 +1229,13 @@ export const appRouter = t.router({
     catalog: t.procedure.query(
       async (): Promise<
         Array<{
-          kind: "qbo" | "xero" | "gmail" | "outlook" | "stripe";
+          kind:
+            | "qbo"
+            | "xero"
+            | "gmail"
+            | "outlook"
+            | "stripe"
+            | "google_calendar";
           configured: boolean;
         }>
       > => NOT_IMPL(),
@@ -1231,7 +1243,13 @@ export const appRouter = t.router({
     startConnect: t.procedure
       .input(
         z.object({
-          kind: z.enum(["qbo", "xero", "gmail", "outlook"]),
+          kind: z.enum([
+            "qbo",
+            "xero",
+            "gmail",
+            "outlook",
+            "google_calendar",
+          ]),
           redirectTo: z.string().url(),
         }),
       )
@@ -1262,6 +1280,26 @@ export const appRouter = t.router({
           errors: number;
         }> => NOT_IMPL(),
       ),
+    /** Calendar push — on-demand. Force-pushes every open deadline. */
+    syncCalendarNow: t.procedure.mutation(
+      async (): Promise<{
+        pushed: number;
+        updated: number;
+        skipped: number;
+        errors: number;
+      }> => NOT_IMPL(),
+    ),
+    /** Calendar status — drives the Settings card counter. */
+    calendarStatus: t.procedure.query(
+      async (): Promise<{
+        connected: boolean;
+        connectedAt: string | null;
+        lastSyncedAt: string | null;
+        lastError: string | null;
+        syncedCount: number;
+        totalOpen: number;
+      }> => NOT_IMPL(),
+    ),
   }),
 
   aiInsights: t.router({
