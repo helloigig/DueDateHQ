@@ -15,6 +15,7 @@ import {
 import { useStore } from "../data/store";
 import { useAllOpenInsights, useResolveInsight } from "../hooks/useAiInsights";
 import { PageContainer } from "../components/ui/PageContainer";
+import { ClientChip } from "../components/ClientChip";
 
 /**
  * Opportunities — Layer C firm-intelligence destination (PRD §4.4 Layer C),
@@ -170,12 +171,7 @@ export function Insights() {
                     <Sparkles className="w-3.5 h-3.5 text-info-ink shrink-0 mt-0.5" aria-hidden />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                        <Link
-                          to={`/clients/${client.id}`}
-                          className="text-sm font-medium text-ink-900 hover:underline"
-                        >
-                          {client.name}
-                        </Link>
+                        <ClientChip client={client} size="md" as="link" />
                         <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded border border-info-border bg-info-bg text-info-ink">
                           {insight.mode === "B"
                             ? "Timing"
@@ -259,12 +255,12 @@ export function Insights() {
                   key={client.id}
                   className="flex items-baseline gap-3 py-2.5 first:pt-0 last:pb-0"
                 >
-                  <Link
-                    to={`/clients/${client.id}`}
-                    className="text-sm font-medium text-ink-900 hover:underline flex-1 truncate"
-                  >
-                    {client.name}
-                  </Link>
+                  <ClientChip
+                    client={client}
+                    size="md"
+                    as="link"
+                    className="flex-1"
+                  />
                   <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded border border-warn-border bg-warn-bg text-warn-ink tabular-nums">
                     {stuckCount} stuck
                   </span>

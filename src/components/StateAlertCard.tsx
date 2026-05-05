@@ -1,7 +1,7 @@
 import { CalendarClock, Check } from "lucide-react";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { StateBadge } from "@/components/ui/StateBadge";
-import { ClientChip } from "@/components/ui/ClientChip";
+import { ClientChip } from "@/components/ClientChip";
 import { formatLongDate, hoursSince } from "@/data/dateHelpers";
 import { clients as MOCK_CLIENTS } from "@/data/mockClients";
 import type { Announcement } from "@/types";
@@ -180,7 +180,7 @@ export function StateAlertCard({
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
                 {visibleChips.map((c) => (
-                  <ClientChip key={c.id} name={c.name} />
+                  <ClientChip key={c.id} client={c} size="sm" as="link" />
                 ))}
                 {overflow > 0 && (
                   <span className="text-xs text-ink-500 px-1.5 tabular-nums">

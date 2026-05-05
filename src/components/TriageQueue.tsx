@@ -22,6 +22,7 @@ import { TODAY, toIso } from "../data/dateHelpers";
 import { useAllOpenInsights } from "../hooks/useAiInsights";
 import { EmailDraftModal, type EmailDraftIntent } from "./EmailDraftModal";
 import { StateBadge } from "./ui/StateBadge";
+import { ClientChip } from "./ClientChip";
 
 /**
  * The single most-important surface of the redesign. Replaces "scroll the
@@ -482,7 +483,7 @@ function PrimaryLine({ item }: { item: QueueItem }) {
     case "decision_confirm":
       return (
         <p className="text-sm text-ink-900">
-          <span className="font-medium">{item.client.name}</span>
+          <ClientChip client={item.client} size="sm" as="span" />
           <span className="text-ink-400"> · </span>
           Confirm <span className="font-medium">{item.checklist.label}</span>
           {item.checklist.aiClassification && (
@@ -495,7 +496,7 @@ function PrimaryLine({ item }: { item: QueueItem }) {
     case "decision_flag":
       return (
         <p className="text-sm text-ink-900">
-          <span className="font-medium">{item.client.name}</span>
+          <ClientChip client={item.client} size="sm" as="span" />
           <span className="text-ink-400"> · </span>
           Resolve flag on <span className="font-medium">{item.checklist.label}</span>
         </p>
@@ -503,7 +504,8 @@ function PrimaryLine({ item }: { item: QueueItem }) {
     case "outgoing_reminder":
       return (
         <p className="text-sm text-ink-900">
-          Send reminder to <span className="font-medium">{item.client.name}</span>
+          Send reminder to{" "}
+          <ClientChip client={item.client} size="sm" as="span" />
           <span className="text-ink-400"> for </span>
           <span className="font-medium">{item.checklist.label}</span>
         </p>
@@ -518,7 +520,7 @@ function PrimaryLine({ item }: { item: QueueItem }) {
     case "insight":
       return (
         <p className="text-sm text-ink-900">
-          <span className="font-medium">{item.client.name}</span>
+          <ClientChip client={item.client} size="sm" as="span" />
           <span className="text-ink-400"> · </span>
           {item.insight.title}
         </p>

@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { Button } from "./ui/button";
+import { ClientChip } from "./ClientChip";
 
 interface MockEstimate {
   id: string;
@@ -165,7 +166,7 @@ export function RecomputeEstimatesModal({
           {clientEstimates.map(({ client, estimates, hasAutopay }) => (
             <div key={client.id} className="border border-line rounded-md bg-surface">
               <div className="px-3 py-2 border-b border-line flex items-baseline gap-2">
-                <span className="text-sm font-medium text-ink-900">{client.name}</span>
+                <ClientChip client={client} size="md" as="link" showState={false} />
                 <span className="text-xs text-ink-500">
                   {client.entityType} · {client.primaryState}
                 </span>

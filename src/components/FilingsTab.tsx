@@ -504,6 +504,34 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
             <Mail className="w-3 h-3" aria-hidden />
             Send summary email
           </button>
+          {/* Visible-but-inactive in real mode (production / live BE) —
+              hover tooltip explains "coming soon" instead of firing a
+              click-to-toast pattern. The full sending flow (mock mode +
+              real-mode wiring through a sibling sendBatchPersonalised
+              proc) ships in the next pass; until then the affordance
+              stays discoverable for design review without misleading
+              users about its state. Mock mode keeps the full clickable
+              behaviour so demo / dogfooding flows remain intact. */}
+          {env.useMockData ? (
+            <button
+              type="button"
+              onClick={() => setBatchDrawerOpen(true)}
+              className="text-xs px-2.5 py-1 rounded bg-indigo hover:bg-indigo-hover transition-colors inline-flex items-center gap-1"
+            >
+              <Mail className="w-3 h-3" aria-hidden />
+              Send summary email
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled
+              title="Sending summary emails — coming soon"
+              className="text-xs px-2.5 py-1 rounded bg-sunken/20 text-ink-300 cursor-not-allowed inline-flex items-center gap-1"
+            >
+              <Mail className="w-3 h-3" aria-hidden />
+              Send summary email (soon)
+            </button>
+          )}
           <button
             type="button"
             onClick={() => filingsSelection.clear()}
@@ -588,6 +616,34 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
               "Sending in real mode requires a backend deploy — coming next pass",
             );
           }
+          // Real mode never reaches this handler — the toolbar Send
+          // button is rendered as a disabled "coming soon" affordance
+          // when env.useMockData is false. Mock-mode flow only:
+          for (const r of payload.recipients) {
+            const draftId = actions.saveEmailDraft({
+              taskId: `filings-summary-${r.clientId}`,
+              clientId: r.clientId,
+              // Single-recipient drawer here — recipient is always
+              // `client`, so contactEmail comes off the prop. Falls
+              // back to a placeholder if the client has no email on
+              // file (the drawer also shows a warning strip in that
+              // case so the user knows it's a stub send).
+              to: client.contactEmail ?? `${r.clientName} <client@example.com>`,
+              cc: "",
+              subject: r.subject,
+              body: r.body,
+              tone: "casual",
+              aiSources: [],
+              sendMethod: "cpa_send",
+              status: "draft",
+            });
+            actions.sendEmail(draftId);
+          }
+          toast.success(
+            `Sent summary covering ${selectedDeadlines.length} ${
+              selectedDeadlines.length === 1 ? "filing" : "filings"
+            }`,
+          );
           setBatchDrawerOpen(false);
           filingsSelection.clear();
         }}
