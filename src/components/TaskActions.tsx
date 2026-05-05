@@ -342,11 +342,7 @@ export function TaskActions({ task }: Props) {
                 isLowConfidence &&
                 completionTyped.trim().toLowerCase() !== "complete"
               }
-              className={
-                isLowConfidence
-                  ? "bg-warn-solid hover:bg-warn-solid/90 text-canvas"
-                  : "bg-indigo hover:bg-indigo-hover text-canvas"
-              }
+              className="bg-indigo hover:bg-indigo-hover text-canvas"
             >
               <Check className="w-3.5 h-3.5" aria-hidden />
               {isLowConfidence ? "Override and complete" : "Mark complete"}

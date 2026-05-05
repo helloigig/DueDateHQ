@@ -345,19 +345,17 @@ function Card({
   items: React.ReactNode;
 }) {
   const navigate = useNavigate();
-  const accent =
-    tone === "yellow"
-      ? "border-l-warn-solid"
-      : tone === "info"
-      ? "border-l-info-solid"
-      : "border-l-line";
+  // `tone` was used for a 2px left rule — dropped per DESIGN.md §Quiet
+  // register Q2 (no thick lines). Argument kept on the API so callers
+  // don't break; status signal now travels through the icon + title.
+  void tone;
   const onClick = () => {
     if (ctaHref) navigate(ctaHref);
     else if (onCta) onCta();
   };
   return (
     <article
-      className={`bg-surface border border-line border-l-2 ${accent} rounded-md p-4 flex flex-col`}
+      className={`bg-surface border border-line rounded-md p-4 flex flex-col`}
     >
       <header className="flex items-baseline gap-2 mb-1.5">
         <span className="text-ink-700">{icon}</span>

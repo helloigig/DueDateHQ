@@ -243,6 +243,7 @@ export function TaskPanel({ clientId, taskId, onClose }: Props) {
           client={client}
           completionPct={completionPct(checklist)}
           onChase={() => setEmailIntent({ task, client })}
+          hideBreadcrumb
         />
 
         <TaskMiniTimeline task={task} checklist={checklist} />

@@ -194,7 +194,7 @@ export function EditClientModal({
                     }
                     className={`text-xs px-2 py-1 rounded border ${
                       on
-                        ? "bg-ink-900 text-white border-ink-900"
+                        ? "bg-ink-900 text-white border-transparent"
                         : "bg-surface text-ink-700 border-line hover:bg-canvas"
                     }`}
                   >

@@ -411,16 +411,17 @@ function QueueRow({
     if (active) ref.current?.scrollIntoView({ block: "nearest" });
   }, [active]);
 
-  const tone = toneFor(item.kind);
-  const accent = tone === "yellow" ? "border-l-warn-solid" : tone === "info" ? "border-l-info-solid" : "border-l-line";
+  // `toneFor` previously fed a 2px left rule — dropped per DESIGN.md
+  // §Quiet register Q2 (no thick lines). Row tone now travels through
+  // the leading KindIcon color.
+  void item.kind;
 
   return (
     <li
       ref={ref}
       onMouseEnter={onActivate}
       className={[
-        "ddhq-row-transition border-l-2",
-        accent,
+        "ddhq-row-transition",
         active ? "bg-sunken/60" : "hover:bg-sunken/30",
       ].join(" ")}
     >
@@ -440,13 +441,9 @@ function QueueRow({
   );
 }
 
-function toneFor(kind: QueueItem["kind"]): "yellow" | "info" | "neutral" {
-  if (kind === "decision_confirm" || kind === "decision_flag") return "yellow";
-  if (kind === "outgoing_reminder") return "yellow";
-  if (kind === "alert") return "info";
-  if (kind === "insight") return "info";
-  return "neutral";
-}
+// `toneFor` previously fed a 2px left rule on each row — dropped per
+// DESIGN.md §Quiet register Q2 (no thick lines). Function removed; row
+// tone now travels through the leading KindIcon color below.
 
 function KindIcon({ kind }: { kind: QueueItem["kind"] }) {
   const Icon =

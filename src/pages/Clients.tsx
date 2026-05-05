@@ -473,7 +473,7 @@ export function Clients() {
         actions={
           <>
             {searchOpen ? (
-              <div className="flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-line-strong bg-surface focus-within:border-ink-900 transition-colors w-64">
+              <div className="flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-line bg-surface focus-within:ring-2 focus-within:ring-indigo focus-within:ring-offset-2 transition-shadow w-64">
                 <Search className="w-4 h-4 text-ink-500 shrink-0" aria-hidden />
                 <input
                   ref={searchInputRef}

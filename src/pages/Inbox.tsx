@@ -606,10 +606,10 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`px-4 py-2 text-sm flex items-center gap-2 ${
+      className={`px-4 py-2 text-sm flex items-center gap-2 -mb-px border-b-[1.5px] ${
         active
-          ? "text-ink-900 border-b-2 border-ink-900 font-medium"
-          : "text-ink-500 hover:text-ink-700"
+          ? "text-ink-900 border-ink-900 font-medium"
+          : "border-transparent text-ink-500 hover:text-ink-700"
       }`}
     >
       {label}

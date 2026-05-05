@@ -37,12 +37,19 @@ interface Props {
    *  surfaces this when `recommendedAction === "chase"`. Wired by the
    *  parent (TaskDetail) so the modal state stays at page scope. */
   onChase?: () => void;
+  /** Hide the "Clients > {client} > {form}" breadcrumb. TaskPanel sets
+   *  this when rendering inside a client drawer — the parent client
+   *  page already establishes the breadcrumb; repeating it inside the
+   *  drawer is redundant. The standalone /clients/:id/tasks/:taskId
+   *  page leaves the prop unset so the breadcrumb shows there. */
+  hideBreadcrumb?: boolean;
 }
 
 export function TaskHeader({
   task,
   client,
   onChase,
+  hideBreadcrumb,
 }: Props) {
   const [copied, setCopied] = useState(false);
   const { deadlines } = useStore();
@@ -66,27 +73,29 @@ export function TaskHeader({
 
   return (
     <header className="bg-surface border border-line rounded-md px-5 py-4">
-      <nav
-        aria-label="Breadcrumb"
-        className="text-xs text-ink-500 flex items-center gap-1 mb-2"
-      >
-        <Link to="/clients" className="hover:text-ink-900">
-          Clients
-        </Link>
-        <ChevronRight className="w-3 h-3" aria-hidden />
-        {/* Breadcrumb leaf for the client — sm chip keeps it inline at
-            the breadcrumb font size; tier dot is suppressed because the
-            full identity sits in the H1 below. */}
-        <ClientChip
-          client={client}
-          size="sm"
-          as="link"
-          showTier={false}
-          showState={false}
-        />
-        <ChevronRight className="w-3 h-3" aria-hidden />
-        <span className="text-ink-900">{task.formType}</span>
-      </nav>
+      {!hideBreadcrumb && (
+        <nav
+          aria-label="Breadcrumb"
+          className="text-xs text-ink-500 flex items-center gap-1 mb-2"
+        >
+          <Link to="/clients" className="hover:text-ink-900">
+            Clients
+          </Link>
+          <ChevronRight className="w-3 h-3" aria-hidden />
+          {/* Breadcrumb leaf for the client — sm chip keeps it inline at
+              the breadcrumb font size; tier dot is suppressed because the
+              full identity sits in the H1 below. */}
+          <ClientChip
+            client={client}
+            size="sm"
+            as="link"
+            showTier={false}
+            showState={false}
+          />
+          <ChevronRight className="w-3 h-3" aria-hidden />
+          <span className="text-ink-900">{task.formType}</span>
+        </nav>
+      )}
 
       {/* Header layout: title block sits side-by-side with the action
           group at sm+; stacks on mobile so the right-aligned action
