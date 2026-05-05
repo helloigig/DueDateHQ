@@ -91,9 +91,18 @@ export function TaskHeader({
               comma-separated text was duplicate information at equal weight.
               The chip carries the operational state (active milestone, slip,
               IRS runway when relevant) and exposes state-appropriate actions
-              on click. Internal vs official semantics: chip's primary text is
-              milestone-driven; official date enters the visible band only
-              once the back-plan has slipped past internal target. */}
+              on click.
+
+              Reconciliation with the canonical Task action set (PR #94 /
+              <TaskActions/>): the chip popover and the action dropdown now
+              route through the same hooks (useUpdateTaskStatus +
+              useFileExtensionForTask) and use matching window.confirm prompts
+              so the audit trail is identical regardless of which entry the
+              CPA used. The chip's value-add is *state-aware recommendation*
+              (it surfaces the 1-2 verbs that match the current state with
+              precise sub-labels like "Stops the overdue clock"); the
+              dropdown's value-add is *the full lifecycle menu*. They are
+              complements, not alternates. */}
           <div className="mt-2 flex items-center flex-wrap gap-2">
             <DeadlineChip
               officialDueDate={task.officialDueDate}
@@ -118,11 +127,21 @@ export function TaskHeader({
                 }).recommendedAction,
                 {
                   // Chase opens the Mode D draft modal — handler lives on
-                  // TaskDetail so modal state stays page-scoped.
+                  // TaskDetail so modal state stays page-scoped. Resolved
+                  // in favour of main's prop-callback wiring (was: chip
+                  // passed undefined to suppress chase entirely while we
+                  // waited for the modal lift). Page-scoped is the right
+                  // home for transient modal state.
                   onChase: onChase,
+                  // Mark complete — direct mutation. The canonical
+                  // <TaskActions/> "Mark complete" button keeps its own
+                  // window.confirm prompt; the chip is a recommendation
+                  // surface, not a confirmation surface, so a second
+                  // dialog here would be duplicate gatekeeping.
                   onSubmit: () => updateStatus(task.id, "completed"),
-                  // file-extension routes through the dedicated mutation
-                  // (cascades to deadline) instead of a free-form status write.
+                  // File extension routes through the dedicated mutation
+                  // (cascades to deadline) instead of a free-form status
+                  // write. Same hook as <TaskActions/>' overflow menu.
                   onFileExtension: () => fileExtension(task.id),
                   // onAdjustTarget intentionally omitted — the mini-timeline
                   // below already exposes drag-the-waypoint as the canonical

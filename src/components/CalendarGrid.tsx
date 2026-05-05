@@ -6,7 +6,7 @@ import { TODAY, parseDate, toIso } from "../data/dateHelpers";
 import type { Task } from "../types";
 
 /**
- * Calendar grid view — alternate to the TaskList. PRD §10.5 P2.
+ * Calendar grid view — alternate to the action queue. PRD §10.5 P2.
  *
  * Month view with task pills per day. CPAs who think calendar-first see
  * their workload distribution at a glance: which days are heavy, which are
