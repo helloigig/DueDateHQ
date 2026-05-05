@@ -182,6 +182,7 @@ function CopilotPane({
   onSendBulletin,
   onApplyDeadline,
   onRunNexusCheck,
+  onAcknowledgeAdmin,
   onSnooze,
   onMarkNotApplicable,
   isSending,
@@ -204,6 +205,10 @@ function CopilotPane({
   ) => void;
   onApplyDeadline: (announcement: Announcement) => void;
   onRunNexusCheck: (announcement: Announcement) => void;
+  /** form_change alerts route through admin reviewer queue. Clicking
+   *  "Open" hands the alert off — we treat the handoff as the finishing
+   *  action and resolve it (matches "Finished alert actions → Resolved"). */
+  onAcknowledgeAdmin: (announcement: Announcement) => void;
   onSnooze: (announcement: Announcement) => void;
   onMarkNotApplicable: (announcement: Announcement) => void;
   isSending: boolean;
@@ -308,7 +313,14 @@ function CopilotPane({
               title={cfg.primaryVerb(includedCount, a)}
               description={`${cfg.label} alerts update the firm's form catalog. Clients aren't notified.`}
               cta="Open"
-              onClick={() => navigate("/settings/federal-forms")}
+              onClick={() => {
+                // Hand the alert off to admin queue + resolve it. The
+                // admin reviewer surface owns the catalog reconciliation
+                // from here; from the alert's perspective this IS the
+                // finishing action.
+                onAcknowledgeAdmin(a);
+                navigate("/settings/federal-forms");
+              }}
             />
           )}
 
@@ -506,6 +518,23 @@ function CopilotPane({
               onClick={() => onRunNexusCheck(a)}
             />
           )}
+
+          {/* Triage handoff — for alerts that touch many clients, the CPA
+              often needs to walk the affected tasks one-by-one (not just
+              send a bulletin). Triage Queue (v0m) is the right pattern:
+              "alert → here are the impacted clients/tasks, triage them in
+              one flow." Hands off to /today/triage with the alert id as
+              a query param so the focused single-card mode can filter
+              its queue to just this alert's affected clients. */}
+          {includedCount > 1 && (
+            <ActionRow
+              icon={<Sparkles className="w-3.5 h-3.5" aria-hidden />}
+              title={`Triage ${includedCount} affected ${includedCount === 1 ? "client" : "clients"}`}
+              description="Walk the affected tasks one-by-one — confirm, chase, or set aside in seconds each."
+              cta="Triage"
+              onClick={() => navigate(`/today/triage?alert=${a.id}`)}
+            />
+          )}
         </div>
       </div>
 
@@ -650,16 +679,24 @@ export function Alerts() {
     );
   }, [announcements, tab]);
 
-  const totals = useMemo(
-    () => ({
+  const totals = useMemo(() => {
+    const affectedClientIds = new Set<string>();
+    for (const a of announcements) {
+      if (a.dismissed) continue;
+      for (const id of a.affectedClientIds) affectedClientIds.add(id);
+    }
+    return {
       affecting: announcements.filter(
         (a) => !a.dismissed && a.affectedClientIds.length > 0,
       ).length,
+      // Distinct clients touched by any non-dismissed alert. The heading
+      // reads "N clients affected" — drives this from a Set so two
+      // alerts on the same client count once.
+      affectingClients: affectedClientIds.size,
       all: announcements.filter((a) => !a.dismissed).length,
       resolved: announcements.filter((a) => a.dismissed).length,
-    }),
-    [announcements],
-  );
+    };
+  }, [announcements]);
 
   // Selection: URL :id wins; otherwise default to first in the active tab.
   const selectedId = params.id ?? filtered[0]?.id ?? null;
@@ -950,7 +987,16 @@ export function Alerts() {
       {/* ── Center feed ──────────────────────────────────────────────── */}
       <section className="flex-1 min-w-0 flex flex-col bg-canvas overflow-hidden">
         <div className="px-4 md:px-6 lg:px-8 pt-6 md:pt-8 pb-region bg-surface border-b border-line sticky top-0 z-10">
-          <PageHeader title="Alerts" meta={`${totals.all} active`} className="mb-2" />
+          {/* Counter reflects # of CLIENTS the active alerts touch
+              (`totals.affectingClients`), not the raw alert count.
+              Sarah asks "how many of MY clients does this affect?" not
+              "how many press releases came in?" — so the heading number
+              must answer the actionable question. */}
+          <PageHeader
+            title="Alerts"
+            meta={`${totals.affectingClients} ${totals.affectingClients === 1 ? "client affected" : "clients affected"}`}
+            className="mb-2"
+          />
           {/* Ambient monitoring line — v0u inheritance. Pulsing dot
               signals "we're watching" without nagging; the timestamp
               earns trust by being specific. Static "14m ago" until
@@ -1044,6 +1090,14 @@ export function Alerts() {
         onEditDraft={handleEditDraft}
         onSendBulletin={handleSendBulletin}
         onApplyDeadline={handleApplyDeadline}
+        onAcknowledgeAdmin={(a) => {
+          // form_change alerts auto-resolve when the CPA opens the admin
+          // reviewer queue — that's the canonical finishing action for
+          // catalog-level updates (vs client emails for client-impacting
+          // alerts). Keeps the "Resolved" tab honest: anything the CPA
+          // has touched moves out of Active.
+          handleComplete(a.id);
+        }}
         onRunNexusCheck={handleRunNexusCheck}
         onSnooze={handleSnooze}
         onMarkNotApplicable={handleMarkNotApplicable}

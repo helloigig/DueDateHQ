@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
 import { useStore } from "../data/store";
 import type { Client, Task } from "../types";
+import { StateBadge } from "./ui/StateBadge";
 
 /**
  * Soft-blocks accidental ignorance: shown at the top of Task detail when the
@@ -42,12 +43,11 @@ export function TaskAlertContext({ client }: Props) {
               : `This task may be affected by ${affecting.length} active state alerts.`}
           </span>
         </p>
-        <p className="text-xs text-warn-ink/80 mt-0.5">
-          <span className="font-medium">
-            {lead.stateCode}: {lead.title}
-          </span>
-          {lead.newDeadline && <> — new deadline {lead.newDeadline}</>}.
-          {!lead.read && " You haven't reviewed it yet."}
+        <p className="text-xs text-warn-ink/80 mt-0.5 flex items-center gap-1.5 flex-wrap">
+          <StateBadge code={lead.stateCode} size="sm" />
+          <span className="font-medium">{lead.title}</span>
+          {lead.newDeadline && <span>— new deadline {lead.newDeadline}.</span>}
+          {!lead.read && <span>You haven't reviewed it yet.</span>}
         </p>
         <Link
           to={`/alerts/${lead.id}`}

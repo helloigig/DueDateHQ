@@ -10,6 +10,7 @@ import {
   parseDate,
 } from "../data/dateHelpers";
 import { actions } from "../data/store";
+import { StateBadge } from "./ui/StateBadge";
 import { useSetDeadlineStatus } from "../hooks/useDeadlines";
 import { env } from "../config";
 
@@ -152,8 +153,9 @@ export function PriorityCard({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <AlertTriangle className="w-3.5 h-3.5 text-danger-ink shrink-0" aria-hidden />
+                  <StateBadge code={item.alert.stateCode} size="sm" />
                   <span className="text-sm font-medium text-ink-900 truncate">
-                    {item.alert.stateCode}: {item.alert.title}
+                    {item.alert.title}
                   </span>
                 </div>
                 <div className="text-xs text-ink-500 truncate mt-0.5">

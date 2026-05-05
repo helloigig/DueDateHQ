@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
   Home,
@@ -12,13 +12,17 @@ import {
   GanttChartSquare,
   UserPlus,
   LogOut,
-  History,
+  Pin,
+  PinOff,
   Check,
 } from "lucide-react";
 import { useAnnouncements } from "../hooks/useAnnouncements";
 import { useSession, signOut } from "../data/session";
 import { useStore } from "../data/store";
+import { useClients } from "../hooks/useClients";
 import { useFeatureFlags } from "../hooks/useFeatureFlags";
+import { usePinnedClients } from "../hooks/usePinnedClients";
+import { env } from "../config";
 import { CountBadge } from "./ui/CountBadge";
 import { Avatar } from "./ui/Avatar";
 import {
@@ -29,7 +33,8 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
-// 7-item sidebar per IA v0.7 amendment §2:
+// Sidebar per IA v0.7 amendment §2 (Activity removed — audit feed lives
+// inside individual task / client surfaces):
 //   Today / Alerts / Timeline / Clients / Mail / Opportunities / Settings
 //
 // Alerts sits second so the state-notification + suggested-action surface
@@ -42,7 +47,6 @@ const primary = [
   { to: "/clients", label: "Clients", Icon: Users, end: false },
   { to: "/mail", label: "Mail", Icon: Mail, end: false },
   { to: "/opportunities", label: "Opportunities", Icon: Lightbulb, end: false },
-  { to: "/activity", label: "Activity", Icon: History, end: false },
 ];
 
 const COLLAPSED_KEY = "duedatehq.sidebar_collapsed.v1";
@@ -56,9 +60,40 @@ export function Sidebar() {
   const announcementsQuery = useAnnouncements({ activeOnly: true });
   const announcements = announcementsQuery.data ?? [];
   const session = useSession();
-  const { checklistItems } = useStore();
+  const { checklistItems, clients: storeClients } = useStore();
+  const liveClientsQuery = useClients();
+  const liveClientsRaw = liveClientsQuery.data?.items ?? [];
+  // Live (BE) clients in real mode, store-seeded mocks otherwise. Counts +
+  // pin lookups need the same source so a pinned id always resolves.
+  const sidebarClients = useMemo(
+    () =>
+      env.useMockData
+        ? storeClients
+        : liveClientsRaw.length > 0
+          ? liveClientsRaw
+          : storeClients,
+    [liveClientsRaw, storeClients],
+  );
   const todayIso = new Date().toISOString().slice(0, 10);
-  const unread = announcements.filter((a) => !a.read).length;
+  // Alerts caption: count of unique CLIENTS affected by active (non-dismissed)
+  // alerts — the actionable number ("how many of MY clients does this touch")
+  // not the raw alert count. Matches the way Sarah scans the bell.
+  const alertsAffectingCount = useMemo(() => {
+    const set = new Set<string>();
+    for (const a of announcements) {
+      if (a.dismissed) continue;
+      for (const id of a.affectedClientIds) set.add(id);
+    }
+    return set.size;
+  }, [announcements]);
+  // Clients caption: active roster size. Excludes archived/inactive/prospect.
+  const activeClientsCount = useMemo(
+    () =>
+      sidebarClients.filter(
+        (c) => (c as { status?: string }).status === "active",
+      ).length,
+    [sidebarClients],
+  );
   const STALLED_HOURS = 14 * 24;
   const hoursSinceIso = (iso: string) =>
     (Date.now() - new Date(iso).getTime()) / (60 * 60 * 1000);
@@ -154,11 +189,28 @@ export function Sidebar() {
                 )}
                 <Icon className="w-4 h-4 shrink-0" aria-hidden />
                 {!collapsed && <span className="flex-1">{label}</span>}
-                {!collapsed && to === "/alerts" && unread > 0 && (
-                  <CountBadge count={unread} tone="danger" className="ml-auto" />
+                {/* Alerts caption — reflects the # of CLIENTS the active
+                    announcements touch, not the raw alert count. The CPA
+                    asks "how many of MY clients does today's news affect?"
+                    not "how many press releases came in." */}
+                {!collapsed && to === "/alerts" && alertsAffectingCount > 0 && (
+                  <CountBadge
+                    count={alertsAffectingCount}
+                    tone="danger"
+                    className="ml-auto"
+                  />
                 )}
-                {collapsed && to === "/alerts" && unread > 0 && (
+                {collapsed && to === "/alerts" && alertsAffectingCount > 0 && (
                   <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-danger-solid" />
+                )}
+                {/* Clients caption — active roster size (excludes archived /
+                    inactive / prospect). */}
+                {!collapsed && to === "/clients" && activeClientsCount > 0 && (
+                  <CountBadge
+                    count={activeClientsCount}
+                    tone="neutral"
+                    className="ml-auto"
+                  />
                 )}
                 {!collapsed && to === "/mail" && inboxCount > 0 && (
                   <CountBadge count={inboxCount} tone="neutral" className="ml-auto" />
@@ -170,6 +222,8 @@ export function Sidebar() {
             )}
           </NavLink>
         ))}
+
+        <PinnedClientsSection collapsed={collapsed} clients={sidebarClients} />
       </nav>
 
       <div className={collapsed ? "px-2 py-2 border-t border-line" : "px-2 py-3 border-t border-line"}>
@@ -461,5 +515,129 @@ function WorkspaceHeader({
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Pinned-clients sidebar section. Surfaces a CPA-curated short list of
+ * clients (max 8) directly under the primary nav so high-touch clients
+ * are reachable in one click — avoiding the round trip through /clients.
+ *
+ * Pin/unpin is invoked from the client detail header (PinClientButton).
+ * State persists in localStorage via usePinnedClients(); the section
+ * hides itself when no pins exist so it doesn't take vertical space
+ * before the user opts in.
+ */
+function PinnedClientsSection({
+  collapsed,
+  clients,
+}: {
+  collapsed: boolean;
+  clients: ReadonlyArray<{ id: string; name: string }>;
+}) {
+  const { pinnedIds, unpin } = usePinnedClients();
+  const clientById = useMemo(
+    () => new Map(clients.map((c) => [c.id, c])),
+    [clients],
+  );
+  const items = useMemo(
+    () =>
+      pinnedIds
+        .map((id) => clientById.get(id))
+        .filter((c): c is { id: string; name: string } => Boolean(c)),
+    [pinnedIds, clientById],
+  );
+  if (items.length === 0) return null;
+
+  return (
+    <div className={collapsed ? "mt-3 pt-3 border-t border-line" : "mt-4 pt-3 border-t border-line"}>
+      {!collapsed && (
+        <p className="text-2xs uppercase tracking-wider text-ink-400 px-3 pb-1.5 font-semibold">
+          Pinned
+        </p>
+      )}
+      <div className="space-y-0.5">
+        {items.map((c) => (
+          <NavLink
+            key={c.id}
+            to={`/clients/${c.id}`}
+            title={collapsed ? c.name : undefined}
+            className={({ isActive }) =>
+              `group relative flex items-center rounded-md text-sm transition-colors ${
+                collapsed ? "justify-center py-2" : "gap-2 pl-3 pr-2 py-1.5"
+              } ${
+                isActive
+                  ? "bg-sunken text-ink-900 font-medium"
+                  : "text-ink-500 hover:bg-sunken hover:text-ink-900"
+              }`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                {isActive && !collapsed && (
+                  <span
+                    className="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-accent"
+                    aria-hidden
+                  />
+                )}
+                {collapsed ? (
+                  <Avatar size="sm" tone="primary" name={c.name} />
+                ) : (
+                  <>
+                    <Avatar size="sm" tone="primary" name={c.name} />
+                    <span className="flex-1 truncate text-xs">{c.name}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        unpin(c.id);
+                      }}
+                      title={`Unpin ${c.name}`}
+                      aria-label={`Unpin ${c.name}`}
+                      className="opacity-0 group-hover:opacity-100 text-ink-400 hover:text-ink-900 p-0.5 rounded shrink-0"
+                    >
+                      <PinOff className="w-3 h-3" aria-hidden />
+                    </button>
+                  </>
+                )}
+              </>
+            )}
+          </NavLink>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Pin / unpin trigger — used in the ClientDetail header so a CPA can pin
+ * the client they're viewing into the sidebar with one click. Lives here
+ * (not in the page) so the icon, copy, and pin-state mapping stay aligned
+ * with the rendered sidebar list.
+ */
+export function PinClientButton({ clientId }: { clientId: string }) {
+  const { isPinned, toggle } = usePinnedClients();
+  const pinned = isPinned(clientId);
+  return (
+    <button
+      type="button"
+      onClick={() => toggle(clientId)}
+      title={pinned ? "Unpin from sidebar" : "Pin to sidebar"}
+      aria-label={pinned ? "Unpin from sidebar" : "Pin to sidebar"}
+      aria-pressed={pinned}
+      className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors ${
+        pinned
+          ? "text-ink-900 bg-sunken hover:bg-sunken/70"
+          : "text-ink-500 hover:text-ink-900 hover:bg-sunken"
+      }`}
+    >
+      {pinned ? (
+        <PinOff className="w-3.5 h-3.5" aria-hidden />
+      ) : (
+        <Pin className="w-3.5 h-3.5" aria-hidden />
+      )}
+      <span>{pinned ? "Pinned" : "Pin"}</span>
+    </button>
   );
 }

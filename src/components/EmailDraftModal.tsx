@@ -15,9 +15,15 @@ import { useSession } from "../data/session";
 import { useSendEmail } from "../hooks/useEmailDrafts";
 
 /**
- * The Email draft modal — IA §3.7. Mode D's primary surface. Triggered from
- * many places (Task detail, Alert detail, AI flag resolution). Same modal
- * everywhere. Tone selector regenerates body in 1-2s with loading state.
+ * Email draft side-panel — IA §3.7. Mode D's primary surface. Triggered
+ * from many places (Task detail, Alert detail, AI flag resolution).
+ * Slides in from the right so the underlying surface (task / client /
+ * inbox) stays visible — matches the /alerts CopilotPane pattern. Tone
+ * selector regenerates body in 1-2s with loading state.
+ *
+ * Component is still named `EmailDraftModal` to keep call sites + the
+ * `EmailDraftIntent` import path stable; the outer chrome is a pane,
+ * not a centered dialog.
  */
 
 export interface EmailDraftIntent {
@@ -197,16 +203,24 @@ export function EmailDraftModal({ open, intent, onClose }: Props) {
       role="dialog"
       aria-modal="true"
       aria-label="Email draft"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/30 p-4"
+      className="fixed inset-0 z-50 flex justify-end bg-ink-900/20"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-surface border border-line rounded-lg shadow-overlay w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+      {/* Right-side pane — matches the /alerts CopilotPane chrome so the
+          email composer reads as the same pattern wherever it opens.
+          Width caps at 560px on desktop, full-width on narrow viewports
+          so the body editor still has working room on a laptop. */}
+      <aside
+        className="bg-surface border-l border-line shadow-overlay w-full max-w-[560px] h-full overflow-hidden flex flex-col animate-in slide-in-from-right duration-150"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <header className="flex items-center px-5 py-3 border-b border-line">
+          <Mail className="w-4 h-4 text-ink-500 mr-2" aria-hidden />
           <h2 className="text-sm font-semibold text-ink-900">Compose</h2>
           <AuthorityChip zone="yellow" className="ml-2" />
-          <span className="ml-2 text-2xs text-ink-400">
+          <span className="ml-2 text-2xs text-ink-400 hidden lg:inline">
             You review and send — we never send on your behalf
           </span>
           <button
@@ -384,7 +398,7 @@ export function EmailDraftModal({ open, intent, onClose }: Props) {
             {scheduledFor ? "Schedule send" : "Send"}
           </button>
         </footer>
-      </div>
+      </aside>
     </div>
   );
 }

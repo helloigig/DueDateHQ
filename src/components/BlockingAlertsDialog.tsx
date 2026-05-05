@@ -4,6 +4,7 @@ import { AlertTriangle } from "lucide-react";
 import type { Announcement } from "../types";
 import { hoursSince } from "../data/dateHelpers";
 import { Button } from "./ui/button";
+import { StateBadge } from "./ui/StateBadge";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -55,9 +56,10 @@ export function BlockingAlertsDialog({
             const h = Math.round(hoursSince(a.detectedAt));
             return (
               <li key={a.id} className="px-5 py-3 flex items-center gap-3">
+                <StateBadge code={a.stateCode} size="sm" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-ink-900 truncate">
-                    {a.stateCode}: {a.title}
+                    {a.title}
                   </div>
                   <div className="text-xs text-ink-500 mt-0.5">
                     {a.affectedClientIds.length} client

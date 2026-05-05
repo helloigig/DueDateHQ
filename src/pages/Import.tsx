@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { BackLink } from "../components/ui/BackLink";
 import { useCommitImport } from "../hooks/useImports";
 import {
   DETECTED_ROWS,
@@ -82,9 +83,7 @@ export function Import({ chromeless = false }: { chromeless?: boolean } = {}) {
     <div className={containerClass}>
       {!chromeless && (
         <>
-          <Link to="/clients" className="text-sm text-ink-500 hover:underline">
-            ‹ Clients
-          </Link>
+          <BackLink fallback="/clients" fallbackLabel="Clients" />
           <h1 className="mt-3 text-xl font-semibold text-ink-900">
             Upload clients from CSV
           </h1>
@@ -508,84 +507,116 @@ function PreviewStep({
         </div>
       </div>
 
-      <table className="w-full text-sm">
-        <thead className="text-xs uppercase tracking-wide text-ink-500 bg-canvas">
-          <tr>
-            <th className="text-left px-4 py-2 font-medium">Name</th>
-            <th className="text-left px-4 py-2 font-medium">Entity</th>
-            <th className="text-left px-4 py-2 font-medium">State</th>
-            <th className="text-left px-4 py-2 font-medium">Email</th>
-            <th className="text-left px-4 py-2 font-medium">Bundle</th>
-            <th className="text-right px-4 py-2 font-medium"></th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-line">
-          {rows.map((r, i) => {
-            const issue = r.issues.length > 0;
-            return (
-              <Fragment key={i}>
-                <tr
-                  className={issue ? "bg-amber-50/50" : "hover:bg-canvas"}
-                >
-                  <td className="px-4 py-2.5 text-ink-900">
-                    {issue && (
-                      <AlertTriangle
-                        className="w-3 h-3 inline text-amber-600 mr-1"
-                        aria-hidden
-                      />
-                    )}
-                    {r.name}
-                  </td>
-                  <td className="px-4 py-2.5 text-ink-700">
-                    {r.entityType ?? (
-                      <span className="text-amber-700">?</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2.5 text-ink-700">
-                    {r.primaryState ?? (
-                      <span className="text-amber-700">?</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2.5 text-ink-700">
-                    {r.email || <span className="text-amber-700">—</span>}
-                  </td>
-                  <td className="px-4 py-2.5 text-ink-700">
-                    {r.bundle ?? <span className="text-ink-400">—</span>}
-                  </td>
-                  <td className="px-4 py-2.5 text-right">
-                    {issue && (
-                      <button
-                        onClick={() => setEditing(editing === i ? null : i)}
-                        className="text-xs px-2 py-1 rounded bg-ink-900 text-white hover:bg-ink-900"
-                      >
-                        {editing === i ? "Cancel" : "Fix inline"}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-                {editing === i && (
-                  <tr className="bg-amber-50">
-                    <td colSpan={6} className="px-4 py-3">
-                      <FixInline
-                        row={r}
-                        onPatch={(patch) => {
-                          onRowFix(i, patch);
-                          // close editor once row has zero issues
-                          const resolved = recomputeIssues({
-                            ...r,
-                            ...patch,
-                          });
-                          if (resolved.length === 0) setEditing(null);
-                        }}
-                      />
+      {/* Scrollable table region — actions live in a sticky footer below
+          so the user can scroll through long rosters and still see Back /
+          Commit at all times. Column widths bias toward Name + Email
+          which are the fields CPAs actually scan to spot wrong rows. */}
+      <div className="max-h-[480px] overflow-y-auto">
+        <table className="w-full text-sm table-fixed">
+          <colgroup>
+            <col className="w-[22%]" />
+            <col className="w-[10%]" />
+            <col className="w-[7%]" />
+            <col className="w-[20%]" />
+            <col className="w-[18%]" />
+            <col className="w-[14%]" />
+            <col className="w-[9%]" />
+          </colgroup>
+          <thead className="text-xs uppercase tracking-wide text-ink-500 bg-canvas sticky top-0 z-10">
+            <tr>
+              <th className="text-left px-4 py-2 font-medium">Name</th>
+              <th className="text-left px-4 py-2 font-medium">Entity</th>
+              <th className="text-left px-4 py-2 font-medium">State</th>
+              <th className="text-left px-4 py-2 font-medium">Email</th>
+              <th className="text-left px-4 py-2 font-medium">Bundle</th>
+              <th
+                className="text-left px-4 py-2 font-medium"
+                title="Tier (0–3) and additional nexus states from the CSV"
+              >
+                Tier · Nexus
+              </th>
+              <th className="text-right px-4 py-2 font-medium"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {rows.map((r, i) => {
+              const issue = r.issues.length > 0;
+              return (
+                <Fragment key={i}>
+                  <tr
+                    className={issue ? "bg-amber-50/50" : "hover:bg-canvas"}
+                  >
+                    <td className="px-4 py-2.5 text-ink-900 truncate">
+                      {issue && (
+                        <AlertTriangle className="w-3 h-3 inline text-amber-600 mr-1" aria-hidden />
+                      )}
+                      {r.name}
+                    </td>
+                    <td className="px-4 py-2.5 text-ink-700">
+                      {r.entityType ?? (
+                        <span className="text-amber-700">?</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-ink-700">
+                      {r.primaryState ?? (
+                        <span className="text-amber-700">?</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-ink-700 truncate">
+                      {r.email || <span className="text-amber-700">—</span>}
+                    </td>
+                    <td className="px-4 py-2.5 text-ink-700 truncate">
+                      {r.bundle ?? <span className="text-ink-400">—</span>}
+                    </td>
+                    <td className="px-4 py-2.5 text-ink-700 truncate">
+                      {r.tier ? (
+                        <span className="text-2xs px-1 py-0.5 rounded bg-sunken text-ink-700 mr-1">
+                          T{r.tier}
+                        </span>
+                      ) : null}
+                      {r.nexusStates && r.nexusStates.length > 0 ? (
+                        <span className="text-2xs text-ink-500">
+                          {r.nexusStates.join(", ")}
+                        </span>
+                      ) : !r.tier ? (
+                        <span className="text-ink-400">—</span>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      {issue && (
+                        <button
+                          onClick={() => setEditing(editing === i ? null : i)}
+                          className="text-xs px-2 py-1 rounded bg-ink-900 text-white hover:bg-ink-900"
+                        >
+                          {editing === i ? "Cancel" : "Fix"}
+                        </button>
+                      )}
                     </td>
                   </tr>
-                )}
-              </Fragment>
+                  {editing === i && (
+                    <tr className="bg-amber-50">
+                      <td colSpan={7} className="px-4 py-3">
+                        <FixInline
+                          row={r}
+                          onPatch={(patch) => {
+                            onRowFix(i, patch);
+                            // close editor once row has zero issues
+                            const resolved = recomputeIssues({
+                              ...r,
+                              ...patch,
+                            });
+                            if (resolved.length === 0) setEditing(null);
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               );
             })}
           </tbody>
         </table>
+      </div>
 
       {/* Action bar — sticks to the viewport bottom while the user scrolls
           the table to fix flagged rows. Border-top + surface bg keeps it
@@ -756,6 +787,24 @@ function CommittingStep({
         contactEmail: r.email,
         contactPhone: r.phone,
         servicePackage: r.bundle ?? undefined,
+        // Schema-parity columns (nexus / tier / notes / status). The BE
+        // imports.commit RowSchema accepts the base fields today; the
+        // extras travel as best-effort metadata so future router
+        // versions can persist them without an FE redeploy. The cast
+        // through Record<string, unknown> matches the existing
+        // build-soft pattern used elsewhere in the FE for not-yet-typed
+        // BE fields.
+        ...((r.nexusStates && r.nexusStates.length > 0) ||
+        r.tier ||
+        r.notes ||
+        (r.status && r.status !== "active")
+          ? {
+              nexusStates: r.nexusStates ?? [],
+              tier: r.tier ?? undefined,
+              notes: r.notes ?? undefined,
+              status: r.status ?? "active",
+            }
+          : {}),
       })),
     [rows]
   );
