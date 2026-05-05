@@ -149,7 +149,7 @@ export function ChaseLoopStatus() {
             if (!first) return;
             if (first.kind === "flag") {
               const t = taskById.get(first.item.taskId);
-              if (t) navigate(`/clients/${t.clientId}/tasks/${t.id}`);
+              if (t) navigate(`/clients/${t.clientId}?task=${t.id}`);
             } else if (first.kind === "insight") {
               navigate(`/clients/${first.insight.clientId}`);
             }
@@ -162,7 +162,7 @@ export function ChaseLoopStatus() {
               return (
                 <li key={`f-${idx}`} className="text-xs text-ink-700">
                   <button
-                    onClick={() => navigate(`/clients/${client.id}/tasks/${task.id}`)}
+                    onClick={() => navigate(`/clients/${client.id}?task=${task.id}`)}
                     className="text-left hover:underline w-full"
                   >
                     <ClientChip client={client} size="sm" as="span" />
@@ -234,7 +234,7 @@ export function ChaseLoopStatus() {
                   <Check className="w-3 h-3" aria-hidden />
                 </button>
                 <button
-                  onClick={() => navigate(`/clients/${client.id}/tasks/${task.id}`)}
+                  onClick={() => navigate(`/clients/${client.id}?task=${task.id}`)}
                   className="text-left hover:underline truncate flex-1"
                 >
                   <ClientChip client={client} size="sm" as="span" />

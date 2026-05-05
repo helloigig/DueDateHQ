@@ -1135,7 +1135,7 @@ function UnifiedNoteItem({
             each note lives at. */}
         {note.scope.kind === "task" ? (
           <Link
-            to={`/clients/${clientId}/tasks/${note.scope.taskId}`}
+            to={`/clients/${clientId}?task=${note.scope.taskId}`}
             className="text-2xs px-1.5 py-0.5 rounded bg-info-bg/60 text-info-ink border border-info-border hover:bg-info-bg"
             title="Open the task this note belongs to"
           >
