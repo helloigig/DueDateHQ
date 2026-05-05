@@ -225,11 +225,17 @@ function renderChipText(
 ): React.ReactNode {
   switch (result.state) {
     case "on_track":
+      // Yuqi audit 2026-05-06: "I am not sure about the On Schedule
+      // IRS jan 31 label." On a calm fleet view (Timeline reading "41
+      // ready to file"), every chip echoing "On schedule" was
+      // tone-redundant — the green pill ALREADY says it. The
+      // information value is the date. Drop the prefix in both modes
+      // and let the calm tone carry the "fine" signal; the IRS date
+      // (or active milestone target) is enough.
       if (!result.activeMilestone) {
         return (
           <span className={tone.runway}>
-            On schedule · IRS{" "}
-            <DateLabel value={officialDueDate} format="short" />
+            IRS <DateLabel value={officialDueDate} format="short" />
           </span>
         );
       }
@@ -241,7 +247,6 @@ function renderChipText(
             value={result.activeMilestone.targetDate}
             format="short"
           />
-          {!isCompact && <span className={tone.delta}>· on schedule</span>}
         </>
       );
     case "behind":

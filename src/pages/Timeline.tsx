@@ -18,6 +18,7 @@ import { SectionHeader } from "../components/ui/SectionHeader";
 import { StatusPill } from "../components/ui/StatusPill";
 import { StateBadge } from "../components/ui/StateBadge";
 import { FilterChip } from "../components/ui/FilterChip";
+import { MetricTile } from "../components/ui/MetricTile";
 import { Button } from "../components/ui/button";
 import {
   DropdownMenu,
@@ -44,7 +45,12 @@ import { useReassignTask } from "../hooks/useTasks";
 import { useRemoteSession } from "../hooks/useSession";
 import type { ClientTier } from "../types";
 import { cn } from "../lib/utils";
-import { TODAY, parseDate, daysBetween } from "../data/dateHelpers";
+import {
+  TODAY,
+  parseDate,
+  daysBetween,
+  periodSuffix,
+} from "../data/dateHelpers";
 
 // Lookup row: clientId → entityType / tier / primaryState. Used to
 // enrich TaskRow with cross-axis filter dimensions (entity, tier,
@@ -225,6 +231,45 @@ const MOCK_TIMELINES: TaskRow[] = [
     assignedUserId: "user-mock",
     assigneeName: "Sarah Mitchell",
   },
+  // On-track 941 — exercises (a) the calmer chip (no "On schedule"
+  // prefix, just "IRS Jul 31") and (b) the period suffix that
+  // disambiguates the row label as "941 · Q2 · federal".
+  {
+    taskId: "mock-task-941-q2",
+    client: "Pacific Ridge Consulting",
+    task: "941 · Q2 · federal",
+    dueDate: "Jul 31",
+    officialDueIso: "2026-07-31",
+    internalDueIso: "2026-07-24",
+    formClass: "quarterly",
+    currentStage: "collect",
+    daysBehind: 0,
+    missingCount: 0,
+    milestoneStatus: ["done", "in_progress", "not_started", "not_started", "not_started"],
+    jurisdiction: "federal",
+    entityType: "S-Corp",
+    tier: "standard",
+    assignedUserId: null,
+    assigneeName: null,
+  },
+  {
+    taskId: "mock-task-941-q3",
+    client: "Pacific Ridge Consulting",
+    task: "941 · Q3 · federal",
+    dueDate: "Oct 31",
+    officialDueIso: "2026-10-31",
+    internalDueIso: "2026-10-24",
+    formClass: "quarterly",
+    currentStage: "initial_meeting",
+    daysBehind: 0,
+    missingCount: 0,
+    milestoneStatus: ["in_progress", "not_started", "not_started", "not_started", "not_started"],
+    jurisdiction: "federal",
+    entityType: "S-Corp",
+    tier: "standard",
+    assignedUserId: null,
+    assigneeName: null,
+  },
 ];
 
 type LiveMilestone = {
@@ -274,9 +319,20 @@ function groupLiveMilestones(
     const dueMs = ms.find((x) => x.milestoneType === "file")?.targetDate;
     const lead = ms[0]!;
     const dueIso = dueMs ?? lead.officialDueDate;
+    // Disambiguate quarterly forms (941/720 file every quarter).
+    // Without the period, three 941 rows under the same client read as
+    // identical labels — the only differentiator gets pushed into the
+    // DeadlineChip date. Yuqi audit 2026-05-06: "you need to
+    // differentiate that".
+    const period =
+      lead.formType && lead.officialDueDate
+        ? periodSuffix(lead.formType, lead.officialDueDate.slice(0, 10))
+        : null;
     const taskLabel =
       lead.formType || lead.jurisdiction
-        ? [lead.formType, lead.jurisdiction].filter(Boolean).join(" · ")
+        ? [lead.formType, period, lead.jurisdiction]
+            .filter(Boolean)
+            .join(" · ")
         : "—";
     const lookup = clientLookup.get(lead.clientId);
     // Strip time component if present — DESIGN.md locked policy: dates only.
@@ -554,9 +610,12 @@ export function Timeline() {
     next.delete("clientId");
     setSearchParams(next, { replace: true });
   };
-  const [filter, setFilter] = useState<FilterMode>(
-    isFocused ? "all" : "waiting",
-  );
+  // Always land on "All tasks" — Yuqi audit 2026-05-05: the previous
+  // default ("waiting") hid the broader fleet on every page load, which
+  // forced the CPA to context-switch into the chip row before the page
+  // even read as a forward-plan. Focus mode (deep link) leaves this
+  // default alone — the row scrolls into view regardless of filter.
+  const [filter, setFilter] = useState<FilterMode>("all");
   const [attr, setAttr] = useState<AttrFilters>(EMPTY_ATTR);
   // Stage-action confirm dialog state — null when closed.
   const [stageAction, setStageAction] = useState<{
@@ -846,56 +905,77 @@ export function Timeline() {
         </div>
       )}
 
-      {/* Ambient summary — one line above the filter chips. Replaces
-          the previous 3-tile MetricTile grid; the same counts are
-          already represented by the filter chips below (each chip's
-          `count` slot), so the tiles were duplicating signals while
-          burning ~120px of vertical canvas. The line keeps the
-          tone-coded numbers so the eye still picks up urgency at a
-          glance, but doesn't pretend to be a hero metric. */}
-      {/* Discrete metrics — gap-section spacing, not middle dots. Per
-          DESIGN.md §Don't (line ~484): "Don't separate metric values with
-          middle dots when a clean row works." */}
-      <div className="mb-region text-xs text-ink-500 flex items-baseline gap-x-section gap-y-1 flex-wrap">
-        <span>
-          <span
-            className={cn(
-              "tabular-nums font-semibold",
-              kpis.behind > 0 ? "text-warn-ink" : "text-ink-700",
-            )}
-          >
-            {kpis.behind}
-          </span>{" "}
-          behind internal
-        </span>
-        <span>
-          <span
-            className={cn(
-              "tabular-nums font-semibold",
-              kpis.waiting > 0 ? "text-warn-ink" : "text-ink-700",
-            )}
-          >
-            {kpis.waiting}
-          </span>{" "}
-          awaiting docs
-        </span>
-        <span>
-          <span
-            className={cn(
-              "tabular-nums font-semibold",
-              kpis.ready > 0 ? "text-ok-ink" : "text-ink-700",
-            )}
-          >
-            {kpis.ready}
-          </span>{" "}
-          ready to file
-        </span>
+      {/* KPI tiles — same Mercury-style headline shape the Clients
+          page uses (label / value / helper). The Behind + Awaiting
+          tiles double as filter triggers, mirroring the Clients
+          "Stuck >14d" tile pattern: clicking flips the workflow
+          filter so the table below scopes immediately. Yuqi audit
+          2026-05-05: "top section of timeline page the same structure
+          and layout as client — follow its design." Three tiles fits
+          the same 3-column grid Clients uses when its conditional
+          Multi-state tile is visible; otherwise we stack two-up on
+          tablets and one-up on mobile. Ready-to-file is display-only
+          (no matching filter chip — its purpose is the count, not
+          a slice the CPA narrows the table to). */}
+      <div className="mb-card grid grid-cols-1 gap-card md:grid-cols-3">
+        <MetricTile
+          label="Behind internal"
+          value={kpis.behind}
+          tone={kpis.behind > 0 ? "danger" : "neutral"}
+          helper="Past internal target — push"
+          active={filter === "behind"}
+          onClick={() => setFilter(filter === "behind" ? "all" : "behind")}
+        />
+        <MetricTile
+          label="Awaiting docs"
+          value={kpis.waiting}
+          tone={kpis.waiting > 0 ? "warn" : "neutral"}
+          helper="Items waiting on client"
+          active={filter === "waiting"}
+          onClick={() => setFilter(filter === "waiting" ? "all" : "waiting")}
+        />
+        <MetricTile
+          label="Ready to file"
+          value={kpis.ready}
+          tone={kpis.ready > 0 ? "ok" : "neutral"}
+          helper="All milestones complete"
+        />
+      </div>
+
+      {/* Workflow-state chips — single source of truth via shared
+          FilterChip. Sit directly under the tiles so the eye reads
+          tiles → chips → MultiSelect filters → table, matching the
+          Clients page rhythm. */}
+      <div className="flex items-center gap-1 mb-card">
+        <FilterChip
+          active={filter === "all"}
+          count={kpis.active}
+          onClick={() => setFilter("all")}
+        >
+          All tasks
+        </FilterChip>
+        <FilterChip
+          active={filter === "waiting"}
+          count={kpis.waiting}
+          onClick={() => setFilter("waiting")}
+        >
+          Awaiting docs
+        </FilterChip>
+        <FilterChip
+          active={filter === "behind"}
+          count={kpis.behind}
+          onClick={() => setFilter("behind")}
+        >
+          Behind
+        </FilterChip>
       </div>
 
       {/* Attribute filters — second axis (jurisdiction / entity / tier).
-          Hierarchy: chips below answer "what's the workflow state?",
-          these answer "what slice of the fleet?" Multi-select; compose
-          with the chips. Mirrors the Clients page filter row. */}
+          Workflow chips above answer "what STATE?", these answer "what
+          SLICE of the fleet?" Multi-select; compose with the chips.
+          Mirrors the Clients page filter row (Entity / State / Tier /
+          Package) — sits below the workflow filter so the visual rhythm
+          tiles → workflow chips → attribute chips → table holds. */}
       <div className="mb-region flex items-center gap-2 flex-wrap">
         <MultiSelectChip
           label="Jurisdiction"
@@ -924,31 +1004,6 @@ export function Timeline() {
             Clear all
           </button>
         )}
-      </div>
-
-      {/* Workflow-state chips — single source of truth via shared FilterChip */}
-      <div className="flex items-center gap-1 mb-card">
-        <FilterChip
-          active={filter === "all"}
-          count={kpis.active}
-          onClick={() => setFilter("all")}
-        >
-          All tasks
-        </FilterChip>
-        <FilterChip
-          active={filter === "waiting"}
-          count={kpis.waiting}
-          onClick={() => setFilter("waiting")}
-        >
-          Awaiting docs
-        </FilterChip>
-        <FilterChip
-          active={filter === "behind"}
-          count={kpis.behind}
-          onClick={() => setFilter("behind")}
-        >
-          Behind
-        </FilterChip>
       </div>
 
       {/* Sections */}
