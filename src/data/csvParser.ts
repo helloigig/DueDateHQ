@@ -72,17 +72,38 @@ const ENTITY_ALIASES: Record<string, EntityType> = {
   trust: "Trust",
 };
 
+// All 13 supported StateCode values from src/types.ts. Each gets both
+// the 2-letter postal code and full name so imports recognise either
+// "CA" or "California". Without the GA/IL/MA/NJ/PA/OR/MI/WA entries the
+// parser flags those rows with `state_unknown` even though the rest of
+// the system supports them.
 const STATE_ALIASES: Record<string, StateCode> = {
   ca: "CA",
   california: "CA",
-  ny: "NY",
-  "new york": "NY",
-  tx: "TX",
-  texas: "TX",
-  la: "LA",
-  louisiana: "LA",
   fl: "FL",
   florida: "FL",
+  ga: "GA",
+  georgia: "GA",
+  il: "IL",
+  illinois: "IL",
+  la: "LA",
+  louisiana: "LA",
+  ma: "MA",
+  massachusetts: "MA",
+  mi: "MI",
+  michigan: "MI",
+  nj: "NJ",
+  "new jersey": "NJ",
+  ny: "NY",
+  "new york": "NY",
+  or: "OR",
+  oregon: "OR",
+  pa: "PA",
+  pennsylvania: "PA",
+  tx: "TX",
+  texas: "TX",
+  wa: "WA",
+  washington: "WA",
 };
 
 function pickEntity(raw: string): EntityType | null {
