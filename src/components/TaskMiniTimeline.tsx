@@ -25,27 +25,32 @@ import { cn } from "../lib/utils";
 type Status = "done" | "in_progress" | "not_started" | "overdue" | "blocked";
 
 /**
- * Yuqi audit 2026-05-06: "5 stages are very complicated."
- * Fold the 5 BE milestones into 3 user-facing phases that match
- * Sarah's daily verb:
- *
- *   Collect  — initial_meeting + collect_materials   (waiting on client)
- *   Prepare  — prepare_workpapers + internal_review  (Sarah's work)
- *   File     — file                                  (terminal)
- *
- * BE schema unchanged — Mark-done fans out across all underlying
- * canonicals via Promise.all. Audit trail granularity preserved.
+ * Five canonical stages — Initial mtg / Collect / Prepare / Review / File.
+ * Yuqi audit 2026-05-05 (round 4): the 3-phase fold (Collect = mtg+collect,
+ * Prepare = prepare+review) was tighter on the eye but lost the audit
+ * granularity Sarah cares about — "did we have the kickoff meeting yet?"
+ * "are we in review or just prep?" needs distinct stages. Restored to 5
+ * stages, each backed by its own BE milestone row, so Mark-done writes
+ * one event per stage (no parallel fan-out needed).
  */
+type WaypointType =
+  | "initial_meeting"
+  | "collect"
+  | "prepare"
+  | "review"
+  | "file";
+
 type Waypoint = {
-  type: "collect" | "prepare" | "file";
+  type: WaypointType;
   label: string;
   targetDate?: string;
   status: Status;
   missingBadge?: number;
   blockerReason?: string;
-  /** Underlying milestone ids — one per canonical that belongs to
-   *  this phase. Used by Mark-done (parallel update) and the override
-   *  popover (operates on the first id). */
+  /** Underlying BE milestone ids. With 5 stages this is typically a
+   *  single id per waypoint, but kept as an array for back-compat with
+   *  the prior 3-phase fold (which aggregated 1-2 underlying canonicals
+   *  per waypoint). */
   ids?: string[];
 };
 
@@ -87,13 +92,21 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
   const [editing, setEditing] = useState<Waypoint | null>(null);
   // Selected waypoint type — drives which stage's actions appear in the
   // panel below the timeline. Starts unset; resolves to the active stage
-  // (in_progress / overdue / blocked) once waypoints load. Yuqi audit
-  // 2026-05-05: the prior dual-surface (floating popover + separate
-  // edit form) felt fragmented. Now: ONE inline panel below the
-  // timeline always holds the actions for ONE selected stage. Click
-  // another dot → panel scopes to it. Default = active stage.
+  // (in_progress / overdue / blocked) once waypoints load.
   const [selectedStageType, setSelectedStageType] =
     useState<Waypoint["type"] | null>(null);
+  // Slide-in direction for the panel — derived from the index delta
+  // between the previous selection and the new one. Yuqi audit
+  // 2026-05-05 (round 4): "clicking on each dot you can have the
+  // action sliding from left to right, vice versa" — left dot picked
+  // = panel slides in from the left, right dot picked = slides from
+  // the right. The previousIdx ref tracks the LAST resolved index so
+  // we can compare across renders. The transient direction state is
+  // used to drive the animation class on the panel.
+  const previousIdxRef = useRef<number | null>(null);
+  const [slideDirection, setSlideDirection] = useState<"left" | "right" | null>(
+    null,
+  );
   const liveMilestones = milestonesQuery.data ?? [];
   const hasLive = liveMilestones.length > 0;
   const blockedCount = liveMilestones.filter((m) => m.status === "blocked").length;
@@ -122,6 +135,21 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
     const firstNotDone = waypoints.find((w) => w.status !== "done");
     return firstNotDone ?? waypoints[0] ?? null;
   }, [waypoints, selectedStageType]);
+
+  const selectedIdx = selectedWaypoint
+    ? waypoints.findIndex((w) => w.type === selectedWaypoint.type)
+    : -1;
+
+  // Compute slide direction whenever the selected index changes.
+  // useEffect runs after render, comparing prev → current index.
+  useEffect(() => {
+    if (selectedIdx < 0) return;
+    const prev = previousIdxRef.current;
+    if (prev !== null && prev !== selectedIdx) {
+      setSlideDirection(selectedIdx > prev ? "right" : "left");
+    }
+    previousIdxRef.current = selectedIdx;
+  }, [selectedIdx]);
 
   const onCheckBlockers = async () => {
     const result = await detectBlockers.mutateAsync({ taskId: task.id });
@@ -239,7 +267,11 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
           one set of controls. */}
       {selectedWaypoint && (
         <ActiveStagePanel
+          // Re-mounting on type change is what triggers the animation;
+          // Tailwind's `animate-in` runs on every fresh mount.
+          key={selectedWaypoint.type}
           wp={selectedWaypoint}
+          slideDirection={slideDirection}
           isMarkingDone={updateMilestone.isPending}
           onMarkDone={
             selectedWaypoint.ids && selectedWaypoint.ids.length > 0
@@ -303,9 +335,9 @@ type LiveMilestone = {
 };
 
 // Map BE TaskMilestone rows → 5 fixed Waypoints for the visualization.
-// We canonicalize the milestone_type names: BE uses `collect_materials` /
-// `prepare_workpapers` / `internal_review`; the FE waypoint type is the
-// shorter form. Missing types fall back to status=not_started + no date.
+// One waypoint per BE canonical milestone. Missing rows fall back to
+// status=not_started + no date so the strip always renders the full
+// 5-stage path even before arrival-timing has proposed dates.
 function milestonesToWaypoints(
   rows: LiveMilestone[],
   checklist: ChecklistItem[],
@@ -313,23 +345,16 @@ function milestonesToWaypoints(
   const byType = new Map(
     rows.map((r) => [canonicalize(r.milestoneType), r] as const),
   );
-  // 3 phases — each aggregates 1-2 underlying BE canonicals.
-  const phases: Array<{
-    type: Waypoint["type"];
+  const stages: Array<{
+    type: WaypointType;
     label: string;
-    canonicals: string[];
+    canonical: string;
   }> = [
-    {
-      type: "collect",
-      label: "Collect",
-      canonicals: ["initial_meeting", "collect_materials"],
-    },
-    {
-      type: "prepare",
-      label: "Prepare",
-      canonicals: ["prepare_workpapers", "internal_review"],
-    },
-    { type: "file", label: "File", canonicals: ["file"] },
+    { type: "initial_meeting", label: "Initial mtg", canonical: "initial_meeting" },
+    { type: "collect", label: "Collect", canonical: "collect_materials" },
+    { type: "prepare", label: "Prepare", canonical: "prepare_workpapers" },
+    { type: "review", label: "Review", canonical: "internal_review" },
+    { type: "file", label: "File", canonical: "file" },
   ];
   const waiting = checklist.filter(
     (c) =>
@@ -338,42 +363,26 @@ function milestonesToWaypoints(
   const reviewPending = checklist.filter(
     (c) => c.state === "received_unreviewed" || c.state === "received_issue",
   ).length;
-  return phases.map((p) => {
-    const subs = p.canonicals
-      .map((c) => byType.get(c))
-      .filter((r): r is LiveMilestone => Boolean(r));
-    const allDone = subs.length > 0 && subs.every((s) => s.status === "done");
-    const anyBlocked = subs.some((s) => s.status === "blocked");
-    const anyOverdue = subs.some((s) => s.status === "overdue");
-    const anyInProgress = subs.some((s) => s.status === "in_progress");
-    const status: Status = allDone
-      ? "done"
-      : anyBlocked
-        ? "blocked"
-        : anyOverdue
-          ? "overdue"
-          : anyInProgress
-            ? "in_progress"
-            : "not_started";
-    const dates = subs
-      .map((s) => s.targetDate)
-      .filter((d): d is string => Boolean(d))
-      .sort();
-    const targetDate = dates.length > 0 ? dates[dates.length - 1] : undefined;
+  return stages.map((s) => {
+    const row = byType.get(s.canonical);
+    const status: Status = row?.status ?? "not_started";
     let missingBadge: number | undefined;
-    if (status === "in_progress" || status === "overdue" || status === "blocked") {
-      if (p.type === "collect") missingBadge = waiting || undefined;
-      else if (p.type === "prepare") missingBadge = reviewPending || undefined;
+    if (
+      status === "in_progress" ||
+      status === "overdue" ||
+      status === "blocked"
+    ) {
+      if (s.type === "collect") missingBadge = waiting || undefined;
+      else if (s.type === "review") missingBadge = reviewPending || undefined;
     }
-    const blockerReason = subs.find((s) => s.blockerReason)?.blockerReason;
     return {
-      type: p.type,
-      label: p.label,
-      targetDate,
+      type: s.type,
+      label: s.label,
+      targetDate: row?.targetDate ?? undefined,
       status,
       missingBadge,
-      blockerReason: blockerReason ?? undefined,
-      ids: subs.map((s) => s.id).filter(Boolean) as string[],
+      blockerReason: row?.blockerReason ?? undefined,
+      ids: row?.id ? [row.id] : [],
     };
   });
 }
@@ -483,32 +492,7 @@ function Waypoint({
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-soft",
       )}
     >
-      {/* Connector lines — split into LEFT (before this dot) + RIGHT
-          (after this dot). Left fills green when the PRIOR stage is
-          done; right fills when THIS stage is done. Together they
-          paint a progress bar across the strip as the task moves. */}
-      <div className="absolute top-3 left-0 right-0 flex items-center pointer-events-none">
-        {!isFirst && (
-          <div
-            className={cn(
-              "flex-1 h-0.5",
-              isConnectorBeforeFilled ? "bg-ok-solid" : "bg-line",
-            )}
-            style={{ marginRight: "50%" }}
-          />
-        )}
-        {!isLast && (
-          <div
-            className={cn(
-              "flex-1 h-0.5",
-              wp.status === "done" ? "bg-ok-solid" : "bg-line",
-            )}
-            style={{ marginLeft: "50%" }}
-          />
-        )}
-      </div>
-
-      {/* Missing-count badge above the dot at the in-progress stage */}
+      {/* Missing-count badge above the dot row */}
       <div className="h-3 mb-0.5 flex items-end justify-center">
         {wp.missingBadge && wp.missingBadge > 0 && (
           <span className="text-2xs text-warn-solid font-semibold tabular-nums leading-none">
@@ -517,19 +501,45 @@ function Waypoint({
         )}
       </div>
 
-      {/* Dot — 14px, state-coloured, with selected indigo ring +
-          active warn ring. The "selected" ring is the page's primary
-          accent (indigo); the "active" ring is the warn palette so
-          they don't fight when both fire on the same dot. */}
-      <div
-        className={cn(
-          "relative z-10 w-3.5 h-3.5 rounded-full shrink-0 border-2 transition-all",
-          dotClasses,
-          isActive && !isSelected && "ring-2 ring-warn-border ring-offset-2 ring-offset-surface",
-          isSelected &&
-            "ring-2 ring-indigo ring-offset-2 ring-offset-surface scale-110",
+      {/* Dot row — fixed-height container that hosts the dot + the
+          connector lines as siblings, all vertically centered via
+          top-1/2/-translate-y-1/2. Guarantees the connector line
+          passes through the dot's vertical centre at every screen
+          size (the prior absolute-positioning at top:12px was off by
+          ~7px because the dot grew from 12 → 14 px). */}
+      <div className="relative h-5 w-full flex items-center justify-center pointer-events-none">
+        {!isFirst && (
+          <div
+            className={cn(
+              "absolute top-1/2 left-0 right-1/2 h-0.5 -translate-y-1/2",
+              isConnectorBeforeFilled ? "bg-ok-solid" : "bg-line",
+            )}
+          />
         )}
-      />
+        {!isLast && (
+          <div
+            className={cn(
+              "absolute top-1/2 left-1/2 right-0 h-0.5 -translate-y-1/2",
+              wp.status === "done" ? "bg-ok-solid" : "bg-line",
+            )}
+          />
+        )}
+        {/* Dot — 14px, state-coloured, with selected indigo ring +
+            active warn ring. The "selected" ring is the page's primary
+            accent (indigo); the "active" ring is the warn palette so
+            they don't fight when both fire on the same dot. */}
+        <div
+          className={cn(
+            "relative z-10 w-3.5 h-3.5 rounded-full shrink-0 border-2 transition-all pointer-events-auto",
+            dotClasses,
+            isActive &&
+              !isSelected &&
+              "ring-2 ring-warn-border ring-offset-2 ring-offset-surface",
+            isSelected &&
+              "ring-2 ring-indigo ring-offset-2 ring-offset-surface scale-110",
+          )}
+        />
+      </div>
 
       {/* Label + date + status — all three lines visible at rest so
           the user reads "Collect · Jun 1 · Done" without hovering. */}
@@ -568,11 +578,17 @@ function ActiveStagePanel({
   onMarkDone,
   onOverride,
   isMarkingDone,
+  slideDirection,
 }: {
   wp: Waypoint;
   onMarkDone?: () => void;
   onOverride?: () => void;
   isMarkingDone?: boolean;
+  /** Direction the panel should slide in from. "right" when the user
+   *  picked a stage to the RIGHT of the previous selection (panel
+   *  enters from the right edge); "left" when picking a stage to the
+   *  left. null on first mount = no animation. */
+  slideDirection?: "left" | "right" | null;
 }) {
   const isFinished = wp.status === "done";
   const tone = (() => {
@@ -594,11 +610,23 @@ function ActiveStagePanel({
     if (wp.status === "done") return `${wp.label} done`;
     return `${wp.label} · not started`;
   })();
+  // Animation classes: tailwindcss-animate's `animate-in slide-in-from-{dir}`
+  // primitives. We use a fixed pixel offset (16) so adjacent stage
+  // changes feel snappy; longer travels would benefit from a larger
+  // offset but at 5 stages the visual jump is small anyway.
+  const slideClass =
+    slideDirection === "right"
+      ? "animate-in slide-in-from-right-4 duration-200"
+      : slideDirection === "left"
+        ? "animate-in slide-in-from-left-4 duration-200"
+        : "";
+
   return (
     <div
       className={cn(
         "mt-3 px-3 py-2.5 rounded-md border text-xs",
         tone,
+        slideClass,
       )}
       aria-label={`${wp.label} stage actions`}
     >
@@ -839,35 +867,23 @@ function deriveWaypoints(task: Task, checklist: ChecklistItem[]): Waypoint[] {
         ? "in_progress"
         : "not_started";
 
-  // Fold the 5 derived statuses into 3 phases — same rules as
-  // milestonesToWaypoints (BE path): allDone → done, anyActive →
-  // in_progress, otherwise not_started.
-  void initialStatus; // hardcoded "done"; assumed via heuristic
-  void initialMeeting; // folded into Collect target via clientPrep
-  void review; // folded into Prepare target via target
-  const collectAggregateStatus: Status =
-    collectStatus === "done"
-      ? "done"
-      : collectStatus === "overdue"
-        ? "overdue"
-        : collectStatus === "in_progress"
-          ? "in_progress"
-          : "not_started";
-  const prepareAggregateStatus: Status =
-    prepareStatus === "done" && reviewStatus === "done"
-      ? "done"
-      : prepareStatus === "in_progress" || reviewStatus === "in_progress"
-        ? "in_progress"
-        : "not_started";
+  // 5 waypoints — one per stage, mirroring the BE canonical milestone
+  // shape. No more folding; the heuristic emits the same shape as
+  // milestonesToWaypoints does for live data.
   return [
+    {
+      type: "initial_meeting",
+      label: "Initial mtg",
+      targetDate: initialMeeting,
+      status: initialStatus,
+    },
     {
       type: "collect",
       label: "Collect",
       targetDate: clientPrep,
-      status: collectAggregateStatus,
+      status: collectStatus,
       missingBadge:
-        collectAggregateStatus === "in_progress" ||
-        collectAggregateStatus === "overdue"
+        collectStatus === "in_progress" || collectStatus === "overdue"
           ? waiting || undefined
           : undefined,
     },
@@ -875,11 +891,17 @@ function deriveWaypoints(task: Task, checklist: ChecklistItem[]): Waypoint[] {
       type: "prepare",
       label: "Prepare",
       targetDate: target,
-      status: prepareAggregateStatus,
+      status: prepareStatus,
       missingBadge:
-        prepareAggregateStatus === "in_progress"
+        prepareStatus === "in_progress"
           ? review_pending || undefined
           : undefined,
+    },
+    {
+      type: "review",
+      label: "Review",
+      targetDate: review,
+      status: reviewStatus,
     },
     {
       type: "file",
