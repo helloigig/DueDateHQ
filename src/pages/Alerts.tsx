@@ -699,6 +699,14 @@ export function Alerts() {
       void utils.announcements.list.invalidate();
     },
   });
+  const restoreMutation = trpc.announcements.restore.useMutation({
+    onSuccess: () => {
+      void utils.announcements.list.invalidate();
+    },
+  });
+  const handleRestore = (id: string) => {
+    restoreMutation.mutate({ id });
+  };
   const runNexusCheckMutation = trpc.alertActions.runNexusCheck.useMutation();
   const addNexusFilingsMutation = trpc.alertActions.addNexusFilings.useMutation({
     onSuccess: () => {
@@ -1259,16 +1267,35 @@ export function Alerts() {
             </div>
           ) : (
             filtered.map((a) => (
-              <StateAlertCard
-                key={a.id}
-                a={a}
-                variant="feed"
-                selected={a.id === selectedId}
-                handled={handledIds.has(a.id)}
-                onSelect={() => handleSelect(a.id)}
-                onComplete={handleComplete}
-                clientSource={clientSource}
-              />
+              <div key={a.id}>
+                <StateAlertCard
+                  a={a}
+                  variant="feed"
+                  selected={a.id === selectedId}
+                  handled={handledIds.has(a.id)}
+                  onSelect={() => handleSelect(a.id)}
+                  onComplete={handleComplete}
+                  clientSource={clientSource}
+                />
+                {tab === "resolved" && a.dismissed && (
+                  <div className="mt-1.5 ml-1 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleRestore(a.id)}
+                      className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-canvas hover:border-ink-400 transition-colors"
+                      title="Re-fire this alert — it'll return to the active feed and the bell badge"
+                    >
+                      ↺ Restore to active
+                    </button>
+                    <span className="text-2xs text-ink-400">
+                      Was dismissed
+                      {a.dismissedAt
+                        ? ` ${new Date(a.dismissedAt).toLocaleDateString()}`
+                        : ""}
+                    </span>
+                  </div>
+                )}
+              </div>
             ))
           )}
         </div>

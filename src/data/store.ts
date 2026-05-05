@@ -538,6 +538,22 @@ export const actions = {
     emit();
   },
 
+  /**
+   * Re-fire a previously dismissed announcement. Mirrors the BE's
+   * `announcements.restore` proc — clears `dismissed` and `read` so the
+   * alert returns to the active feed. Used by the /alerts page's
+   * "Restore" button on resolved rows.
+   */
+  restoreAnnouncement(id: string) {
+    state = {
+      ...state,
+      announcements: state.announcements.map((a) =>
+        a.id === id ? { ...a, dismissed: false, read: false } : a
+      ),
+    };
+    emit();
+  },
+
   markAnnouncementRead(id: string) {
     const ann = state.announcements.find((a) => a.id === id);
     const wasUnread = ann && !ann.read;

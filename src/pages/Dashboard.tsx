@@ -29,6 +29,8 @@ import { CapacityStrip } from "../components/CapacityStrip";
 // import { ModeFHealth } from "../components/ModeFHealth";
 import { ActionQueue } from "../components/ActionQueue";
 import { JustHappenedStrip } from "../components/JustHappenedStrip";
+import { AlertTriageModal } from "../components/AlertTriageModal";
+import { WhatChangedBanner } from "../components/WhatChangedBanner";
 import { AiUsageInfo } from "../components/AiUsageInfo";
 import { PageHeader } from "../components/ui/PageHeader";
 import { DateLabel } from "../components/ui/DateLabel";
@@ -230,6 +232,11 @@ export function Dashboard() {
 
   return (
     <div className="max-w-[1080px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      {/* Triage modal — fires once per browser session on first land
+          when the user has alerts that arrived while they were away.
+          Honors the per-user toggle in Settings → Notifications. */}
+      <AlertTriageModal />
+
       {/* PAGE HEADER ROW — Mercury Home anatomy: H1 left + action button row
           right. The action row carries the page's "what can I do here right
           now" affordances (Mercury Home: Send / Transfer / Deposit / Request).
@@ -311,6 +318,12 @@ export function Dashboard() {
           State-alert news (no client matches) drops out as a compact
           chip above the queue. Pure-news doesn't generate queue rows
           (state-monitor gates on affectedClientIds.length > 0). */}
+
+      {/* §0: What changed since the user was last here. Banner sits
+          above the just-happened strip so a fresh state alert is the
+          first thing the eye lands on after the H1. Vanishes when
+          there are no new alerts since last visit (no zero-state). */}
+      <WhatChangedBanner />
 
       {/* §1: Just happened — overnight diff strip. */}
       <JustHappenedStrip />

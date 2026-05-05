@@ -108,6 +108,17 @@ export interface UserPreferences {
     /** Days of the week the digest fires. Mon-Fri default. */
     days: Array<"mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun">;
   };
+  /**
+   * Triage modal that fires on first /-page-land per browser session
+   * when there are state alerts the user hasn't seen since their
+   * previous `last_active_at`. Default ON; users who find it noisy
+   * can toggle off in Settings → Notifications and the inline
+   * `<WhatChangedBanner>` continues to surface the same urgency
+   * non-modally.
+   */
+  alertTriageModal?: {
+    enabled: boolean;
+  };
 }
 
 // Daily-digest send history — one row per (user, local-date). Drives
