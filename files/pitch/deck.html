@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DueDateHQ · Pitch · 2026-05-05</title>
+<style>
+  /* DESIGN.md tokens — Mercury-aligned cool neutral. */
+  :root {
+    --canvas: #F8F9FB;
+    --surface: #FFFFFF;
+    --sunken: #F2F3F5;
+    --ink-900: #0F172A;
+    --ink-700: #334155;
+    --ink-500: #64748B;
+    --ink-400: #94A3B8;
+    --ink-300: #CBD5E1;
+    --line: #E2E8F0;
+    --line-strong: #CBD5E1;
+    --indigo: #5B5BD6;
+    --indigo-hover: #4A4AC9;
+    --indigo-soft: #ECECFE;
+    --indigo-ink: #3D3DAF;
+    --warn-bg: #FFFBEB;
+    --warn-border: #FCD34D;
+    --warn-ink: #92400E;
+    --warn-solid: #D97706;
+    --ok-bg: #ECFDF5;
+    --ok-border: #86EFAC;
+    --ok-ink: #047857;
+    --info-bg: #EFF6FF;
+    --info-border: #93C5FD;
+    --info-ink: #1D4ED8;
+    --danger-bg: #FEF2F2;
+    --danger-border: #FCA5A5;
+    --danger-ink: #B91C1C;
+
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+    --pop: 0 2px 8px rgba(15, 23, 42, 0.06);
+    --overlay: 0 8px 24px rgba(15, 23, 42, 0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: #1a1a1f;
+    font-family: var(--font);
+    color: var(--ink-900);
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  .stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+
+  .deck {
+    width: min(100vw, calc(100vh * 16 / 9));
+    height: min(100vh, calc(100vw * 9 / 16));
+    position: relative;
+    background: var(--canvas);
+    overflow: hidden;
+    box-shadow: 0 30px 80px -20px rgba(0,0,0,0.5);
+  }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    padding: 6vmin 8vmin;
+    display: none;
+    flex-direction: column;
+    background: var(--canvas);
+  }
+  .slide.active { display: flex; animation: fadeIn 240ms ease-out; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .slide.surface { background: var(--surface); }
+  .slide.center { justify-content: center; }
+
+  /* Type scale — bumped from DESIGN.md for projection but proportionally aligned */
+  .micro {
+    font-size: 1.2vmin;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-500);
+  }
+  .caption { font-size: 1.4vmin; line-height: 1.55; color: var(--ink-500); }
+  .body { font-size: 1.8vmin; line-height: 1.55; color: var(--ink-700); font-weight: 400; }
+  .lead { font-size: 2.6vmin; line-height: 1.4; color: var(--ink-900); font-weight: 500; letter-spacing: -0.005em; }
+  .h2 { font-size: 4vmin; line-height: 1.15; color: var(--ink-900); font-weight: 600; letter-spacing: -0.015em; }
+  .h1 { font-size: 5.5vmin; line-height: 1.1; color: var(--ink-900); font-weight: 600; letter-spacing: -0.02em; }
+  .display { font-size: 8vmin; line-height: 1; color: var(--ink-900); font-weight: 600; letter-spacing: -0.025em; }
+  .num-lg { font-size: 7vmin; line-height: 1; font-weight: 600; letter-spacing: -0.02em; color: var(--ink-900); font-variant-numeric: tabular-nums; }
+  .num-md { font-size: 4vmin; line-height: 1; font-weight: 600; letter-spacing: -0.015em; color: var(--ink-900); font-variant-numeric: tabular-nums; }
+
+  .accent { color: var(--indigo); }
+  .ink-500 { color: var(--ink-500); }
+  .ink-700 { color: var(--ink-700); }
+
+  /* Chrome — slide num + title bottom strip */
+  .chrome {
+    position: absolute;
+    bottom: 2vmin;
+    left: 8vmin;
+    right: 8vmin;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 1.1vmin;
+    color: var(--ink-400);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 500;
+    font-family: var(--font-mono);
+  }
+  .chrome .left { display: flex; gap: 1.2vmin; }
+  .chrome .num { color: var(--ink-500); font-weight: 600; }
+
+  /* Pills + chips — DESIGN.md vocabulary */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.4vmin 1.1vmin;
+    border-radius: 9999px;
+    font-size: 1.2vmin;
+    font-weight: 500;
+    line-height: 1.3;
+    border: 1px solid transparent;
+  }
+  .pill.success { background: var(--ok-bg); color: var(--ok-ink); border-color: var(--ok-border); }
+  .pill.warn { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-border); }
+  .pill.info { background: var(--info-bg); color: var(--info-ink); border-color: var(--info-border); }
+  .pill.indigo { background: var(--indigo-soft); color: var(--indigo-ink); border-color: rgba(91, 91, 214, 0.2); }
+  .pill.silent { background: var(--sunken); color: var(--ink-700); border-color: var(--line); }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.3vmin 0.8vmin;
+    background: var(--sunken);
+    color: var(--ink-700);
+    font-size: 1.1vmin;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    border-radius: 4px;
+    text-transform: uppercase;
+    font-family: var(--font-mono);
+  }
+  .chip.warn { background: var(--warn-bg); color: var(--warn-ink); }
+
+  /* Card */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 3vmin;
+  }
+  .card.tight { padding: 2vmin; }
+
+  /* Quiet link */
+  a.link {
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 1px dotted currentColor;
+    transition: color 160ms;
+  }
+  a.link:hover { color: var(--indigo); border-bottom-color: var(--indigo); }
+
+  /* Layout helpers */
+  .row { display: flex; gap: 3vmin; }
+  .col { display: flex; flex-direction: column; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 3vmin; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3vmin; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2.5vmin; }
+  .stack-sm > * + * { margin-top: 1vmin; }
+  .stack-md > * + * { margin-top: 2vmin; }
+  .stack-lg > * + * { margin-top: 3vmin; }
+  .grow { flex: 1; }
+  .center-x { text-align: center; }
+
+  .eyebrow { color: var(--ink-500); margin-bottom: 2vmin; }
+  .rule { border-top: 1px solid var(--line); margin: 3vmin 0; }
+
+  /* SLIDE 1 — Title */
+  .slide-title { background: var(--canvas); align-items: center; justify-content: center; }
+  .slide-title .word {
+    font-size: 11vmin;
+    font-weight: 600;
+    line-height: 0.95;
+    letter-spacing: -0.035em;
+  }
+  .slide-title .word .accent { color: var(--indigo); }
+  .slide-title .tag {
+    margin-top: 3vmin;
+    font-size: 2.4vmin;
+    color: var(--ink-500);
+    letter-spacing: -0.01em;
+    font-weight: 400;
+  }
+  .slide-title .meta {
+    margin-top: 8vmin;
+    font-size: 1.3vmin;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-400);
+    font-family: var(--font-mono);
+    display: flex;
+    gap: 1.5vmin;
+    align-items: center;
+  }
+  .slide-title .meta .dot { width: 0.3vmin; height: 0.3vmin; background: var(--ink-400); border-radius: 50%; }
+
+  /* SLIDE 2 — Louisiana hook */
+  .louisiana { display: grid; grid-template-columns: 1.1fr 1fr; gap: 5vmin; align-items: center; }
+  .timestamp-row { display: flex; align-items: baseline; gap: 1.5vmin; margin-bottom: 1.5vmin; }
+  .timestamp-row .ts {
+    font-size: 4vmin; font-weight: 600; line-height: 1; letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums; color: var(--ink-900);
+    font-family: var(--font-mono);
+  }
+  .timestamp-row .lbl { font-size: 1.4vmin; color: var(--ink-500); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; }
+  .between-line { width: 1px; height: 3vmin; background: var(--line); margin-left: 2vmin; }
+  .outcome-list { margin-top: 3vmin; padding-top: 3vmin; border-top: 1px solid var(--line); }
+  .outcome-line { display: flex; align-items: baseline; gap: 1.2vmin; padding: 0.6vmin 0; }
+  .outcome-line .n { font-size: 2.2vmin; font-weight: 600; color: var(--ink-900); min-width: 4vmin; font-variant-numeric: tabular-nums; }
+  .outcome-line .t { font-size: 1.8vmin; color: var(--ink-700); }
+
+  .alert-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 2.5vmin;
+    box-shadow: var(--pop);
+  }
+  .alert-card .top { display: flex; gap: 1vmin; align-items: center; margin-bottom: 1.5vmin; }
+  .alert-card .title { font-size: 1.8vmin; font-weight: 600; color: var(--ink-900); flex: 1; line-height: 1.3; }
+  .alert-card .when { font-size: 1.2vmin; color: var(--ink-400); }
+  .alert-card .summary { font-size: 1.4vmin; color: var(--ink-500); line-height: 1.5; margin-bottom: 1.5vmin; }
+  .alert-card .row-pills { display: flex; gap: 0.6vmin; margin-bottom: 1.5vmin; flex-wrap: wrap; }
+  .alert-card .actions { display: flex; gap: 0.6vmin; flex-wrap: wrap; }
+  .btn-primary {
+    padding: 0.7vmin 1.3vmin;
+    background: var(--indigo);
+    color: white;
+    font-size: 1.2vmin;
+    font-weight: 500;
+    border-radius: 6px;
+    border: none;
+  }
+  .btn-secondary {
+    padding: 0.7vmin 1.3vmin;
+    background: var(--surface);
+    color: var(--ink-700);
+    font-size: 1.2vmin;
+    font-weight: 500;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+  }
+
+  /* SLIDE 3 — Opener */
+  .opener-text {
+    font-size: 5vmin;
+    line-height: 1.18;
+    letter-spacing: -0.02em;
+    color: var(--ink-900);
+    font-weight: 600;
+  }
+  .opener-text .strong { color: var(--ink-900); }
+  .opener-text .accent { color: var(--indigo); }
+  .activity-row {
+    margin-top: 5vmin;
+    padding-top: 3vmin;
+    border-top: 1px solid var(--line);
+    display: flex;
+    gap: 1vmin;
+    flex-wrap: wrap;
+  }
+  .act-chip {
+    padding: 0.8vmin 1.4vmin;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-size: 1.4vmin;
+    color: var(--ink-700);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.8vmin;
+  }
+  .act-chip .n { font-family: var(--font-mono); font-size: 1.1vmin; color: var(--ink-400); font-weight: 600; }
+
+  /* SLIDE 4 — Insight bar chart */
+  .insight-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 6vmin; align-items: center; }
+  .bar-chart { position: relative; height: 32vmin; padding-bottom: 3vmin; border-bottom: 1px solid var(--line); }
+  .bar-chart .bars { display: flex; align-items: flex-end; gap: 0.3vmin; height: 100%; }
+  .bar-chart .bar { flex: 1; background: var(--ink-900); border-radius: 1px 1px 0 0; }
+  .bar-chart .bar.faded { background: var(--ink-300); }
+  .bar-chart .ceiling-line { position: absolute; top: 35%; left: 0; right: 0; border-top: 1.5px dashed var(--indigo); }
+  .bar-chart .ceiling-label {
+    position: absolute; top: 31%; right: 0;
+    color: var(--indigo-ink); font-size: 1.2vmin; font-weight: 600;
+    letter-spacing: 0.04em; background: var(--indigo-soft);
+    padding: 0.4vmin 1vmin; border-radius: 4px; border: 1px solid rgba(91, 91, 214, 0.2);
+  }
+  .bar-chart .x-label { position: absolute; bottom: -3vmin; font-size: 1.1vmin; color: var(--ink-400); font-family: var(--font-mono); }
+  .bar-chart .x-left { left: 0; }
+  .bar-chart .x-right { right: 0; }
+
+  /* SLIDE 5 — Lacerte */
+  .compare {
+    display: grid; grid-template-columns: 1fr 1fr; margin-top: 3vmin;
+    border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
+  }
+  .compare-col { padding: 2.5vmin; background: var(--surface); }
+  .compare-col.faded { background: var(--sunken); color: var(--ink-400); }
+  .compare-col .label { font-size: 1.2vmin; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-500); font-weight: 600; margin-bottom: 1.5vmin; font-family: var(--font-mono); }
+  .compare-col.active .label { color: var(--indigo-ink); }
+  .compare-row { padding: 1.5vmin 0; border-top: 1px solid var(--line); font-size: 1.5vmin; line-height: 1.45; color: var(--ink-700); }
+  .compare-col.faded .compare-row { color: var(--ink-400); border-top-color: var(--ink-300); }
+
+  /* SLIDE 6 — 3 user research efforts */
+  .research-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.5vmin; margin-top: 3vmin; }
+  .research-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 2.5vmin;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5vmin;
+  }
+  .research-card .method-num {
+    font-family: var(--font-mono);
+    font-size: 1.1vmin;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--indigo-ink);
+    text-transform: uppercase;
+  }
+  .research-card .method {
+    font-size: 2.2vmin;
+    font-weight: 600;
+    color: var(--ink-900);
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+  .research-card .scale {
+    font-size: 3.5vmin;
+    font-weight: 600;
+    color: var(--ink-900);
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .research-card .scale .unit { font-size: 1.4vmin; color: var(--ink-500); font-weight: 500; }
+  .research-card .desc {
+    font-size: 1.4vmin;
+    color: var(--ink-700);
+    line-height: 1.5;
+    flex: 1;
+  }
+  .research-card .source {
+    font-family: var(--font-mono);
+    font-size: 1vmin;
+    color: var(--ink-400);
+    padding-top: 1.5vmin;
+    border-top: 1px solid var(--line);
+  }
+  .traceability {
+    margin-top: 3vmin;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .traceability .header {
+    background: var(--sunken);
+    padding: 1vmin 1.8vmin;
+    display: grid;
+    grid-template-columns: 2fr 2fr 0.7fr;
+    gap: 2vmin;
+    font-family: var(--font-mono);
+    font-size: 1.1vmin;
+    font-weight: 600;
+    color: var(--ink-500);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-bottom: 1px solid var(--line);
+  }
+  .traceability .row {
+    padding: 0.9vmin 1.8vmin;
+    display: grid;
+    grid-template-columns: 2fr 2fr 0.7fr;
+    gap: 2vmin;
+    font-size: 1.3vmin;
+    color: var(--ink-700);
+    border-top: 1px solid var(--line);
+  }
+  .traceability .row:first-child { border-top: none; }
+  .traceability .row .ref { font-family: var(--font-mono); color: var(--ink-400); font-size: 1.1vmin; }
+
+  /* SLIDE 7 — Wedge quote + SQL */
+  .wedge-quote {
+    font-size: 3.6vmin;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    color: var(--ink-900);
+    font-weight: 500;
+    max-width: 92%;
+  }
+  .wedge-attr {
+    margin-top: 2vmin;
+    font-size: 1.3vmin;
+    color: var(--ink-500);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 500;
+    font-family: var(--font-mono);
+  }
+  .code-block {
+    margin-top: 4vmin;
+    background: var(--ink-900);
+    border-radius: 8px;
+    padding: 2.2vmin 2.5vmin;
+    color: #e2e8f0;
+    font-family: var(--font-mono);
+    font-size: 1.5vmin;
+    line-height: 1.65;
+    box-shadow: var(--pop);
+  }
+  .code-block .keyword { color: #fbbf24; font-weight: 500; }
+  .code-block .string { color: #86efac; }
+  .code-block .comment { color: #64748b; font-style: italic; }
+  .code-block .op { color: #f472b6; }
+  .wedge-payoff {
+    margin-top: 3vmin;
+    padding-top: 2vmin;
+    border-top: 1px solid var(--line);
+    font-size: 1.5vmin;
+    color: var(--ink-700);
+  }
+  .wedge-payoff .arrow { color: var(--indigo); font-weight: 600; }
+
+  /* SLIDE 8 — Sarah problem */
+  .sarah-id {
+    display: flex;
+    align-items: baseline;
+    gap: 1.5vmin;
+    margin-bottom: 3vmin;
+    padding-bottom: 2vmin;
+    border-bottom: 1px solid var(--line);
+  }
+  .sarah-id .name { font-size: 3.2vmin; font-weight: 600; color: var(--ink-900); letter-spacing: -0.015em; }
+  .sarah-id .meta { font-size: 1.3vmin; color: var(--ink-500); font-family: var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; }
+  .failure-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2vmin; }
+  .failure-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 2.5vmin;
+  }
+  .failure-card .marker {
+    font-family: var(--font-mono);
+    font-size: 1.1vmin;
+    color: var(--ink-500);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 600;
+    margin-bottom: 1vmin;
+  }
+  .failure-card .title { font-size: 2.2vmin; font-weight: 600; color: var(--ink-900); letter-spacing: -0.01em; line-height: 1.2; margin-bottom: 1.5vmin; }
+  .failure-card .desc { font-size: 1.4vmin; color: var(--ink-700); line-height: 1.55; }
+
+  /* SLIDE 9 — Dashboard mockup */
+  .mockup {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: var(--overlay);
+    margin-top: 1.5vmin;
+    height: 64vmin;
+    display: flex;
+    flex-direction: column;
+  }
+  .mockup-bar {
+    background: var(--sunken);
+    border-bottom: 1px solid var(--line);
+    padding: 1vmin 1.8vmin;
+    display: flex;
+    gap: 1.2vmin;
+    align-items: center;
+    font-size: 1.1vmin;
+  }
+  .mockup-bar .dots { display: flex; gap: 0.4vmin; }
+  .mockup-bar .dot { width: 0.9vmin; height: 0.9vmin; border-radius: 50%; background: var(--ink-300); }
+  .mockup-bar .url {
+    font-family: var(--font-mono); background: var(--surface); padding: 0.4vmin 0.9vmin;
+    border-radius: 4px; border: 1px solid var(--line); font-size: 1.1vmin;
+    color: var(--ink-500); flex: 1; max-width: 28vmin;
+  }
+  .live-stamp {
+    margin-left: auto; font-size: 1vmin; color: var(--ok-ink);
+    background: var(--ok-bg); padding: 0.3vmin 0.8vmin; border-radius: 9999px;
+    border: 1px solid var(--ok-border); font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .mockup-content { flex: 1; padding: 2.5vmin 3vmin; display: flex; flex-direction: column; gap: 1.8vmin; overflow: hidden; }
+  .mockup-alert {
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    border-radius: 6px;
+    padding: 1.3vmin 1.8vmin;
+    display: flex;
+    align-items: center;
+    gap: 1.5vmin;
+  }
+  .mockup-alert .ac-content { flex: 1; }
+  .mockup-alert .ac-title { font-size: 1.4vmin; font-weight: 600; color: var(--warn-ink); margin-bottom: 0.3vmin; }
+  .mockup-alert .ac-meta { font-size: 1.1vmin; color: var(--warn-ink); opacity: 0.85; }
+  .mockup-alert .ac-actions { display: flex; gap: 0.5vmin; }
+  .mockup-alert .ac-btn {
+    padding: 0.4vmin 0.9vmin; background: var(--surface); border: 1px solid var(--warn-border);
+    color: var(--warn-ink); font-size: 1.1vmin; border-radius: 4px; font-weight: 500;
+  }
+  .mockup-queue { display: flex; flex-direction: column; gap: 0.7vmin; position: relative; flex: 1; overflow: hidden; }
+  .mockup-queue .label-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.3vmin; }
+  .mockup-queue .label {
+    font-size: 1.1vmin; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--ink-500); font-weight: 600; font-family: var(--font-mono);
+  }
+  .queue-row {
+    display: flex; align-items: center; gap: 1.3vmin; padding: 1.2vmin 1.4vmin;
+    border: 1px solid var(--line); border-radius: 6px; background: var(--surface);
+  }
+  .queue-row .urg { width: 0.4vmin; height: 3.8vmin; border-radius: 9999px; }
+  .queue-row .urg.high { background: var(--indigo); }
+  .queue-row .urg.med { background: var(--ink-400); }
+  .queue-row .urg.low { background: var(--ink-300); }
+  .queue-row .qr-content { flex: 1; }
+  .queue-row .qr-name { font-size: 1.4vmin; font-weight: 600; color: var(--ink-900); margin-bottom: 0.2vmin; }
+  .queue-row .qr-action { font-size: 1.2vmin; color: var(--ink-500); line-height: 1.4; }
+  .queue-row .qr-action .em { color: var(--indigo-ink); font-weight: 500; }
+  .queue-row .qr-cta {
+    padding: 0.5vmin 1.1vmin; background: var(--indigo); color: white;
+    font-size: 1.1vmin; border-radius: 6px; font-weight: 500;
+  }
+  .annotation {
+    position: absolute; font-size: 1.1vmin; color: var(--indigo-ink); font-weight: 500;
+    font-family: var(--font-mono); letter-spacing: 0.04em; background: var(--indigo-soft);
+    padding: 0.3vmin 0.7vmin; border-radius: 4px; border: 1px dashed rgba(91, 91, 214, 0.3);
+    white-space: nowrap;
+  }
+  .mockup-queue .annotation { right: -2vmin; top: 30%; }
+
+  /* SLIDE 10 — Why now */
+  .whynow-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.5vmin; margin-top: 3vmin; }
+  .whynow-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 3vmin;
+  }
+  .whynow-card .marker {
+    font-family: var(--font-mono);
+    font-size: 1.1vmin;
+    color: var(--ink-500);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 600;
+    margin-bottom: 1.2vmin;
+  }
+  .whynow-card .big {
+    font-size: 4vmin;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--ink-900);
+    letter-spacing: -0.025em;
+    margin-bottom: 1vmin;
+  }
+  .whynow-card .big .small { font-size: 2vmin; color: var(--ink-500); font-weight: 500; }
+  .whynow-card .vs { font-size: 1.2vmin; color: var(--ink-400); margin-bottom: 1.5vmin; }
+  .whynow-card .text { font-size: 1.4vmin; color: var(--ink-700); line-height: 1.55; }
+
+  /* SLIDE 11 — Market */
+  .market-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 5vmin; align-items: center; }
+  .market-stack { display: flex; height: 7vmin; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); margin-top: 2.5vmin; }
+  .market-seg { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 1vmin 0.5vmin; color: white; text-align: center; }
+  .market-seg.solo { background: var(--ink-900); flex: 28; }
+  .market-seg.pro { background: var(--indigo); flex: 12; }
+  .market-seg.team { background: var(--indigo-ink); flex: 5; }
+  .market-seg .name { font-size: 1.3vmin; font-weight: 600; }
+  .market-seg .n { font-family: var(--font-mono); font-size: 1.1vmin; opacity: 0.85; margin-top: 0.2vmin; }
+  .market-arpu { display: flex; margin-top: 0.8vmin; font-family: var(--font-mono); font-size: 1.1vmin; color: var(--ink-500); }
+  .market-arpu .item { padding: 0 0.5vmin; text-align: center; }
+  .market-arpu .item.solo { flex: 28; }
+  .market-arpu .item.pro { flex: 12; }
+  .market-arpu .item.team { flex: 5; }
+  .market-num {
+    font-size: 11vmin; font-weight: 600; line-height: 1; letter-spacing: -0.035em;
+    color: var(--ink-900); font-variant-numeric: tabular-nums;
+  }
+  .market-num .suffix { font-size: 3vmin; color: var(--ink-500); font-weight: 500; }
+  .market-honest {
+    margin-top: 1.5vmin; font-size: 1.8vmin; color: var(--ink-500); font-style: italic;
+  }
+
+  /* SLIDE 12 — Staircase */
+  .staircase {
+    margin-top: 3vmin; height: 30vmin; display: flex; align-items: flex-end; gap: 0.4vmin;
+  }
+  .step {
+    flex: 1; border: 1px solid var(--line); border-bottom: none;
+    border-radius: 6px 6px 0 0; padding: 1.8vmin; display: flex;
+    flex-direction: column; justify-content: flex-end;
+  }
+  .step.y1 { height: 30%; background: var(--sunken); }
+  .step.y3 { height: 55%; background: var(--indigo-soft); border-color: rgba(91, 91, 214, 0.2); }
+  .step.y5 { height: 90%; background: var(--ink-900); border-color: var(--ink-900); color: white; }
+  .step .yr { font-family: var(--font-mono); font-size: 1.1vmin; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-500); margin-bottom: 0.5vmin; }
+  .step.y3 .yr { color: var(--indigo-ink); }
+  .step.y5 .yr { color: var(--ink-300); }
+  .step .step-title { font-size: 1.8vmin; font-weight: 600; line-height: 1.2; margin-bottom: 0.8vmin; color: var(--ink-900); letter-spacing: -0.01em; }
+  .step.y5 .step-title { color: white; }
+  .step .price { font-family: var(--font-mono); font-size: 1.3vmin; color: var(--ink-500); font-weight: 500; }
+  .step.y5 .price { color: var(--ink-300); }
+  .verts {
+    margin-top: 3vmin; padding-top: 2vmin; border-top: 1px solid var(--line);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 1.4vmin; color: var(--ink-700);
+  }
+  .verts .tags { display: flex; gap: 0.6vmin; }
+
+  /* SLIDE 13 — Status */
+  .scale-strip {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 2vmin;
+    margin-bottom: 3vmin; padding-bottom: 3vmin; border-bottom: 1px solid var(--line);
+  }
+  .scale-num .n {
+    font-size: 4.5vmin; line-height: 1; font-weight: 600; letter-spacing: -0.025em;
+    color: var(--ink-900); font-variant-numeric: tabular-nums;
+  }
+  .scale-num .lbl {
+    margin-top: 0.4vmin;
+    font-size: 1.2vmin; color: var(--ink-500); text-transform: uppercase;
+    letter-spacing: 0.1em; font-weight: 600; font-family: var(--font-mono);
+  }
+  .quad-grid {
+    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 2vmin;
+  }
+  .quad {
+    padding: 2.5vmin;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    display: flex; flex-direction: column;
+  }
+  .quad.shipped { background: var(--ok-bg); border-color: var(--ok-border); }
+  .quad .quad-status {
+    font-family: var(--font-mono); font-size: 1.1vmin; text-transform: uppercase;
+    letter-spacing: 0.12em; font-weight: 700; color: var(--ink-500); margin-bottom: 1vmin;
+  }
+  .quad.shipped .quad-status { color: var(--ok-ink); }
+  .quad .quad-title { font-size: 1.9vmin; font-weight: 600; color: var(--ink-900); margin-bottom: 1.2vmin; line-height: 1.2; letter-spacing: -0.01em; }
+  .quad .quad-body { font-size: 1.3vmin; color: var(--ink-700); line-height: 1.5; flex: 1; }
+
+  /* SLIDE 14 — Close */
+  .close-slide { background: var(--surface); padding: 8vmin 10vmin; }
+  .close-quote {
+    font-size: 3.5vmin; line-height: 1.25; color: var(--ink-900);
+    letter-spacing: -0.01em; margin-bottom: 5vmin;
+    padding-bottom: 4vmin; border-bottom: 1px solid var(--line);
+    font-weight: 500;
+  }
+  .close-quote .attr {
+    display: block; margin-top: 2vmin; font-size: 1.5vmin; color: var(--ink-500);
+    font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em;
+    font-weight: 500;
+  }
+  .close-line {
+    font-size: 4.5vmin; line-height: 1.2; color: var(--ink-900);
+    letter-spacing: -0.02em; font-weight: 600;
+  }
+  .close-line .accent { color: var(--indigo); }
+  .close-domain {
+    margin-top: 6vmin; font-family: var(--font-mono); font-size: 1.4vmin;
+    color: var(--ink-500); letter-spacing: 0.06em; text-align: right;
+  }
+
+  /* Notes panel */
+  .notes-panel {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(15, 23, 42, 0.96); color: #e2e8f0;
+    padding: 2vmin 4vmin; font-size: 1.5vmin; line-height: 1.5;
+    transform: translateY(100%); transition: transform 200ms ease;
+    z-index: 100; max-height: 35vh; overflow-y: auto;
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+  .notes-panel.open { transform: translateY(0); }
+  .notes-panel .label { font-size: 1.1vmin; text-transform: uppercase; letter-spacing: 0.12em; color: #94a3b8; margin-bottom: 0.6vmin; font-weight: 600; }
+
+  .help-overlay {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: rgba(15, 23, 42, 0.96); color: #e2e8f0;
+    padding: 3vmin; border-radius: 8px; font-size: 1.4vmin;
+    z-index: 200; display: none;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+  }
+  .help-overlay.open { display: block; }
+  .help-overlay h3 { font-size: 2vmin; margin-bottom: 1.5vmin; color: #fbbf24; font-weight: 600; }
+  .help-overlay .key-row { display: flex; justify-content: space-between; gap: 4vmin; margin-bottom: 0.7vmin; align-items: baseline; }
+  .help-overlay kbd {
+    font-family: var(--font-mono); background: rgba(255,255,255,0.1);
+    padding: 0.2vmin 0.7vmin; border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.2); font-size: 1.2vmin;
+  }
+  .help-overlay .desc { color: #94a3b8; }
+
+  @media print {
+    @page { size: 16in 9in; margin: 0; }
+    html, body { background: white; height: auto; overflow: visible; }
+    .stage { position: static; height: auto; display: block; }
+    .deck { width: 16in; height: 9in; box-shadow: none; page-break-after: always; }
+    .slide { display: flex !important; position: relative; height: 9in; }
+    .notes-panel, .help-overlay { display: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+<div class="deck" id="deck">
+
+<!-- 1. Title -->
+<section class="slide slide-title active" data-num="01" data-title="Title" data-notes="Hi. This is DueDateHQ. Before I tell you what we do, let me tell you what just happened to one of our users last Tuesday.">
+  <div class="col" style="align-items: center; text-align: center;">
+    <div class="word">DueDate<span class="accent">HQ</span></div>
+    <div class="tag">The client intelligence layer for CPA firms.</div>
+    <div class="meta">
+      <a class="link" href="https://duedatehq.space" target="_blank" rel="noopener">duedatehq.space</a>
+      <span class="dot"></span>
+      <span>May 2026</span>
+    </div>
+  </div>
+</section>
+
+<!-- 2. Louisiana hook -->
+<section class="slide center" data-num="02" data-title="Louisiana, last Tuesday" data-notes="Louisiana DOR posted a hurricane filing extension at 3:14 PM Central. By 7:08 the same day, our user had six affected clients identified, eight deadlines extended, and six client emails drafted in her tone. Her peers using TaxDome and Karbon found out from a client complaint.">
+  <div class="micro eyebrow">Last Tuesday · Louisiana DOR</div>
+  <div class="louisiana">
+    <div class="col">
+      <div class="timestamp-row"><span class="ts">3:14 PM</span><span class="lbl">Hurricane extension posted</span></div>
+      <div class="between-line"></div>
+      <div class="timestamp-row"><span class="ts">7:08 PM</span><span class="lbl">Same day · 3h 54m later</span></div>
+      <div class="outcome-list">
+        <div class="outcome-line"><span class="n">6</span><span class="t">affected clients identified</span></div>
+        <div class="outcome-line"><span class="n">8</span><span class="t">deadlines extended</span></div>
+        <div class="outcome-line"><span class="n">6</span><span class="t">client emails drafted, in her tone</span></div>
+        <div class="outcome-line"><span class="n">90s</span><span class="t">to review and approve all of them</span></div>
+      </div>
+      <div class="lead" style="margin-top: 3vmin; font-size: 2vmin;">
+        Her peers using <strong>TaxDome</strong> or <strong>Karbon</strong> found out from a client complaint.
+      </div>
+    </div>
+    <div class="alert-card">
+      <div class="top">
+        <span class="chip">LA · DOR</span>
+        <span class="title">Hurricane Delta extension</span>
+        <span class="when">2h ago</span>
+      </div>
+      <div class="summary">Filing deadlines extended through Nov 15 for affected counties. AI parsed 12 fields with high confidence.</div>
+      <div class="row-pills">
+        <span class="pill silent"><strong style="margin-right: 0.4vmin;">6 clients</strong> · 8 deadlines</span>
+        <span class="pill success">AI parse · high</span>
+        <span class="pill success">AI match · high</span>
+      </div>
+      <div class="actions">
+        <button class="btn-primary">Draft client emails</button>
+        <button class="btn-secondary">Batch-extend</button>
+        <button class="btn-secondary">Forward bulletin</button>
+      </div>
+    </div>
+  </div>
+  <div class="chrome">
+    <div class="left"><span class="num">02</span><span>The opening moment</span></div>
+    <div>DueDateHQ · 2026</div>
+  </div>
+</section>
+
+<!-- 3. 2-sentence opener -->
+<section class="slide surface center" data-num="03" data-title="What we do" data-notes="Here's what we do, in two sentences. A solo CPA can give 10 clients fine-grained service. She physically cannot replicate that across 100. We run the parts of that service a machine can do — across her entire book.">
+  <div class="micro eyebrow">What we do</div>
+  <div class="opener-text">
+    A solo CPA can give <span class="strong">10 clients</span> fine-grained service.<br>
+    She physically can't replicate that across <span class="strong">100</span>.
+    <br><br>
+    DueDateHQ runs the parts a machine can do —<br>
+    <span class="accent">across her entire book.</span>
+  </div>
+  <div class="activity-row">
+    <span class="act-chip"><span class="n">01</span>Memory</span>
+    <span class="act-chip"><span class="n">02</span>Predictions</span>
+    <span class="act-chip"><span class="n">03</span>Confirmation</span>
+    <span class="act-chip"><span class="n">04</span>Monitoring</span>
+    <span class="act-chip"><span class="n">05</span>Drafting</span>
+    <span class="act-chip" style="margin-left: auto; background: var(--sunken); color: var(--ink-500); border-style: dashed;">CPA keeps: judgment · signature · relationships</span>
+  </div>
+  <div class="chrome">
+    <div class="left"><span class="num">03</span><span>The 2-sentence opener</span></div>
+    <div>5 machine-replicated activities</div>
+  </div>
+</section>
+
+<!-- 4. Insight -->
+<section class="slide center" data-num="04" data-title="The insight" data-notes="Every CPA software vendor implicitly assumes the CPA picks which clients get fine-grained service. They don't. They run out of hours. The constraint is supply-side capacity. AI's job is to lift the ceiling.">
+  <div class="micro eyebrow">The insight</div>
+  <div class="insight-grid">
+    <div class="col">
+      <h2 class="h1">The bottleneck is <span class="accent">supply-side</span>.<br>Not strategic segmentation.</h2>
+      <div class="body" style="margin-top: 3vmin; max-width: 90%;">
+        Every incumbent assumes the CPA <em>picks</em> which clients get fine-grained service.<br><br>
+        <strong style="color: var(--ink-900);">They don't. They run out of hours.</strong>
+      </div>
+    </div>
+    <div class="col">
+      <div class="bar-chart">
+        <div class="bars">
+          <div class="bar" style="height: 95%"></div>
+          <div class="bar" style="height: 92%"></div>
+          <div class="bar" style="height: 90%"></div>
+          <div class="bar" style="height: 88%"></div>
+          <div class="bar" style="height: 87%"></div>
+          <div class="bar" style="height: 85%"></div>
+          <div class="bar" style="height: 84%"></div>
+          <div class="bar" style="height: 82%"></div>
+          <div class="bar" style="height: 80%"></div>
+          <div class="bar" style="height: 78%"></div>
+          <div class="bar faded" style="height: 35%"></div>
+          <div class="bar faded" style="height: 33%"></div>
+          <div class="bar faded" style="height: 32%"></div>
+          <div class="bar faded" style="height: 30%"></div>
+          <div class="bar faded" style="height: 28%"></div>
+          <div class="bar faded" style="height: 26%"></div>
+          <div class="bar faded" style="height: 24%"></div>
+          <div class="bar faded" style="height: 22%"></div>
+          <div class="bar faded" style="height: 20%"></div>
+          <div class="bar faded" style="height: 19%"></div>
+          <div class="bar faded" style="height: 18%"></div>
+          <div class="bar faded" style="height: 17%"></div>
+          <div class="bar faded" style="height: 16%"></div>
+          <div class="bar faded" style="height: 15%"></div>
+          <div class="bar faded" style="height: 14%"></div>
+        </div>
+        <div class="ceiling-line"></div>
+        <div class="ceiling-label">↑ AI lifts this</div>
+        <span class="x-label x-left">client #1</span>
+        <span class="x-label x-right">client #100</span>
+      </div>
+    </div>
+  </div>
+  <div class="chrome">
+    <div class="left"><span class="num">04</span><span>Bottleneck is supply-side</span></div>
+    <div>PRD §1.3</div>
+  </div>
+</section>
+
+<!-- 5. Lacerte test -->
+<section class="slide surface center" data-num="05" data-title="The Lacerte-organizer test" data-notes="Here's the test we run on every feature. Mechanical rollover is the floor. Pattern recognition is the product.">
+  <div class="micro eyebrow">The test we run on every feature</div>
+  <h2 class="h1">"Would Lacerte's organizer give this same answer?"</h2>
+  <div class="lead" style="margin-top: 1.5vmin; max-width: 80%; font-weight: 400;">
+    If yes, we haven't built anything new.
+    <span class="ink-500" style="font-style: italic;">Mechanical rollover is the floor. Pattern recognition is the product.</span>
+  </div>
+  <div class="compare">
+    <div class="compare-col faded">
+      <div class="label">Lacerte rollover</div>
+      <div class="compare-row">Copy last year's W-2 placeholder</div>
+      <div class="compare-row">Re-use last year's checklist items</div>
+      <div class="compare-row">Carry forward dependents</div>
+    </div>
+    <div class="compare-col active">
+      <div class="label">DueDateHQ AI</div>
+      <div class="compare-row">"This client's W-2 historically arrives Feb 5; this year Feb 12 with no email — should we ask?"</div>
+      <div class="compare-row">"Schedule E was on the checklist 5 years; gone this year — did the client sell the rental?"</div>
+      <div class="compare-row">"K-1 from Apex Fund hasn't arrived by April 8 (came Apr 8 last year, Apr 2 the year before) — flag for early extension."</div>
+    </div>
+  </div>
+  <div class="chrome">
+    <div class="left"><span class="num">05</span><span>Mechanical rollover vs. pattern recognition</span></div>
+    <div>PRD §1.4</div>
+  </div>
+</section>
+
+<!-- 6. THREE user research efforts -->
+<section class="slide center" data-num="06" data-title="User research backbone" data-notes="That insight isn't a hunch. It came from three distinct research efforts: a depth interview with a 15-year CPA partner, a customer journey map across three personas, and a user story map that decomposed the workflow into 7 activities. Most pre-launch companies cannot show three research artifacts at this depth.">
+  <div class="micro eyebrow">The research that produced it</div>
+  <h2 class="h1">Three distinct research efforts.</h2>
+  <div class="research-grid">
+    <div class="research-card">
+      <div class="method-num">Method 01 · Depth interview</div>
+      <div class="method">15-year CPA founder</div>
+      <div class="scale">660<span class="unit"> lines · synthesis</span></div>
+      <div class="desc">
+        Yan Jing, partner at a 10-person firm running 600 clients across 20 states.
+        57 product decisions traced line-by-line to specific things he said.
+      </div>
+      <div class="source">Interview Notes — 15-Year CPA Founder.rtf</div>
+    </div>
+    <div class="research-card">
+      <div class="method-num">Method 02 · Journey mapping</div>
+      <div class="method">3 personas × 8 stages</div>
+      <div class="scale">24<span class="unit"> stage cells</span></div>
+      <div class="desc">
+        Sarah Mitchell (primary · solo CPA), Jennifer Wu (compliance-driven), David Park (the onboarding gauntlet). Emotion + churn risk + opportunity zones per stage.
+      </div>
+      <div class="source">strategy-03-customer-journey.md</div>
+    </div>
+    <div class="research-card">
+      <div class="method-num">Method 03 · Story mapping</div>
+      <div class="method">Workflow → release slices</div>
+      <div class="scale">7<span class="unit"> activities · 3 releases</span></div>
+      <div class="desc">
+        Year-round CPA workflow decomposed: setup → onboard → triage → chase → confirm → file → review.
+        Each activity sliced into MVP, R2, R3+ for sequencing discipline.
+      </div>
+      <div class="source">strategy-04-user-story-map.md</div>
+    </div>
+  </div>
+  <div class="traceability">
+    <div class="header">
+      <span>Insight</span>
+      <span>Product decision</span>
+      <span>PRD ref</span>
+    </div>
+    <div class="row">
+      <span>"Solve confirming the client gave 100%..."</span>
+      <span>§5.3 invariant + DB CHECK constraint</span>
+      <span class="ref">§5.3</span>
+    </div>
+    <div class="row">
+      <span>"你不能 1 月 1 号开始就问了."</span>
+      <span>Mode B per-client timing prediction</span>
+      <span class="ref">§4.3</span>
+    </div>
+    <div class="row">
+      <span>David Park trialed 4 competitors before us</span>
+      <span>5-min onboarding L1 · no integrations needed</span>
+      <span class="ref">§8.4</span>
+    </div>
+  </div>
+  <div class="chrome">
+    <div class="left"><span class="num">06</span><span>3 research efforts · 1 product</span></div>
+    <div>+ 54 more rows in PRD §0.5</div>
+  </div>
+</section>
+
+<!-- 7. Wedge quote + SQL -->
+<section class="slide surface center" data-num="07" data-title="The customer named the price of trust" data-notes="The customer named the price of trust. We paid it. The §5.3 invariant — AI never auto-promotes a checklist item to received_confirmed — is enforced at the database with a CHECK constraint.">
+  <div class="micro eyebrow">From the design partner who runs 600 clients</div>
+  <div class="wedge-quote">"Solve this one pain — confirming the client gave 100% of what's needed — and I'm definitely your first customer."</div>
+  <div class="wedge-attr">Yan Jing · 15-year CPA partner · standing commitment</div>
+  <div class="code-block">
+<span class="comment">-- §5.3 invariant: AI never auto-promotes</span>
+<span class="comment">-- to received_confirmed.</span>
+<span class="keyword">ALTER TABLE</span> checklist_item <span class="keyword">ADD CONSTRAINT</span> human_must_confirm
+  <span class="keyword">CHECK</span> (
+    state <span class="op">!=</span> <span class="string">'received_confirmed'</span>
+    <span class="op">OR</span> confirmed_by_user_id <span class="keyword">IS NOT NULL</span>
+  );
+</div>
+  <div class="wedge-payoff">
+    <span class="arrow">→</span> The customer named the price of trust. We paid it at the database layer.
+  </div>
+  <div class="chrome">
+    <div class="left"><span class="num">07</span><span>The wedge · the architecture</span></div>
+    <div>arch v0.7 §5</div>
+  </div>
+</section>
+
+<!-- 8. Sarah problem -->
+<section class="slide center" data-num="08" data-title="Sarah Mitchell · 49 clients · 6 states" data-notes="Sarah Mitchell. Solo CPA. 49 active clients across 6 states. She has three failure modes every week. She'll pay $49 a month to fix all three. She will not switch to TaxDome and re-learn her stack.">
+  <div class="micro eyebrow">Primary persona</div>
+  <div class="sarah-id">
+    <span class="name">Sarah Mitchell</span>
+    <span class="meta">Solo CPA · 49 clients · 6 states · 4 years independent</span>
+  </div>
+  <div class="failure-grid">
+    <div class="failure-card">
+      <div class="marker">Failure mode 1</div>
+      <div class="title">Monday-morning anxiety</div>
+      <div class="desc">She reopens her Excel sheet and tries to remember what was urgent before the weekend. Every Monday, reconstructed from short-term memory.</div>
+    </div>
+    <div class="failure-card">
+      <div class="marker">Failure mode 2</div>
+      <div class="title">The chase loop</div>
+      <div class="desc">Three weeks before any deadline, she hand-types the same reminder email twelve times. Some clients respond. Many don't. One inevitably surprises her with a 1099 she didn't ask for.</div>
+    </div>
+    <div class="failure-card">
+      <div class="marker">Failure mode 3</div>
+      <div class="title">The state-change miss</div>
+      <div class="desc">When Louisiana changes an estimated payment rule mid-year, she finds out from a client's complaint, not from her tools.</div>
+    </div>
+  </div>
+  <div class="lead" style="margin-top: 3vmin; font-size: 2vmin; color: var(--ink-700); font-style: italic; font-weight: 400;">
+    She'll pay $49/mo to make all three go away. She will <em>not</em> switch to TaxDome and re-learn her stack.
+  </div>
+  <div class="chrome">
+    <div class="left"><span class="num">08</span><span>The problem · 3 failure modes</span></div>
+    <div>journey · personas.md</div>
+  </div>
+</section>
+
+<!-- 9. Solution mockup -->
+<section class="slide center" data-num="09" data-title="What Sarah sees Monday morning" data-notes="This is what she actually sees. State-alert band on top, conditional. Action queue below — one row per client × email-thread, sorted by urgency. Nine sources collapsed into four verbs: Send, Confirm, Apply, Discuss.">
+  <div class="micro eyebrow">What Sarah sees Monday morning</div>
+  <div class="mockup">
+    <div class="mockup-bar">
+      <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+      <div class="url">duedatehq.space/today</div>
+      <div class="live-stamp">● Live in production</div>
+    </div>
+    <div class="mockup-content">
+      <div class="mockup-alert">
+        <div class="ac-content">
+          <div class="ac-title">LA · Hurricane Delta extension · 6 of your clients affected</div>
+          <div class="ac-meta">8 deadlines to extend · 6 emails drafted, in your voice</div>
+        </div>
+        <div class="ac-actions">
+          <span class="ac-btn">Review</span>
+          <span class="ac-btn">Batch-extend</span>
+          <span class="ac-btn">Forward</span>
+        </div>
+      </div>
+      <div class="mockup-queue">
+        <div class="label-row">
+          <span class="label">Action Queue · 12 items · sorted by urgency</span>
+        </div>
+        <div class="queue-row">
+          <div class="urg high"></div>
+          <div class="qr-content">
+            <div class="qr-name">Emily Chen · 1040</div>
+            <div class="qr-action">W-2 not yet arrived · 7 days past her pattern · <span class="em">Suggested: soft check-in (draft ready)</span></div>
+          </div>
+          <span class="qr-cta">Review</span>
+        </div>
+        <div class="queue-row">
+          <div class="urg high"></div>
+          <div class="qr-content">
+            <div class="qr-name">Apex Capital · 1065</div>
+            <div class="qr-action">K-1 deadline T-21 · materials ~30% complete · <span class="em">Suggested: send chase email (draft ready)</span></div>
+          </div>
+          <span class="qr-cta">Review</span>
+        </div>
+        <div class="queue-row">
+          <div class="urg med"></div>
+          <div class="qr-content">
+            <div class="qr-name">Marcus Rodriguez · 1120-S</div>
+            <div class="qr-action">Bank statement uploaded · 2 anomalies vs. pattern · <span class="em">Suggested: confirm before close</span></div>
+          </div>
+          <span class="qr-cta">Review</span>
+        </div>
+        <div class="queue-row">
+          <div class="urg med"></div>
+          <div class="qr-content">
+            <div class="qr-name">Ridgewood Properties · LLC</div>
+            <div class="qr-action">Schedule E missing 5-year history · <span class="em">Suggested: discuss with client</span></div>
+          </div>
+          <span class="qr-cta">Review</span>
+        </div>
+        <div class="queue-row">
+          <div class="urg low"></div>
+          <div class="qr-content">
+            <div class="qr-name">Ben Hoffman · 1040</div>
+            <div class="qr-action">All received · awaiting your review · <span class="em">Suggested: confirm</span></div>
+          </div>
+          <span class="qr-cta">Review</span>
+        </div>
+        <div class="annotation">9 sources → 4 verbs</div>
+      </div>
+    </div>
+  </div>
+  <div class="chrome">
+    <div class="left"><span class="num">09</span><span>The solution · gap-over-fill</span></div>
+    <div>Today.tsx · ActionQueue.tsx</div>
+  </div>
+</section>
+
+<!-- 10. Why now -->
+<section class="slide center" data-num="10" data-title="Why now · 3 things changed" data-notes="Why now. Three things changed. LLM economics. Desktop incumbents bleeding. Suite fatigue real. Market is begging for a layer.">
+  <div class="micro eyebrow">Why now</div>
+  <h2 class="h1">Three things changed.</h2>
+  <div class="whynow-grid">
+    <div class="whynow-card">
+      <div class="marker">Economics</div>
+      <div class="big">$3–5<span class="small">/firm/mo</span></div>
+      <div class="vs">vs. Bloomberg's $thousands/yr</div>
+      <div class="text">State-DOR scraping + LLM parsing + per-firm portfolio matching at consumer-grade pricing. The <em>layer</em> couldn't exist below $200/mo before LLMs.</div>
+    </div>
+    <div class="whynow-card">
+      <div class="marker">Incumbent decay</div>
+      <div class="big">Windows<br><span class="small">installer</span></div>
+      <div class="vs">File In Time, 2026</div>
+      <div class="text">The closest direct competitor on deadline tracking still ships a desktop installer. Their architecture cannot deliver a 24h cloud SLA on state announcements.</div>
+    </div>
+    <div class="whynow-card">
+      <div class="marker">Suite fatigue</div>
+      <div class="big">10–15h<br><span class="small">setup</span></div>
+      <div class="vs">TaxDome onboarding</div>
+      <div class="text">Annual lock-in plus 10–15 hours of setup is causing measurable churn. The market wants a <em>layer</em>; incumbents structurally can't ship one.</div>
+    </div>
+  </div>
+  <div class="chrome">
+    <div class="left"><span class="num">10</span><span>Why now</span></div>
+    <div>positioning §3</div>
+  </div>
+</section>
+
+<!-- 11. Market sizing -->
+<section class="slide center" data-num="11" data-title="Market · bottom-up SAM" data-notes="Market sizing. Bottom-up. The US has roughly 46K accounting firms. ICP is about 45K. Blended ARPU at our pricing is sixty dollars a month. That's a $22M fully-penetrated SAM in the launch wedge. Small. We know.">
+  <div class="micro eyebrow">The wedge — bottom-up SAM</div>
+  <div class="market-grid">
+    <div class="col">
+      <div class="lead">
+        US accounting firms ≈ 46K<br>
+        ICP (solo–10 person) ≈ 45K<br>
+        Blended ARPU ≈ $60/mo
+      </div>
+      <div class="market-stack">
+        <div class="market-seg solo"><div class="name">Solo</div><div class="n">28K firms</div></div>
+        <div class="market-seg pro"><div class="name">Pro</div><div class="n">12K</div></div>
+        <div class="market-seg team"><div class="name">Team</div><div class="n">5K</div></div>
+      </div>
+      <div class="market-arpu">
+        <div class="item solo">$29/mo</div>
+        <div class="item pro">$49/mo</div>
+        <div class="item team">$99/mo</div>
+      </div>
+    </div>
+    <div class="col" style="text-align: right;">
+      <div class="market-num">~$22M<span class="suffix">/yr</span></div>
+      <div class="caption" style="margin-top: 0.5vmin;">ARR · fully penetrated · launch wedge</div>
+      <div class="market-honest">Small. We know.</div>
+    </div>
+  </div>
+  <div class="chrome">
+    <div class="left"><span class="num">11</span><span>Bottom-up SAM</span></div>
+    <div>no top-down fluff</div>
+  </div>
+</section>
+
+<!-- 12. Wedge → Platform -->
+<section class="slide surface center" data-num="12" data-title="Wedge → Platform" data-notes="Year three we ship Layer B and pricing power moves to two-to-five hundred a seat. Year five, firm brain, opens mid-tier firms at a thousand to five thousand. Adjacent verticals — same architecture, five-times the firm count.">
+  <div class="micro eyebrow">Wedge → Platform</div>
+  <h2 class="h1">The wedge is small. The intelligence layer is not.</h2>
+  <div class="staircase">
+    <div class="step y1">
+      <div class="yr">Year 1 · now</div>
+      <div class="step-title">Granularity replication</div>
+      <div class="price">$49/seat · ~$22M wedge</div>
+    </div>
+    <div class="step y3">
+      <div class="yr">Year 3</div>
+      <div class="step-title">Layer B · advisory triggers · churn risk · pricing intelligence</div>
+      <div class="price">$200–500/seat</div>
+    </div>
+    <div class="step y5">
+      <div class="yr">Year 5</div>
+      <div class="step-title">Firm brain · captured partner knowledge survives turnover</div>
+      <div class="price">$1K–5K/seat · mid-tier firms</div>
+    </div>
+  </div>
+  <div class="verts">
+    <span><strong>+ adjacent verticals</strong> · same architecture · 5× firm count</span>
+    <div class="tags">
+      <span class="pill silent">Bookkeepers</span>
+      <span class="pill silent">EAs</span>
+      <span class="pill silent">Fractional CFOs</span>
+      <span class="pill silent">International tax</span>
+    </div>
+  </div>
+  <div class="chrome">
+    <div class="left"><span class="num">12</span><span>Three timescales of value</span></div>
+    <div>PRD §1.3</div>
+  </div>
+</section>
+
+<!-- 13. Where we are + what's next -->
+<section class="slide center" data-num="13" data-title="Where we are · what's next" data-notes="Dashboard shipped. 22 pages, 83 components, ~63K lines TypeScript. Action queue, four alert surfaces. Public /changes archive shipped — SEO surface and trust signal. Next on the body — Modes A, C, D shipping together.">
+  <div class="micro eyebrow">Where we are · what's next</div>
+  <div class="scale-strip">
+    <div class="scale-num"><div class="n">22</div><div class="lbl">Shipped pages</div></div>
+    <div class="scale-num"><div class="n">83</div><div class="lbl">Components</div></div>
+    <div class="scale-num"><div class="n">~63K</div><div class="lbl">Lines TypeScript</div></div>
+    <div class="scale-num"><div class="n">4</div><div class="lbl">Alert surfaces · sub-24h SLA</div></div>
+  </div>
+  <div class="quad-grid">
+    <div class="quad shipped">
+      <div class="quad-status">✓ Shipped</div>
+      <div class="quad-title">The dashboard is in production</div>
+      <div class="quad-body">Action queue · 4 alert surfaces (bell · banner · blocking modal · /alerts) · state-announcement pipeline · multi-state apply wizard · 7-step onboarding · public <a class="link" href="https://duedatehq.space/changes" target="_blank" rel="noopener">/changes</a> archive (SEO + trust signal).</div>
+    </div>
+    <div class="quad">
+      <div class="quad-status">→ Next · the body</div>
+      <div class="quad-title">Modes A + C + D ship together</div>
+      <div class="quad-body">Auto-generated checklist · sanity-check inbound · drafted outbound. The chase-loop (Pattern 2) lands as a complete experience, not three half-features.</div>
+    </div>
+    <div class="quad">
+      <div class="quad-status">→ Next · the engine</div>
+      <div class="quad-title">Modes B + E behind import Tier 3</div>
+      <div class="quad-body">Per-client timing · cross-year anomaly. The customer goes from <em>"AI helps me chase"</em> to <em>"AI knows my clients better than I remember."</em></div>
+    </div>
+    <div class="quad">
+      <div class="quad-status">→ Next · the wedge</div>
+      <div class="quad-title">State-monitoring health goes customer-facing</div>
+      <div class="quad-body">From internal SLO ("scraper running 50/50 states · 14m ago") to a customer-facing trust signal. The CPA sees the watchman watching.</div>
+    </div>
+  </div>
+  <div class="chrome">
+    <div class="left"><span class="num">13</span><span>Status · roadmap</span></div>
+    <div>build_priorities.md</div>
+  </div>
+</section>
+
+<!-- 14. Close -->
+<section class="slide close-slide" data-num="14" data-title="Close" data-notes="One closing thought. Yan Jing told us the test. We built the architecture around his words. The §5.3 invariant is the price of his trust, and we paid it at the database layer. The product is the customer's words made into software.">
+  <div class="close-quote">
+    "Solve this one pain — confirming the client gave 100% of what's needed — and I'm definitely your first customer."
+    <span class="attr">— Yan Jing</span>
+  </div>
+  <div class="close-line">
+    We built the architecture around his words.<br><br>
+    <span class="accent">The product is the customer's words made into software.</span>
+  </div>
+  <div class="close-domain">
+    <a class="link" href="https://duedatehq.space" target="_blank" rel="noopener">duedatehq.space</a>
+  </div>
+  <div class="chrome">
+    <div class="left"><span class="num">14</span><span>Close</span></div>
+    <div>end · ?</div>
+  </div>
+</section>
+
+</div>
+</div>
+
+<div class="notes-panel" id="notesPanel">
+  <div class="label">Speaker notes · Slide <span id="notesNum">01</span> · press <kbd>S</kbd> to hide</div>
+  <div id="notesText" style="font-style: italic;">—</div>
+</div>
+
+<div class="help-overlay" id="helpOverlay">
+  <h3>Keyboard shortcuts</h3>
+  <div class="key-row"><kbd>→</kbd> <kbd>Space</kbd> <span class="desc">Next slide</span></div>
+  <div class="key-row"><kbd>←</kbd> <span class="desc">Previous slide</span></div>
+  <div class="key-row"><kbd>1</kbd>—<kbd>9</kbd> <span class="desc">Jump to slide</span></div>
+  <div class="key-row"><kbd>S</kbd> <span class="desc">Toggle speaker notes</span></div>
+  <div class="key-row"><kbd>F</kbd> <span class="desc">Fullscreen</span></div>
+  <div class="key-row"><kbd>Cmd/Ctrl-P</kbd> <span class="desc">Print to PDF</span></div>
+  <div class="key-row"><kbd>?</kbd> <span class="desc">Toggle this help</span></div>
+</div>
+
+<script>
+(function() {
+  const slides = document.querySelectorAll('.slide');
+  const notesPanel = document.getElementById('notesPanel');
+  const notesText = document.getElementById('notesText');
+  const notesNum = document.getElementById('notesNum');
+  const helpOverlay = document.getElementById('helpOverlay');
+  let current = 0;
+  let notesOpen = false;
+
+  function show(idx) {
+    if (idx < 0 || idx >= slides.length) return;
+    slides[current].classList.remove('active');
+    current = idx;
+    slides[current].classList.add('active');
+    notesText.textContent = slides[current].dataset.notes || '';
+    notesNum.textContent = slides[current].dataset.num || (idx + 1);
+    history.replaceState(null, '', '#' + (idx + 1));
+  }
+
+  function next() { show(Math.min(current + 1, slides.length - 1)); }
+  function prev() { show(Math.max(current - 1, 0)); }
+
+  document.addEventListener('keydown', function(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'p') return;
+    switch(e.key) {
+      case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown':
+        e.preventDefault(); next(); break;
+      case 'ArrowLeft': case 'ArrowUp': case 'PageUp':
+        e.preventDefault(); prev(); break;
+      case 'Home': e.preventDefault(); show(0); break;
+      case 'End': e.preventDefault(); show(slides.length - 1); break;
+      case 's': case 'S':
+        notesOpen = !notesOpen;
+        notesPanel.classList.toggle('open', notesOpen);
+        break;
+      case 'f': case 'F':
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+        else document.exitFullscreen();
+        break;
+      case '?': case '/':
+        helpOverlay.classList.toggle('open');
+        break;
+      case 'Escape':
+        helpOverlay.classList.remove('open');
+        break;
+      default:
+        if (e.key >= '1' && e.key <= '9') show(parseInt(e.key, 10) - 1);
+    }
+  });
+
+  document.getElementById('deck').addEventListener('click', function(e) {
+    if (e.target.tagName === 'A' || e.target.closest('a')) return;
+    const w = window.innerWidth;
+    if (e.clientX < w * 0.3) prev();
+    else if (e.clientX > w * 0.7) next();
+  });
+
+  const hash = window.location.hash.slice(1);
+  if (hash && /^\d+$/.test(hash)) {
+    show(Math.max(0, Math.min(parseInt(hash, 10) - 1, slides.length - 1)));
+  } else {
+    show(0);
+  }
+
+  helpOverlay.classList.add('open');
+  setTimeout(() => helpOverlay.classList.remove('open'), 2200);
+})();
+</script>
+
+</body>
+</html>
