@@ -35,7 +35,7 @@ import { DateLabel } from "../components/ui/DateLabel";
 import { MetricTile } from "../components/ui/MetricTile";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { StateAlertCard } from "../components/StateAlertCard";
-import { Megaphone, Mail, CheckCircle2, Plus, ChevronRight, type LucideIcon } from "lucide-react";
+import { Megaphone, Mail, CheckCircle2, ChevronRight, type LucideIcon } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { Announcement } from "../types";
 import { escalationTier as escTier } from "../data/dateHelpers";
@@ -552,12 +552,10 @@ function DashboardActionRow() {
       />
       {/* "View alerts" cut — sidebar Alerts nav + the inline "View all
           alerts →" link inside the State alerts section already cover
-          this. Three paths to the same destination was redundant. */}
-      <ActionPill
-        icon={Plus}
-        label="New client"
-        onClick={() => navigate("/clients?new=1")}
-      />
+          this. Three paths to the same destination was redundant.
+          "New client" cut 2026-05-05 — the global +New button in the
+          AppShell header already covers this; two paths to the same
+          modal was the same redundancy class. */}
     </div>
   );
 }
