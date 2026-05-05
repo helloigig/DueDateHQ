@@ -1464,7 +1464,13 @@ export const mockAdapter = {
       await delay();
       return [] as Array<{
         id: string;
-        kind: "qbo" | "xero" | "gmail" | "outlook" | "stripe";
+        kind:
+          | "qbo"
+          | "xero"
+          | "gmail"
+          | "outlook"
+          | "stripe"
+          | "google_calendar";
         status: "connected" | "disconnected" | "error";
         externalAccountId: string | null;
         scope: string | null;
@@ -1482,6 +1488,7 @@ export const mockAdapter = {
         { kind: "gmail" as const, configured: false },
         { kind: "outlook" as const, configured: false },
         { kind: "stripe" as const, configured: false },
+        { kind: "google_calendar" as const, configured: false },
       ];
     },
     startConnect: async () => {
@@ -1516,6 +1523,25 @@ export const mockAdapter = {
         updated: 0,
         skipped: 0,
         errors: 0,
+      };
+    },
+    syncCalendarNow: async () => {
+      await delay(400);
+      // Mock mode: pretend we pushed everything to a fake calendar.
+      // Demo workspace has 12 open deadlines; render that as 12 pushed.
+      return { pushed: 12, updated: 0, skipped: 0, errors: 0 };
+    },
+    calendarStatus: async () => {
+      await delay();
+      // Connected-looking mock so the Settings card renders fully in
+      // demo mode. Real mode reads from the integrations table.
+      return {
+        connected: false,
+        connectedAt: null,
+        lastSyncedAt: null,
+        lastError: null,
+        syncedCount: 0,
+        totalOpen: 0,
       };
     },
   },
@@ -2741,6 +2767,75 @@ export const mockAdapter = {
       };
     },
   },
+
+  /**
+   * dailyDigest — mock-mode stubs for the Daily AM digest settings card.
+   * Stores draft settings in module-level state so toggling and saving
+   * round-trips correctly without persistence. Preview returns "sent"
+   * so the UI flashes the success state for design demos.
+   */
+  dailyDigest: (() => {
+    let mockSettings: {
+      enabled: boolean;
+      sendHour: number;
+      days: Array<"sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat">;
+    } = {
+      // Default ON to mirror the BE default (see daily-digest.ts
+      // DEFAULT_DIGEST_PREFS). Users in mock mode see the toggle pre-on
+      // so the demo-workspace flow matches what a fresh real-mode user
+      // would experience post-deploy.
+      enabled: true,
+      sendHour: 7,
+      days: ["mon", "tue", "wed", "thu", "fri"],
+    };
+    return {
+      getSettings: async () => {
+        await delay();
+        return mockSettings;
+      },
+      updateSettings: async (input: typeof mockSettings) => {
+        await delay();
+        mockSettings = input;
+        return { ok: true as const };
+      },
+      previewMyDigest: async () => {
+        await delay(400);
+        console.info("[mock] dailyDigest.previewMyDigest");
+        return { status: "sent" as const };
+      },
+      listRecentRuns: async () => {
+        await delay();
+        // Two seeded "yesterday" + "two days ago" rows so the recent-sends
+        // panel renders with realistic content in the demo workspace.
+        const today = new Date();
+        const iso = (d: Date) => d.toISOString().slice(0, 10);
+        const y1 = new Date(today.getTime() - 86_400_000);
+        const y2 = new Date(today.getTime() - 2 * 86_400_000);
+        return [
+          {
+            id: "mock-run-1",
+            localDate: iso(y1),
+            sentAt: y1.toISOString(),
+            status: "sent",
+            urgentCount: 3,
+            alertsCount: 1,
+            repliesCount: 2,
+            errorMessage: null,
+          },
+          {
+            id: "mock-run-2",
+            localDate: iso(y2),
+            sentAt: y2.toISOString(),
+            status: "skipped_quiet",
+            urgentCount: 0,
+            alertsCount: 0,
+            repliesCount: 0,
+            errorMessage: null,
+          },
+        ];
+      },
+    };
+  })(),
 } as const;
 
 export type MockAdapter = typeof mockAdapter;

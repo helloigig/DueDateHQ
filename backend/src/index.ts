@@ -23,6 +23,8 @@ import {
   runScraperCycle,
   startScraperScheduler,
 } from "./lib/scraper.js";
+import { startDailyDigestScheduler } from "./lib/daily-digest-scheduler.js";
+import { startCalendarSyncScheduler } from "./lib/calendar-sync.js";
 import {
   listFederalRegisterStatus,
   runFederalRegisterCycle,
@@ -381,6 +383,22 @@ if (env.NODE_ENV !== "test") {
   // callback path so the user sees clients populate without waiting.
   if (process.env.QBO_SYNC_ENABLED === "1") {
     startQboSyncScheduler();
+  }
+  // Daily AM digest — 15-minute tick, fires per-user when their local
+  // time hits the configured sendHour. Set DAILY_DIGEST_DISABLED=1 to
+  // suppress all sends without redeploying (e.g. during a Resend
+  // incident). Defaults to enabled in prod; opt-in is per-user via
+  // users.preferences.dailyDigest.enabled.
+  if (process.env.DAILY_DIGEST_DISABLED !== "1") {
+    startDailyDigestScheduler();
+  }
+  // Google Calendar push — 4h cron tick, walks every firm with a
+  // connected google_calendar integration and pushes stale deadlines
+  // to the user's primary calendar. The assignBundle path also fires
+  // a fresh-write sync inline, so the cron's job is catch-up only.
+  // Set CALENDAR_SYNC_DISABLED=1 to suppress.
+  if (process.env.CALENDAR_SYNC_DISABLED !== "1") {
+    startCalendarSyncScheduler();
   }
 }
 

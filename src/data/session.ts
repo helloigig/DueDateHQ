@@ -27,6 +27,13 @@ export interface FirmSession {
    *  every Phase-2-enabled template is paused regardless of per-template
    *  state. The CPA can flip it instantly from Settings → Reminders. */
   phase2AutoSendPaused?: boolean;
+  /** Onboarding → first-action arc (Yuqi audit 2026-05-05). After import
+   *  the CPA lands on Today with a fresh queue but no muscle memory; we
+   *  surface a one-time "Try it: send your first chase" banner pointing
+   *  at the most-overdue client. Set when the user dismisses the banner
+   *  OR sends their first chase email. Persists across sessions so the
+   *  banner doesn't reappear on every login. */
+  firstChaseDone?: boolean;
 }
 
 const KEY = "duedatehq.session.v1";

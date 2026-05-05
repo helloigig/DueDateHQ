@@ -35,7 +35,7 @@ import { DateLabel } from "../components/ui/DateLabel";
 import { MetricTile } from "../components/ui/MetricTile";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { StateAlertCard } from "../components/StateAlertCard";
-import { Megaphone, Mail, CheckCircle2, ChevronRight, type LucideIcon } from "lucide-react";
+import { Megaphone, ChevronRight } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { Announcement } from "../types";
 import { escalationTier as escTier } from "../data/dateHelpers";
@@ -47,7 +47,7 @@ const DONE_STATUSES = new Set(["completed", "filed_extension"]);
  *
  * Two zones above the fold:
  *   1. State-alert band — conditional, vanishes when no actionable alerts
- *   2. The queue — TaskList (urgency-sorted, with chase actions inline)
+ *   2. The queue — ActionQueue (urgency-sorted, with chase actions inline)
  *
  * Below the fold: capacity strip (≥3-staff firms only).
  *
@@ -247,33 +247,49 @@ export function Dashboard() {
             </>
           }
         />
-        <DashboardActionRow />
       </div>
 
-      {/* KPI STRIP — 2 tiles (was 4). Cut: "Active clients" (slow-moving
-          stat that doesn't change a CPA's day) + "Due this week"
-          (overlaps "Filing today" since today is in this week). Kept
-          the two that DRIVE the day: "Filing today" (warn when
-          nonzero) + "Past official" / "Past target" (danger / warn).
-          The roster count + week-window are visible on Clients +
-          Timeline respectively — no need to repeat here. */}
-      <div className="mb-card grid grid-cols-1 md:grid-cols-2 gap-region max-w-md">
+      {/* KPI STRIP — operational signal first, legal-miss as conditional
+          secondary. Per the deadline-UX principle: official date is a
+          reference constraint, not the primary daily driver. The signal
+          Sarah feels every day is "behind plan" (past internal target,
+          buffer eaten); legal misses are rare and only loud up when they
+          actually exist. So:
+            • "Behind plan" — always present, amber when nonzero. The
+              operational signal. Counts open tasks where today >
+              internal target but ≤ official deadline.
+            • "Filing today" — calendar context. Always present, neutral.
+            • "Past official" — danger tile, conditional. Only rendered
+              when the count is > 0. Never primary even when present —
+              its job is to alert without re-centering the mental model
+              on the legal date.
+          Pre-PR #92, the second slot flip-flopped between "Past target"
+          and "Past official" depending on count. That flipping conflated
+          two different decisions. Splitting them removes the ambiguity. */}
+      <div
+        className={`mb-card grid grid-cols-1 gap-region ${
+          summary.pastOfficial > 0
+            ? "md:grid-cols-3 max-w-2xl"
+            : "md:grid-cols-2 max-w-md"
+        }`}
+      >
+        <MetricTile
+          label="Behind plan"
+          value={summary.pastInternalTarget}
+          tone={summary.pastInternalTarget > 0 ? "warn" : "neutral"}
+        />
         <MetricTile
           label="Filing today"
           value={summary.dueToday}
           tone={summary.dueToday > 0 ? "warn" : "neutral"}
         />
-        <MetricTile
-          label={summary.pastOfficial > 0 ? "Past official" : "Past target"}
-          value={summary.pastOfficial > 0 ? summary.pastOfficial : summary.pastInternalTarget}
-          tone={
-            summary.pastOfficial > 0
-              ? "danger"
-              : summary.pastInternalTarget > 0
-              ? "warn"
-              : "neutral"
-          }
-        />
+        {summary.pastOfficial > 0 && (
+          <MetricTile
+            label="Past official"
+            value={summary.pastOfficial}
+            tone="danger"
+          />
+        )}
       </div>
 
       {/* WelcomeTour hidden per user direction — adds noise on the daily
@@ -528,63 +544,6 @@ function StateAlertsPreview({
         </div>
       )}
     </section>
-  );
-}
-
-// DashboardActionRow — top-right pill button cluster on the Dashboard page
-// header. Mercury Home anatomy: the page's primary actions sit beside the
-// title, not buried inside sections. Per T2 — only the first action wears
-// the indigo accent (the "next likely action"); the rest are ghost pills.
-function DashboardActionRow() {
-  const navigate = useNavigate();
-  return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <ActionPill
-        primary
-        icon={Mail}
-        label="Send chase"
-        onClick={() => navigate("/mail")}
-      />
-      <ActionPill
-        icon={CheckCircle2}
-        label="Mark received"
-        onClick={() => navigate("/mail")}
-      />
-      {/* "View alerts" cut — sidebar Alerts nav + the inline "View all
-          alerts →" link inside the State alerts section already cover
-          this. Three paths to the same destination was redundant.
-          "New client" cut 2026-05-05 — the global +New button in the
-          AppShell header already covers this; two paths to the same
-          modal was the same redundancy class. */}
-    </div>
-  );
-}
-
-// ActionPill — pill-shaped page-header CTA. Per T3 (pills for actions) +
-// T2 (only one indigo accent on the page).
-function ActionPill({
-  primary,
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  primary?: boolean;
-  icon: LucideIcon;
-  label: string;
-  onClick?: () => void;
-}) {
-  const cls = primary
-    ? "bg-indigo text-white hover:bg-indigo-hover border-transparent"
-    : "bg-surface text-ink-700 hover:bg-sunken border-line hover:border-line-strong";
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-pill border transition-colors whitespace-nowrap ${cls}`}
-    >
-      <Icon className="w-4 h-4" aria-hidden />
-      {label}
-    </button>
   );
 }
 

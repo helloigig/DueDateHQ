@@ -8,8 +8,13 @@
  * Spec: docs/specs/alert-detail-pte-change.md
  */
 import { useMemo, useState } from "react";
-import { CalendarClock, Phone, Mail } from "lucide-react";
+import { CalendarClock, Phone, Mail, CalendarPlus, Download } from "lucide-react";
 import type { Announcement, Client } from "../types";
+import {
+  downloadIcs,
+  googleCalendarUrl,
+  outlookCalendarUrl,
+} from "../lib/calendarLink";
 import {
   Dialog,
   DialogBody,
@@ -87,9 +92,10 @@ export function SchedulePlanningCallModal({
             Schedule planning calls for {recipients.length} client{recipients.length === 1 ? "" : "s"}
           </DialogTitle>
           <DialogDescription>
-            Each call lands on Today as a TodoItem. Talking points are
-            generated from the alert + client history. You'll book the time
-            externally for now — calendar integration is on the roadmap.
+            Each call lands on Today as a TodoItem with talking points
+            generated from the alert + client history. Add to Google,
+            Outlook, or download an .ics for your existing calendar — your
+            choice, no scopes required.
           </DialogDescription>
         </DialogHeader>
 
@@ -124,7 +130,7 @@ export function SchedulePlanningCallModal({
             <ul className="divide-y divide-line border border-line rounded-md bg-surface">
               {recipients.map((c) => (
                 <li key={c.id} className="px-3 py-2.5">
-                  <div className="flex items-baseline gap-2">
+                  <div className="flex items-baseline gap-2 flex-wrap">
                     <span className="text-sm font-medium text-ink-900">{c.name}</span>
                     <span className="text-xs text-ink-500">
                       {c.entityType} · {c.primaryState}
@@ -142,6 +148,16 @@ export function SchedulePlanningCallModal({
                       </li>
                     ))}
                   </ul>
+                  <CalendarLinks
+                    title={`Planning call · ${c.name}`}
+                    description={[
+                      `Re: ${announcement.title}`,
+                      "",
+                      "Talking points:",
+                      ...(points.get(c.id) ?? []).map((p) => `· ${p}`),
+                    ].join("\n")}
+                    suggestedWindow={windowChoice}
+                  />
                 </li>
               ))}
             </ul>
@@ -176,5 +192,84 @@ export function SchedulePlanningCallModal({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Resolves the suggested-window choice into a concrete start datetime,
+ * defaulting to 10:00 local time on the chosen day. The CPA can edit
+ * the time in their calendar client of choice — we just open it
+ * pre-filled. This avoids the trap of silently picking 9am or 5pm
+ * (feedback_deadlines_dates_only doesn't apply here — this is a
+ * call, which IS time-bound — but defaulting to a conservative
+ * mid-morning slot still respects the spirit).
+ */
+function suggestedStartIso(
+  suggestedWindow: "this_week" | "next_2_weeks" | "before_deadline",
+): string {
+  const now = new Date();
+  const offsetDays =
+    suggestedWindow === "this_week"
+      ? 2
+      : suggestedWindow === "next_2_weeks"
+        ? 7
+        : 14;
+  const target = new Date(now);
+  target.setDate(now.getDate() + offsetDays);
+  target.setHours(10, 0, 0, 0);
+  return target.toISOString();
+}
+
+function CalendarLinks({
+  title,
+  description,
+  suggestedWindow,
+}: {
+  title: string;
+  description: string;
+  suggestedWindow: "this_week" | "next_2_weeks" | "before_deadline";
+}) {
+  const startIso = suggestedStartIso(suggestedWindow);
+  const event = { title, description, startIso, durationMinutes: 30 };
+  const linkClass =
+    "text-2xs inline-flex items-center gap-1 px-2 py-1 rounded border border-line text-ink-700 hover:bg-sunken";
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <span className="text-2xs uppercase tracking-wide text-ink-400 mr-1">
+        Add to:
+      </span>
+      <a
+        href={googleCalendarUrl(event)}
+        target="_blank"
+        rel="noreferrer"
+        className={linkClass}
+      >
+        <CalendarPlus className="w-3 h-3" aria-hidden />
+        Google
+      </a>
+      <a
+        href={outlookCalendarUrl(event)}
+        target="_blank"
+        rel="noreferrer"
+        className={linkClass}
+      >
+        <CalendarPlus className="w-3 h-3" aria-hidden />
+        Outlook
+      </a>
+      <button
+        type="button"
+        onClick={() =>
+          downloadIcs(
+            event,
+            `${title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.ics`,
+          )
+        }
+        className={linkClass}
+        title="Apple Calendar / desktop Outlook / any RFC-5545 client"
+      >
+        <Download className="w-3 h-3" aria-hidden />
+        .ics
+      </button>
+    </div>
   );
 }

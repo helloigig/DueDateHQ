@@ -1209,7 +1209,13 @@ export const appRouter = t.router({
       async (): Promise<
         Array<{
           id: string;
-          kind: "qbo" | "xero" | "gmail" | "outlook" | "stripe";
+          kind:
+            | "qbo"
+            | "xero"
+            | "gmail"
+            | "outlook"
+            | "stripe"
+            | "google_calendar";
           status: "connected" | "disconnected" | "error";
           externalAccountId: string | null;
           scope: string | null;
@@ -1223,7 +1229,13 @@ export const appRouter = t.router({
     catalog: t.procedure.query(
       async (): Promise<
         Array<{
-          kind: "qbo" | "xero" | "gmail" | "outlook" | "stripe";
+          kind:
+            | "qbo"
+            | "xero"
+            | "gmail"
+            | "outlook"
+            | "stripe"
+            | "google_calendar";
           configured: boolean;
         }>
       > => NOT_IMPL(),
@@ -1231,7 +1243,13 @@ export const appRouter = t.router({
     startConnect: t.procedure
       .input(
         z.object({
-          kind: z.enum(["qbo", "xero", "gmail", "outlook"]),
+          kind: z.enum([
+            "qbo",
+            "xero",
+            "gmail",
+            "outlook",
+            "google_calendar",
+          ]),
           redirectTo: z.string().url(),
         }),
       )
@@ -1262,6 +1280,26 @@ export const appRouter = t.router({
           errors: number;
         }> => NOT_IMPL(),
       ),
+    /** Calendar push — on-demand. Force-pushes every open deadline. */
+    syncCalendarNow: t.procedure.mutation(
+      async (): Promise<{
+        pushed: number;
+        updated: number;
+        skipped: number;
+        errors: number;
+      }> => NOT_IMPL(),
+    ),
+    /** Calendar status — drives the Settings card counter. */
+    calendarStatus: t.procedure.query(
+      async (): Promise<{
+        connected: boolean;
+        connectedAt: string | null;
+        lastSyncedAt: string | null;
+        lastError: string | null;
+        syncedCount: number;
+        totalOpen: number;
+      }> => NOT_IMPL(),
+    ),
   }),
 
   aiInsights: t.router({
@@ -1633,6 +1671,50 @@ export const appRouter = t.router({
           createdPackageId: string | null;
         }> => NOT_IMPL()
       ),
+  }),
+
+  // Daily AM digest — per-user opt-in + cadence + preview-now. Real
+  // mode dispatches to backend/src/lib/daily-digest-scheduler.ts; mock
+  // mode returns local stubs. See backend/src/trpc/routers/dailyDigest.ts
+  // for the canonical schema.
+  dailyDigest: t.router({
+    getSettings: t.procedure.query(
+      async (): Promise<{
+        enabled: boolean;
+        sendHour: number;
+        days: Array<"mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun">;
+      }> => NOT_IMPL(),
+    ),
+    updateSettings: t.procedure
+      .input(
+        z.object({
+          enabled: z.boolean(),
+          sendHour: z.number().int().min(0).max(23),
+          days: z.array(
+            z.enum(["sun", "mon", "tue", "wed", "thu", "fri", "sat"]),
+          ).min(1),
+        }),
+      )
+      .mutation(async (): Promise<{ ok: true }> => NOT_IMPL()),
+    previewMyDigest: t.procedure.mutation(
+      async (): Promise<{
+        status: "sent" | "skipped_quiet" | "skipped_disabled" | "failed";
+      }> => NOT_IMPL(),
+    ),
+    listRecentRuns: t.procedure.query(
+      async (): Promise<
+        Array<{
+          id: string;
+          localDate: string;
+          sentAt: string;
+          status: string;
+          urgentCount: number;
+          alertsCount: number;
+          repliesCount: number;
+          errorMessage: string | null;
+        }>
+      > => NOT_IMPL(),
+    ),
   }),
 });
 

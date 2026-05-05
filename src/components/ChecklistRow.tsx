@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Check,
   Clock,
@@ -8,6 +9,8 @@ import {
   Mail,
   MoreHorizontal,
   Trash2,
+  Sparkles,
+  FileText,
 } from "lucide-react";
 import type { ChecklistItem, DocumentState } from "../types";
 import {
@@ -15,6 +18,7 @@ import {
   useSetChecklistItemState,
 } from "../hooks/useChecklist";
 import { confirmWithUndo } from "../lib/confirmWithUndo";
+import { useReminderTemplates } from "../hooks/useReminderTemplates";
 
 /**
  * Renders one Layer 3 checklist item per IA §3.4. Each row's visual
@@ -152,6 +156,19 @@ export function ChecklistRow({ item, onOpenEmailDraft }: Props) {
             <span className={`text-sm font-medium text-ink-900 ${labelStrike}`}>
               {item.label}
             </span>
+            {item.sourceUrl && (
+              <a
+                href={item.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-2xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-0.5 px-1 py-0.5 rounded hover:bg-sunken"
+                title={`Open IRS reference (${item.sourceUrl.split("/").pop()})`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FileText className="w-2.5 h-2.5" aria-hidden />
+                IRS PDF
+              </a>
+            )}
             {item.custom && (
               <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-500">
                 custom
@@ -271,20 +288,23 @@ function StateDetail({ item }: { item: ChecklistItem }) {
   switch (item.state) {
     case "requested_waiting":
       return (
-        <div className="text-xs text-ink-500 mt-1">
-          {item.lastReminderAt && (
-            <>
-              Last reminder: <span className="text-ink-700">{shortDate(item.lastReminderAt)}</span>
-              {" · "}
-            </>
-          )}
-          {item.nextReminderAt ? (
-            <>
-              Next: <span className="text-ink-700">{shortDate(item.nextReminderAt)}</span>
-            </>
-          ) : (
-            "No follow-up scheduled"
-          )}
+        <div className="text-xs text-ink-500 mt-1 space-y-0.5">
+          <div>
+            {item.lastReminderAt && (
+              <>
+                Last reminder: <span className="text-ink-700">{shortDate(item.lastReminderAt)}</span>
+                {" · "}
+              </>
+            )}
+            {item.nextReminderAt ? (
+              <>
+                Next: <span className="text-ink-700">{shortDate(item.nextReminderAt)}</span>
+              </>
+            ) : (
+              "No follow-up scheduled"
+            )}
+          </div>
+          <MatchedTemplateLink itemType={item.itemType} />
         </div>
       );
     case "received_unreviewed":
@@ -327,13 +347,48 @@ function StateDetail({ item }: { item: ChecklistItem }) {
       );
     case "not_requested":
       return (
-        <div className="text-xs text-ink-400 mt-1">
-          Not yet requested.
+        <div className="text-xs text-ink-400 mt-1 space-y-0.5">
+          <div>Not yet requested.</div>
+          <MatchedTemplateLink itemType={item.itemType} />
         </div>
       );
     default:
       return null;
   }
+}
+
+/**
+ * MatchedTemplateLink — surfaces the reminder template that would be the
+ * seed for this item's chase email. Closes the loop between Settings →
+ * Reminder Templates and the per-item daily flow per Yuqi audit
+ * 2026-05-05: "what email goes out when I click Request?" used to be
+ * invisible. Same matching logic as EmailDraftModal: direct itemType
+ * first, then family fallback ("1099_int" → "1099_any").
+ */
+function MatchedTemplateLink({ itemType }: { itemType: string }) {
+  const templates = useReminderTemplates();
+  const matched = useMemo(() => {
+    if (!itemType) return null;
+    const direct = templates.find((t) => t.itemType === itemType);
+    if (direct) return direct;
+    const family = itemType.split("_")[0];
+    return templates.find((t) => t.itemType === `${family}_any`) ?? null;
+  }, [itemType, templates]);
+  if (!matched) return null;
+  return (
+    <div className="inline-flex items-center gap-1 text-2xs text-ink-500">
+      <Sparkles className="w-2.5 h-2.5 text-ink-400" aria-hidden />
+      <span>Next reminder uses</span>
+      <Link
+        to="/settings/reminders"
+        className="text-info-ink hover:underline inline-flex items-center gap-0.5"
+        title={`Template: ${matched.subject}`}
+      >
+        {matched.name ?? matched.subject}
+        <span aria-hidden> ↗</span>
+      </Link>
+    </div>
+  );
 }
 
 function ConfidencePill({ confidence }: { confidence: "high" | "medium" | "low" }) {

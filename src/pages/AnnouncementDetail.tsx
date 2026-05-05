@@ -268,8 +268,9 @@ export function AnnouncementDetail() {
         navigate(`/settings/federal-forms?event=${ann.id}`);
         break;
       case "route_calendar_schedule":
-        // P2 — calendar integration. For now the planning_call modal
-        // captures the intent and creates a TodoItem.
+        // Calendar integration uses per-call deep-links (Google, Outlook,
+        // .ics download) inside the planning_call modal — no OAuth scopes
+        // required. Real calendar sync via OAuth is a Phase 2 add.
         setPlanningCallOpen(true);
         break;
     }

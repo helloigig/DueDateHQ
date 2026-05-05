@@ -7,6 +7,7 @@ import { STATE_NAMES } from "../types";
 import { useModalDialog } from "../hooks/useModalDialog";
 import { trpc } from "../lib/api/client";
 import { env } from "../config";
+import { toast } from "sonner";
 
 const ENTITY_OPTIONS: EntityType[] = [
   "Individual",
@@ -149,6 +150,12 @@ export function AddClientModal({
           contactPhone: phone.trim() || undefined,
           servicePackage: suggestedPackageName ?? "Individual + Federal",
         });
+        // Success toast — replaces the silent navigation. The CPA gets
+        // confirmation that the row actually wrote, with the package
+        // that was assigned, before the page transitions.
+        toast.success(
+          `${name.trim()} added · ${suggestedPackageName ?? "Individual + Federal"} package assigned`,
+        );
         onClose();
         navigate(`/clients/${id}`);
         return;
@@ -175,12 +182,18 @@ export function AddClientModal({
       void utils.deadlines.listForTriage.invalidate();
       void utils.deadlines.listForClient.invalidate();
       void utils.tasks.list.invalidate();
+      toast.success(
+        `${name.trim()} added${suggestedPackageName ? ` · ${suggestedPackageName} package assigned` : ""}`,
+      );
       onClose();
       navigate(`/clients/${created.id}`);
     } catch (err) {
-      setSubmitError(
-        err instanceof Error ? err.message : "Couldn't save the client.",
-      );
+      const message = err instanceof Error ? err.message : "Couldn't save the client.";
+      setSubmitError(message);
+      // Also surface as a toast so the user notices even if their
+      // attention is on the page below the modal. The inline error
+      // stays in the dialog body for context.
+      toast.error(`Add client failed — ${message}`);
     } finally {
       setSubmitting(false);
     }

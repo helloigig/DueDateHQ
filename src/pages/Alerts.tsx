@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   CalendarClock,
   ChevronLeft,
@@ -194,6 +194,7 @@ function CopilotPane({
   isSending,
   isApplying,
   clientSource,
+  hasExplicitSelection,
 }: {
   announcement: Announcement | null;
   excludedClientIds: Set<string>;
@@ -230,6 +231,11 @@ function CopilotPane({
     name: string;
     contactEmail?: string | null;
   }>;
+  /** True when the URL carries an alert id (user explicitly selected). On
+   *  <md the pane stays hidden when false so the feed owns the viewport;
+   *  the auto-first-selected announcement is still bound for md+ inline
+   *  display, just not surfaced. */
+  hasExplicitSelection: boolean;
 }) {
   const [draftIndex, setDraftIndex] = useState(0);
   const navigate = useNavigate();
@@ -239,8 +245,11 @@ function CopilotPane({
   }, [announcement?.id]);
 
   if (!announcement) {
+    // On <md the empty state is hidden — the feed already fills the
+    // viewport when nothing is selected. md+ keeps the empty pane visible
+    // as a hint that selecting a card on the left populates this side.
     return (
-      <aside className="w-pane shrink-0 bg-canvas border-l border-line flex flex-col items-center justify-center text-center px-region">
+      <aside className="w-full md:w-pane md:shrink-0 bg-canvas md:border-l md:border-line hidden md:flex flex-col items-center justify-center text-center px-region">
         <Sparkles className="w-8 h-8 text-ink-300 mb-3" aria-hidden />
         <div className="text-sm font-semibold text-ink-700">
           Pick an alert to see suggested actions
@@ -283,7 +292,11 @@ function CopilotPane({
   const body = currentDraft.body;
 
   return (
-    <aside className="w-pane shrink-0 bg-canvas border-l border-line flex flex-col overflow-hidden">
+    <aside
+      className={`w-full md:w-pane md:shrink-0 bg-canvas md:border-l md:border-line flex-col overflow-hidden md:flex ${
+        hasExplicitSelection ? "flex" : "hidden md:flex"
+      }`}
+    >
       {/* ── Header zone: Context ─────────────────────────────────
           Collapsed to ONE line — the feed card is the summary, the
           pane is the detail. Re-rendering state + title + authority
@@ -292,6 +305,19 @@ function CopilotPane({
           title + close X. Everything else (full client list, email
           draft, action card) lives in the pane body. */}
       <div className="bg-surface border-b border-line px-region py-3 flex items-start gap-3">
+        {/* Mobile: explicit "Back to alerts" affordance — the pane fills the
+            viewport at <md, so the user needs a clear way to return to the
+            feed. md+ uses a discreet X (the feed is already visible to the
+            left, so this is just a clear-selection control). */}
+        <button
+          type="button"
+          onClick={onClose}
+          className="shrink-0 inline-flex items-center justify-center rounded text-ink-500 hover:bg-sunken hover:text-ink-900 transition-colors md:hidden gap-1 px-2 py-1 text-xs font-medium"
+          aria-label="Back to alerts"
+        >
+          <ChevronLeft className="w-4 h-4" aria-hidden />
+          Back
+        </button>
         <StateBadge code={a.stateCode} />
         <div className="flex-1 min-w-0 text-sm font-semibold text-ink-900 leading-snug pt-0.5">
           {a.title}
@@ -299,7 +325,7 @@ function CopilotPane({
         <button
           type="button"
           onClick={onClose}
-          className="shrink-0 w-7 h-7 inline-flex items-center justify-center rounded text-ink-500 hover:bg-sunken hover:text-ink-900 transition-colors"
+          className="hidden md:inline-flex shrink-0 w-7 h-7 items-center justify-center rounded text-ink-500 hover:bg-sunken hover:text-ink-900 transition-colors"
           aria-label="Close detail pane"
         >
           <X className="w-4 h-4" aria-hidden />
@@ -403,33 +429,54 @@ function CopilotPane({
                 {allAffected.map((c) => {
                   const isExcluded = excludedClientIds.has(c.id);
                   return (
-                    <button
+                    <span
                       key={c.id}
-                      type="button"
-                      onClick={() => onToggleExclusion(c.id)}
-                      className={cn(
-                        "group inline-flex items-center gap-1 rounded-pill border text-xs px-2 py-0.5 transition-colors",
-                        isExcluded
-                          ? "border-line bg-transparent text-ink-400 line-through hover:border-line-strong hover:text-ink-700 hover:no-underline"
-                          : "border-line bg-surface text-ink-700 hover:border-danger-border hover:text-danger-ink",
-                      )}
-                      title={
-                        isExcluded
-                          ? `Click to include ${c.name}`
-                          : `Click to exclude ${c.name} from this send`
-                      }
+                      className="inline-flex items-stretch rounded-pill border border-line overflow-hidden"
                     >
-                      <span className="truncate max-w-[110px]">{c.name}</span>
-                      <X
+                      {/* Click body → toggle include/exclude (existing
+                          behaviour). The arrow on the right opens
+                          ClientDetail in a new tab — no conflict
+                          with the chip toggle. Yuqi audit 2026-05-05:
+                          previously the chip was the only affordance,
+                          so users couldn't navigate from an alert to
+                          a specific affected client. */}
+                      <button
+                        type="button"
+                        onClick={() => onToggleExclusion(c.id)}
                         className={cn(
-                          "w-2.5 h-2.5 transition-opacity",
+                          "group inline-flex items-center gap-1 text-xs px-2 py-0.5 transition-colors",
                           isExcluded
-                            ? "rotate-45 text-ink-400"
-                            : "text-ink-400 opacity-0 group-hover:opacity-100",
+                            ? "bg-transparent text-ink-400 line-through hover:text-ink-700 hover:no-underline"
+                            : "bg-surface text-ink-700 hover:text-danger-ink",
                         )}
-                        aria-hidden
-                      />
-                    </button>
+                        title={
+                          isExcluded
+                            ? `Click to include ${c.name}`
+                            : `Click to exclude ${c.name} from this send`
+                        }
+                      >
+                        <span className="truncate max-w-[110px]">{c.name}</span>
+                        <X
+                          className={cn(
+                            "w-2.5 h-2.5 transition-opacity",
+                            isExcluded
+                              ? "rotate-45 text-ink-400"
+                              : "text-ink-400 opacity-0 group-hover:opacity-100",
+                          )}
+                          aria-hidden
+                        />
+                      </button>
+                      <Link
+                        to={`/clients/${c.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-1.5 border-l border-line bg-sunken/40 text-ink-400 hover:text-ink-900 hover:bg-sunken transition-colors text-2xs"
+                        title={`Open ${c.name} in a new tab`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        ↗
+                      </Link>
+                    </span>
                   );
                 })}
               </div>
@@ -1122,10 +1169,21 @@ export function Alerts() {
     [recomputeForAnnouncement, handleComplete],
   );
 
+  // Mobile column visibility — at <md the workshop is single-column.
+  // Without an explicit URL :id the user sees the feed; selecting an alert
+  // pushes the pane to fill the viewport (the pane's X button returns to
+  // the feed via handleClearSelection, which clears the URL). At md+ both
+  // columns are visible together as the workshop intends.
+  const hasExplicitSelection = Boolean(params.id);
+
   return (
-    <PageContainer variant="workshop">
+    <PageContainer variant="workshop" className="flex-col md:flex-row">
       {/* ── Center feed ──────────────────────────────────────────────── */}
-      <section className="flex-1 min-w-0 flex flex-col bg-canvas overflow-hidden">
+      <section
+        className={`flex-1 min-w-0 flex-col bg-canvas overflow-hidden md:flex ${
+          hasExplicitSelection ? "hidden" : "flex"
+        }`}
+      >
         <div className="px-4 md:px-6 lg:px-8 pt-6 md:pt-8 pb-region bg-surface border-b border-line sticky top-0 z-10">
           {/* Counter reflects # of CLIENTS the active alerts touch
               (`totals.affectingClients`), not the raw alert count.
@@ -1218,6 +1276,7 @@ export function Alerts() {
 
       {/* ── Co-pilot pane ────────────────────────────────────────────── */}
       <CopilotPane
+        hasExplicitSelection={hasExplicitSelection}
         announcement={selected}
         excludedClientIds={
           selected ? excludedByAlert.get(selected.id) ?? new Set() : new Set()

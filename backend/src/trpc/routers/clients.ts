@@ -4,17 +4,22 @@ import { z } from "zod";
 import { firmProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
 import {
+  activityEvents,
   checklistItems,
   clientNotes,
   clients,
   clientServicePackages,
   deadlines,
+  emailDrafts,
+  firms,
   servicePackages,
   tasks,
   users,
 } from "../../db/schema.js";
 import { ALL_STATES } from "../../lib/states.js";
 import { seedClientWithPackage } from "../../lib/client-package-seeder.js";
+import { sendEmail, fromAddressForFirm } from "../../lib/email-sender.js";
+import { captureException } from "../../lib/observability.js";
 
 const ENTITY_TYPES = [
   "LLC",
@@ -616,5 +621,202 @@ export const clientsRouter = router({
         );
       if (result.count === 0) throw new TRPCError({ code: "NOT_FOUND" });
       return { ok: true as const };
+    }),
+
+  /**
+   * Batch file-request fanout — one email per selected client. Used by
+   * the Clients page bulk-action toolbar ("send file request to N
+   * clients"). Mirrors `announcements.sendBulletinEmails` but without
+   * an announcement context — the trigger is the CPA picking clients
+   * from the roster, not a regulatory bulletin.
+   *
+   * Per recipient:
+   *   • verify the client belongs to the firm
+   *   • skip if no contact email on file
+   *   • find or lazy-create a Task on the client's earliest deadline
+   *     (so the email_drafts FK to tasks resolves)
+   *   • interpolate {first_name} into subject + body
+   *   • send via Resend, persist email_drafts row, append activity event
+   *
+   * Returns `{ sentCount, skippedCount, sent, skipped }` so the FE can
+   * show a real result toast ("11 sent · 1 skipped (no email)") instead
+   * of the previous Phase-1 stub toast.
+   */
+  sendBatchFileRequest: firmProcedure
+    .input(
+      z.object({
+        clientIds: z.array(z.string().uuid()).min(1).max(500),
+        subject: z.string().min(1).max(300),
+        body: z.string().min(1).max(20_000),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const clientRows = await db
+        .select()
+        .from(clients)
+        .where(
+          and(
+            eq(clients.firmId, ctx.firmId),
+            inArray(clients.id, input.clientIds),
+          ),
+        );
+      const clientById = new Map(clientRows.map((c) => [c.id, c]));
+
+      const [firmRow] = await db
+        .select({ name: firms.name })
+        .from(firms)
+        .where(eq(firms.id, ctx.firmId));
+      const fromAddr = firmRow ? fromAddressForFirm(firmRow.name) : undefined;
+
+      const sent: Array<{ clientId: string; draftId: string }> = [];
+      const skipped: Array<{ clientId: string; reason: string }> = [];
+
+      for (const clientId of input.clientIds) {
+        const c = clientById.get(clientId);
+        if (!c) {
+          skipped.push({ clientId, reason: "client_not_in_firm" });
+          continue;
+        }
+        if (!c.contactEmail) {
+          skipped.push({ clientId, reason: "no_email" });
+          continue;
+        }
+
+        // First-name interpolation — `{first_name}` is the only
+        // placeholder Phase 1 supports. Splits on the first whitespace
+        // so "Marie Boudreaux" → "Marie", "Apex Fund LLC" → "Apex".
+        const firstName = c.name.split(/\s+/)[0] ?? c.name;
+        const personalisedSubject = input.subject.replaceAll(
+          "{first_name}",
+          firstName,
+        );
+        const personalisedBody = input.body.replaceAll(
+          "{first_name}",
+          firstName,
+        );
+
+        // Pick the earliest deadline for this client; lazy-create a
+        // task on it if none exists (same pattern as
+        // announcements.sendBulletinEmails). email_drafts FK requires
+        // a task; this is the cleanest place to materialize one.
+        const [chosenDeadline] = await db
+          .select({ id: deadlines.id, formType: deadlines.formType })
+          .from(deadlines)
+          .where(
+            and(
+              eq(deadlines.firmId, ctx.firmId),
+              eq(deadlines.clientId, clientId),
+            ),
+          )
+          .orderBy(asc(deadlines.adjustedDueDate))
+          .limit(1);
+        if (!chosenDeadline) {
+          skipped.push({ clientId, reason: "no_task" });
+          continue;
+        }
+        const existingTask = await db.query.tasks.findFirst({
+          where: eq(tasks.deadlineId, chosenDeadline.id),
+        });
+        let taskId: string;
+        if (existingTask) {
+          taskId = existingTask.id;
+        } else {
+          const slug = (s: string) =>
+            s.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 16) || "task";
+          const token = Math.random().toString(36).slice(2, 6);
+          const localPart = `${slug(c.name.split(" ")[0] ?? "task")}-${slug(chosenDeadline.formType)}-${token}`;
+          const [newTask] = await db
+            .insert(tasks)
+            .values({
+              firmId: ctx.firmId,
+              deadlineId: chosenDeadline.id,
+              forwardingEmailLocalPart: localPart,
+              status: "not_started",
+            })
+            .returning();
+          if (!newTask) {
+            skipped.push({ clientId, reason: "no_task" });
+            continue;
+          }
+          taskId = newTask.id;
+        }
+
+        const [taskRow] = await db
+          .select({ forwardingLocal: tasks.forwardingEmailLocalPart })
+          .from(tasks)
+          .where(eq(tasks.id, taskId));
+        const replyTo = taskRow?.forwardingLocal
+          ? `${taskRow.forwardingLocal}@duedatehq.space`
+          : undefined;
+
+        let providerId: string | null = null;
+        let skippedSend = false;
+        try {
+          const result = await sendEmail({
+            to: c.contactEmail,
+            cc: null,
+            subject: personalisedSubject,
+            body: personalisedBody,
+            replyTo,
+            from: fromAddr,
+          });
+          providerId = result.providerId ?? null;
+          skippedSend = !!result.skipped;
+        } catch (err) {
+          captureException(err, {
+            ctx: "clients.sendBatchFileRequest",
+            clientId,
+            firmId: ctx.firmId,
+          });
+          skipped.push({ clientId, reason: "send_failed" });
+          continue;
+        }
+
+        const sentAt = new Date();
+        const [draft] = await db
+          .insert(emailDrafts)
+          .values({
+            firmId: ctx.firmId,
+            taskId,
+            toAddress: c.contactEmail,
+            ccAddress: null,
+            subject: personalisedSubject,
+            body: personalisedBody,
+            tone: "default",
+            aiSources: { batchFileRequest: true } as object,
+            status: "sent",
+            sendMethod: "cpa_send",
+            sentAt,
+            sentByUserId: ctx.dbUser.id,
+            recallWindowExpiresAt: new Date(sentAt.getTime() + 60_000),
+          })
+          .returning();
+        if (!draft) {
+          skipped.push({ clientId, reason: "draft_persist_failed" });
+          continue;
+        }
+        await db.insert(activityEvents).values({
+          firmId: ctx.firmId,
+          taskId,
+          eventType: "email_sent",
+          actorKind: "user",
+          actorUserId: ctx.dbUser.id,
+          description: `${ctx.dbUser.displayName ?? ctx.dbUser.email} sent batch file request: ${personalisedSubject}`,
+          relatedEmailDraftId: draft.id,
+          payload: {
+            batchFileRequest: true,
+            providerSkipped: skippedSend,
+            providerId,
+          },
+        });
+        sent.push({ clientId, draftId: draft.id });
+      }
+
+      return {
+        sentCount: sent.length,
+        skippedCount: skipped.length,
+        sent,
+        skipped,
+      };
     }),
 });

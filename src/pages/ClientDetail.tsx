@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   Link,
   useNavigate,
@@ -233,7 +234,11 @@ export function ClientDetail() {
       <BackLink fallback="/clients" fallbackLabel="Clients" />
 
 
-      <div className="mt-3 flex items-start gap-3">
+      {/* Header layout: stacks vertically on mobile (action group sits BELOW
+          the wrapping H1 + meta) and goes side-by-side at sm+ where there's
+          room. Without the breakpoint, the right-rail buttons crash into a
+          wrapping client name on narrow viewports. */}
+      <div className="mt-3 flex flex-col sm:flex-row sm:items-start gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             {/* Title typography matches PageHeader (text-display, 22/600).
@@ -331,24 +336,29 @@ export function ClientDetail() {
               on clients.ai_summary_override. */}
           <ClientAiSummary client={client} />
         </div>
-        <PinClientButton clientId={client.id} />
-        <ExportClientsButton clientId={client.id} />
-        {/* Legacy ExportModal still mounted (deadline iCal/PDF surfaces) but
-            no longer the default trigger — env.useMockData callers can still
-            reach it via setExportOpen if a future surface needs it. */}
-        <button
-          onClick={() => setEditOpen(true)}
-          className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40"
-        >
-          Edit
-        </button>
-        <button
-          onClick={() => setArchiveOpen(true)}
-          disabled={client.status === "archived"}
-          className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Archive
-        </button>
+        {/* Action group — kept together as a single shrink-0 cluster so the
+            row can never collapse half its buttons. On mobile the parent flex
+            stacks this group below the title; at sm+ it sits inline. */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <PinClientButton clientId={client.id} />
+          <ExportClientsButton clientId={client.id} />
+          {/* Legacy ExportModal still mounted (deadline iCal/PDF surfaces) but
+              no longer the default trigger — env.useMockData callers can still
+              reach it via setExportOpen if a future surface needs it. */}
+          <button
+            onClick={() => setEditOpen(true)}
+            className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40"
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => setArchiveOpen(true)}
+            disabled={client.status === "archived"}
+            className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Archive
+          </button>
+        </div>
       </div>
 
       <ClientAiInsightsCard clientId={client.id} />
@@ -726,16 +736,30 @@ function NotesTab({ client }: { client: Client }) {
     });
   }, [notes]);
 
-  const onAdd = () => {
+  const onAdd = async () => {
     const body = draft.trim();
     if (!body) return;
     if (env.useMockData) {
       actions.addNote(client.id, body);
-    } else {
-      addNoteMutation.mutate({ clientId: client.id, body });
+      toast.success("Note added");
+      setDraft("");
+      return;
     }
-    setDraft("");
+    // Real mode — await the BE so a 4xx surfaces as an error toast
+    // instead of silently dropping the draft text. Yuqi audit
+    // 2026-05-05: was previously fire-and-forget + clear-the-textarea,
+    // which destroyed the user's typing on a network failure.
+    try {
+      await addNoteMutation.mutateAsync({ clientId: client.id, body });
+      toast.success("Note added");
+      setDraft("");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Couldn't save the note.";
+      toast.error(`Add note failed — ${message}`);
+    }
   };
+  const isAddingNote = addNoteMutation.isPending;
 
   return (
     <div className="space-y-4">
@@ -756,10 +780,10 @@ function NotesTab({ client }: { client: Client }) {
           </span>
           <button
             onClick={onAdd}
-            disabled={!draft.trim()}
+            disabled={!draft.trim() || isAddingNote}
             className="text-xs px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover disabled:opacity-40"
           >
-            Add note
+            {isAddingNote ? "Saving…" : "Add note"}
           </button>
         </div>
       </div>
@@ -1056,8 +1080,69 @@ function ToDoTab({
   const taskHref = (taskId?: string) =>
     taskId ? `/clients/${client.id}/tasks/${taskId}` : `/clients/${client.id}`;
 
+  // Derive the unique tasks from the items list — each task is a
+  // first-class navigable unit on this surface. Yuqi audit 2026-05-05:
+  // "you can't enter task from client" — items used to be flat with the
+  // task name buried as small subtitle, the task was never the click
+  // target. This strip surfaces tasks as the primary unit and a clear
+  // entry point to TaskDetail.
+  const tasksOnPage = useMemo(() => {
+    const seen = new Map<string, { id: string; name: string; openCount: number }>();
+    for (const ci of items) {
+      if (!ci.taskId) continue;
+      const entry = seen.get(ci.taskId) ?? {
+        id: ci.taskId,
+        name: ci.taskName ?? "Task",
+        openCount: 0,
+      };
+      const isOpen =
+        ci.state === "not_requested" ||
+        ci.state === "requested_waiting" ||
+        ci.state === "received_unreviewed" ||
+        ci.state === "received_issue";
+      if (isOpen) entry.openCount += 1;
+      seen.set(ci.taskId, entry);
+    }
+    return Array.from(seen.values()).sort((a, b) => b.openCount - a.openCount);
+  }, [items]);
+
   return (
     <div className="space-y-4">
+      {/* Tasks strip — every task on this client as a navigable chip.
+          Open count badge surfaces which task has the most pending
+          work; click → TaskDetail. The To Do view below stays as the
+          per-item gap surface. */}
+      {tasksOnPage.length > 0 && (
+        <section className="bg-surface border border-line rounded-md px-4 py-3">
+          <header className="flex items-baseline gap-2 mb-2">
+            <h3 className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
+              Tasks
+            </h3>
+            <span className="text-2xs text-ink-400">
+              {tasksOnPage.length}{" "}
+              {tasksOnPage.length === 1 ? "active" : "active"}
+            </span>
+          </header>
+          <div className="flex flex-wrap gap-1.5">
+            {tasksOnPage.map((t) => (
+              <Link
+                key={t.id}
+                to={taskHref(t.id)}
+                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded border border-line bg-canvas text-ink-700 hover:bg-sunken hover:text-ink-900 hover:border-line-strong transition-colors"
+                title={`Open ${t.name}`}
+              >
+                <span className="font-medium">{t.name}</span>
+                {t.openCount > 0 && (
+                  <span className="text-2xs tabular-nums text-warn-ink bg-warn-bg/60 border border-warn-border px-1 py-0.5 rounded">
+                    {t.openCount}
+                  </span>
+                )}
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* 🚨 STILL WAITING ON CLIENT — primary, bordered, always-expanded. */}
       <section
         aria-labelledby="todo-still-waiting-heading"
@@ -1111,7 +1196,20 @@ function ToDoTab({
                       {ci.label ?? "Item"}
                     </p>
                     <p className="text-2xs text-ink-500 truncate">
-                      {ci.taskName ?? "—"}
+                      {/* Task name is the natural entry into TaskDetail.
+                          Yuqi audit 2026-05-05 — was plain text, no
+                          affordance. Wrap as Link so the eye + the
+                          click both find the path. */}
+                      {ci.taskId ? (
+                        <Link
+                          to={taskHref(ci.taskId)}
+                          className="hover:text-ink-900 hover:underline"
+                        >
+                          {ci.taskName ?? "—"}
+                        </Link>
+                      ) : (
+                        <span>{ci.taskName ?? "—"}</span>
+                      )}
                       {days != null && ` · last reminder ${days}d ago`}
                       {ci.state === "not_requested" &&
                         " · First reminder pending"}
@@ -1168,7 +1266,16 @@ function ToDoTab({
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-ink-900 truncate">{ci.label}</p>
                   <p className="text-2xs text-ink-500 truncate">
-                    {ci.taskName ?? "—"}
+                    {ci.taskId ? (
+                      <Link
+                        to={taskHref(ci.taskId)}
+                        className="hover:text-ink-900 hover:underline"
+                      >
+                        {ci.taskName ?? "—"}
+                      </Link>
+                    ) : (
+                      <span>{ci.taskName ?? "—"}</span>
+                    )}
                   </p>
                 </div>
                 <Link

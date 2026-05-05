@@ -319,7 +319,7 @@ export function Signup() {
             <Promise
               icon={<Inbox className="w-3.5 h-3.5" aria-hidden />}
               title="Per-task forwarding emails, no OAuth required"
-              detail="Every task gets a unique address like emily-1040-X7fK@duedatehq.com. Client docs route to the right place automatically."
+              detail="Every task gets a unique address like emily-1040-X7fK@duedatehq.space. Client docs route to the right place automatically."
             />
             <Promise
               icon={<Mail className="w-3.5 h-3.5" aria-hidden />}

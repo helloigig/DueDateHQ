@@ -44,3 +44,18 @@ export const firmProcedure = t.procedure.use(async ({ ctx, next }) => {
     ctx: { ...ctx, user: ctx.user, dbUser: row, firmId: row.firmId },
   });
 });
+
+/**
+ * Requires the caller to be the firm owner (today's "admin" until the
+ * Phase 2 admin/viewer split lands). Use for catalog mutations + any
+ * action that changes shared firm state.
+ */
+export const ownerProcedure = firmProcedure.use(async ({ ctx, next }) => {
+  if (ctx.dbUser.role !== "owner") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "owner_role_required",
+    });
+  }
+  return next({ ctx });
+});

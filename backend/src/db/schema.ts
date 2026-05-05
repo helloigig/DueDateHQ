@@ -74,11 +74,69 @@ export const users = pgTable("users", {
   displayName: text("display_name"),
   role: userRole("role").notNull().default("owner"),
   timezone: text("timezone").notNull().default("America/Los_Angeles"),
+  // Single jsonb home for UI-level prefs that don't deserve their own
+  // column. See migration 0011 for the daily-digest sub-schema and the
+  // default-on backfill. Use `UserPreferences` (defined below) on read
+  // paths so callers don't have to remember the shape.
+  preferences: jsonb("preferences")
+    .notNull()
+    .default({
+      dailyDigest: {
+        enabled: true,
+        sendHour: 7,
+        days: ["mon", "tue", "wed", "thu", "fri"],
+      },
+    }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .default(sql`now()`),
   lastActiveAt: timestamp("last_active_at", { withTimezone: true }),
 });
+
+/**
+ * Shape of `users.preferences` — currently houses daily-digest opt-in
+ * + cadence. Add new sub-keys here when introducing new user-scoped
+ * UI prefs (e.g. notification volume, mail-density).
+ *
+ * Empty object = all defaults = digest disabled.
+ */
+export interface UserPreferences {
+  dailyDigest?: {
+    enabled: boolean;
+    /** Hour-of-day (0-23) in the user's local timezone. */
+    sendHour: number;
+    /** Days of the week the digest fires. Mon-Fri default. */
+    days: Array<"mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun">;
+  };
+}
+
+// Daily-digest send history — one row per (user, local-date). Drives
+// dedupe via the (user_id, local_date) UNIQUE constraint and provides
+// an audit trail for ops. See migration 0011 for the schema rationale.
+// Drizzle DDL mirrors the migration, but the migration is authoritative
+// for the constraint name (`daily_digest_runs_user_local_date_unique`).
+export const dailyDigestRuns = pgTable("daily_digest_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  firmId: uuid("firm_id")
+    .notNull()
+    .references(() => firms.id, { onDelete: "cascade" }),
+  sentAt: timestamp("sent_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
+  localDate: date("local_date").notNull(),
+  urgentCount: integer("urgent_count").notNull().default(0),
+  alertsCount: integer("alerts_count").notNull().default(0),
+  repliesCount: integer("replies_count").notNull().default(0),
+  /** 'sent' | 'skipped_quiet' | 'skipped_disabled' | 'failed' */
+  status: text("status").notNull(),
+  errorMessage: text("error_message"),
+  emailId: text("email_id"),
+});
+export type DailyDigestRun = typeof dailyDigestRuns.$inferSelect;
+export type DailyDigestRunInsert = typeof dailyDigestRuns.$inferInsert;
 
 export const clients = pgTable("clients", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -259,6 +317,13 @@ export const deadlines = pgTable("deadlines", {
   // For nexus contraction cases: deadline marked kept-as-protective
   // through this filing year, then auto-disables.
   protectedAfterFilingYear: integer("protected_after_filing_year"),
+  // Google Calendar push state. Set when the calendar-sync helper
+  // creates an event for this deadline; null while the deadline lives
+  // only in the dashboard. The pair of fields is the de-duplication
+  // key for re-runs: if calendar_event_id is set, update; otherwise
+  // create. See backend/src/lib/calendar-sync.ts.
+  calendarEventId: text("calendar_event_id"),
+  calendarSyncedAt: timestamp("calendar_synced_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .default(sql`now()`),
@@ -714,6 +779,11 @@ export const integrationKind = pgEnum("integration_kind", [
   "gmail",
   "outlook",
   "stripe",
+  // Google Calendar push channel for deadlines. Reuses Gmail OAuth
+  // client credentials (same Google Cloud project) but with a calendar-
+  // events scope, so a CPA can connect Calendar without granting
+  // Gmail.Read. See backend/src/lib/oauth.ts PROVIDERS map.
+  "google_calendar",
 ]);
 
 export const integrationStatus = pgEnum("integration_status", [
@@ -1147,6 +1217,11 @@ export const federalForms = pgTable("federal_forms", {
   dueDateRule: jsonb("due_date_rule"),
   notes: text("notes"),
   irsUrl: text("irs_url"),
+  /** Per-form checklist items (W-2, 1099-INT, K-1, …) with optional IRS
+   *  PDF source link + per-item confidence. Powers FilingsTab expandable
+   *  rows and Mode A inbound classifier's expected-itemType set. Shape:
+   *  [{ label, itemType, source?, confidence? }, …]. */
+  requiredItems: jsonb("required_items").notNull().default([]),
   extractionMethod: federalFormExtractionMethod("extraction_method")
     .notNull()
     .default("curated"),

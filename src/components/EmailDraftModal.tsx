@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import { X, Send, Calendar, Sparkles, Mail } from "lucide-react";
 import type {
   AiSource,
@@ -57,6 +58,10 @@ export function EmailDraftModal({ open, intent, onClose }: Props) {
   const [generating, setGenerating] = useState(false);
   const [scheduledFor, setScheduledFor] = useState<string>("");
   const [showSchedule, setShowSchedule] = useState(false);
+  // Local pending flag — Send button shows "Sending…" / disables itself
+  // for the duration. Falls back to false if the underlying call paths
+  // are mock-mode synchronous.
+  const [sending, setSending] = useState(false);
 
   const cpaName = session?.userName ?? "Sarah Mitchell";
   const cpaEmail = session?.userEmail ?? "sarah@mitchellcpa.com";
@@ -170,28 +175,44 @@ export function EmailDraftModal({ open, intent, onClose }: Props) {
 
   if (!open || !intent) return null;
 
-  const send = () => {
-    const id = actions.saveEmailDraft({
-      taskId: intent.task.id,
-      clientId: intent.client.id,
-      checklistItemId: intent.checklistItem?.id,
-      to: intent.client.contactEmail || `${intent.client.name} <client@example.com>`,
-      cc: cpaEmail,
-      subject,
-      body,
-      tone,
-      aiSources,
-      sendMethod: "cpa_send",
-      scheduledFor: scheduledFor || undefined,
-      status: scheduledFor ? "scheduled" : "draft",
-    });
-    if (!scheduledFor) {
-      // Wraps actions.sendEmail with the 60s "Sent · Undo" toast that
-      // backs the soft-recall affordance (emails.recall on real, store
-      // recallEmail in mock).
-      sendEmail(id);
+  const send = async () => {
+    if (sending) return;
+    setSending(true);
+    try {
+      const id = actions.saveEmailDraft({
+        taskId: intent.task.id,
+        clientId: intent.client.id,
+        checklistItemId: intent.checklistItem?.id,
+        to:
+          intent.client.contactEmail ||
+          `${intent.client.name} <client@example.com>`,
+        cc: cpaEmail,
+        subject,
+        body,
+        tone,
+        aiSources,
+        sendMethod: "cpa_send",
+        scheduledFor: scheduledFor || undefined,
+        status: scheduledFor ? "scheduled" : "draft",
+      });
+      if (!scheduledFor) {
+        // Wraps actions.sendEmail with the 60s "Sent · Undo" toast that
+        // backs the soft-recall affordance (emails.recall on real, store
+        // recallEmail in mock).
+        sendEmail(id);
+      } else {
+        // Scheduled send — toast separately so the user gets explicit
+        // confirmation instead of a silent close (Yuqi audit 2026-05-05).
+        toast.success(`Scheduled · sends ${scheduledFor}`);
+      }
+      onClose();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Couldn't send the email.";
+      toast.error(`Send failed — ${message}`);
+    } finally {
+      setSending(false);
     }
-    onClose();
   };
 
   const discard = () => {
@@ -391,11 +412,19 @@ export function EmailDraftModal({ open, intent, onClose }: Props) {
           </button>
           <button
             onClick={send}
-            disabled={generating || !subject.trim() || !body.trim()}
+            disabled={
+              generating || sending || !subject.trim() || !body.trim()
+            }
             className="text-sm px-4 py-1.5 rounded bg-accent text-canvas hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
           >
             <Send className="w-3.5 h-3.5" aria-hidden />
-            {scheduledFor ? "Schedule send" : "Send"}
+            {sending
+              ? scheduledFor
+                ? "Scheduling…"
+                : "Sending…"
+              : scheduledFor
+                ? "Schedule send"
+                : "Send"}
           </button>
         </footer>
       </aside>

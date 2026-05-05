@@ -1,8 +1,24 @@
+import { toast } from "sonner";
 import { useStore, actions } from "../data/store";
 import type { Task, TaskStatus } from "../types";
 import { buildTasksFromDeadlines } from "../data/mockTasks";
 import { trpc } from "../lib/api/client";
 import { env } from "../config";
+
+/**
+ * Shared error-toast helper. Yuqi audit 2026-05-05 — task mutations
+ * were fire-and-forget; a BE failure looked exactly like success.
+ * Every mutation hook in this file now uses this onError handler so
+ * every consumer (TaskActions, DeadlineChip, popovers, etc.) fails
+ * loud instead of silent. Single point of repair.
+ */
+function toastMutationError(verb: string) {
+  return (err: unknown) => {
+    const message =
+      err instanceof Error ? err.message : `couldn't ${verb}`;
+    toast.error(`${verb} failed — ${message.slice(0, 120)}`);
+  };
+}
 
 /** All tasks (for filters / lists). */
 export function useTasks(): Task[] {
@@ -65,6 +81,7 @@ export function useUpdateTaskStatus() {
   const invalidate = useInvalidateTask();
   const mutation = trpc.tasks.updateStatus.useMutation({
     onSuccess: invalidate,
+    onError: toastMutationError("update task status"),
   });
   return (taskId: string, status: TaskStatus) => {
     if (env.useMockData) {
@@ -79,7 +96,10 @@ export function useUpdateTaskStatus() {
  *  unchanged; `null` to un-assign; uuid to set. */
 export function useReassignTask() {
   const invalidate = useInvalidateTask();
-  const mutation = trpc.tasks.assign.useMutation({ onSuccess: invalidate });
+  const mutation = trpc.tasks.assign.useMutation({
+    onSuccess: invalidate,
+    onError: toastMutationError("reassign task"),
+  });
   return (
     taskId: string,
     patch: {
@@ -111,7 +131,9 @@ export function useDeferTask() {
       invalidate();
       void utils.deadlines.listForTriage.invalidate();
       void utils.deadlines.listForClient.invalidate();
+      toast.success("Working date deferred");
     },
+    onError: toastMutationError("defer task"),
   });
   return (taskId: string, newDate: string, reason?: string) => {
     if (env.useMockData) {
@@ -130,7 +152,9 @@ export function useFileExtensionForTask() {
       invalidate();
       void utils.deadlines.listForTriage.invalidate();
       void utils.deadlines.listForClient.invalidate();
+      toast.success("Extension filed · cascades to deadline");
     },
+    onError: toastMutationError("file extension"),
   });
   return (taskId: string) => {
     if (env.useMockData) {
@@ -144,7 +168,11 @@ export function useFileExtensionForTask() {
 export function useMarkTaskNotApplicable() {
   const invalidate = useInvalidateTask();
   const mutation = trpc.tasks.markNotApplicable.useMutation({
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      toast.success("Task marked not applicable");
+    },
+    onError: toastMutationError("mark not applicable"),
   });
   return (taskId: string, reason: string) => {
     if (env.useMockData) {

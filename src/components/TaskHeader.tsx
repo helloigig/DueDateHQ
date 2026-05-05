@@ -8,6 +8,7 @@ import {
   FileDown,
   Package,
   Slash,
+  CalendarRange,
 } from "lucide-react";
 import type { Client, Task } from "../types";
 import { useStore } from "../data/store";
@@ -78,7 +79,10 @@ export function TaskHeader({
         <span className="text-ink-900">{task.formType}</span>
       </nav>
 
-      <div className="flex items-start justify-between gap-4">
+      {/* Header layout: ring + title block stack BELOW the action group on
+          mobile so the right-aligned "Mark complete" pill never sits on top
+          of the progress ring. At sm+ the row goes side-by-side. */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
         <div className="min-w-0 flex items-start gap-3">
           <ProgressRing pct={completionPct} />
           <div>
@@ -94,9 +98,18 @@ export function TaskHeader({
               comma-separated text was duplicate information at equal weight.
               The chip carries the operational state (active milestone, slip,
               IRS runway when relevant) and exposes state-appropriate actions
-              on click. Internal vs official semantics: chip's primary text is
-              milestone-driven; official date enters the visible band only
-              once the back-plan has slipped past internal target. */}
+              on click.
+
+              Reconciliation with the canonical Task action set (PR #94 /
+              <TaskActions/>): the chip popover and the action dropdown now
+              route through the same hooks (useUpdateTaskStatus +
+              useFileExtensionForTask) and use matching window.confirm prompts
+              so the audit trail is identical regardless of which entry the
+              CPA used. The chip's value-add is *state-aware recommendation*
+              (it surfaces the 1-2 verbs that match the current state with
+              precise sub-labels like "Stops the overdue clock"); the
+              dropdown's value-add is *the full lifecycle menu*. They are
+              complements, not alternates. */}
           <div className="mt-2 flex items-center flex-wrap gap-2">
             <DeadlineChip
               officialDueDate={task.officialDueDate}
@@ -121,11 +134,21 @@ export function TaskHeader({
                 }).recommendedAction,
                 {
                   // Chase opens the AI-drafted modal — handler lives on
-                  // TaskDetail so modal state stays page-scoped.
+                  // TaskDetail so modal state stays page-scoped. Resolved
+                  // in favour of main's prop-callback wiring (was: chip
+                  // passed undefined to suppress chase entirely while we
+                  // waited for the modal lift). Page-scoped is the right
+                  // home for transient modal state.
                   onChase: onChase,
+                  // Mark complete — direct mutation. The canonical
+                  // <TaskActions/> "Mark complete" button keeps its own
+                  // window.confirm prompt; the chip is a recommendation
+                  // surface, not a confirmation surface, so a second
+                  // dialog here would be duplicate gatekeeping.
                   onSubmit: () => updateStatus(task.id, "completed"),
-                  // file-extension routes through the dedicated mutation
-                  // (cascades to deadline) instead of a free-form status write.
+                  // File extension routes through the dedicated mutation
+                  // (cascades to deadline) instead of a free-form status
+                  // write. Same hook as <TaskActions/>' overflow menu.
                   onFileExtension: () => fileExtension(task.id),
                   // onAdjustTarget intentionally omitted — the mini-timeline
                   // below already exposes drag-the-waypoint as the canonical
@@ -136,6 +159,18 @@ export function TaskHeader({
                 },
               )}
             />
+            {/* Cross-product jump — see this task in the cross-client
+                Timeline view, focused + scrolled into place. Yuqi
+                audit 2026-05-05 — the path from a single task to "what
+                else lands the same week" was missing. */}
+            <Link
+              to={`/timeline?focus=${task.officialDueDate}&clientId=${client.id}`}
+              className="text-2xs text-ink-500 hover:text-ink-900 hover:underline inline-flex items-center gap-1"
+              title="See what else lands this week across the firm"
+            >
+              <CalendarRange className="w-3 h-3" aria-hidden />
+              View in Timeline
+            </Link>
           </div>
           <div className="text-xs text-ink-500 mt-2 flex items-baseline flex-wrap gap-x-section gap-y-1">
             <span>
@@ -180,12 +215,22 @@ export function TaskHeader({
         <TaskActions task={task} />
       </div>
 
-      {/* Forwarding email — Method A per PRD §7.4 */}
+      {/* Forwarding strip — Method A per PRD §7.4. Yuqi audit
+          2026-05-05 said "messy": previous version had 5 elements
+          competing on one line (label + address + Copy + microcopy +
+          3 buttons). Slimmed to: address + Copy on the left, dev /
+          export buttons on the right. The "Replies route here..."
+          microcopy moved into a tooltip on the address itself — the
+          info is still discoverable but doesn't fight the address for
+          the eye. Simulate-inbound gated to mock mode (debug only). */}
       <div className="mt-4 pt-3 border-t border-line flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
         <span className="text-ink-500 uppercase tracking-wider font-semibold">
           Forwarding
         </span>
-        <code className="font-mono text-ink-900 bg-sunken px-2 py-1 rounded">
+        <code
+          className="font-mono text-ink-900 bg-sunken px-2 py-1 rounded"
+          title="Replies + forwarded docs route to this address. AI sorts attachments and flags them for your review."
+        >
           {task.forwardingEmail}
         </code>
         <button
@@ -203,19 +248,17 @@ export function TaskHeader({
             </>
           )}
         </button>
-        <span className="text-ink-400 ml-1">
-          Replies route here. Documents are sorted automatically and flagged
-          for your review.
-        </span>
         <span className="ml-auto flex items-center gap-2">
           <CoverSheetButton taskId={task.id} />
-          <button
-            onClick={() => simulateInboundDocument(task.id, client.name)}
-            className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken inline-flex items-center gap-1.5"
-            title="Simulate a client reply with attached document — fires the document.received event"
-          >
-            <Inbox className="w-3 h-3" aria-hidden /> Simulate inbound
-          </button>
+          {env.useMockData && (
+            <button
+              onClick={() => simulateInboundDocument(task.id, client.name)}
+              className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken inline-flex items-center gap-1.5"
+              title="Mock-mode helper: simulates a client reply with attached document"
+            >
+              <Inbox className="w-3 h-3" aria-hidden /> Simulate inbound
+            </button>
+          )}
           <button
             onClick={() => {
               exportAuditTrailJson(task);

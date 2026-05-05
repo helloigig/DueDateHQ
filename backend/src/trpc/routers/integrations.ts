@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { firmProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
@@ -13,7 +13,13 @@ import { pollMethodBOnce } from "../../lib/method-b-poller.js";
 import { syncFirm as qboSyncFirm } from "../../lib/sync/qbo.js";
 
 const KIND = ["qbo", "xero", "gmail", "outlook", "stripe"] as const;
-const OAUTH_KIND = ["qbo", "xero", "gmail", "outlook"] as const;
+const OAUTH_KIND = [
+  "qbo",
+  "xero",
+  "gmail",
+  "outlook",
+  "google_calendar",
+] as const;
 
 export const integrationsRouter = router({
   list: firmProcedure.query(async ({ ctx }) => {
@@ -163,4 +169,66 @@ export const integrationsRouter = router({
         });
       }
     }),
+
+  /**
+   * Calendar push — on-demand. Drives the Settings → Integrations
+   * "Sync now" button for Google Calendar. Walks all open deadlines
+   * regardless of `calendar_synced_at` (forces re-push); the cron
+   * version uses `onlyStale: true`.
+   */
+  syncCalendarNow: firmProcedure.mutation(async ({ ctx }) => {
+    try {
+      const { syncFirmToGoogleCalendar } = await import(
+        "../../lib/calendar-sync.js"
+      );
+      return await syncFirmToGoogleCalendar(ctx.firmId, { onlyStale: false });
+    } catch (err) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: err instanceof Error ? err.message : "calendar_sync_failed",
+      });
+    }
+  }),
+
+  /**
+   * Calendar status — drives the Settings card's "X of Y deadlines
+   * synced" counter without making the FE compute it from a list query.
+   */
+  calendarStatus: firmProcedure.query(async ({ ctx }) => {
+    const integration = await db.query.integrations.findFirst({
+      where: and(
+        eq(integrations.firmId, ctx.firmId),
+        eq(integrations.kind, "google_calendar"),
+      ),
+    });
+    if (!integration) {
+      return {
+        connected: false as const,
+        connectedAt: null,
+        lastSyncedAt: null,
+        lastError: null,
+        syncedCount: 0,
+        totalOpen: 0,
+      };
+    }
+    const [counts] = (await db.execute(sql`
+      SELECT
+        COUNT(*) FILTER (
+          WHERE calendar_event_id IS NOT NULL
+        )::int AS synced,
+        COUNT(*) FILTER (
+          WHERE status NOT IN ('completed', 'filed_extension')
+        )::int AS open_total
+      FROM deadlines
+      WHERE firm_id = ${ctx.firmId}
+    `)) as unknown as Array<{ synced: number; open_total: number }>;
+    return {
+      connected: integration.status === "connected",
+      connectedAt: integration.createdAt.toISOString(),
+      lastSyncedAt: integration.lastSyncedAt?.toISOString() ?? null,
+      lastError: integration.lastError,
+      syncedCount: counts?.synced ?? 0,
+      totalOpen: counts?.open_total ?? 0,
+    };
+  }),
 });

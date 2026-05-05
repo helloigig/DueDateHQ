@@ -12,6 +12,10 @@ const schema = z.object({
   // still flips the draft to `sent` so the UI advances. Production
   // sets this via `fly secrets set RESEND_API_KEY=…`.
   RESEND_API_KEY: z.string().optional(),
+  // Public-facing dashboard URL used in outbound email deep links.
+  // Defaults to the production hostname; staging/dev should override
+  // via `fly secrets set PUBLIC_BASE_URL=https://staging.duedatehq.space`.
+  PUBLIC_BASE_URL: z.string().url().default("https://duedatehq.space"),
 });
 
 export const env = schema.parse(process.env);

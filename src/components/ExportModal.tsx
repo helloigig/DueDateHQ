@@ -59,7 +59,7 @@ function buildIcal(deadlines: Deadline[], clients: Map<string, Client>): string 
     const day = d.officialDueDate.replace(/-/g, "");
     lines.push(
       "BEGIN:VEVENT",
-      `UID:${d.id}@duedatehq.com`,
+      `UID:${d.id}@duedatehq.space`,
       `DTSTART;VALUE=DATE:${day}`,
       `DTEND;VALUE=DATE:${day}`,
       `SUMMARY:${c.name} — ${d.form}`,

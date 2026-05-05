@@ -31,6 +31,7 @@ import { deliveryEventsRouter } from "./routers/deliveryEvents.js";
 import { uploadsRouter } from "./routers/uploads.js";
 import { federalFormsRouter } from "./routers/federalForms.js";
 import { alertActionsRouter } from "./routers/alertActions.js";
+import { dailyDigestRouter } from "./routers/dailyDigest.js";
 
 export const appRouter = router({
   auth: authRouter,
@@ -76,6 +77,10 @@ export const appRouter = router({
   // (form_change procedures are on federalFormsRouter since they mutate
   //  the catalog directly.)
   alertActions: alertActionsRouter,
+  // Daily AM digest — per-user opt-in, cron-fired by the in-process
+  // scheduler in lib/daily-digest-scheduler.ts. The router exposes
+  // settings (Settings → Notifications card) + preview-now affordance.
+  dailyDigest: dailyDigestRouter,
 });
 
 export type AppRouter = typeof appRouter;

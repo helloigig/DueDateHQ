@@ -56,7 +56,7 @@ export function AiUsageInfo() {
               ],
               [
                 "Routes inbound documents",
-                "Per-task forwarding addresses (e.g. emily-1040-X7fK@duedatehq.com) get parsed and attached to the right client + task automatically.",
+                "Per-task forwarding addresses (e.g. emily-1040-X7fK@duedatehq.space) get parsed and attached to the right client + task automatically.",
               ],
               [
                 "Surfaces what to do next",

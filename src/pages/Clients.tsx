@@ -15,9 +15,11 @@ import { ErrorState } from "../components/ErrorState";
 import { useClients } from "../hooks/useClients";
 import { useTriageDeadlines } from "../hooks/useDeadlines";
 import { useAnnouncements } from "../hooks/useAnnouncements";
-import { useStore } from "../data/store";
+import { useStore, actions } from "../data/store";
 import { useFeatureFlags } from "../hooks/useFeatureFlags";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { trpc } from "../lib/api/client";
+import { env } from "../config";
 import { UpgradePrompt } from "../components/UpgradePrompt";
 import { toast } from "sonner";
 import { countdownLabel, parseDate, TODAY, daysBetween } from "../data/dateHelpers";
@@ -176,6 +178,31 @@ export function Clients() {
       for (const id of a.affectedClientIds) s.add(id);
     }
     return s;
+  }, [announcements]);
+
+  // For the per-row alert chip — pick the most recent active alert
+  // hitting each client. Drives the "View alert →" affordance Yuqi
+  // requested 2026-05-05: yellow-tinted rows used to be a dead-end
+  // with no path to the bundle-send action.
+  const alertByClientId = useMemo(() => {
+    const m = new Map<
+      string,
+      { id: string; title: string; stateCode: string }
+    >();
+    // Walk newest-first so the first hit wins. `issuanceDate` is the
+    // canonical "when was this regulatory change published" field on
+    // the announcement model.
+    const active = announcements.filter((a) => !a.dismissed);
+    const sorted = [...active].sort((a, b) =>
+      (b.issuanceDate ?? "").localeCompare(a.issuanceDate ?? ""),
+    );
+    for (const a of sorted) {
+      for (const cid of a.affectedClientIds) {
+        if (!m.has(cid))
+          m.set(cid, { id: a.id, title: a.title, stateCode: a.stateCode });
+      }
+    }
+    return m;
   }, [announcements]);
 
   const atLimit =
@@ -545,19 +572,31 @@ export function Clients() {
 
       {/* Inline pill on alert-affected client rows surfaces the affiliation
           without painting status color across the row (T4). Per-row pill
-          replaces the prior row-tint affordance. */}
+          replaces the prior row-tint affordance. The legend doubles as a
+          handoff link to /alerts so the CPA can jump straight to triage. */}
       {alertedClientIds.size > 0 && (
-        <div className="text-2xs text-ink-500 inline-flex items-center gap-1.5">
-          <span
-            className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-warn-bg text-warn-ink text-[10px] font-medium"
-            aria-hidden
+        <div className="text-2xs text-ink-500 inline-flex items-center gap-2 flex-wrap">
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-warn-bg text-warn-ink text-[10px] font-medium"
+              aria-hidden
+            >
+              State alert
+            </span>
+            <span>
+              <span className="text-ink-700 font-medium">
+                {alertedClientIds.size}
+              </span>{" "}
+              {alertedClientIds.size === 1 ? "client" : "clients"} tagged with
+              this pill have an active state alert affecting their filings.
+            </span>
+          </span>
+          <Link
+            to="/alerts"
+            className="text-info-ink hover:underline"
           >
-            State alert
-          </span>
-          <span>
-            Rows tagged with this pill have an active state alert affecting
-            their filings — click to triage.
-          </span>
+            Open alerts ↗
+          </Link>
         </div>
       )}
 
@@ -708,6 +747,11 @@ export function Clients() {
                     />
                   </td>
                   <td className="px-4 py-2.5">
+                    {/* Per-row alert affordance — chip links directly to
+                        the alert detail (where the bundled send lives).
+                        Replaces the prior row-tint approach (T4: status
+                        colors are pills, never row paint). One click →
+                        alert with this client pre-included in the bundle. */}
                     <div className="flex items-center gap-2 min-w-0">
                       <Link
                         to={href}
@@ -715,15 +759,23 @@ export function Clients() {
                       >
                         {c.name}
                       </Link>
-                      {hasAlert && (
-                        <span
-                          className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full bg-warn-bg text-warn-ink shrink-0"
-                          title="Active state alert affecting this client"
-                          aria-label="Active state alert"
-                        >
-                          State alert
-                        </span>
-                      )}
+                      {(() => {
+                        const alert = alertByClientId.get(c.id);
+                        if (!alert) return null;
+                        return (
+                          <Link
+                            to={`/alerts/${alert.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full bg-warn-bg text-warn-ink hover:bg-warn-bg/80 shrink-0 align-middle"
+                            title={`${alert.stateCode} alert · ${alert.title} — open to email all affected clients`}
+                          >
+                            <span className="font-semibold tabular-nums">
+                              {alert.stateCode}
+                            </span>
+                            <span className="hidden md:inline">alert ↗</span>
+                          </Link>
+                        );
+                      })()}
                     </div>
                   </td>
                   <td className="px-4 py-2.5">
@@ -880,16 +932,100 @@ function BatchFileRequestModal({
     "Hi {first_name},\n\nA quick check-in — we need a few documents from you to keep your filings on track. Please reply with what you have so far; I'll follow up on anything missing.\n\nThanks!",
   );
   const dialogRef = useModalDialog(true, onClose);
+  // Filter recipients: must have an email on file. Skipped recipients
+  // are surfaced in the result toast so the CPA knows why a count
+  // doesn't match what they selected.
+  const eligibleRecipients = useMemo(
+    () => recipients.filter((r) => !!r.contactEmail),
+    [recipients],
+  );
+  const ineligibleCount = recipients.length - eligibleRecipients.length;
 
-  const onSend = () => {
-    // Phase 1: fire a toast and close. Phase 2 wires to a real BE
-    // procedure (clients.sendBatchFileRequest or similar) that
-    // saves one email_drafts row per recipient and dispatches them
-    // through the existing Resend pipeline.
-    toast.success(
-      `Queued · ${recipients.length} ${recipients.length === 1 ? "request" : "requests"} sent (Phase 2 will hit the BE)`,
-    );
-    onSent();
+  // Cast through `any` — FE-side router types are stale until the BE
+  // redeploys with the new procedure. Same shape as the
+  // `announcements.sendBulletinEmails` cast earlier in this file's
+  // history; runtime contract is safe.
+  const sendBatch = (
+    trpc.clients as unknown as {
+      sendBatchFileRequest: {
+        useMutation: () => {
+          mutateAsync: (input: {
+            clientIds: string[];
+            subject: string;
+            body: string;
+          }) => Promise<{
+            sentCount: number;
+            skippedCount: number;
+            sent: Array<{ clientId: string; draftId: string }>;
+            skipped: Array<{ clientId: string; reason: string }>;
+          }>;
+          isPending: boolean;
+        };
+      };
+    }
+  ).sendBatchFileRequest.useMutation();
+  const isSending = sendBatch.isPending;
+  // Tiny helper — substitute placeholders without leaning on
+  // String.prototype.replaceAll (not in the project's TS lib target).
+  const interpolateName = (template: string, firstName: string) =>
+    template.split("{first_name}").join(firstName);
+
+  const onSend = async () => {
+    if (eligibleRecipients.length === 0) {
+      toast.error("None of the selected clients have an email on file.");
+      return;
+    }
+    if (env.useMockData) {
+      // Mock-mode fallback — fan out via the local store so seeded demos
+      // still show the new email rows in Mailbox without a BE round-trip.
+      let count = 0;
+      for (const c of eligibleRecipients) {
+        const firstName = c.name.split(/\s+/)[0] ?? c.name;
+        const personalisedSubject = interpolateName(subject, firstName);
+        const personalisedBody = interpolateName(body, firstName);
+        const taskId = `batch-${c.id}`;
+        const draftId = actions.saveEmailDraft({
+          taskId,
+          clientId: c.id,
+          to: c.contactEmail ?? `${c.name} <client@example.com>`,
+          cc: "",
+          subject: personalisedSubject,
+          body: personalisedBody,
+          tone: "casual",
+          aiSources: [],
+          sendMethod: "cpa_send",
+          status: "draft",
+        });
+        actions.sendEmail(draftId);
+        count++;
+      }
+      toast.success(
+        `Sent ${count} ${count === 1 ? "request" : "requests"}` +
+          (ineligibleCount > 0
+            ? ` · ${ineligibleCount} skipped (no email)`
+            : ""),
+      );
+      onSent();
+      return;
+    }
+    // Real-mode — single BE proc handles fanout, lazy-creates tasks
+    // when needed, sends via Resend, persists email_drafts + activity.
+    try {
+      const result = await sendBatch.mutateAsync({
+        clientIds: eligibleRecipients.map((c) => c.id),
+        subject,
+        body,
+      });
+      const totalSkipped = ineligibleCount + result.skippedCount;
+      const skippedSummary = totalSkipped > 0 ? ` · ${totalSkipped} skipped` : "";
+      toast.success(
+        `Sent ${result.sentCount} ${result.sentCount === 1 ? "request" : "requests"}${skippedSummary}`,
+      );
+      onSent();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "send failed";
+      toast.error(`Couldn't send batch — ${message}`);
+    }
   };
 
   return (
@@ -989,19 +1125,37 @@ function BatchFileRequestModal({
 
         <footer className="flex items-center justify-between gap-2 px-region py-3 border-t border-line bg-canvas">
           <span className="text-xs text-ink-500">
-            One email per recipient · personalised by name
+            {ineligibleCount > 0 ? (
+              <>
+                <span className="text-warn-ink font-medium">
+                  {ineligibleCount}
+                </span>{" "}
+                of {recipients.length} skipped — no email on file
+              </>
+            ) : (
+              <>One email per recipient · personalised by name</>
+            )}
           </span>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={onClose}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onClose}
+              disabled={isSending}
+            >
               Cancel
             </Button>
             <Button
               size="sm"
               onClick={onSend}
-              disabled={recipients.length === 0 || !subject.trim()}
+              disabled={
+                eligibleRecipients.length === 0 || !subject.trim() || isSending
+              }
               className="bg-indigo hover:bg-indigo-hover text-white"
             >
-              Send {recipients.length}
+              {isSending
+                ? `Sending ${eligibleRecipients.length}…`
+                : `Send ${eligibleRecipients.length}`}
             </Button>
           </div>
         </footer>

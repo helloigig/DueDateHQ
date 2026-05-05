@@ -102,44 +102,45 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
       aria-labelledby="task-mini-timeline-heading"
       className="bg-surface border border-line rounded-md px-4 py-3"
     >
+      {/* Header — Yuqi audit 2026-05-05: previous header crammed five
+          things on one line (title, milestone count, due date, Mode B
+          chip, Check for blockers button). User feedback: "messy".
+          Slimmed to title + due date. Mode B is a hover tooltip on
+          the title sparkle; blocker count surfaces only when there
+          ARE blockers (silence when zero). The Propose-dates / Check-
+          for-blockers buttons moved to the right rail (compact, only
+          visible when relevant). */}
       <header className="flex items-baseline justify-between mb-3 gap-3">
         <h3
           id="task-mini-timeline-heading"
-          className="text-2xs uppercase tracking-wider text-ink-500 font-semibold"
+          className="text-2xs uppercase tracking-wider text-ink-500 font-semibold inline-flex items-center gap-1.5"
         >
+          {hasLive && (
+            <span title="Mode B proposed these dates — edit any waypoint to override">
+              <Sparkles className="w-3 h-3 text-info-ink" aria-hidden />
+            </span>
+          )}
           Path to filing
         </h3>
         <span className="text-2xs text-ink-400 flex items-center gap-2 flex-wrap justify-end">
-          5 milestones · today → due {task.officialDueDate}
-          {hasLive ? (
-            <>
-              <span
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-info-bg/60 text-info-ink"
-                title="AI proposed target dates for this filing"
-              >
-                <Sparkles className="w-3 h-3" aria-hidden />
-                AI dates
-              </span>
-              <button
-                type="button"
-                onClick={onCheckBlockers}
-                disabled={detectBlockers.isPending}
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border ${
-                  blockedCount > 0
-                    ? "border-danger-border bg-danger-bg/40 text-danger-ink"
-                    : "border-line text-ink-700 hover:bg-sunken"
-                } disabled:opacity-50`}
-                title="Detect at-risk milestones — AI proposal only; you can dismiss"
-              >
-                <AlertOctagon className="w-3 h-3" aria-hidden />
-                {detectBlockers.isPending
-                  ? "checking…"
-                  : blockedCount > 0
-                    ? `${blockedCount} blocker${blockedCount === 1 ? "" : "s"} flagged`
-                    : "Check for blockers"}
-              </button>
-            </>
-          ) : (
+          <span className="tabular-nums">
+            Due {formatShort(task.officialDueDate)}
+          </span>
+          {hasLive && blockedCount > 0 && (
+            <button
+              type="button"
+              onClick={onCheckBlockers}
+              disabled={detectBlockers.isPending}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-danger-border bg-danger-bg/40 text-danger-ink disabled:opacity-50"
+              title="AI flagged at-risk milestones — click to re-run"
+            >
+              <AlertOctagon className="w-3 h-3" aria-hidden />
+              {detectBlockers.isPending
+                ? "checking…"
+                : `${blockedCount} blocker${blockedCount === 1 ? "" : "s"}`}
+            </button>
+          )}
+          {!hasLive && (
             <button
               type="button"
               onClick={() => proposeForTask.mutate({ taskId: task.id })}

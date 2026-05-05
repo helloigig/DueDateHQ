@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { useStore, actions } from "../data/store";
 import type { ChecklistItem, DocumentState } from "../types";
 import { buildChecklistsFromTasks } from "../data/mockChecklistItems";
@@ -51,6 +52,10 @@ export function useSetChecklistItemState() {
       // Suppress unused-var lint
       void vars;
     },
+    onError: (err) => {
+      const message = err instanceof Error ? err.message : "couldn't update item";
+      toast.error(`Update failed — ${message.slice(0, 120)}`);
+    },
   });
   return (
     itemId: string,
@@ -77,6 +82,10 @@ export function useAddChecklistItem() {
       void utils.checklists.listForTask.invalidate({ taskId: vars.taskId });
       void utils.activity.listForTask.invalidate({ taskId: vars.taskId });
     },
+    onError: (err) => {
+      const message = err instanceof Error ? err.message : "couldn't add item";
+      toast.error(`Add item failed — ${message.slice(0, 120)}`);
+    },
   });
   return (taskId: string, label: string, itemType = "custom") => {
     if (env.useMockData) {
@@ -97,6 +106,11 @@ export function useDeleteChecklistItem() {
     onSuccess: () => {
       void utils.checklists.listForTask.invalidate();
       void utils.activity.listForTask.invalidate();
+    },
+    onError: (err) => {
+      const message =
+        err instanceof Error ? err.message : "couldn't delete item";
+      toast.error(`Delete failed — ${message.slice(0, 120)}`);
     },
   });
   return (itemId: string) => {

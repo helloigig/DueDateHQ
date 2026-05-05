@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
-import { ChevronRight } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronRight, X as XIcon } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { trpc } from "../lib/api/client";
 import { env } from "../config";
@@ -21,11 +21,12 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import { MultiSelectChip } from "../components/MultiSelectChip";
-import { DueDate } from "../components/ui/DueDate";
+import { DeadlineChip } from "../components/ui/DeadlineChip";
 import { clients as MOCK_CLIENTS } from "../data/mockClients";
 import { useClients } from "../hooks/useClients";
 import type { ClientTier } from "../types";
 import { cn } from "../lib/utils";
+import { TODAY, parseDate, daysBetween } from "../data/dateHelpers";
 
 // Lookup row: clientId → entityType / tier / primaryState. Used to
 // enrich TaskRow with cross-axis filter dimensions (entity, tier,
@@ -240,6 +241,18 @@ function groupLiveMilestones(
     // Strip time component if present — DESIGN.md locked policy: dates only.
     const officialDueIso =
       dueIso && dueIso.length >= 10 ? dueIso.slice(0, 10) : undefined;
+    // Compute daysBehind from the operative target date (file milestone if
+    // present, otherwise official due). Hardcoded 0 was bucketing every
+    // task under "On track" — including ones the chip rendered as OVERDUE.
+    // File milestone done → 0 (no longer in the working pipeline). Otherwise
+    // positive when today is past the target.
+    const fileDone = milestoneStatus[stages.indexOf("file")] === "done";
+    let daysBehind = 0;
+    if (!fileDone && officialDueIso) {
+      const target = parseDate(officialDueIso);
+      const slip = daysBetween(target, TODAY);
+      if (slip > 0) daysBehind = slip;
+    }
     out.push({
       taskId,
       clientId: lead.clientId,
@@ -257,7 +270,7 @@ function groupLiveMilestones(
       // buffer (annual_return: -7d) until the field ships on milestones.
       formClass: "annual_return",
       currentStage,
-      daysBehind: 0,
+      daysBehind,
       missingCount: ms.filter((m) => m.status === "blocked" || m.status === "overdue").length,
       milestoneStatus,
       jurisdiction: lead.jurisdiction ?? lookup?.primaryState,
@@ -296,7 +309,35 @@ function jurisdictionLabel(j: string): string {
 }
 
 export function Timeline() {
-  const [filter, setFilter] = useState<FilterMode>("waiting");
+  // Focus mode (Yuqi audit 2026-05-05): URLs from cross-product
+  // entry points carry context — Today's timeline-row click sends
+  // `?date=YYYY-MM-DD`, TaskDetail's "View in Timeline" sends
+  // `?focus=YYYY-MM-DD&clientId=...`. We accept all three keys so
+  // earlier links don't drop on the floor:
+  //   focus       — preferred, matches a row's officialDueIso
+  //   date        — legacy alias from Today's timeline-day strip
+  //   clientId    — restricts the visible rows to one client
+  // Without this, those links landed on /timeline and the user had
+  // to re-navigate manually (silent dead-link bug).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusDate =
+    searchParams.get("focus") ?? searchParams.get("date") ?? null;
+  const focusClientId = searchParams.get("clientId") ?? null;
+  const isFocused = !!(focusDate || focusClientId);
+  const [focusNode, setFocusNode] = useState<HTMLElement | null>(null);
+  const focusRowRef = useCallback((node: HTMLElement | null) => {
+    setFocusNode(node);
+  }, []);
+  const clearFocus = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("focus");
+    next.delete("date");
+    next.delete("clientId");
+    setSearchParams(next, { replace: true });
+  };
+  const [filter, setFilter] = useState<FilterMode>(
+    isFocused ? "all" : "waiting",
+  );
   const [attr, setAttr] = useState<AttrFilters>(EMPTY_ATTR);
   // Stage-action confirm dialog state — null when closed.
   const [stageAction, setStageAction] = useState<{
@@ -340,13 +381,36 @@ export function Timeline() {
         ? MOCK_TIMELINES
         : [];
 
+  // Effective "behind" classifier — single source of truth for the bucket
+  // split, the KPIs, and the filter chip. Combines the stored daysBehind
+  // (set when a non-File milestone slips, derived in groupLiveMilestones)
+  // with a freshness check against officialDueIso so a task whose file
+  // milestone hasn't completed yet but the legal deadline has passed never
+  // ends up under "On track" (the bug: MOCK_TIMELINES seeds had stale
+  // daysBehind=0 even when officialDueIso was clearly past TODAY).
+  const isBehind = (t: TaskRow): boolean => {
+    if (t.daysBehind > 0) return true;
+    const fileDone = t.milestoneStatus[4] === "done";
+    if (fileDone) return false;
+    if (!t.officialDueIso) return false;
+    return daysBetween(parseDate(t.officialDueIso), TODAY) > 0;
+  };
+  // Effective slip in days — used in the sort weight + the count rendering.
+  const effectiveDaysBehind = (t: TaskRow): number => {
+    if (t.daysBehind > 0) return t.daysBehind;
+    const fileDone = t.milestoneStatus[4] === "done";
+    if (fileDone || !t.officialDueIso) return 0;
+    const slip = daysBetween(parseDate(t.officialDueIso), TODAY);
+    return slip > 0 ? slip : 0;
+  };
+
   // KPIs across the full source (filter doesn't change them)
   const kpis = useMemo(() => {
     const active = source.length;
-    const behind = source.filter((t) => t.daysBehind > 0).length;
+    const behind = source.filter(isBehind).length;
     const waiting = source.filter((t) => t.missingCount > 0).length;
     const ready = source.filter(
-      (t) => t.daysBehind === 0 && t.missingCount === 0,
+      (t) => !isBehind(t) && t.missingCount === 0,
     ).length;
     return { active, behind, waiting, ready };
   }, [source]);
@@ -363,8 +427,13 @@ export function Timeline() {
 
   const filtered = useMemo(() => {
     let out = source;
+    // Focus filter takes precedence — when arriving from a deep link
+    // with ?clientId=…, restrict to that client.
+    if (focusClientId) {
+      out = out.filter((t) => t.clientId === focusClientId);
+    }
     if (filter === "waiting") out = out.filter((t) => t.missingCount > 0);
-    if (filter === "behind") out = out.filter((t) => t.daysBehind > 0);
+    if (filter === "behind") out = out.filter(isBehind);
     if (attr.jurisdiction.length) {
       out = out.filter(
         (t) => t.jurisdiction && attr.jurisdiction.includes(t.jurisdiction),
@@ -379,7 +448,29 @@ export function Timeline() {
       out = out.filter((t) => t.tier && attr.tier.includes(t.tier));
     }
     return out;
-  }, [source, filter, attr]);
+  }, [source, filter, attr, focusClientId]);
+
+  // Scroll the focused row into view once it mounts. Callback ref
+  // fires after layout, so the scrollIntoView call happens at the
+  // right time. Filter-length dependency re-fires when attr filters
+  // clip and re-add the matching row.
+  useEffect(() => {
+    if (!isFocused || !focusNode) return;
+    const id = window.setTimeout(() => {
+      focusNode.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+    return () => window.clearTimeout(id);
+  }, [isFocused, focusNode, filtered.length]);
+
+  // Resolve the focused-client display name for the banner copy.
+  const focusedClientLabel = useMemo(() => {
+    if (!focusClientId) return null;
+    const live = clientsQuery.data?.items ?? [];
+    const c = live.find((x) => x.id === focusClientId);
+    if (c) return c.name;
+    const mock = MOCK_CLIENTS.find((x) => x.id === focusClientId);
+    return mock?.name ?? focusClientId.slice(0, 8);
+  }, [focusClientId]);
 
   const hasAttrFilters =
     attr.jurisdiction.length + attr.entity.length + attr.tier.length > 0;
@@ -389,19 +480,42 @@ export function Timeline() {
     () =>
       [...filtered].sort(
         (a, b) =>
-          b.missingCount * 10 + b.daysBehind * 5 -
-          (a.missingCount * 10 + a.daysBehind * 5),
+          b.missingCount * 10 + effectiveDaysBehind(b) * 5 -
+          (a.missingCount * 10 + effectiveDaysBehind(a) * 5),
       ),
     [filtered],
   );
 
   // Split sorted into Behind + On-track sections (gap > fill)
-  const behindList = sorted.filter((t) => t.daysBehind > 0);
-  const onTrackList = sorted.filter((t) => t.daysBehind === 0);
+  const behindList = sorted.filter(isBehind);
+  const onTrackList = sorted.filter((t) => !isBehind(t));
 
   return (
     <PageContainer variant="wide">
       <PageHeader title="Timeline" meta={`${kpis.active} active`} />
+
+      {/* Focus banner — appears when arriving from a cross-product
+          deep link (?focus=, ?date=, ?clientId=). Tells the user
+          what they're centered on; "Clear focus" returns to the
+          normal multi-client view. Without this, focused state was
+          silent and the user wondered why some rows disappeared. */}
+      {isFocused && (
+        <div className="mb-region px-3 py-2 rounded-md bg-info-bg border border-info-border flex items-center gap-3 text-xs text-info-ink">
+          <span className="font-medium">Focused</span>
+          <span className="text-info-ink/80">
+            {focusDate && <>on {focusDate}</>}
+            {focusDate && focusedClientLabel && " · "}
+            {focusedClientLabel && <>{focusedClientLabel}</>}
+          </span>
+          <button
+            type="button"
+            onClick={clearFocus}
+            className="ml-auto text-2xs px-2 py-0.5 rounded border border-info-border bg-surface text-info-ink hover:bg-info-bg/60 inline-flex items-center gap-1"
+          >
+            <XIcon className="w-3 h-3" aria-hidden /> Clear focus
+          </button>
+        </div>
+      )}
 
       {/* Ambient summary — one line above the filter chips. Replaces
           the previous 3-tile MetricTile grid; the same counts are
@@ -524,6 +638,8 @@ export function Timeline() {
                 collapsed={collapsed}
                 onToggleGroup={toggleGroup}
                 onStageClick={(row, ns) => setStageAction({ row, nextStage: ns })}
+                focusDate={focusDate}
+                focusRowRef={focusRowRef}
               />
             </section>
           )}
@@ -538,6 +654,8 @@ export function Timeline() {
                 collapsed={collapsed}
                 onToggleGroup={toggleGroup}
                 onStageClick={(row, ns) => setStageAction({ row, nextStage: ns })}
+                focusDate={focusDate}
+                focusRowRef={focusRowRef}
               />
             </section>
           )}
@@ -552,6 +670,8 @@ export function Timeline() {
                 collapsed={collapsed}
                 onToggleGroup={toggleGroup}
                 onStageClick={(row, ns) => setStageAction({ row, nextStage: ns })}
+                focusDate={focusDate}
+                focusRowRef={focusRowRef}
               />
             </section>
           )}
@@ -665,11 +785,15 @@ function TaskTable({
   collapsed,
   onToggleGroup,
   onStageClick,
+  focusDate,
+  focusRowRef,
 }: {
   rows: TaskRow[];
   collapsed: Set<string>;
   onToggleGroup: (key: string) => void;
   onStageClick: (row: TaskRow, nextStage: Stage | null) => void;
+  focusDate?: string | null;
+  focusRowRef?: (node: HTMLElement | null) => void;
 }) {
   const groups = groupRowsByClient(rows);
   return (
@@ -681,6 +805,8 @@ function TaskTable({
           collapsed={collapsed.has(g.key)}
           onToggle={() => onToggleGroup(g.key)}
           onStageClick={onStageClick}
+          focusDate={focusDate}
+          focusRowRef={focusRowRef}
         />
       ))}
     </div>
@@ -692,11 +818,15 @@ function ClientGroup({
   collapsed,
   onToggle,
   onStageClick,
+  focusDate,
+  focusRowRef,
 }: {
   group: { key: string; client: string; clientId?: string; tasks: TaskRow[] };
   collapsed: boolean;
   onToggle: () => void;
   onStageClick: (row: TaskRow, nextStage: Stage | null) => void;
+  focusDate?: string | null;
+  focusRowRef?: (node: HTMLElement | null) => void;
 }) {
   const navigate = useNavigate();
   const taskCount = group.tasks.length;
@@ -713,7 +843,14 @@ function ClientGroup({
   // Single-task clients render flush (no header row) — header would
   // just duplicate the row's identity column.
   if (taskCount === 1) {
-    return <TaskTimelineRow t={group.tasks[0]} onStageClick={onStageClick} />;
+    return (
+      <TaskTimelineRow
+        t={group.tasks[0]}
+        onStageClick={onStageClick}
+        focusDate={focusDate}
+        focusRowRef={focusRowRef}
+      />
+    );
   }
   return (
     <div>
@@ -784,6 +921,8 @@ function ClientGroup({
               t={t}
               nested
               onStageClick={onStageClick}
+              focusDate={focusDate}
+              focusRowRef={focusRowRef}
             />
           ))}
         </ul>
@@ -814,10 +953,14 @@ function TaskTimelineRow({
   t,
   nested,
   onStageClick,
+  focusDate,
+  focusRowRef,
 }: {
   t: TaskRow;
   nested?: boolean;
   onStageClick: (row: TaskRow, nextStage: Stage | null) => void;
+  focusDate?: string | null;
+  focusRowRef?: (node: HTMLElement | null) => void;
 }) {
   const navigate = useNavigate();
   const stages: Stage[] = [
@@ -832,10 +975,15 @@ function TaskTimelineRow({
   // current is the last (file), advance triggers "mark filed" (null).
   const currentIdx = stages.indexOf(t.currentStage);
   const nextStage: Stage | null = stages[currentIdx + 1] ?? null;
+  // Focus highlight — true when the URL's ?focus=YYYY-MM-DD (or ?date=)
+  // matches this row's official deadline. Carries the scroll target ref
+  // so the page-level useEffect can scrollIntoView on mount.
+  const isFocusedRow = !!(focusDate && t.officialDueIso === focusDate);
 
   return (
     <li className="list-none">
       <div
+        ref={isFocusedRow ? focusRowRef : undefined}
         role={navigable ? "button" : undefined}
         tabIndex={navigable ? 0 : undefined}
         onClick={() => {
@@ -853,6 +1001,8 @@ function TaskTimelineRow({
           nested && "pl-card", // indent under client group header
           navigable ? "hover:bg-sunken cursor-pointer" : "cursor-default",
           "focus-visible:outline-none focus-visible:bg-sunken",
+          isFocusedRow &&
+            "ring-2 ring-info-border bg-info-bg/40 hover:bg-info-bg/60",
         )}
         title={
           navigable
@@ -893,13 +1043,26 @@ function TaskTimelineRow({
               <span className="truncate">{t.task}</span>
               <span className="text-ink-400 mx-1">·</span>
               {t.officialDueIso ? (
-                <DueDate
-                  official={t.officialDueIso}
-                  internal={t.internalDueIso}
-                  formClass={t.formClass}
-                  filed={t.currentStage === "file" && t.daysBehind === 0 && t.missingCount === 0}
-                  inline
-                  className="text-xs"
+                <DeadlineChip
+                  variant="compact"
+                  officialDueDate={t.officialDueIso}
+                  internalTargetDate={t.internalDueIso}
+                  currentMilestoneTargetDate={t.internalDueIso}
+                  currentMilestoneLabel={STAGE_LABELS[t.currentStage]}
+                  status={
+                    t.currentStage === "file" &&
+                    t.daysBehind === 0 &&
+                    t.missingCount === 0
+                      ? "completed"
+                      : undefined
+                  }
+                  originalBufferDays={
+                    t.formClass === "quarterly"
+                      ? 3
+                      : t.formClass === "monthly"
+                        ? 2
+                        : 7
+                  }
                 />
               ) : (
                 <span className="text-ink-400">due {t.dueDate}</span>
