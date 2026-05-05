@@ -476,6 +476,14 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
           <span className="text-ink-500 text-2xs" aria-hidden>
             ·
           </span>
+          <button
+            type="button"
+            onClick={() => setBatchDrawerOpen(true)}
+            className="text-xs px-2.5 py-1 rounded bg-indigo hover:bg-indigo-hover transition-colors inline-flex items-center gap-1"
+          >
+            <Mail className="w-3 h-3" aria-hidden />
+            Send summary email
+          </button>
           {/* Visible-but-inactive in real mode (production / live BE) —
               hover tooltip explains "coming soon" instead of firing a
               click-to-toast pattern. The full sending flow (mock mode +
@@ -553,6 +561,41 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
           // emails.send mutation per recipient pattern as the /clients
           // batch-send. For now, mock-mode only since the "summary email"
           // BE proc isn't carved out yet — flagged TODO.
+          if (env.useMockData) {
+            for (const r of payload.recipients) {
+              const draftId = actions.saveEmailDraft({
+                taskId: `filings-summary-${r.clientId}`,
+                clientId: r.clientId,
+                // Single-recipient drawer here — recipient is always
+                // `client`, so contactEmail comes off the prop. Falls
+                // back to a placeholder if the client has no email on
+                // file (the drawer also shows a warning strip in that
+                // case so the user knows it's a stub send).
+                to: client.contactEmail ?? `${r.clientName} <client@example.com>`,
+                cc: "",
+                subject: r.subject,
+                body: r.body,
+                tone: "casual",
+                aiSources: [],
+                sendMethod: "cpa_send",
+                status: "draft",
+              });
+              actions.sendEmail(draftId);
+            }
+            toast.success(
+              `Sent summary covering ${selectedDeadlines.length} ${
+                selectedDeadlines.length === 1 ? "filing" : "filings"
+              }`,
+            );
+          } else {
+            // TODO(real-mode): wire through to a generic emails.send
+            // proc that takes per-recipient subject + body. The
+            // /clients batch-send path uses sendBatchFileRequest;
+            // we'd want a sibling proc here for proper audit trail.
+            toast.info(
+              "Sending in real mode requires a backend deploy — coming next pass",
+            );
+          }
           // Real mode never reaches this handler — the toolbar Send
           // button is rendered as a disabled "coming soon" affordance
           // when env.useMockData is false. Mock-mode flow only:

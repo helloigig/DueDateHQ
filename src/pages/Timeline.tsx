@@ -1,4 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ChevronRight,
+  X as XIcon,
+  ArrowRight,
+  UserPlus,
+  Check,
+  Slash,
+} from "lucide-react";
 import { ChevronRight, X as XIcon, ArrowRight } from "lucide-react";
 import { useSelection } from "../hooks/useSelection";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -13,6 +21,14 @@ import { StateBadge } from "../components/ui/StateBadge";
 import { FilterChip } from "../components/ui/FilterChip";
 import { Button } from "../components/ui/button";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
+import {
   Dialog,
   DialogBody,
   DialogContent,
@@ -25,6 +41,8 @@ import { MultiSelectChip } from "../components/MultiSelectChip";
 import { DeadlineChip } from "../components/ui/DeadlineChip";
 import { clients as MOCK_CLIENTS } from "../data/mockClients";
 import { useClients } from "../hooks/useClients";
+import { useReassignTask } from "../hooks/useTasks";
+import { useRemoteSession } from "../hooks/useSession";
 import type { ClientTier } from "../types";
 import { cn } from "../lib/utils";
 import { TODAY, parseDate, daysBetween } from "../data/dateHelpers";
@@ -102,6 +120,11 @@ type TaskRow = {
   jurisdiction?: string;
   entityType?: string;
   tier?: ClientTier;
+  /** Preparer assignment — surfaced from `tasks.assigned_user_id`. Joined
+   *  through fleetStack so the Timeline can render an avatar per row +
+   *  highlight "what's mine". null = unassigned. */
+  assignedUserId?: string | null;
+  assigneeName?: string | null;
 };
 
 const STAGE_LABELS: Record<Stage, string> = {
@@ -114,6 +137,7 @@ const STAGE_LABELS: Record<Stage, string> = {
 
 const MOCK_TIMELINES: TaskRow[] = [
   {
+    taskId: "mock-task-apex",
     client: "Apex Fund",
     task: "1065 Partner Forms",
     dueDate: "Mar 15",
@@ -127,8 +151,11 @@ const MOCK_TIMELINES: TaskRow[] = [
     jurisdiction: "federal",
     entityType: "Partnership",
     tier: "premium",
+    assignedUserId: "user-mock",
+    assigneeName: "Sarah Mitchell",
   },
   {
+    taskId: "mock-task-hartfield",
     client: "Emily Hartfield",
     task: "1040 NY",
     dueDate: "Apr 15",
@@ -142,8 +169,11 @@ const MOCK_TIMELINES: TaskRow[] = [
     jurisdiction: "NY",
     entityType: "Individual",
     tier: "standard",
+    assignedUserId: null,
+    assigneeName: null,
   },
   {
+    taskId: "mock-task-chen",
     client: "Marcus Chen",
     task: "S-Corp CA",
     dueDate: "Mar 31",
@@ -157,8 +187,11 @@ const MOCK_TIMELINES: TaskRow[] = [
     jurisdiction: "CA",
     entityType: "S-Corp",
     tier: "premium",
+    assignedUserId: "user-mock",
+    assigneeName: "Sarah Mitchell",
   },
   {
+    taskId: "mock-task-mitchell",
     client: "Sarah Mitchell",
     task: "1040 TX",
     dueDate: "Apr 15",
@@ -172,8 +205,11 @@ const MOCK_TIMELINES: TaskRow[] = [
     jurisdiction: "TX",
     entityType: "Individual",
     tier: "standard",
+    assignedUserId: null,
+    assigneeName: null,
   },
   {
+    taskId: "mock-task-lee",
     client: "Jordan Lee",
     task: "1040 Federal",
     dueDate: "Apr 15",
@@ -187,6 +223,8 @@ const MOCK_TIMELINES: TaskRow[] = [
     jurisdiction: "federal",
     entityType: "Individual",
     tier: "standard",
+    assignedUserId: "user-mock",
+    assigneeName: "Sarah Mitchell",
   },
 ];
 
@@ -200,6 +238,9 @@ type LiveMilestone = {
   formType: string | null;
   jurisdiction: string | null;
   officialDueDate: string | null;
+  /** Joined from `tasks.assigned_user_id` + `users` in fleetStack. */
+  assignedUserId?: string | null;
+  assigneeName?: string | null;
 };
 
 function groupLiveMilestones(
@@ -277,6 +318,8 @@ function groupLiveMilestones(
       jurisdiction: lead.jurisdiction ?? lookup?.primaryState,
       entityType: lookup?.entityType,
       tier: lookup?.tier,
+      assignedUserId: lead.assignedUserId ?? null,
+      assigneeName: lead.assigneeName ?? null,
     });
   }
   return out;
@@ -307,6 +350,182 @@ const TIER_OPTIONS = [
 
 function jurisdictionLabel(j: string): string {
   return j === "federal" ? "FED" : j;
+}
+
+// Stable initials from a display name. Falls back to "?" when nothing
+// reasonable can be derived. Hoisted so the per-row avatar + the picker
+// render the same letters for the same user.
+function initialsFor(input: string | null | undefined): string {
+  if (!input) return "?";
+  const parts = input.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return (parts[0][0] ?? "?").toUpperCase();
+  return ((parts[0][0] ?? "") + (parts[1][0] ?? "")).toUpperCase();
+}
+
+// Deterministic palette pick from a userId — the avatar circle for the
+// same user is consistently coloured across rows. Picks from a small
+// fixed set so colours stay on-brand (no random HSL per render).
+const ASSIGNEE_PALETTE = [
+  "bg-indigo text-canvas",
+  "bg-info-solid text-canvas",
+  "bg-ok-solid text-canvas",
+  "bg-warn-solid text-canvas",
+  "bg-ink-700 text-canvas",
+  "bg-ink-900 text-canvas",
+] as const;
+
+function paletteFor(id: string | null | undefined): string {
+  if (!id) return "bg-sunken text-ink-500 border border-line";
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  }
+  return ASSIGNEE_PALETTE[hash % ASSIGNEE_PALETTE.length] ?? ASSIGNEE_PALETTE[0];
+}
+
+interface FirmMember {
+  id: string;
+  email: string;
+  displayName: string | null;
+  role: "owner" | "member";
+}
+
+/**
+ * AssigneePicker — DropdownMenu that lists firm members + an "Unassign"
+ * footer. Used by both the per-row hover affordance + the bulk-action
+ * toolbar. The trigger is rendered by the caller (asChild) so the same
+ * picker behaves identically whether opened from a tiny icon button on
+ * a row or a full-width pill in the floating toolbar.
+ *
+ * Yuqi audit 2026-05-05: "Timeline currently it is not assignable." —
+ * single + bulk go through the same picker so picking yourself for one
+ * row vs. five rows feels like the same gesture.
+ */
+function AssigneePicker({
+  trigger,
+  members,
+  loading,
+  currentUserId,
+  showUnassign = true,
+  onPick,
+  align = "end",
+  emptyLabel = "Loading firm members…",
+  pickedLabel = "Pick a preparer",
+}: {
+  trigger: React.ReactNode;
+  members: FirmMember[];
+  loading?: boolean;
+  /** When set, the matching member shows a check mark (current
+   *  assignee). Pass null for the bulk picker (no single "current"
+   *  selection across N rows). */
+  currentUserId?: string | null;
+  showUnassign?: boolean;
+  onPick: (userId: string | null) => void;
+  align?: "start" | "end";
+  emptyLabel?: string;
+  pickedLabel?: string;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent
+        align={align}
+        className="min-w-[15rem]"
+        // Stop click bubbling so the row's navigate-on-click handler
+        // doesn't fire when the user picks a member from a row picker.
+        onClick={(e) => e.stopPropagation()}
+      >
+        <DropdownMenuLabel className="uppercase tracking-wider">
+          {pickedLabel}
+        </DropdownMenuLabel>
+        {loading ? (
+          <div className="px-3 py-2 text-2xs text-ink-500">{emptyLabel}</div>
+        ) : members.length === 0 ? (
+          <div className="px-3 py-2 text-2xs text-ink-500">
+            No team members in this firm yet.
+          </div>
+        ) : (
+          members.map((m) => {
+            const name = m.displayName || m.email;
+            const isMe = currentUserId === m.id;
+            return (
+              <DropdownMenuItem
+                key={m.id}
+                onSelect={() => onPick(m.id)}
+                className="flex items-center gap-2"
+              >
+                <span
+                  className={cn(
+                    "inline-flex items-center justify-center w-5 h-5 rounded-pill text-[9px] font-bold leading-none shrink-0",
+                    paletteFor(m.id),
+                  )}
+                  aria-hidden
+                >
+                  {initialsFor(name)}
+                </span>
+                <span className="flex-1 truncate">{name}</span>
+                {isMe ? (
+                  <Check className="w-3.5 h-3.5 text-indigo shrink-0" aria-hidden />
+                ) : null}
+              </DropdownMenuItem>
+            );
+          })
+        )}
+        {showUnassign && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() => onPick(null)}
+              className="text-ink-500"
+            >
+              <Slash className="w-3.5 h-3.5" aria-hidden />
+              <span>Unassign</span>
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+// Small avatar used in the row's assignee column. Empty state is a
+// muted dash so the column reads "no preparer yet" without looking
+// broken (CPA scans the column for ownership at a glance).
+function AssigneeAvatar({
+  userId,
+  name,
+  isCurrentUser,
+}: {
+  userId: string | null | undefined;
+  name: string | null | undefined;
+  isCurrentUser: boolean;
+}) {
+  if (!userId) {
+    return (
+      <span
+        className="text-2xs text-ink-400"
+        title="Unassigned"
+        aria-label="Unassigned"
+      >
+        —
+      </span>
+    );
+  }
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center justify-center w-6 h-6 rounded-pill text-[10px] font-bold leading-none shrink-0",
+        paletteFor(userId),
+        // "What's mine" — subtle indigo ring so Sarah can scan
+        // ownership across the fleet without reading every name.
+        isCurrentUser && "ring-2 ring-indigo ring-offset-1 ring-offset-surface",
+      )}
+      title={name ? `${name}${isCurrentUser ? " (you)" : ""}` : userId}
+    >
+      {initialsFor(name ?? userId)}
+    </span>
+  );
 }
 
 export function Timeline() {
@@ -362,6 +581,78 @@ export function Timeline() {
       return next;
     });
   const fleetQuery = trpc.taskMilestones.fleetStack.useQuery({});
+  const trpcUtils = trpc.useUtils();
+  // Team list for the assignee picker — both per-row + bulk reuse this.
+  // Eagerly fetched: the team is small (typically < 10 members) and
+  // cached for 5min, so paying a single round-trip on Timeline mount is
+  // worth not racing setState→re-render against the picker click.
+  const teamQuery = trpc.team.list.useQuery(undefined, {
+    staleTime: 5 * 60_000,
+  });
+  const teamMembers: FirmMember[] = useMemo(
+    () =>
+      (teamQuery.data?.members ?? []).map((m) => ({
+        id: m.id,
+        email: m.email,
+        displayName: m.displayName,
+        role: m.role,
+      })),
+    [teamQuery.data],
+  );
+  // Current user — drives the "what's mine" indigo ring on rows.
+  const session = useRemoteSession();
+  const currentUserId = session.data?.user?.id ?? null;
+
+  const reassignTask = useReassignTask();
+  const assignBulkMutation = trpc.tasks.assignBulk.useMutation({
+    onSuccess: () => {
+      void trpcUtils.taskMilestones.fleetStack.invalidate();
+      void trpcUtils.tasks.list.invalidate();
+    },
+    onError: (err) => {
+      toast.error(
+        `Bulk assign failed — ${(err.message ?? "unknown").slice(0, 120)}`,
+      );
+      // Rollback — drop the optimistic overlay so re-render reads
+      // truth from the (now-invalidated) server query.
+      setAssigneeOverrides(new Map());
+      void trpcUtils.taskMilestones.fleetStack.invalidate();
+    },
+  });
+
+  // Local assignment overlay — keyed by taskId. Holds the optimistic
+  // patch the moment a picker fires, so the row re-renders before the
+  // mutation settles. Used in mock mode (where MOCK_TIMELINES is a
+  // static const fallback and setData on an empty fleetStack cache
+  // wouldn't surface) AND in real mode (belt + braces against any
+  // race between the toast and the cache refetch).
+  const [assigneeOverrides, setAssigneeOverrides] = useState<
+    Map<string, { assignedUserId: string | null; assigneeName: string | null }>
+  >(new Map());
+  const applyOverride = useCallback(
+    (taskIds: string[], userId: string | null, name: string | null) => {
+      setAssigneeOverrides((prev) => {
+        const next = new Map(prev);
+        for (const id of taskIds) {
+          next.set(id, { assignedUserId: userId, assigneeName: name });
+        }
+        return next;
+      });
+      // Also patch the tRPC cache so consumers reading fleetStack
+      // directly stay in sync.
+      const targets = new Set(taskIds);
+      const cached = trpcUtils.taskMilestones.fleetStack.getData({});
+      if (cached) {
+        const nextCached = (cached as unknown as LiveMilestone[]).map((m) =>
+          targets.has(m.taskId)
+            ? { ...m, assignedUserId: userId, assigneeName: name }
+            : m,
+        );
+        trpcUtils.taskMilestones.fleetStack.setData({}, nextCached as never);
+      }
+    },
+    [trpcUtils],
+  );
   const clientsQuery = useClients();
   const clientLookup = useMemo(() => {
     const live = clientsQuery.data?.items;
@@ -381,12 +672,28 @@ export function Timeline() {
 
   // In real mode, never substitute MOCK_TIMELINES — empty BE shows empty
   // state, not fake "Apex Fund" rows the user can't act on.
-  const source =
+  const sourceRaw =
     liveTimelines.length > 0
       ? liveTimelines
       : env.useMockData
         ? MOCK_TIMELINES
         : [];
+  // Layer the optimistic assignment overlay on top — applies to both
+  // mock fallback rows AND live ones for the brief window before the
+  // BE refetch lands.
+  const source = useMemo(() => {
+    if (assigneeOverrides.size === 0) return sourceRaw;
+    return sourceRaw.map((t) => {
+      if (!t.taskId) return t;
+      const override = assigneeOverrides.get(t.taskId);
+      if (!override) return t;
+      return {
+        ...t,
+        assignedUserId: override.assignedUserId,
+        assigneeName: override.assigneeName,
+      };
+    });
+  }, [sourceRaw, assigneeOverrides]);
 
   // Effective "behind" classifier — single source of truth for the bucket
   // split, the KPIs, and the filter chip. Combines the stored daysBehind
@@ -665,6 +972,26 @@ export function Timeline() {
                 focusRowRef={focusRowRef}
                 isSelected={(taskId) => timelineSelection.has(taskId)}
                 onToggleSelect={(taskId) => timelineSelection.toggle(taskId)}
+                teamMembers={teamMembers}
+                teamLoading={teamQuery.isLoading}
+                currentUserId={currentUserId}
+
+                onAssignRow={(row, userId) => {
+                  if (!row.taskId) return;
+                  const member = userId
+                    ? teamMembers.find((m) => m.id === userId) ?? null
+                    : null;
+                  const name = member
+                    ? member.displayName ?? member.email
+                    : null;
+                  applyOverride([row.taskId], userId, name);
+                  reassignTask(row.taskId, { preparerUserId: userId });
+                  toast.success(
+                    userId
+                      ? `Assigned ${row.client} · ${row.task}${name ? ` → ${name}` : ""}`
+                      : `Unassigned ${row.client} · ${row.task}`,
+                  );
+                }}
               />
             </section>
           )}
@@ -683,6 +1010,26 @@ export function Timeline() {
                 focusRowRef={focusRowRef}
                 isSelected={(taskId) => timelineSelection.has(taskId)}
                 onToggleSelect={(taskId) => timelineSelection.toggle(taskId)}
+                teamMembers={teamMembers}
+                teamLoading={teamQuery.isLoading}
+                currentUserId={currentUserId}
+
+                onAssignRow={(row, userId) => {
+                  if (!row.taskId) return;
+                  const member = userId
+                    ? teamMembers.find((m) => m.id === userId) ?? null
+                    : null;
+                  const name = member
+                    ? member.displayName ?? member.email
+                    : null;
+                  applyOverride([row.taskId], userId, name);
+                  reassignTask(row.taskId, { preparerUserId: userId });
+                  toast.success(
+                    userId
+                      ? `Assigned ${row.client} · ${row.task}${name ? ` → ${name}` : ""}`
+                      : `Unassigned ${row.client} · ${row.task}`,
+                  );
+                }}
               />
             </section>
           )}
@@ -701,6 +1048,26 @@ export function Timeline() {
                 focusRowRef={focusRowRef}
                 isSelected={(taskId) => timelineSelection.has(taskId)}
                 onToggleSelect={(taskId) => timelineSelection.toggle(taskId)}
+                teamMembers={teamMembers}
+                teamLoading={teamQuery.isLoading}
+                currentUserId={currentUserId}
+
+                onAssignRow={(row, userId) => {
+                  if (!row.taskId) return;
+                  const member = userId
+                    ? teamMembers.find((m) => m.id === userId) ?? null
+                    : null;
+                  const name = member
+                    ? member.displayName ?? member.email
+                    : null;
+                  applyOverride([row.taskId], userId, name);
+                  reassignTask(row.taskId, { preparerUserId: userId });
+                  toast.success(
+                    userId
+                      ? `Assigned ${row.client} · ${row.task}${name ? ` → ${name}` : ""}`
+                      : `Unassigned ${row.client} · ${row.task}`,
+                  );
+                }}
               />
             </section>
           )}
@@ -731,6 +1098,49 @@ export function Timeline() {
             <ArrowRight className="w-3 h-3" aria-hidden />
             Advance stage
           </button>
+          <AssigneePicker
+            trigger={
+              <button
+                type="button"
+                className="text-xs px-2.5 py-1 rounded bg-canvas/10 hover:bg-canvas/20 text-canvas transition-colors inline-flex items-center gap-1"
+              >
+                <UserPlus className="w-3 h-3" aria-hidden />
+                Assign to…
+              </button>
+            }
+            members={teamMembers}
+            loading={teamQuery.isLoading}
+            currentUserId={null}
+            pickedLabel={`Assign ${timelineSelection.count} ${
+              timelineSelection.count === 1 ? "task" : "tasks"
+            } to…`}
+            onPick={(userId) => {
+              const taskIds = selectedTimelineRows
+                .map((r) => r.taskId)
+                .filter((id): id is string => !!id);
+              if (taskIds.length === 0) return;
+              const member = userId
+                ? teamMembers.find((m) => m.id === userId) ?? null
+                : null;
+              const name = member ? member.displayName ?? member.email : null;
+              // Optimistic — flip the cache before the round-trip.
+              applyOverride(taskIds, userId, name);
+              assignBulkMutation.mutate(
+                { taskIds, preparerUserId: userId },
+                {
+                  onSuccess: (res) => {
+                    const verb = userId
+                      ? `Assigned ${res.count} ${res.count === 1 ? "task" : "tasks"}${
+                          name ? ` to ${name}` : ""
+                        }`
+                      : `Unassigned ${res.count} ${res.count === 1 ? "task" : "tasks"}`;
+                    toast.success(verb);
+                    timelineSelection.clear();
+                  },
+                },
+              );
+            }}
+          />
           <button
             type="button"
             disabled
@@ -985,6 +1395,11 @@ function TaskTable({
   focusRowRef,
   isSelected,
   onToggleSelect,
+  teamMembers,
+  teamLoading,
+  currentUserId,
+  onPrimeTeamQuery,
+  onAssignRow,
 }: {
   rows: TaskRow[];
   collapsed: Set<string>;
@@ -997,6 +1412,14 @@ function TaskTable({
    *  callers if any). */
   isSelected?: (taskId: string) => boolean;
   onToggleSelect?: (taskId: string) => void;
+  /** Assignment context — team list + handlers for the per-row picker. */
+  teamMembers?: FirmMember[];
+  teamLoading?: boolean;
+  currentUserId?: string | null;
+  /** Hover/focus on a row picker primes the team query so the dropdown
+   *  isn't paying the round-trip on first click. */
+  onPrimeTeamQuery?: () => void;
+  onAssignRow?: (row: TaskRow, userId: string | null) => void;
 }) {
   const groups = groupRowsByClient(rows);
   return (
@@ -1012,6 +1435,11 @@ function TaskTable({
           focusRowRef={focusRowRef}
           isSelected={isSelected}
           onToggleSelect={onToggleSelect}
+          teamMembers={teamMembers}
+          teamLoading={teamLoading}
+          currentUserId={currentUserId}
+          onPrimeTeamQuery={onPrimeTeamQuery}
+          onAssignRow={onAssignRow}
         />
       ))}
     </div>
@@ -1027,6 +1455,11 @@ function ClientGroup({
   focusRowRef,
   isSelected,
   onToggleSelect,
+  teamMembers,
+  teamLoading,
+  currentUserId,
+  onPrimeTeamQuery,
+  onAssignRow,
 }: {
   group: { key: string; client: string; clientId?: string; tasks: TaskRow[] };
   collapsed: boolean;
@@ -1036,6 +1469,11 @@ function ClientGroup({
   focusRowRef?: (node: HTMLElement | null) => void;
   isSelected?: (taskId: string) => boolean;
   onToggleSelect?: (taskId: string) => void;
+  teamMembers?: FirmMember[];
+  teamLoading?: boolean;
+  currentUserId?: string | null;
+  onPrimeTeamQuery?: () => void;
+  onAssignRow?: (row: TaskRow, userId: string | null) => void;
 }) {
   const navigate = useNavigate();
   const taskCount = group.tasks.length;
@@ -1060,6 +1498,11 @@ function ClientGroup({
         focusRowRef={focusRowRef}
         isSelected={isSelected}
         onToggleSelect={onToggleSelect}
+        teamMembers={teamMembers}
+        teamLoading={teamLoading}
+        currentUserId={currentUserId}
+        onPrimeTeamQuery={onPrimeTeamQuery}
+        onAssignRow={onAssignRow}
       />
     );
   }
@@ -1136,6 +1579,11 @@ function ClientGroup({
               focusRowRef={focusRowRef}
               isSelected={isSelected}
               onToggleSelect={onToggleSelect}
+              teamMembers={teamMembers}
+              teamLoading={teamLoading}
+              currentUserId={currentUserId}
+              onPrimeTeamQuery={onPrimeTeamQuery}
+              onAssignRow={onAssignRow}
             />
           ))}
         </ul>
@@ -1170,6 +1618,11 @@ function TaskTimelineRow({
   focusRowRef,
   isSelected,
   onToggleSelect,
+  teamMembers,
+  teamLoading,
+  currentUserId,
+  onPrimeTeamQuery,
+  onAssignRow,
 }: {
   t: TaskRow;
   nested?: boolean;
@@ -1178,6 +1631,11 @@ function TaskTimelineRow({
   focusRowRef?: (node: HTMLElement | null) => void;
   isSelected?: (taskId: string) => boolean;
   onToggleSelect?: (taskId: string) => void;
+  teamMembers?: FirmMember[];
+  teamLoading?: boolean;
+  currentUserId?: string | null;
+  onPrimeTeamQuery?: () => void;
+  onAssignRow?: (row: TaskRow, userId: string | null) => void;
 }) {
   const navigate = useNavigate();
   const stages: Stage[] = [
@@ -1378,6 +1836,84 @@ function TaskTimelineRow({
               </div>
             );
           })}
+        </div>
+
+        {/* Assignee column — single source of "who owns this task." Renders
+            an avatar for the assigned preparer + a click target that swaps
+            the avatar for an AssigneePicker dropdown so the CPA can pick a
+            new preparer (or unassign) without leaving the row. Hover surfaces
+            an "Assign" affordance for unassigned rows so the empty state is
+            actionable, not just decorative.
+            Yuqi audit 2026-05-05: "Timeline currently it is not assignable." */}
+        <div
+          className="w-20 shrink-0 flex items-center justify-center"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+          }}
+        >
+          {onAssignRow && t.taskId && teamMembers ? (
+            <AssigneePicker
+              trigger={
+                <button
+                  type="button"
+                  onMouseEnter={onPrimeTeamQuery}
+                  onFocus={onPrimeTeamQuery}
+                  className={cn(
+                    "inline-flex items-center justify-center rounded-pill p-0.5 transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-soft",
+                  )}
+                  aria-label={
+                    t.assignedUserId
+                      ? `Assigned to ${t.assigneeName ?? "team member"} — change`
+                      : "Assign preparer"
+                  }
+                  title={
+                    t.assignedUserId
+                      ? t.assigneeName
+                        ? `${t.assigneeName} — click to reassign`
+                        : "Click to reassign"
+                      : "Assign preparer"
+                  }
+                >
+                  {t.assignedUserId ? (
+                    <AssigneeAvatar
+                      userId={t.assignedUserId}
+                      name={t.assigneeName}
+                      isCurrentUser={
+                        !!currentUserId && t.assignedUserId === currentUserId
+                      }
+                    />
+                  ) : (
+                    // Unassigned: dashed placeholder always visible (no
+                    // opacity-0) so the column reads consistently across
+                    // rows. Hover deepens tone + reveals the picker
+                    // affordance so the empty state is discoverable.
+                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-pill bg-sunken/40 text-ink-400 group-hover:bg-sunken group-hover:text-ink-700 border border-dashed border-line transition-colors">
+                      <UserPlus
+                        className="w-3 h-3 opacity-60 group-hover:opacity-100"
+                        aria-hidden
+                      />
+                    </span>
+                  )}
+                </button>
+              }
+              members={teamMembers}
+              loading={teamLoading}
+              currentUserId={t.assignedUserId ?? null}
+              pickedLabel={`Assign ${t.client.split(" ")[0] ?? "task"} to…`}
+              onPick={(userId) => onAssignRow(t, userId)}
+            />
+          ) : (
+            <AssigneeAvatar
+              userId={t.assignedUserId}
+              name={t.assigneeName}
+              isCurrentUser={
+                !!currentUserId && t.assignedUserId === currentUserId
+              }
+            />
+          )}
         </div>
 
         {/* Status pill — gap-loud (T4: as pill, never paint).
