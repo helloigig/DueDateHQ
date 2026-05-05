@@ -233,7 +233,11 @@ export function ClientDetail() {
       <BackLink fallback="/clients" fallbackLabel="Clients" />
 
 
-      <div className="mt-3 flex items-start gap-3">
+      {/* Header layout: stacks vertically on mobile (action group sits BELOW
+          the wrapping H1 + meta) and goes side-by-side at sm+ where there's
+          room. Without the breakpoint, the right-rail buttons crash into a
+          wrapping client name on narrow viewports. */}
+      <div className="mt-3 flex flex-col sm:flex-row sm:items-start gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-semibold text-ink-900">
@@ -326,24 +330,29 @@ export function ClientDetail() {
               on clients.ai_summary_override. */}
           <ClientAiSummary client={client} />
         </div>
-        <PinClientButton clientId={client.id} />
-        <ExportClientsButton clientId={client.id} />
-        {/* Legacy ExportModal still mounted (deadline iCal/PDF surfaces) but
-            no longer the default trigger — env.useMockData callers can still
-            reach it via setExportOpen if a future surface needs it. */}
-        <button
-          onClick={() => setEditOpen(true)}
-          className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40"
-        >
-          Edit
-        </button>
-        <button
-          onClick={() => setArchiveOpen(true)}
-          disabled={client.status === "archived"}
-          className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Archive
-        </button>
+        {/* Action group — kept together as a single shrink-0 cluster so the
+            row can never collapse half its buttons. On mobile the parent flex
+            stacks this group below the title; at sm+ it sits inline. */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <PinClientButton clientId={client.id} />
+          <ExportClientsButton clientId={client.id} />
+          {/* Legacy ExportModal still mounted (deadline iCal/PDF surfaces) but
+              no longer the default trigger — env.useMockData callers can still
+              reach it via setExportOpen if a future surface needs it. */}
+          <button
+            onClick={() => setEditOpen(true)}
+            className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40"
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => setArchiveOpen(true)}
+            disabled={client.status === "archived"}
+            className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Archive
+          </button>
+        </div>
       </div>
 
       <ClientAiInsightsCard clientId={client.id} />

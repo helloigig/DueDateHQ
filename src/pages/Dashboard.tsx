@@ -35,7 +35,7 @@ import { DateLabel } from "../components/ui/DateLabel";
 import { MetricTile } from "../components/ui/MetricTile";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { StateAlertCard } from "../components/StateAlertCard";
-import { Megaphone, Mail, CheckCircle2, ChevronRight, type LucideIcon } from "lucide-react";
+import { Megaphone, ChevronRight } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { Announcement } from "../types";
 import { escalationTier as escTier } from "../data/dateHelpers";
@@ -247,7 +247,6 @@ export function Dashboard() {
             </>
           }
         />
-        <DashboardActionRow />
       </div>
 
       {/* KPI STRIP — operational signal first, legal-miss as conditional
@@ -545,63 +544,6 @@ function StateAlertsPreview({
         </div>
       )}
     </section>
-  );
-}
-
-// DashboardActionRow — top-right pill button cluster on the Dashboard page
-// header. Mercury Home anatomy: the page's primary actions sit beside the
-// title, not buried inside sections. Per T2 — only the first action wears
-// the indigo accent (the "next likely action"); the rest are ghost pills.
-function DashboardActionRow() {
-  const navigate = useNavigate();
-  return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <ActionPill
-        primary
-        icon={Mail}
-        label="Send chase"
-        onClick={() => navigate("/mail")}
-      />
-      <ActionPill
-        icon={CheckCircle2}
-        label="Mark received"
-        onClick={() => navigate("/mail")}
-      />
-      {/* "View alerts" cut — sidebar Alerts nav + the inline "View all
-          alerts →" link inside the State alerts section already cover
-          this. Three paths to the same destination was redundant.
-          "New client" cut 2026-05-05 — the global +New button in the
-          AppShell header already covers this; two paths to the same
-          modal was the same redundancy class. */}
-    </div>
-  );
-}
-
-// ActionPill — pill-shaped page-header CTA. Per T3 (pills for actions) +
-// T2 (only one indigo accent on the page).
-function ActionPill({
-  primary,
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  primary?: boolean;
-  icon: LucideIcon;
-  label: string;
-  onClick?: () => void;
-}) {
-  const cls = primary
-    ? "bg-indigo text-white hover:bg-indigo-hover border-transparent"
-    : "bg-surface text-ink-700 hover:bg-sunken border-line hover:border-line-strong";
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-pill border transition-colors whitespace-nowrap ${cls}`}
-    >
-      <Icon className="w-4 h-4" aria-hidden />
-      {label}
-    </button>
   );
 }
 

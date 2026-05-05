@@ -78,7 +78,10 @@ export function TaskHeader({
         <span className="text-ink-900">{task.formType}</span>
       </nav>
 
-      <div className="flex items-start justify-between gap-4">
+      {/* Header layout: ring + title block stack BELOW the action group on
+          mobile so the right-aligned "Mark complete" pill never sits on top
+          of the progress ring. At sm+ the row goes side-by-side. */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
         <div className="min-w-0 flex items-start gap-3">
           <ProgressRing pct={completionPct} />
           <div>

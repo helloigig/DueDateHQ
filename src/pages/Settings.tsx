@@ -1628,10 +1628,16 @@ function Phase2StatusCard({
                 <span className="text-warn-ink font-medium">Paused.</span>{" "}
                 The system is holding all auto-fires until you resume.
               </>
-            ) : activeCount === 0 ? (
+            ) : activeCount === 0 && autoSendsThisWeek === 0 ? (
               <>
                 Live. No templates currently auto-send — nothing is firing
                 without your review.
+              </>
+            ) : activeCount === 0 ? (
+              <>
+                Live. No templates are scheduled to auto-send right now —
+                the {autoSendsThisWeek} send{autoSendsThisWeek === 1 ? "" : "s"}{" "}
+                below ran earlier this week before the template was demoted.
               </>
             ) : (
               <>
