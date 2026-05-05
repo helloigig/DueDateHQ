@@ -1075,8 +1075,69 @@ function ToDoTab({
   const taskHref = (taskId?: string) =>
     taskId ? `/clients/${client.id}/tasks/${taskId}` : `/clients/${client.id}`;
 
+  // Derive the unique tasks from the items list — each task is a
+  // first-class navigable unit on this surface. Yuqi audit 2026-05-05:
+  // "you can't enter task from client" — items used to be flat with the
+  // task name buried as small subtitle, the task was never the click
+  // target. This strip surfaces tasks as the primary unit and a clear
+  // entry point to TaskDetail.
+  const tasksOnPage = useMemo(() => {
+    const seen = new Map<string, { id: string; name: string; openCount: number }>();
+    for (const ci of items) {
+      if (!ci.taskId) continue;
+      const entry = seen.get(ci.taskId) ?? {
+        id: ci.taskId,
+        name: ci.taskName ?? "Task",
+        openCount: 0,
+      };
+      const isOpen =
+        ci.state === "not_requested" ||
+        ci.state === "requested_waiting" ||
+        ci.state === "received_unreviewed" ||
+        ci.state === "received_issue";
+      if (isOpen) entry.openCount += 1;
+      seen.set(ci.taskId, entry);
+    }
+    return Array.from(seen.values()).sort((a, b) => b.openCount - a.openCount);
+  }, [items]);
+
   return (
     <div className="space-y-4">
+      {/* Tasks strip — every task on this client as a navigable chip.
+          Open count badge surfaces which task has the most pending
+          work; click → TaskDetail. The To Do view below stays as the
+          per-item gap surface. */}
+      {tasksOnPage.length > 0 && (
+        <section className="bg-surface border border-line rounded-md px-4 py-3">
+          <header className="flex items-baseline gap-2 mb-2">
+            <h3 className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
+              Tasks
+            </h3>
+            <span className="text-2xs text-ink-400">
+              {tasksOnPage.length}{" "}
+              {tasksOnPage.length === 1 ? "active" : "active"}
+            </span>
+          </header>
+          <div className="flex flex-wrap gap-1.5">
+            {tasksOnPage.map((t) => (
+              <Link
+                key={t.id}
+                to={taskHref(t.id)}
+                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded border border-line bg-canvas text-ink-700 hover:bg-sunken hover:text-ink-900 hover:border-line-strong transition-colors"
+                title={`Open ${t.name}`}
+              >
+                <span className="font-medium">{t.name}</span>
+                {t.openCount > 0 && (
+                  <span className="text-2xs tabular-nums text-warn-ink bg-warn-bg/60 border border-warn-border px-1 py-0.5 rounded">
+                    {t.openCount}
+                  </span>
+                )}
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* 🚨 STILL WAITING ON CLIENT — primary, bordered, always-expanded. */}
       <section
         aria-labelledby="todo-still-waiting-heading"
@@ -1130,7 +1191,20 @@ function ToDoTab({
                       {ci.label ?? "Item"}
                     </p>
                     <p className="text-2xs text-ink-500 truncate">
-                      {ci.taskName ?? "—"}
+                      {/* Task name is the natural entry into TaskDetail.
+                          Yuqi audit 2026-05-05 — was plain text, no
+                          affordance. Wrap as Link so the eye + the
+                          click both find the path. */}
+                      {ci.taskId ? (
+                        <Link
+                          to={taskHref(ci.taskId)}
+                          className="hover:text-ink-900 hover:underline"
+                        >
+                          {ci.taskName ?? "—"}
+                        </Link>
+                      ) : (
+                        <span>{ci.taskName ?? "—"}</span>
+                      )}
                       {days != null && ` · last reminder ${days}d ago`}
                       {ci.state === "not_requested" &&
                         " · First reminder pending"}
@@ -1187,7 +1261,16 @@ function ToDoTab({
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-ink-900 truncate">{ci.label}</p>
                   <p className="text-2xs text-ink-500 truncate">
-                    {ci.taskName ?? "—"}
+                    {ci.taskId ? (
+                      <Link
+                        to={taskHref(ci.taskId)}
+                        className="hover:text-ink-900 hover:underline"
+                      >
+                        {ci.taskName ?? "—"}
+                      </Link>
+                    ) : (
+                      <span>{ci.taskName ?? "—"}</span>
+                    )}
                   </p>
                 </div>
                 <Link
