@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ExternalLink, FileText, Sparkles, AlertTriangle, Check } from "lucide-react";
 import type { Client } from "../types";
-import type { Deadline } from "../types";
+import type { Deadline, DeadlineStatus } from "../types";
 import { trpc } from "../lib/api/client";
 import type { FederalFormDTO } from "../lib/api/router";
 import type { AddDeadlinePrefill } from "./AddDeadlineModal";
@@ -112,19 +112,136 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
     (f) => !applicableNumbers.has(f.formNumber),
   );
 
+  // Active filings for this client, grouped by tax year + jurisdiction.
+  // Replaces the previous "go straight to applicability" framing —
+  // the user reads this tab to see "what's planned for this client THIS
+  // year" first, then "what's the catalog say is applicable" second.
+  const filingsByYear = useMemo(() => {
+    const m = new Map<
+      string,
+      { year: string; deadlines: Deadline[] }
+    >();
+    for (const d of deadlines) {
+      const year = d.officialDueDate.slice(0, 4);
+      const entry = m.get(year) ?? { year, deadlines: [] };
+      entry.deadlines.push(d);
+      m.set(year, entry);
+    }
+    return Array.from(m.values()).sort((a, b) => b.year.localeCompare(a.year));
+  }, [deadlines]);
+  const currentYear = String(new Date().getFullYear());
+
   return (
     <div className="space-y-4">
+      {/* "This year's filings" — surfaces the actual planned deadlines
+          for the current tax year first. Replaces the previously-empty
+          catalog placeholder copy. Per dogfooding 2026-05-05: users
+          opened Filings expecting their filings, got engineering meta
+          copy instead. */}
+      {filingsByYear.length > 0 && (
+        <section className="bg-surface border border-line rounded-md">
+          <header className="px-4 py-3 border-b border-line flex items-baseline gap-2">
+            <h3 className="text-sm font-semibold text-ink-900">
+              Filing plan
+            </h3>
+            <span className="text-2xs text-ink-500">
+              {deadlines.length} {deadlines.length === 1 ? "filing" : "filings"}{" "}
+              across {filingsByYear.length}{" "}
+              {filingsByYear.length === 1 ? "tax year" : "tax years"}
+            </span>
+          </header>
+          <div className="divide-y divide-line">
+            {filingsByYear.map(({ year, deadlines: yrFilings }) => {
+              const isCurrentYear = year === currentYear;
+              const statusCounts = yrFilings.reduce<
+                Record<string, number>
+              >((acc, d) => {
+                acc[d.status] = (acc[d.status] ?? 0) + 1;
+                return acc;
+              }, {});
+              return (
+                <div key={year} className="px-4 py-3">
+                  <div className="flex items-baseline gap-2 mb-2">
+                    <span
+                      className={`text-sm font-semibold tabular-nums ${
+                        isCurrentYear ? "text-ink-900" : "text-ink-700"
+                      }`}
+                    >
+                      {year}
+                    </span>
+                    {isCurrentYear && (
+                      <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-info-bg text-info-ink border border-info-border">
+                        Current tax year
+                      </span>
+                    )}
+                    <span className="ml-auto text-2xs text-ink-500 inline-flex items-center gap-2">
+                      {statusCounts.completed && (
+                        <span className="text-ok-ink">
+                          {statusCounts.completed} filed
+                        </span>
+                      )}
+                      {statusCounts.filed_extension && (
+                        <span className="text-warn-ink">
+                          {statusCounts.filed_extension} extended
+                        </span>
+                      )}
+                      {(statusCounts.not_started ||
+                        statusCounts.in_progress ||
+                        statusCounts.deferred) && (
+                        <span>
+                          {(statusCounts.not_started ?? 0) +
+                            (statusCounts.in_progress ?? 0) +
+                            (statusCounts.deferred ?? 0)}{" "}
+                          open
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <ul className="space-y-1">
+                    {yrFilings
+                      .slice()
+                      .sort((a, b) =>
+                        a.officialDueDate.localeCompare(b.officialDueDate),
+                      )
+                      .map((d) => (
+                        <li
+                          key={d.id}
+                          className="flex items-center gap-3 text-sm"
+                        >
+                          <span
+                            className={`text-2xs uppercase tracking-wide font-mono px-1.5 py-0.5 rounded shrink-0 ${
+                              d.jurisdiction === "federal"
+                                ? "bg-ink-900 text-canvas"
+                                : "bg-sunken text-ink-700 border border-line"
+                            }`}
+                          >
+                            {d.jurisdiction === "federal"
+                              ? "FED"
+                              : d.jurisdiction.toUpperCase()}
+                          </span>
+                          <span className="text-ink-900">{d.form}</span>
+                          <span className="text-2xs text-ink-400 ml-auto tabular-nums">
+                            due {d.officialDueDate}
+                          </span>
+                          <FilingStatusPill status={d.status} />
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       <header className="flex items-baseline justify-between">
         <div>
           <h3 className="text-sm font-semibold text-ink-900">
-            Federal filings
+            Federal forms catalog
           </h3>
           <p className="text-xs text-ink-500 mt-0.5">
-            Catalog-driven applicability for {client.name}.
-            <span className="text-ink-400">
-              {" "}
-              · Entity: {client.entityType}
-            </span>
+            Applicability for {client.name}{" "}
+            <span className="text-ink-400">· Entity: {client.entityType}</span>
           </p>
         </div>
         <Link
@@ -307,6 +424,66 @@ function FormRow({
     </li>
   );
 }
+
+/**
+ * Status pill for a single deadline row in the "Filing plan" view.
+ * Mercury palette per DESIGN.md T4 — color expresses state, not chrome.
+ *
+ * Mapping:
+ *   not_started     → neutral (sunken)         — default; nothing to read into
+ *   in_progress     → info (indigo)            — work happening
+ *   completed       → ok (green)               — filed
+ *   filed_extension → warn (amber)             — buys time but still open
+ *   deferred        → neutral muted            — intentionally pushed
+ *   overdue         → danger (red)             — past due, loud
+ */
+function FilingStatusPill({ status }: { status: DeadlineStatus }) {
+  const meta = STATUS_META[status];
+  return (
+    <span
+      className={`text-2xs px-1.5 py-0.5 rounded shrink-0 ${meta.cls}`}
+      title={meta.title}
+    >
+      {meta.label}
+    </span>
+  );
+}
+
+const STATUS_META: Record<
+  DeadlineStatus,
+  { label: string; cls: string; title: string }
+> = {
+  not_started: {
+    label: "Not started",
+    cls: "bg-sunken text-ink-500 border border-line",
+    title: "Work has not started on this filing.",
+  },
+  in_progress: {
+    label: "In progress",
+    cls: "bg-info-bg text-info-ink border border-info-border",
+    title: "Work in progress.",
+  },
+  completed: {
+    label: "Filed",
+    cls: "bg-ok-bg text-ok-ink border border-ok-border",
+    title: "Filing completed.",
+  },
+  filed_extension: {
+    label: "Extension filed",
+    cls: "bg-warn-bg text-warn-ink border border-warn-border",
+    title: "Extension filed — final return still owed.",
+  },
+  deferred: {
+    label: "Deferred",
+    cls: "bg-sunken text-ink-500 border border-line",
+    title: "Intentionally deferred.",
+  },
+  overdue: {
+    label: "Overdue",
+    cls: "bg-danger-bg text-danger-ink border border-danger-border",
+    title: "Past the official due date.",
+  },
+};
 
 function ReferenceSection({
   forms,
