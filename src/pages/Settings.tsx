@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import {
   Mail,
@@ -770,17 +770,239 @@ function SparklineChart({
 
 function NotificationsPanel() {
   return (
+    <div className="space-y-6">
+      <DailyDigestCard />
+      <Card
+        title="In-app notifications"
+        description="Controls what appears in the bell dropdown."
+      >
+        <p className="text-sm text-ink-500">
+          All categories are enabled by default. Fine-grained toggles will appear
+          here as we add notification types beyond state alerts and email
+          bounces.
+        </p>
+      </Card>
+    </div>
+  );
+}
+
+const DAY_LABELS: Array<{ key: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"; label: string }> = [
+  { key: "mon", label: "M" },
+  { key: "tue", label: "T" },
+  { key: "wed", label: "W" },
+  { key: "thu", label: "T" },
+  { key: "fri", label: "F" },
+  { key: "sat", label: "S" },
+  { key: "sun", label: "S" },
+];
+
+/**
+ * Settings card for the daily AM digest. Toggle, time-of-day picker,
+ * day-of-week chips, and a "Send a preview now" button. Reads + writes
+ * via `trpc.dailyDigest.*`. Recent runs are shown below the controls
+ * so the user can verify the cron is firing without opening their inbox.
+ */
+function DailyDigestCard() {
+  const utils = trpc.useUtils();
+  const settingsQuery = trpc.dailyDigest.getSettings.useQuery();
+  const recentRunsQuery = trpc.dailyDigest.listRecentRuns.useQuery();
+  const updateMut = trpc.dailyDigest.updateSettings.useMutation({
+    onSuccess: () => void utils.dailyDigest.getSettings.invalidate(),
+  });
+  const previewMut = trpc.dailyDigest.previewMyDigest.useMutation({
+    onSuccess: () => void utils.dailyDigest.listRecentRuns.invalidate(),
+  });
+
+  const settings = settingsQuery.data;
+  const [draft, setDraft] = useState<typeof settings | undefined>(settings);
+
+  // Sync local draft state when the server returns. Without this, the
+  // card renders the stale defaults the moment the query lands.
+  useEffect(() => {
+    if (settings) setDraft(settings);
+  }, [settings]);
+
+  if (!draft) {
+    return (
+      <Card title="Daily morning digest">
+        <p className="text-sm text-ink-500">Loading…</p>
+      </Card>
+    );
+  }
+
+  const dirty =
+    settings &&
+    (settings.enabled !== draft.enabled ||
+      settings.sendHour !== draft.sendHour ||
+      JSON.stringify(settings.days) !== JSON.stringify(draft.days));
+
+  const toggleDay = (key: (typeof DAY_LABELS)[number]["key"]) => {
+    setDraft((d) =>
+      d
+        ? {
+            ...d,
+            days: d.days.includes(key)
+              ? (d.days.filter((x) => x !== key) as typeof d.days)
+              : ([...d.days, key] as typeof d.days),
+          }
+        : d,
+    );
+  };
+
+  const recentRuns = recentRunsQuery.data ?? [];
+  const lastSent = recentRuns.find((r) => r.status === "sent");
+
+  return (
     <Card
-      title="In-app notifications"
-      description="Controls what appears in the bell dropdown."
+      title="Daily morning digest"
+      description={
+        draft.enabled
+          ? `Email summary of urgent tasks, new state alerts, and pending replies — sent at ${formatHour(draft.sendHour)} in your timezone on selected days. Skipped on quiet days.`
+          : "Off. Turn on to get an email every morning summarizing what's urgent today."
+      }
     >
-      <p className="text-sm text-ink-500">
-        All categories are enabled by default. Fine-grained toggles will appear
-        here as we add notification types beyond state alerts and email
-        bounces.
-      </p>
+      <div className="space-y-4">
+        <label className="flex items-center gap-3 text-sm">
+          <input
+            type="checkbox"
+            checked={draft.enabled}
+            onChange={(e) =>
+              setDraft((d) => (d ? { ...d, enabled: e.target.checked } : d))
+            }
+            className="w-4 h-4"
+          />
+          <span className="text-ink-900 font-medium">Send me a morning digest</span>
+        </label>
+
+        {draft.enabled && (
+          <div className="space-y-4 pl-7">
+            <label className="block text-sm">
+              <span className="text-2xs uppercase tracking-wider text-ink-500 font-semibold block mb-1.5">
+                Send hour (your timezone)
+              </span>
+              <select
+                value={draft.sendHour}
+                onChange={(e) =>
+                  setDraft((d) =>
+                    d ? { ...d, sendHour: Number(e.target.value) } : d,
+                  )
+                }
+                className="border border-line rounded px-2 py-1.5 text-sm bg-surface"
+              >
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>
+                    {formatHour(h)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="text-sm">
+              <span className="text-2xs uppercase tracking-wider text-ink-500 font-semibold block mb-1.5">
+                Days
+              </span>
+              <div className="flex gap-1">
+                {DAY_LABELS.map((d) => {
+                  const on = draft.days.includes(d.key);
+                  return (
+                    <button
+                      key={d.key}
+                      type="button"
+                      onClick={() => toggleDay(d.key)}
+                      className={`w-9 h-9 rounded text-xs font-medium transition-colors ${
+                        on
+                          ? "bg-ink-900 text-white"
+                          : "bg-surface border border-line text-ink-700 hover:bg-canvas"
+                      }`}
+                      aria-pressed={on}
+                      aria-label={d.key}
+                    >
+                      {d.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center gap-3 pt-2">
+          <button
+            type="button"
+            onClick={() => draft && updateMut.mutate(draft)}
+            disabled={!dirty || updateMut.isPending}
+            className="text-sm px-4 py-1.5 rounded bg-ink-900 text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+            title={!dirty ? "No changes to save" : undefined}
+          >
+            {updateMut.isPending ? "Saving…" : "Save"}
+          </button>
+          <button
+            type="button"
+            onClick={() => previewMut.mutate()}
+            disabled={previewMut.isPending}
+            className="text-sm px-3 py-1.5 rounded border border-line text-ink-700 hover:bg-canvas disabled:opacity-40"
+          >
+            {previewMut.isPending ? "Sending…" : "Send a preview now"}
+          </button>
+          {previewMut.isSuccess && (
+            <span className="text-xs text-ok-ink">
+              Preview {previewMut.data.status === "sent" ? "sent" : previewMut.data.status}
+            </span>
+          )}
+        </div>
+
+        {recentRuns.length > 0 && (
+          <div className="pt-4 border-t border-line">
+            <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold mb-2">
+              Recent sends
+            </p>
+            <ul className="text-xs text-ink-700 space-y-1">
+              {recentRuns.slice(0, 7).map((r) => (
+                <li key={r.id} className="flex items-center gap-2">
+                  <span className="font-mono text-ink-500 w-24 shrink-0">
+                    {r.localDate}
+                  </span>
+                  <span className="w-20 shrink-0">
+                    {r.status === "sent"
+                      ? "✓ Sent"
+                      : r.status === "skipped_quiet"
+                        ? "Skipped (quiet)"
+                        : r.status === "failed"
+                          ? "Failed"
+                          : r.status}
+                  </span>
+                  {r.status === "sent" && (
+                    <span className="text-ink-500">
+                      {r.urgentCount} urgent · {r.alertsCount} alerts ·{" "}
+                      {r.repliesCount} replies
+                    </span>
+                  )}
+                  {r.errorMessage && (
+                    <span className="text-danger-ink truncate">
+                      {r.errorMessage}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {!lastSent && (
+              <p className="text-2xs text-ink-400 mt-2">
+                No digests sent yet. Use "Send a preview now" to verify
+                delivery, or wait for tomorrow's scheduled run.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
     </Card>
   );
+}
+
+function formatHour(h: number): string {
+  if (h === 0) return "12:00 AM";
+  if (h < 12) return `${h}:00 AM`;
+  if (h === 12) return "12:00 PM";
+  return `${h - 12}:00 PM`;
 }
 
 function ImportsPanel() {
