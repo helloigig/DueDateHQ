@@ -1071,7 +1071,15 @@ function TaskTimelineRow({
           </div>
         </div>
 
-        {/* Mini-timeline */}
+        {/* Mini-timeline. Yuqi audit 2026-05-05: "Initial mtg is actually
+            'Mark Initial mtg done' right? Why not discard that and click
+            onto the Initial Mtg dot and mark done?" The right-column
+            "Mark X done" button has been retired — clicking the
+            CURRENT-stage dot fires the same advance flow. Past dots
+            (done) and future dots (not_started) remain decorative. The
+            current dot has a larger 12px hit target wrapper around its
+            10px visual so the tap area is touch-friendly without
+            inflating the dot's visual weight. */}
         <div className="flex-1 flex items-center gap-1.5 min-w-0">
           {stages.map((s, idx) => {
             const status = t.milestoneStatus[idx] ?? "not_started";
@@ -1089,13 +1097,46 @@ function TaskTimelineRow({
                 key={s}
                 className="flex items-center gap-1.5 flex-1 min-w-0"
               >
-                <span
-                  className={cn(
-                    "w-2.5 h-2.5 rounded-pill shrink-0",
-                    dotClass,
-                  )}
-                  title={`${STAGE_LABELS[s]} — ${status.replace("_", " ")}`}
-                />
+                {isCurrent ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onStageClick(t, nextStage);
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    aria-label={
+                      nextStage
+                        ? `Mark ${STAGE_LABELS[s]} done — advance to ${STAGE_LABELS[nextStage]}`
+                        : `Mark ${STAGE_LABELS[s]} done`
+                    }
+                    title={
+                      nextStage
+                        ? `Click to mark ${STAGE_LABELS[s]} done · advances to ${STAGE_LABELS[nextStage]}`
+                        : `Click to mark ${STAGE_LABELS[s]} done · final stage`
+                    }
+                    className={cn(
+                      "shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-full",
+                      "transition-transform hover:scale-110 cursor-pointer",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-soft",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "w-2.5 h-2.5 rounded-pill",
+                        dotClass,
+                      )}
+                    />
+                  </button>
+                ) : (
+                  <span
+                    className={cn(
+                      "w-2.5 h-2.5 rounded-pill shrink-0",
+                      dotClass,
+                    )}
+                    title={`${STAGE_LABELS[s]} — ${status.replace("_", " ")}`}
+                  />
+                )}
                 {idx < stages.length - 1 && (
                   <span
                     className="flex-1 h-px bg-line shrink min-w-3"
@@ -1114,6 +1155,10 @@ function TaskTimelineRow({
             to ignore the column entirely, then real "behind" / "waiting"
             states had to fight for attention against a wall of green.
             Now: behind = red pill, waiting = yellow pill, clean = nothing. */}
+        {/* Yuqi audit 2026-05-05: the right-column "Mark X done" button
+            was retired — its job is now done by clicking the current-
+            stage dot in the mini-timeline above. The status column
+            keeps its width so row alignment doesn't reflow. */}
         <div className="w-44 shrink-0 flex items-center justify-end gap-2">
           {t.daysBehind > 0 ? (
             <StatusPill variant="danger" size="xs">
@@ -1124,27 +1169,6 @@ function TaskTimelineRow({
               {t.missingCount} waiting
             </StatusPill>
           ) : null}
-          {/* Stage action — clicking opens a confirm Dialog. Stops
-              propagation so the row's click-to-open-detail doesn't
-              fire alongside. Title is the stage's "complete this step"
-              verb (current step) or "Mark filed" (final step). */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onStageClick(t, nextStage);
-            }}
-            onKeyDown={(e) => e.stopPropagation()}
-            className="text-xs font-medium text-indigo-ink hover:text-indigo-hover hover:bg-indigo-soft px-2 py-1 rounded transition-colors hidden md:inline-flex items-center gap-1"
-            title={
-              nextStage
-                ? `Mark ${STAGE_LABELS[t.currentStage]} done · advance to ${STAGE_LABELS[nextStage]}`
-                : `Mark ${STAGE_LABELS[t.currentStage]} complete`
-            }
-          >
-            {STAGE_LABELS[t.currentStage]}
-            <ChevronRight className="w-3 h-3" aria-hidden />
-          </button>
         </div>
 
         <ChevronRight
