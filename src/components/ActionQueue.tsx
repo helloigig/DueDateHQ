@@ -18,10 +18,11 @@ import type {
   TodoVerb,
 } from "../data/mockTodoItems";
 import { env } from "../config";
-import { actions } from "../data/store";
+import { actions, useStore } from "../data/store";
 import { DateLabel } from "./ui/DateLabel";
 import { DotStack } from "./ui/DotStack";
 import { SectionHeader } from "./ui/SectionHeader";
+import { StateChipGroup } from "./StateChipGroup";
 import { ChaseBundleModal, type ChaseItem } from "./ChaseBundleModal";
 import { cn } from "../lib/utils";
 import {
@@ -32,6 +33,7 @@ import {
   type BulkBatchRow,
   type QueueTodoItem,
 } from "../lib/queueGrouping";
+import type { Client } from "../types";
 
 // ActionQueue — Today's chase queue. One row per (client × email-thread).
 // State alerts pin to top; bulk-batch drafts render their own variant.
@@ -83,6 +85,17 @@ export function ActionQueue() {
     ? (MOCK_TODO_ITEMS as QueueTodoItem[])
     : (live as QueueTodoItem[]);
 
+  // Pull every client once so the per-row identity strip can render
+  // primary + nexus state pills without N round-trips. Mock mode reads
+  // the store; real mode falls through to the same shape via mock-
+  // adapter. The map is keyed by id so per-row lookup is O(1).
+  const storeClients = useStore().clients;
+  const clientsById = useMemo(() => {
+    const m = new Map<string, Client>();
+    for (const c of storeClients) m.set(c.id, c);
+    return m;
+  }, [storeClients]);
+
   const rows = buildQueueRows(items);
   const visibleCount = expanded ? rows.length : 5;
   const visible = rows.slice(0, visibleCount);
@@ -105,7 +118,15 @@ export function ActionQueue() {
               return <StateAlertRowView key={row.key} row={row} />;
             if (row.kind === "bulk_batch")
               return <BulkBatchRowView key={row.key} row={row} />;
-            return <ClientGroupRowView key={row.key} row={row} />;
+            return (
+              <ClientGroupRowView
+                key={row.key}
+                row={row}
+                client={
+                  row.clientId ? clientsById.get(row.clientId) : undefined
+                }
+              />
+            );
           })}
         </ul>
         {hidden > 0 && (
@@ -191,22 +212,40 @@ function aggregateChecklistStates(
 // lifted up to this component so a single "Send N" footer covers items
 // across all tasks for this client. Clicking Send opens the
 // ChaseBundleModal — one email, one composer, all selected items.
-function ClientGroupRowView({ row }: { row: ClientGroupRow }) {
+function ClientGroupRowView({
+  row,
+  client,
+}: {
+  row: ClientGroupRow;
+  client?: Client;
+}) {
   const [open, setOpen] = useState(false);
   const [bundleOpen, setBundleOpen] = useState(false);
   const summary = summarizeClientGroup(row);
-  const sendCount = row.verbCounts.Send ?? 0;
-  const primaryVerb: TodoVerb =
-    sendCount > 0
-      ? "Send"
-      : row.verbCounts.Confirm
-        ? "Confirm"
-        : row.verbCounts.Discuss
-          ? "Discuss"
-          : "Apply";
-  const PrimaryIcon = VERB_ICON[primaryVerb];
   const checklistStates = aggregateChecklistStates(row.items);
-  const itemCount = checklistStates.length;
+  // Pending = anything not confirmed / not_applicable (the chase loop
+  // is still open). The mockup's "{N} items pending · last sent {Y}d
+  // ago" footer reads this number.
+  const pendingCount = checklistStates.filter(
+    (c) => c.state !== "received_confirmed" && c.state !== "not_applicable",
+  ).length;
+  // "last sent Yd ago" — derive from the max `daysBehind` across Send
+  // items in this group. daysBehind is the chase-loop's stuck duration
+  // (days since the most recent reminder), so the max across this
+  // client's sends approximates "last sent for any of these" — close
+  // enough for the demo. Falls back to omitting the footer fragment
+  // when no Send item carries the field.
+  const lastSentDays = (() => {
+    let max = 0;
+    let any = false;
+    for (const it of row.items) {
+      if (it.verb === "Send" && typeof it.daysBehind === "number") {
+        any = true;
+        if (it.daysBehind > max) max = it.daysBehind;
+      }
+    }
+    return any ? max : null;
+  })();
 
   // All chase-eligible items across all tasks in this group, flattened
   // into a single shape the modal can consume. Indexed by composite
@@ -330,97 +369,117 @@ function ClientGroupRowView({ row }: { row: ClientGroupRow }) {
       className="group bg-surface focus-within:bg-canvas/60 transition-colors"
       data-deadline-row
     >
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-label={open ? "Collapse client" : "Expand client"}
+      {/* Header — caret + identity (name + state pills) on the left,
+          Send button on the right. The caret/identity area toggles
+          expand; the Send button is a sibling sitting outside that
+          click target so a single click on it doesn't also expand
+          the panel. */}
+      <div
         className={cn(
-          "w-full text-left px-region py-3 flex items-start gap-3 transition-colors",
-          // Real hover treatment: solid sunken on hover; a slightly
-          // brighter shade when expanded so the open state reads
-          // distinct without competing with row hover. Focus ring on
-          // keyboard nav. Active (mousedown) gets a subtle press tint.
-          "hover:bg-sunken active:bg-sunken-strong/80",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo/40",
+          "flex items-start gap-2 px-region py-3 transition-colors",
+          "hover:bg-sunken",
           open && "bg-canvas/70",
         )}
       >
-        <div className="flex-1 min-w-0">
-          {/* Identity line — client name is a Link with stopPropagation
-              so navigating doesn't toggle the expand. */}
-          <div className="flex items-center gap-2 text-xs text-ink-500 mb-0.5 flex-wrap">
-            {row.clientId ? (
-              <Link
-                to={`/clients/${row.clientId}`}
-                onClick={(e) => e.stopPropagation()}
-                className="font-medium text-ink-900 hover:underline focus-visible:outline-none focus-visible:underline"
-              >
-                {row.clientName}
-              </Link>
-            ) : (
-              <span className="font-medium text-ink-900">{row.clientName}</span>
-            )}
-            <span className="text-ink-300" aria-hidden>·</span>
-            <span>
-              {itemCount} {itemCount === 1 ? "item" : "items"}
-            </span>
-            {row.earliestDueDate && (
-              <>
-                <span className="text-ink-300" aria-hidden>·</span>
-                <span className="inline-flex items-center gap-1">
-                  earliest due{" "}
-                  <DateLabel value={row.earliestDueDate} format="auto" />
-                </span>
-              </>
-            )}
-            {/* Verb hint — muted metadata, NOT a button. Earlier this
-                rendered as `<icon> Send` in ink-700 on the right edge,
-                which read as a tappable Send affordance. Clicking did
-                nothing (the parent <button> just toggles expand), so
-                users hit a dead end. The verb is already restated on
-                the action line below; here we render it as inline
-                metadata in muted text.
-                Yuqi audit 2026-05-05 — "next:" was ambiguous (could
-                read as "next deadline" or "next reminder"). Switched
-                to "next step:" so the meta line says exactly what it
-                is: the next action you'll take on this row. */}
-            <span className="ml-auto inline-flex items-center gap-1 text-2xs text-ink-400">
-              next step:
-              <PrimaryIcon className="w-3 h-3" aria-hidden />
-              <span className="font-medium text-ink-500">{primaryVerb}</span>
-            </span>
-          </div>
-
-          {/* Action line — verb summary (e.g. "Send 4 reminders · across 1040 + 941") */}
-          <div className="text-sm text-ink-900 font-medium">{summary}</div>
-
-          {/* Context — first item's context as flavor */}
-          <div className="text-xs text-ink-500 mt-0.5 line-clamp-1">
-            {row.items[0].context}
-          </div>
-
-          {/* Status footer — DotStack at the bottom of the row content,
-              not as a left prefix. Tells the chase-loop story without
-              competing with the client name for first read. */}
-          <div className="mt-2 flex items-center gap-2 text-2xs text-ink-500">
-            <DotStack
-              states={checklistStates.map((c) => c.state)}
-              maxVisible={12}
-            />
-            <span className="text-ink-400">{statusSummary(checklistStates)}</span>
-          </div>
-        </div>
-
-        {/* Chevron is decorative — the entire row is the expand button. */}
-        <span className="pt-1.5 shrink-0 text-ink-400 group-hover:text-ink-700 transition-colors">
-          {open ? (
-            <ChevronDown className="w-4 h-4" aria-hidden />
-          ) : (
-            <ChevronRight className="w-4 h-4" aria-hidden />
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-label={open ? "Collapse client" : "Expand client"}
+          className={cn(
+            "flex-1 min-w-0 text-left flex items-start gap-2",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo/40 rounded",
           )}
-        </span>
-      </button>
+        >
+          {/* Caret — collapse indicator on the left, matching the
+              mockup. Up = open, right = collapsed. */}
+          <span className="pt-0.5 shrink-0 text-ink-400 group-hover:text-ink-700 transition-colors">
+            {open ? (
+              <ChevronDown className="w-4 h-4" aria-hidden />
+            ) : (
+              <ChevronRight className="w-4 h-4" aria-hidden />
+            )}
+          </span>
+          <div className="flex-1 min-w-0">
+            {/* Identity row — client name (small, muted) + primary +
+                nexus state pills inline. The name is a Link so a
+                middle-click / cmd-click opens the client without
+                expanding this row. */}
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              {row.clientId ? (
+                <Link
+                  to={`/clients/${row.clientId}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-xs text-ink-500 hover:text-ink-900 hover:underline truncate"
+                >
+                  {row.clientName}
+                </Link>
+              ) : (
+                <span className="text-xs text-ink-500 truncate">
+                  {row.clientName}
+                </span>
+              )}
+              {client && (
+                <StateChipGroup
+                  primary={client.primaryState}
+                  nexus={client.nexusStates}
+                />
+              )}
+            </div>
+            {/* Title — verb summary, big and bold per the mockup
+                ("Send 7 reminders · across TX Franchise + 941"). */}
+            <h3 className="text-base font-semibold text-ink-900 leading-snug">
+              {summary}
+            </h3>
+            {/* Dot row + status line — dots above, "{N} items pending ·
+                last sent {Y}d ago" below. The dots tell the chase-loop
+                story; the line gives the count + recency at a glance. */}
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
+              <DotStack
+                states={checklistStates.map((c) => c.state)}
+                maxVisible={12}
+              />
+              <span className="text-xs text-ink-500">
+                {pendingCount} {pendingCount === 1 ? "item" : "items"} pending
+                {lastSentDays != null && (
+                  <>
+                    {" · "}
+                    <span className="text-ink-400">
+                      last sent {lastSentDays}d ago
+                    </span>
+                  </>
+                )}
+              </span>
+            </div>
+          </div>
+        </button>
+        {/* Send button — opens the bundle modal with whatever items
+            are currently selected (defaults to all chase-eligible).
+            Visible in both collapsed and expanded states so one click
+            sends without forcing the user to expand first. Disabled
+            when no items are eligible. */}
+        {allChaseItems.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setBundleOpen(true)}
+            disabled={checkedCount === 0}
+            title={
+              checkedCount === 0
+                ? "Expand to pick items"
+                : `Send ${checkedCount} in one email`
+            }
+            className={cn(
+              "shrink-0 inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border transition-colors",
+              "border-line bg-surface text-ink-700 hover:bg-sunken",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo/40",
+              "disabled:opacity-40 disabled:cursor-not-allowed",
+            )}
+          >
+            <Mail className="w-3.5 h-3.5" aria-hidden />
+            Send
+          </button>
+        )}
+      </div>
 
       {open && (
         <div className="bg-sunken/40 border-t border-line">
@@ -436,37 +495,6 @@ function ClientGroupRowView({ row }: { row: ClientGroupRow }) {
               />
             ))}
           </ul>
-          {/* Parent-level Send bar — covers items across ALL tasks in
-              the group. Lifted above the per-task Send buttons because
-              one chase email per loop is the PRD §7.3 invariant. */}
-          {allChaseItems.length > 0 && (
-            <div className="px-region py-2.5 flex items-center justify-between border-t border-line bg-canvas/80">
-              <span className="text-xs text-ink-500">
-                {checkedCount === 0
-                  ? "Pick at least one item to send"
-                  : checkedCount === allChaseItems.length
-                    ? `All ${checkedCount} items selected`
-                    : `${checkedCount} of ${allChaseItems.length} selected`}
-              </span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setBundleOpen(true);
-                }}
-                disabled={checkedCount === 0}
-                className={cn(
-                  "inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded transition-colors",
-                  "bg-indigo text-white hover:bg-indigo-hover active:bg-indigo-hover/90",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo/40",
-                  "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-indigo",
-                )}
-              >
-                <Mail className="w-3 h-3" aria-hidden />
-                Send {checkedCount} in one email
-              </button>
-            </div>
-          )}
         </div>
       )}
 
@@ -481,54 +509,12 @@ function ClientGroupRowView({ row }: { row: ClientGroupRow }) {
   );
 }
 
-// Plain-language summary of a checklist-state distribution. Used in the
-// status footer beneath each parent row so the dot stack reads honest at
-// a glance ("3 awaiting client · 1 awaiting your review").
-function statusSummary(states: ChecklistItemSnapshot[]): string {
-  const counts = states.reduce<Record<string, number>>((acc, s) => {
-    acc[s.state] = (acc[s.state] ?? 0) + 1;
-    return acc;
-  }, {});
-  const parts: string[] = [];
-  if (counts.received_unreviewed)
-    parts.push(`${counts.received_unreviewed} awaiting your review`);
-  if (counts.received_issue)
-    parts.push(`${counts.received_issue} flagged`);
-  if (counts.requested_waiting)
-    parts.push(`${counts.requested_waiting} awaiting client`);
-  if (counts.not_requested)
-    parts.push(`${counts.not_requested} first reminder pending`);
-  if (counts.received_confirmed)
-    parts.push(`${counts.received_confirmed} confirmed`);
-  return parts.join(" · ");
-}
-
-// Color a checklist-item dot to match the canonical state palette
-// (mirrors DotStack's checklistStateColor map). Used by the expanded
-// per-item rows below the parent.
-const CHECKLIST_DOT_CLASS: Record<
-  ChecklistItemSnapshot["state"],
-  string
-> = {
-  not_requested: "bg-ink-400",
-  requested_waiting: "bg-warn-solid",
-  received_unreviewed: "bg-info-solid",
-  received_confirmed: "bg-ok-solid",
-  received_issue: "bg-danger-solid",
-  not_applicable: "bg-ink-200",
-};
-
-const CHECKLIST_STATE_LABEL: Record<
-  ChecklistItemSnapshot["state"],
-  string
-> = {
-  not_requested: "First reminder pending",
-  requested_waiting: "Awaiting client",
-  received_unreviewed: "Awaiting your review",
-  received_confirmed: "Confirmed",
-  received_issue: "Has issue",
-  not_applicable: "N/A",
-};
+// statusSummary / CHECKLIST_DOT_CLASS / CHECKLIST_STATE_LABEL retired
+// 2026-05-06 — the redesign drops the per-item state dot and full
+// "Awaiting client" label in favour of a checkbox + optional
+// "Follow-up" tag (clean per the mockup). The chase-loop story is
+// told by the parent row's DotStack, which already reads the same
+// state palette via DotStack's internal map.
 
 // Sub-item inside an expanded client group. For arrival-timing rows (with a
 // checklistItems snapshot), each checklist item renders as a per-row
@@ -556,28 +542,35 @@ function SubItemRow({
     const taskScopedKey = (ciId: string) =>
       `${item.taskId ?? item.id}:${ciId}`;
     return (
-      <li className="px-region py-2.5 pl-10 bg-surface/60">
-        {/* Task header — form name + due date + stage */}
-        <div className="flex items-center gap-2 text-xs text-ink-500 mb-1.5 flex-wrap">
+      <li className="px-region py-3 pl-10 bg-surface/60">
+        {/* Task header — bold form name + due date. Matches the
+            mockup's "TX Franchise · due May 15" pattern. The full
+            state-label strip is gone (it lived per-item on the row
+            below before; the state is now communicated by checkbox
+            disabled-state + the optional "Follow-up" tag). */}
+        <div className="flex items-baseline gap-2 mb-1.5 flex-wrap">
           {item.task && (
-            <span className="text-ink-700 font-medium">{item.task}</span>
+            <span className="text-sm text-ink-900 font-semibold">
+              {item.task}
+            </span>
           )}
           {item.dueDate && (
-            <>
-              {item.task && <span className="text-ink-300" aria-hidden>·</span>}
-              <span className="inline-flex items-center gap-1">
-                due <DateLabel value={item.dueDate} format="auto" />
-              </span>
-            </>
+            <span className="inline-flex items-baseline gap-1 text-xs text-ink-500">
+              due <DateLabel value={item.dueDate} format="auto" />
+            </span>
           )}
           {item.stageLabel && (
-            <>
-              <span className="text-ink-300" aria-hidden>·</span>
-              <span className="text-ink-500">{item.stageLabel}</span>
-            </>
+            <span className="text-2xs text-ink-400">
+              · {item.stageLabel}
+            </span>
           )}
         </div>
-        {/* Per-checklist-item rows — checkboxes (pre-checked for outstanding) */}
+        {/* Per-checklist-item rows — checkbox + label + optional
+            "Follow-up" tag. Items in `requested_waiting` have already
+            been chased once → tag them as a follow-up so the CPA can
+            see at a glance which are first-asks vs. re-asks. State
+            dots and full state labels are dropped; the chase-loop
+            story is told by the parent row's DotStack instead. */}
         <ul className="space-y-1">
           {item.checklistItems.map((ci) => {
             const k = taskScopedKey(ci.id);
@@ -585,6 +578,7 @@ function SubItemRow({
               ci.state === "received_confirmed" ||
               ci.state === "not_applicable";
             const isChecked = !disabled && (checked[k] ?? false);
+            const isFollowUp = ci.state === "requested_waiting";
             return (
               <li
                 key={ci.id}
@@ -611,17 +605,12 @@ function SubItemRow({
                   )}
                   aria-label={`Include ${ci.label} in next chase`}
                 />
-                <span
-                  className={cn(
-                    "inline-block w-1.5 h-1.5 rounded-pill shrink-0",
-                    CHECKLIST_DOT_CLASS[ci.state],
-                  )}
-                  aria-hidden
-                />
                 <span className="flex-1 truncate">{ci.label}</span>
-                <span className="text-2xs text-ink-500 shrink-0">
-                  {CHECKLIST_STATE_LABEL[ci.state]}
-                </span>
+                {isFollowUp && (
+                  <span className="text-2xs text-warn-ink shrink-0">
+                    Follow-up
+                  </span>
+                )}
               </li>
             );
           })}
