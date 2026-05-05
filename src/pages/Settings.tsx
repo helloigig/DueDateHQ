@@ -221,7 +221,13 @@ function ProfilePanel() {
           />
           <Row
             label="Signed in"
-            value={new Date(session.signedInAt).toLocaleString()}
+            value={new Date(session.signedInAt).toLocaleString(undefined, {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+            })}
           />
         </dl>
       </Card>
@@ -282,7 +288,7 @@ function AlertsPanel() {
           />
         </div>
         <p className="text-2xs text-ink-500 mt-4">
-          SMS reminders are deferred to Phase 2 — we won't half-build them.
+          SMS reminders are deferred to a later release — we won't half-build them.
         </p>
       </Card>
 
@@ -606,7 +612,7 @@ function AiEvalPanel() {
               className={[
                 "text-xs px-3 py-1 rounded-md border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2",
                 mode === m
-                  ? "bg-sunken text-ink-900 border-ink-900 font-medium"
+                  ? "bg-ink-900 text-surface border-transparent font-medium"
                   : "border-line text-ink-500 hover:bg-sunken hover:text-ink-700",
               ].join(" ")}
             >
@@ -1039,8 +1045,9 @@ function DailyDigestCard() {
                   </span>
                   {r.status === "sent" && (
                     <span className="text-ink-500">
-                      {r.urgentCount} urgent · {r.alertsCount} alerts ·{" "}
-                      {r.repliesCount} replies
+                      {r.urgentCount} urgent ·{" "}
+                      {r.alertsCount} {r.alertsCount === 1 ? "alert" : "alerts"} ·{" "}
+                      {r.repliesCount} {r.repliesCount === 1 ? "reply" : "replies"}
                     </span>
                   )}
                   {r.errorMessage && (
@@ -1303,7 +1310,7 @@ function TeamPanel() {
           <p>
             <span className="font-medium text-ink-900">Firm = workspace = tenant.</span>{" "}
             All clients, tasks, and deadlines live under your firm. Users are
-            members of one firm at MVP (multi-firm is Phase 2).
+            members of one firm at MVP (multi-firm comes later).
           </p>
           <p>
             <span className="font-medium text-ink-900">Each client has a relationship owner</span>{" "}
@@ -1319,7 +1326,7 @@ function TeamPanel() {
             the dashboard by assignee to see "what's on John's plate."
           </p>
           <p className="text-xs text-ink-500 pt-2">
-            What ships in Phase 2: per-client access restrictions, formal
+            Coming in a later release: per-client access restrictions, formal
             handoff workflow (with auto-revert on return), and Specialist tags
             (international tax / S-corp / trust) for routing.
           </p>

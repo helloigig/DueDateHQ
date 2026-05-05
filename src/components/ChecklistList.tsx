@@ -88,7 +88,7 @@ export function ChecklistList({ taskId, items, onOpenEmailDraft }: Props) {
       {groups.waiting.length > 0 && (
         <section
           aria-labelledby="still-waiting-heading"
-          className="bg-surface border-2 border-warn-border rounded-md overflow-hidden"
+          className="bg-surface border border-warn-border rounded-md overflow-hidden"
         >
           <header className="flex items-center px-4 py-2.5 bg-warn-bg/50 border-b border-warn-border gap-3">
             <Siren className="w-4 h-4 text-warn-solid" aria-hidden />

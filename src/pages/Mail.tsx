@@ -306,10 +306,10 @@ export function Mail() {
             role="tab"
             aria-selected={tab === id}
             onClick={() => setTab(id)}
-            className={`relative flex items-center gap-2 px-3 py-2 text-sm rounded-t -mb-px ${
+            className={`relative flex items-center gap-2 px-3 py-2 text-sm rounded-t -mb-px border-b-[1.5px] ${
               tab === id
-                ? "border-b-2 border-accent text-ink-900 font-medium"
-                : "text-ink-500 hover:text-ink-900"
+                ? "border-ink-900 text-ink-900 font-medium"
+                : "border-transparent text-ink-500 hover:text-ink-900"
             }`}
           >
             <Icon className="w-4 h-4" aria-hidden />
@@ -529,13 +529,13 @@ export function Mail() {
       )}
 
       <p className="mt-6 text-2xs text-ink-400 leading-relaxed">
-        Per <Link to="/settings/integrations" className="underline">Method A (per-task forwarding)</Link> +{" "}
-        <Link to="/settings/integrations" className="underline">Method B (Gmail/Outlook OAuth)</Link> —
-        both Day 1 — inbound is classified by AI into 7 classes (client doc /
-        client reply / agency / 3rd-party data / payment / vendor / spam) and
-        routed to the right client × task. Bytes stay in your email; we hold
-        extracted text + facts + thumbnails. Outbox + Drafts views land in
-        Phase 1 once <code>emails.listSent</code> + <code>emails.listDrafts</code> are wired.
+        Inbound flows through <Link to="/settings/integrations" className="underline">per-task forwarding</Link> and{" "}
+        <Link to="/settings/integrations" className="underline">Gmail / Outlook OAuth</Link>.
+        AI classifies into 7 classes (client doc / client reply / agency /
+        3rd-party data / payment / vendor / spam) and routes to the right
+        client × task. Bytes stay in your email; we hold extracted text + facts
+        + thumbnails. Outbox + Drafts views light up once{" "}
+        <code>emails.listSent</code> + <code>emails.listDrafts</code> are wired.
       </p>
 
       {linking && (

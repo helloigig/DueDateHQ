@@ -103,7 +103,7 @@ export function ActivityTimeline({
                 className={[
                   "text-2xs uppercase tracking-wide px-2 py-0.5 rounded border",
                   active
-                    ? "bg-ink-900 text-canvas border-ink-900"
+                    ? "bg-ink-900 text-canvas border-transparent"
                     : "border-line text-ink-500 hover:bg-sunken",
                 ].join(" ")}
               >

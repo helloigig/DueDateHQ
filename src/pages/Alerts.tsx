@@ -166,15 +166,22 @@ function ActionRow({
   description,
   cta,
   onClick,
+  primary,
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
   cta: string;
   onClick: () => void;
+  /** Promote the CTA to the recommended next-action style (indigo solid).
+   *  Per DESIGN.md §Alert-type primary verb taxonomy, exactly one ActionRow
+   *  per alert carries the primary verb (Move / Tag / Schedule / Recompute
+   *  / Add filings); the rest stay outline. T2: one accent, one viewport,
+   *  one action. */
+  primary?: boolean;
 }) {
   return (
-    <article className="bg-surface border border-line rounded-md p-region flex items-start gap-3 hover:border-line-strong transition-colors">
+    <article className="bg-surface border border-line rounded-md p-region flex items-start gap-3 hover:bg-sunken/40 transition-colors">
       <span
         aria-hidden
         className="shrink-0 w-7 h-7 rounded-md bg-sunken text-ink-700 inline-flex items-center justify-center"
@@ -189,7 +196,12 @@ function ActionRow({
           {description}
         </div>
       </div>
-      <Button size="sm" variant="outline" onClick={onClick} className="shrink-0">
+      <Button
+        size="sm"
+        variant={primary ? "default" : "outline"}
+        onClick={onClick}
+        className="shrink-0"
+      >
         {cta}
       </Button>
     </article>
@@ -789,6 +801,7 @@ function CopilotPane({
                 if (isApplying) return;
                 onApplyDeadline(a);
               }}
+              primary={a.type === "disaster_extension"}
             />
           )}
 
@@ -803,6 +816,7 @@ function CopilotPane({
               description={`Per-state questionnaire — adds suggested filings on established nexus.`}
               cta={`Add filings`}
               onClick={() => onRunNexusCheck(a)}
+              primary
             />
           )}
 
@@ -813,6 +827,7 @@ function CopilotPane({
               description="Surfaces in each affected client's task at filing time so you remember to apply the relief."
               cta={`Tag ${includedCount}`}
               onClick={() => onOpenTag(a)}
+              primary
             />
           )}
 
@@ -823,6 +838,7 @@ function CopilotPane({
               description={`Schedules a planning call task for ${includedCount} affected ${includedCount === 1 ? "client" : "clients"}.`}
               cta="Schedule"
               onClick={() => onOpenPlanningCall(a)}
+              primary
             />
           )}
 
@@ -833,6 +849,7 @@ function CopilotPane({
               description="Recomputes estimate amounts using the new rate; you review before sending."
               cta="Recompute"
               onClick={() => onOpenRecompute(a)}
+              primary
             />
           )}
 
