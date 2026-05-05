@@ -23,8 +23,25 @@ import { trpc } from "../lib/api/client";
 
 type Status = "done" | "in_progress" | "not_started" | "overdue" | "blocked";
 
+/**
+ * Yuqi audit 2026-05-06: "5 stages are very complicated."
+ * Folded the 5 BE milestones (initial_meeting / collect_materials /
+ * prepare_workpapers / internal_review / file) into 3 user-facing
+ * phases the daily flow actually distinguishes:
+ *
+ *   Collect — Sarah is waiting on the client (initial_meeting +
+ *             collect_materials)
+ *   Prepare — Sarah is doing internal work (prepare_workpapers +
+ *             internal_review)
+ *   File    — terminal (file)
+ *
+ * The BE schema is unchanged — we still update the underlying
+ * milestones on `Mark done`, fanning out across all the canonicals
+ * folded into the phase. This keeps audit trail granularity intact
+ * while giving the user a 3-step mental model.
+ */
 type Waypoint = {
-  type: "initial_meeting" | "collect" | "prepare" | "review" | "file";
+  type: "collect" | "prepare" | "file";
   label: string;
   targetDate?: string;
   status: Status;
@@ -33,10 +50,11 @@ type Waypoint = {
   missingBadge?: number;
   // cross-year-insighter blocker reason — shown in tooltip + tinted dot when status=blocked
   blockerReason?: string;
-  // Persisted milestone id — present only for live BE rows (not heuristic).
-  // Drives the edit affordance: when id is set, the waypoint is clickable
-  // and opens an inline edit popover that calls taskMilestones.update.
-  id?: string;
+  // Persisted milestone ids — one per underlying canonical that
+  // belongs to this phase. Used by Mark-done to advance every
+  // sub-milestone in parallel + by the edit popover (operates on
+  // the first id).
+  ids?: string[];
 };
 
 const STATUS_OPTIONS: Array<{ value: Status; label: string }> = [
@@ -162,15 +180,42 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
       )}
 
       <div className="flex items-start gap-1">
-        {waypoints.map((wp, i) => (
-          <Waypoint
-            key={wp.type}
-            wp={wp}
-            isFirst={i === 0}
-            isLast={i === waypoints.length - 1}
-            onEdit={wp.id ? () => setEditing(wp) : undefined}
-          />
-        ))}
+        {waypoints.map((wp, i) => {
+          const isActive =
+            wp.status === "in_progress" ||
+            wp.status === "overdue" ||
+            wp.status === "blocked";
+          // Active phase exposes a "Mark done →" button that updates
+          // every underlying milestone in parallel — Yuqi audit
+          // 2026-05-06 replacing the click-into-dropdown flow which
+          // was "too complicated".
+          const onMarkDone =
+            isActive && wp.ids && wp.ids.length > 0
+              ? async () => {
+                  try {
+                    await Promise.all(
+                      wp.ids!.map((id) =>
+                        updateMilestone.mutateAsync({ id, status: "done" }),
+                      ),
+                    );
+                  } catch {
+                    // Error toast surfaces via the hook's onError.
+                  }
+                }
+              : undefined;
+          return (
+            <Waypoint
+              key={wp.type}
+              wp={wp}
+              isFirst={i === 0}
+              isLast={i === waypoints.length - 1}
+              isActive={isActive}
+              onEdit={wp.ids && wp.ids.length > 0 ? () => setEditing(wp) : undefined}
+              onMarkDone={onMarkDone}
+              isMarkingDone={updateMilestone.isPending}
+            />
+          );
+        })}
       </div>
 
       {editing && (
@@ -178,10 +223,11 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
           waypoint={editing}
           onClose={() => setEditing(null)}
           onSave={async (input) => {
-            if (!editing.id) return;
+            const targetId = editing.ids?.[0];
+            if (!targetId) return;
             try {
               await updateMilestone.mutateAsync({
-                id: editing.id,
+                id: targetId,
                 ...input,
               });
               setEditing(null);
@@ -218,16 +264,29 @@ function milestonesToWaypoints(
   const byType = new Map(
     rows.map((r) => [canonicalize(r.milestoneType), r] as const),
   );
-  const stages: Array<{
+  // Phase definition — see Waypoint type comment. Each phase aggregates
+  // 1-2 underlying BE milestones; rollup rules: all-done → done, any
+  // active → in_progress, otherwise not_started.
+  const phases: Array<{
     type: Waypoint["type"];
     label: string;
-    canonical: string;
+    canonicals: string[];
   }> = [
-    { type: "initial_meeting", label: "Initial mtg", canonical: "initial_meeting" },
-    { type: "collect", label: "Collect", canonical: "collect_materials" },
-    { type: "prepare", label: "Prepare", canonical: "prepare_workpapers" },
-    { type: "review", label: "Review", canonical: "internal_review" },
-    { type: "file", label: "File", canonical: "file" },
+    {
+      type: "collect",
+      label: "Collect",
+      canonicals: ["initial_meeting", "collect_materials"],
+    },
+    {
+      type: "prepare",
+      label: "Prepare",
+      canonicals: ["prepare_workpapers", "internal_review"],
+    },
+    {
+      type: "file",
+      label: "File",
+      canonicals: ["file"],
+    },
   ];
   const waiting = checklist.filter(
     (c) =>
@@ -236,32 +295,44 @@ function milestonesToWaypoints(
   const reviewPending = checklist.filter(
     (c) => c.state === "received_unreviewed" || c.state === "received_issue",
   ).length;
-  return stages.map((s) => {
-    const row = byType.get(s.canonical);
-    const status: Status =
-      row?.status === "done"
-        ? "done"
-        : row?.status === "blocked"
-          ? "blocked"
-          : row?.status === "in_progress"
+  return phases.map((p) => {
+    const subs = p.canonicals
+      .map((c) => byType.get(c))
+      .filter((r): r is LiveMilestone => Boolean(r));
+    const allDone = subs.length > 0 && subs.every((s) => s.status === "done");
+    const anyBlocked = subs.some((s) => s.status === "blocked");
+    const anyOverdue = subs.some((s) => s.status === "overdue");
+    const anyInProgress = subs.some((s) => s.status === "in_progress");
+    const status: Status = allDone
+      ? "done"
+      : anyBlocked
+        ? "blocked"
+        : anyOverdue
+          ? "overdue"
+          : anyInProgress
             ? "in_progress"
-            : row?.status === "overdue"
-              ? "overdue"
-              : "not_started";
+            : "not_started";
+    // Phase target = latest sub-milestone date (the moment this phase
+    // is supposed to close).
+    const dates = subs
+      .map((s) => s.targetDate)
+      .filter((d): d is string => Boolean(d))
+      .sort();
+    const targetDate = dates.length > 0 ? dates[dates.length - 1] : undefined;
     let missingBadge: number | undefined;
     if (status === "in_progress" || status === "overdue" || status === "blocked") {
-      if (s.canonical === "collect_materials") missingBadge = waiting || undefined;
-      else if (s.canonical === "prepare_workpapers")
-        missingBadge = reviewPending || undefined;
+      if (p.type === "collect") missingBadge = waiting || undefined;
+      else if (p.type === "prepare") missingBadge = reviewPending || undefined;
     }
+    const blockerReason = subs.find((s) => s.blockerReason)?.blockerReason;
     return {
-      type: s.type,
-      label: s.label,
-      targetDate: row?.targetDate ?? undefined,
+      type: p.type,
+      label: p.label,
+      targetDate,
       status,
       missingBadge,
-      blockerReason: row?.blockerReason ?? undefined,
-      id: row?.id,
+      blockerReason: blockerReason ?? undefined,
+      ids: subs.map((s) => s.id).filter(Boolean) as string[],
     };
   });
 }
@@ -278,12 +349,23 @@ function Waypoint({
   wp,
   isFirst,
   isLast,
+  isActive,
   onEdit,
+  onMarkDone,
+  isMarkingDone,
 }: {
   wp: Waypoint;
   isFirst: boolean;
   isLast: boolean;
+  /** True if this is the phase the user is currently working on
+   *  (in_progress / overdue / blocked). Drives the "Mark done" CTA. */
+  isActive?: boolean;
   onEdit?: () => void;
+  /** Click handler that marks every underlying milestone in this
+   *  phase as done. Provided only when the phase is active and has
+   *  at least one persisted milestone id. */
+  onMarkDone?: () => void;
+  isMarkingDone?: boolean;
 }) {
   const dotClasses = (() => {
     switch (wp.status) {
@@ -337,13 +419,24 @@ function Waypoint({
 
       {/* Label + date */}
       <div className="mt-2 text-center min-w-0 w-full">
-        <div className="text-2xs font-medium text-ink-700 truncate inline-flex items-center gap-1 justify-center">
+        <div
+          className={`text-2xs font-medium truncate inline-flex items-center gap-1 justify-center ${
+            isActive ? "text-ink-900" : "text-ink-700"
+          }`}
+        >
           {wp.label}
           {onEdit && (
-            <Pencil
-              className="w-2.5 h-2.5 text-ink-300 group-hover:text-ink-500 transition-colors shrink-0"
-              aria-hidden
-            />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+              aria-label={`Edit ${wp.label}`}
+              className="text-ink-300 hover:text-ink-700 transition-colors shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100"
+            >
+              <Pencil className="w-2.5 h-2.5" aria-hidden />
+            </button>
           )}
         </div>
         {wp.targetDate && (
@@ -351,27 +444,30 @@ function Waypoint({
             {formatShort(wp.targetDate)}
           </div>
         )}
+        {/* Active-phase Mark-done CTA — Yuqi audit 2026-05-06 replaces
+            the click-into-popover-and-pick-Done flow. Phase-level: one
+            click marks every underlying milestone done in parallel. */}
+        {onMarkDone && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onMarkDone();
+            }}
+            disabled={isMarkingDone}
+            className="mt-1.5 text-2xs px-2 py-0.5 rounded-pill bg-indigo text-white hover:bg-indigo-hover disabled:opacity-50 inline-flex items-center gap-0.5"
+          >
+            {isMarkingDone ? "Marking…" : "Mark done"}
+            <span aria-hidden>→</span>
+          </button>
+        )}
       </div>
     </>
   );
 
-  if (onEdit) {
-    return (
-      <button
-        type="button"
-        onClick={onEdit}
-        title={tooltipText}
-        aria-label={`Edit ${wp.label} milestone`}
-        className="group flex-1 flex flex-col items-center min-w-0 relative bg-transparent border-0 p-0 cursor-pointer rounded hover:bg-sunken/30 focus:outline-none focus:ring-2 focus:ring-info-border focus:ring-offset-1 focus:ring-offset-surface transition-colors"
-      >
-        {inner}
-      </button>
-    );
-  }
-
   return (
     <div
-      className="flex-1 flex flex-col items-center min-w-0 relative"
+      className="group flex-1 flex flex-col items-center min-w-0 relative"
       title={tooltipText}
     >
       {inner}
@@ -570,32 +666,52 @@ function deriveWaypoints(task: Task, checklist: ChecklistItem[]): Waypoint[] {
         ? "in_progress"
         : "not_started";
 
+  // Fold the 5 derived statuses into 3 phases — same rules as
+  // milestonesToWaypoints (BE path): allDone → done, anyActive →
+  // in_progress, otherwise not_started.
+  // initialStatus is always "done" in the heuristic (we assume the
+  // initial meeting happened), so the collect-aggregate is driven by
+  // collectStatus alone — TS narrowed initialStatus to "done" so any
+  // comparison with "in_progress" is dead.
+  void initialStatus;
+  const collectAggregateStatus: Status =
+    collectStatus === "done"
+      ? "done"
+      : collectStatus === "overdue"
+        ? "overdue"
+        : collectStatus === "in_progress"
+          ? "in_progress"
+          : "not_started";
+  const prepareAggregateStatus: Status =
+    prepareStatus === "done" && reviewStatus === "done"
+      ? "done"
+      : prepareStatus === "in_progress" || reviewStatus === "in_progress"
+        ? "in_progress"
+        : "not_started";
+  // Use the latest sub-date as the phase target.
+  const collectTarget = clientPrep ?? initialMeeting;
+  const prepareTarget = review ?? target;
   return [
-    {
-      type: "initial_meeting",
-      label: "Initial mtg",
-      targetDate: initialMeeting,
-      status: initialStatus,
-    },
     {
       type: "collect",
       label: "Collect",
-      targetDate: clientPrep,
-      status: collectStatus,
-      missingBadge: collectStatus === "in_progress" || collectStatus === "overdue" ? waiting : undefined,
+      targetDate: collectTarget,
+      status: collectAggregateStatus,
+      missingBadge:
+        collectAggregateStatus === "in_progress" ||
+        collectAggregateStatus === "overdue"
+          ? waiting || undefined
+          : undefined,
     },
     {
       type: "prepare",
       label: "Prepare",
-      targetDate: target,
-      status: prepareStatus,
-      missingBadge: prepareStatus === "in_progress" ? review_pending : undefined,
-    },
-    {
-      type: "review",
-      label: "Review",
-      targetDate: review,
-      status: reviewStatus,
+      targetDate: prepareTarget,
+      status: prepareAggregateStatus,
+      missingBadge:
+        prepareAggregateStatus === "in_progress"
+          ? review_pending || undefined
+          : undefined,
     },
     {
       type: "file",

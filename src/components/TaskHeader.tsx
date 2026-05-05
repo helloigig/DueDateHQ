@@ -28,7 +28,9 @@ import { TaskActions } from "./TaskActions";
 interface Props {
   task: Task;
   client: Client;
-  /** Completion percentage 0-100 from the checklist; renders the progress ring. */
+  /** @deprecated Progress ring removed 2026-05-06; prop preserved on
+   *  the API so existing callers don't break, but the value is
+   *  ignored. Remove from callers in a follow-up. */
   completionPct?: number;
   /** Open the AI email-draft modal in chase mode. The DeadlineChip
    *  surfaces this when `recommendedAction === "chase"`. Wired by the
@@ -39,7 +41,6 @@ interface Props {
 export function TaskHeader({
   task,
   client,
-  completionPct = 0,
   onChase,
 }: Props) {
   const [copied, setCopied] = useState(false);
@@ -79,12 +80,16 @@ export function TaskHeader({
         <span className="text-ink-900">{task.formType}</span>
       </nav>
 
-      {/* Header layout: ring + title block stack BELOW the action group on
-          mobile so the right-aligned "Mark complete" pill never sits on top
-          of the progress ring. At sm+ the row goes side-by-side. */}
+      {/* Header layout: title block sits side-by-side with the action
+          group at sm+; stacks on mobile so the right-aligned action
+          pills don't crowd the title. ProgressRing dropped 2026-05-06
+          per Yuqi audit — "0%" without a label was meaningless; the
+          actual progress signal is in the checklist sections below
+          ("Still waiting · 2 of 2 items"), which read clearly without
+          a percentage. The completionPct prop is kept on the API for
+          callers that still pass it; it's now ignored. */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
-        <div className="min-w-0 flex items-start gap-3">
-          <ProgressRing pct={completionPct} />
+        <div className="min-w-0 flex-1">
           <div>
           {/* Title typography matches PageHeader (text-display, 22/600).
               Inline h1 (not <PageHeader>) because the deadline chip + meta
@@ -327,41 +332,4 @@ function CoverSheetButton({ taskId }: { taskId: string }) {
   );
 }
 
-/**
- * Progress ring showing checklist completion percentage. Built with SVG
- * so it scales cleanly. Color shifts subtly as the value crosses 50% / 90%.
- * The needle-thin stroke keeps the ring elegant — never a "loud" donut.
- */
-function ProgressRing({ pct }: { pct: number }) {
-  const clamped = Math.max(0, Math.min(100, Math.round(pct)));
-  const radius = 18;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (clamped / 100) * circumference;
-  const stroke =
-    clamped >= 100
-      ? "stroke-ok-solid"
-      : clamped >= 50
-      ? "stroke-info-solid"
-      : "stroke-ink-400";
-  return (
-    <div className="relative w-12 h-12 shrink-0" aria-label={`${clamped}% complete`} role="img">
-      <svg viewBox="0 0 44 44" className="w-12 h-12 -rotate-90">
-        <circle cx="22" cy="22" r={radius} fill="none" className="stroke-line" strokeWidth="2.5" />
-        <circle
-          cx="22"
-          cy="22"
-          r={radius}
-          fill="none"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          className={`${stroke} transition-[stroke-dashoffset] duration-500 ease-out`}
-        />
-      </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-2xs font-medium text-ink-700 tabular-nums">
-        {clamped}%
-      </span>
-    </div>
-  );
-}
+// ProgressRing removed 2026-05-06 — see Props.completionPct comment.
