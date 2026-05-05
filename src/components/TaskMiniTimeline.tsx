@@ -85,6 +85,15 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
     null,
   );
   const [editing, setEditing] = useState<Waypoint | null>(null);
+  // Selected waypoint type — drives which stage's actions appear in the
+  // panel below the timeline. Starts unset; resolves to the active stage
+  // (in_progress / overdue / blocked) once waypoints load. Yuqi audit
+  // 2026-05-05: the prior dual-surface (floating popover + separate
+  // edit form) felt fragmented. Now: ONE inline panel below the
+  // timeline always holds the actions for ONE selected stage. Click
+  // another dot → panel scopes to it. Default = active stage.
+  const [selectedStageType, setSelectedStageType] =
+    useState<Waypoint["type"] | null>(null);
   const liveMilestones = milestonesQuery.data ?? [];
   const hasLive = liveMilestones.length > 0;
   const blockedCount = liveMilestones.filter((m) => m.status === "blocked").length;
@@ -93,6 +102,26 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
     if (hasLive) return milestonesToWaypoints(liveMilestones, checklist);
     return deriveWaypoints(task, checklist);
   }, [hasLive, liveMilestones, task, checklist]);
+
+  // Resolve the currently-selected waypoint. Falls back to the active
+  // stage (in-progress / overdue / blocked) when nothing was clicked,
+  // so the panel below the timeline is always populated when the task
+  // is live. If nothing's active (all done, all not-started), pick
+  // whatever the user last clicked, else first not-started, else null.
+  const selectedWaypoint = useMemo(() => {
+    if (selectedStageType) {
+      return waypoints.find((w) => w.type === selectedStageType) ?? null;
+    }
+    const active = waypoints.find(
+      (w) =>
+        w.status === "in_progress" ||
+        w.status === "overdue" ||
+        w.status === "blocked",
+    );
+    if (active) return active;
+    const firstNotDone = waypoints.find((w) => w.status !== "done");
+    return firstNotDone ?? waypoints[0] ?? null;
+  }, [waypoints, selectedStageType]);
 
   const onCheckBlockers = async () => {
     const result = await detectBlockers.mutateAsync({ taskId: task.id });
@@ -171,26 +200,23 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
         </div>
       )}
 
+      {/* Timeline strip — bigger dots, filled connector showing progress,
+          status text always visible under each date. Click any dot to
+          select that stage; selected stage's actions render in the
+          panel below. */}
       <div className="flex items-start gap-1">
         {waypoints.map((wp, i) => {
           const isActive =
             wp.status === "in_progress" ||
             wp.status === "overdue" ||
             wp.status === "blocked";
-          const onMarkDone =
-            isActive && wp.ids && wp.ids.length > 0
-              ? async () => {
-                  try {
-                    await Promise.all(
-                      wp.ids!.map((id) =>
-                        updateMilestone.mutateAsync({ id, status: "done" }),
-                      ),
-                    );
-                  } catch {
-                    // Error toast surfaces via the hook's onError.
-                  }
-                }
-              : undefined;
+          const isSelected = selectedWaypoint?.type === wp.type;
+          // Connector before this dot is "filled" if THIS dot's stage
+          // has been started (done or in-progress) OR any earlier dot
+          // is done. Drives the green line that visually fills as the
+          // task progresses.
+          const isPriorDone =
+            i > 0 && waypoints[i - 1].status === "done";
           return (
             <Waypoint
               key={wp.type}
@@ -198,13 +224,48 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
               isFirst={i === 0}
               isLast={i === waypoints.length - 1}
               isActive={isActive}
-              onEdit={wp.ids && wp.ids.length > 0 ? () => setEditing(wp) : undefined}
-              onMarkDone={onMarkDone}
-              isMarkingDone={updateMilestone.isPending}
+              isSelected={isSelected}
+              isConnectorBeforeFilled={isPriorDone}
+              onSelect={() => setSelectedStageType(wp.type)}
             />
           );
         })}
       </div>
+
+      {/* Active-stage panel — always visible below the timeline;
+          replaces the floating-popover-on-hover pattern. Holds the
+          status pill + Mark done CTA + Override link for the currently-
+          selected stage (defaults to the active stage). One surface,
+          one set of controls. */}
+      {selectedWaypoint && (
+        <ActiveStagePanel
+          wp={selectedWaypoint}
+          isMarkingDone={updateMilestone.isPending}
+          onMarkDone={
+            selectedWaypoint.ids && selectedWaypoint.ids.length > 0
+              ? async () => {
+                  try {
+                    await Promise.all(
+                      selectedWaypoint.ids!.map((id) =>
+                        updateMilestone.mutateAsync({
+                          id,
+                          status: "done",
+                        }),
+                      ),
+                    );
+                  } catch {
+                    // Error toast surfaces via the hook's onError.
+                  }
+                }
+              : undefined
+          }
+          onOverride={
+            selectedWaypoint.ids && selectedWaypoint.ids.length > 0
+              ? () => setEditing(selectedWaypoint)
+              : undefined
+          }
+        />
+      )}
 
       {editing && (
         <MilestoneEditPopover
@@ -325,101 +386,125 @@ function canonicalize(milestoneType: string): string {
   return milestoneType;
 }
 
+/**
+ * Waypoint — one stage on the path-to-filing strip. Yuqi audit
+ * 2026-05-05 (round 3) — "i think you can design better for this
+ * section." Redesign goals:
+ *   - Stronger dots: 14px (was 12px), state-aware fills + rings,
+ *     selected ring in indigo so the user sees their current focus
+ *   - Filled connector: the line BEFORE a dot turns ok-solid green
+ *     when the prior stage is done — visually "fills" as progress
+ *     accumulates
+ *   - Always-visible status text under each date (was hover-only),
+ *     so Sarah doesn't need to point-and-wait to read state
+ *   - No floating popover anymore — actions live in the
+ *     ActiveStagePanel below the timeline (single surface, single
+ *     set of controls per stage)
+ *   - Click the dot → selects this stage (panel below scopes to it).
+ *     Hover unchanged (no UI). Keyboard: Enter/Space selects.
+ */
 function Waypoint({
   wp,
   isFirst,
   isLast,
   isActive,
-  onEdit,
-  onMarkDone,
-  isMarkingDone,
+  isSelected,
+  isConnectorBeforeFilled,
+  onSelect,
 }: {
   wp: Waypoint;
   isFirst: boolean;
   isLast: boolean;
   isActive?: boolean;
-  onEdit?: () => void;
-  onMarkDone?: () => void;
-  isMarkingDone?: boolean;
+  isSelected?: boolean;
+  isConnectorBeforeFilled?: boolean;
+  onSelect: () => void;
 }) {
-  // Popover visibility — Yuqi audit 2026-05-06 (round 2): the prior
-  // hover-only flow looked elegant on desktop but was a discoverability
-  // wall in the side-panel ("I cannot assign status to the path to
-  // filing"). Hover doesn't work on touch, requires natural mouse
-  // exploration, and is invisible to anyone who clicks the dot
-  // expecting an action. Click now PINS the popover open until the
-  // user clicks elsewhere; hover keeps the previous transient
-  // surfacing for power users.
-  const [hover, setHover] = useState(false);
-  const [pinned, setPinned] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const open = hover || pinned;
-  // Close pinned popover on outside click. Hover stays event-driven.
-  useEffect(() => {
-    if (!pinned) return;
-    const handler = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) {
-        setPinned(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [pinned]);
-  const isInteractive = !!(onMarkDone || onEdit);
   const dotClasses = (() => {
     switch (wp.status) {
       case "done":
-        return "bg-ok-solid";
+        return "bg-ok-solid border-ok-solid";
       case "in_progress":
-        return "bg-warn-solid ring-2 ring-warn-border ring-offset-2 ring-offset-surface";
+        return "bg-warn-solid border-warn-solid";
       case "overdue":
-        return "bg-danger-solid";
+        return "bg-danger-solid border-danger-solid";
       case "blocked":
-        return "bg-danger-solid ring-2 ring-danger-border ring-offset-2 ring-offset-surface animate-pulse";
+        return "bg-danger-solid border-danger-solid animate-pulse";
       default:
-        return "bg-line";
+        return "bg-surface border-line-strong"; // hollow "not started"
+    }
+  })();
+  const statusLabel = (() => {
+    switch (wp.status) {
+      case "done":
+        return "Done";
+      case "in_progress":
+        return "In progress";
+      case "overdue":
+        return "Overdue";
+      case "blocked":
+        return "Blocked";
+      default:
+        return "Not started";
+    }
+  })();
+  const statusToneClass = (() => {
+    switch (wp.status) {
+      case "done":
+        return "text-ok-ink";
+      case "in_progress":
+        return "text-warn-ink";
+      case "overdue":
+      case "blocked":
+        return "text-danger-ink";
+      default:
+        return "text-ink-400";
     }
   })();
 
   return (
     <div
-      ref={rootRef}
-      role={isInteractive ? "button" : undefined}
-      tabIndex={isInteractive ? 0 : undefined}
-      aria-label={
-        isInteractive
-          ? `${wp.label} — ${wp.status.replace("_", " ")} (click for actions)`
-          : undefined
-      }
+      role="button"
+      tabIndex={0}
+      aria-label={`${wp.label} — ${statusLabel}`}
+      aria-pressed={isSelected}
       onClick={(e) => {
-        if (!isInteractive) return;
         e.stopPropagation();
-        setPinned((v) => !v);
+        onSelect();
       }}
       onKeyDown={(e) => {
-        if (!isInteractive) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          setPinned((v) => !v);
+          onSelect();
         }
-        if (e.key === "Escape") setPinned(false);
       }}
       className={cn(
-        "group flex-1 flex flex-col items-center min-w-0 relative",
-        isInteractive && "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-soft rounded",
+        "group flex-1 flex flex-col items-center min-w-0 relative cursor-pointer rounded",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-soft",
       )}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      onFocus={() => setHover(true)}
-      onBlur={() => setHover(false)}
     >
-      {/* Connector line on left and right (skipped at edges) */}
-      <div className="absolute top-2.5 left-0 right-0 flex items-center pointer-events-none">
+      {/* Connector lines — split into LEFT (before this dot) + RIGHT
+          (after this dot). Left fills green when the PRIOR stage is
+          done; right fills when THIS stage is done. Together they
+          paint a progress bar across the strip as the task moves. */}
+      <div className="absolute top-3 left-0 right-0 flex items-center pointer-events-none">
         {!isFirst && (
-          <div className="flex-1 h-px bg-line" style={{ marginRight: "50%" }} />
+          <div
+            className={cn(
+              "flex-1 h-0.5",
+              isConnectorBeforeFilled ? "bg-ok-solid" : "bg-line",
+            )}
+            style={{ marginRight: "50%" }}
+          />
         )}
         {!isLast && (
-          <div className="flex-1 h-px bg-line" style={{ marginLeft: "50%" }} />
+          <div
+            className={cn(
+              "flex-1 h-0.5",
+              wp.status === "done" ? "bg-ok-solid" : "bg-line",
+            )}
+            style={{ marginLeft: "50%" }}
+          />
         )}
       </div>
 
@@ -432,17 +517,28 @@ function Waypoint({
         )}
       </div>
 
-      {/* Dot */}
+      {/* Dot — 14px, state-coloured, with selected indigo ring +
+          active warn ring. The "selected" ring is the page's primary
+          accent (indigo); the "active" ring is the warn palette so
+          they don't fight when both fire on the same dot. */}
       <div
-        className={`relative z-10 w-3 h-3 rounded-full shrink-0 ${dotClasses}`}
+        className={cn(
+          "relative z-10 w-3.5 h-3.5 rounded-full shrink-0 border-2 transition-all",
+          dotClasses,
+          isActive && !isSelected && "ring-2 ring-warn-border ring-offset-2 ring-offset-surface",
+          isSelected &&
+            "ring-2 ring-indigo ring-offset-2 ring-offset-surface scale-110",
+        )}
       />
 
-      {/* Label + date */}
+      {/* Label + date + status — all three lines visible at rest so
+          the user reads "Collect · Jun 1 · Done" without hovering. */}
       <div className="mt-2 text-center min-w-0 w-full">
         <div
-          className={`text-2xs font-medium truncate ${
-            isActive ? "text-ink-900" : "text-ink-700"
-          }`}
+          className={cn(
+            "text-2xs font-medium truncate",
+            isActive || isSelected ? "text-ink-900" : "text-ink-700",
+          )}
         >
           {wp.label}
         </div>
@@ -451,57 +547,96 @@ function Waypoint({
             {formatShort(wp.targetDate)}
           </div>
         )}
-      </div>
-
-      {/* Popover — appears on hover (transient) or click (pinned).
-          Surfaces phase status + Mark done CTA + override edit,
-          without a dropdown step. */}
-      {open && isInteractive && (
         <div
-          className="absolute z-30 top-full mt-2 w-44 bg-surface border border-line rounded-md shadow-pop p-2 text-2xs"
-          role="dialog"
-          aria-label={`${wp.label} actions`}
+          className={cn("text-2xs truncate font-medium", statusToneClass)}
         >
-          <div className="font-semibold text-ink-900 mb-1 capitalize">
-            {wp.label} ·{" "}
-            <span
-              className={
-                wp.status === "done"
-                  ? "text-ok-ink"
-                  : wp.status === "in_progress"
-                    ? "text-warn-ink"
-                    : wp.status === "overdue" || wp.status === "blocked"
-                      ? "text-danger-ink"
-                      : "text-ink-500"
-              }
-            >
-              {wp.status.replace("_", " ")}
-            </span>
-          </div>
-          {wp.targetDate && (
-            <div className="text-ink-500 mb-1.5">
-              Target {formatShort(wp.targetDate)}
-            </div>
-          )}
-          {wp.blockerReason && (
-            <div className="text-danger-ink mb-1.5">{wp.blockerReason}</div>
-          )}
-          {onMarkDone && (
+          {statusLabel}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * ActiveStagePanel — one inline panel below the timeline that surfaces
+ * the selected stage's status + actions. Replaces the prior floating-
+ * hover-popover flow. One surface, one set of controls. Default-
+ * selected stage is the active one (in-progress / overdue / blocked).
+ */
+function ActiveStagePanel({
+  wp,
+  onMarkDone,
+  onOverride,
+  isMarkingDone,
+}: {
+  wp: Waypoint;
+  onMarkDone?: () => void;
+  onOverride?: () => void;
+  isMarkingDone?: boolean;
+}) {
+  const isFinished = wp.status === "done";
+  const tone = (() => {
+    if (wp.status === "overdue" || wp.status === "blocked") {
+      return "border-danger-border bg-danger-bg/40";
+    }
+    if (wp.status === "in_progress") {
+      return "border-warn-border bg-warn-bg/30";
+    }
+    if (wp.status === "done") {
+      return "border-ok-border bg-ok-bg/30";
+    }
+    return "border-line bg-sunken/30";
+  })();
+  const headline = (() => {
+    if (wp.status === "blocked") return `${wp.label} · blocked`;
+    if (wp.status === "overdue") return `${wp.label} · overdue`;
+    if (wp.status === "in_progress") return `Currently on ${wp.label}`;
+    if (wp.status === "done") return `${wp.label} done`;
+    return `${wp.label} · not started`;
+  })();
+  return (
+    <div
+      className={cn(
+        "mt-3 px-3 py-2.5 rounded-md border text-xs",
+        tone,
+      )}
+      aria-label={`${wp.label} stage actions`}
+    >
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <span className="font-semibold text-ink-900">{headline}</span>
+        {wp.targetDate && (
+          <span className="text-2xs text-ink-500 tabular-nums">
+            target {formatShort(wp.targetDate)}
+          </span>
+        )}
+        {wp.missingBadge && wp.missingBadge > 0 && (
+          <span className="text-2xs text-warn-ink font-medium">
+            · {wp.missingBadge} item
+            {wp.missingBadge === 1 ? "" : "s"} waiting
+          </span>
+        )}
+      </div>
+      {wp.blockerReason && (
+        <p className="mt-1 text-2xs text-danger-ink">{wp.blockerReason}</p>
+      )}
+      {(onMarkDone || onOverride) && (
+        <div className="mt-2 flex items-center gap-3 flex-wrap">
+          {onMarkDone && !isFinished && (
             <button
               type="button"
               onClick={onMarkDone}
               disabled={isMarkingDone}
-              className="w-full mb-1 px-2 py-1 rounded-pill bg-indigo text-white hover:bg-indigo-hover disabled:opacity-50 inline-flex items-center justify-center gap-1"
+              className="text-xs font-medium px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover disabled:opacity-50 inline-flex items-center gap-1"
             >
-              {isMarkingDone ? "Marking…" : "Mark done"}
+              {isMarkingDone ? "Marking…" : `Mark ${wp.label} done`}
               <span aria-hidden>→</span>
             </button>
           )}
-          {onEdit && (
+          {onOverride && (
             <button
               type="button"
-              onClick={onEdit}
-              className="w-full px-2 py-1 rounded text-ink-700 hover:bg-sunken inline-flex items-center justify-center gap-1"
+              onClick={onOverride}
+              className="text-2xs text-ink-500 hover:text-ink-900 underline underline-offset-2 inline-flex items-center gap-1"
             >
               <Pencil className="w-2.5 h-2.5" aria-hidden />
               Override date / status
