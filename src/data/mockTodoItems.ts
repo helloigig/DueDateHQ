@@ -139,7 +139,7 @@ export const MOCK_TODO_ITEMS: MockTodoItem[] = [
     source: "mode_f_alert",
     verb: "Apply",
     client: "12 clients",
-    action: "Apply CA FTB extension · 12 affected clients",
+    action: "Apply California Franchise Tax Board extension · 12 affected clients",
     context: "Published 6h ago · matched on entity + state",
     urgency: "medium",
     urgencyScore: 150,
