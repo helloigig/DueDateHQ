@@ -9,6 +9,7 @@ import { StatusPill } from "./ui/StatusPill";
 const MILESTONE_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
   Circle, Pencil, Ban, CheckCircle2, AlertCircle,
 };
+import { cn } from "../lib/utils";
 
 // TaskMiniTimeline — per IA v0.7 amendment §3.4.
 //
@@ -348,11 +349,30 @@ function Waypoint({
   onMarkDone?: () => void;
   isMarkingDone?: boolean;
 }) {
-  // Hover popover state — Yuqi audit 2026-05-06: replaced the
-  // "click → expand → pick from dropdown" flow with hover-to-popover.
-  // The popover surfaces phase status + Mark done CTA + a subtle
-  // override edit affordance, all without a dropdown step.
+  // Popover visibility — Yuqi audit 2026-05-06 (round 2): the prior
+  // hover-only flow looked elegant on desktop but was a discoverability
+  // wall in the side-panel ("I cannot assign status to the path to
+  // filing"). Hover doesn't work on touch, requires natural mouse
+  // exploration, and is invisible to anyone who clicks the dot
+  // expecting an action. Click now PINS the popover open until the
+  // user clicks elsewhere; hover keeps the previous transient
+  // surfacing for power users.
   const [hover, setHover] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const open = hover || pinned;
+  // Close pinned popover on outside click. Hover stays event-driven.
+  useEffect(() => {
+    if (!pinned) return;
+    const handler = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) {
+        setPinned(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [pinned]);
+  const isInteractive = !!(onMarkDone || onEdit);
   const dotClasses = (() => {
     switch (wp.status) {
       case "done":
@@ -370,7 +390,31 @@ function Waypoint({
 
   return (
     <div
-      className="group flex-1 flex flex-col items-center min-w-0 relative"
+      ref={rootRef}
+      role={isInteractive ? "button" : undefined}
+      tabIndex={isInteractive ? 0 : undefined}
+      aria-label={
+        isInteractive
+          ? `${wp.label} — ${wp.status.replace("_", " ")} (click for actions)`
+          : undefined
+      }
+      onClick={(e) => {
+        if (!isInteractive) return;
+        e.stopPropagation();
+        setPinned((v) => !v);
+      }}
+      onKeyDown={(e) => {
+        if (!isInteractive) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setPinned((v) => !v);
+        }
+        if (e.key === "Escape") setPinned(false);
+      }}
+      className={cn(
+        "group flex-1 flex flex-col items-center min-w-0 relative",
+        isInteractive && "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-soft rounded",
+      )}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       onFocus={() => setHover(true)}
@@ -416,10 +460,10 @@ function Waypoint({
         )}
       </div>
 
-      {/* Hover popover — appears on the active phase or any
-          edit-eligible phase. Surfaces status + Mark done + override
-          edit, all without a dropdown step. */}
-      {hover && (onMarkDone || onEdit) && (
+      {/* Popover — appears on hover (transient) or click (pinned).
+          Surfaces phase status + Mark done CTA + override edit,
+          without a dropdown step. */}
+      {open && isInteractive && (
         <div
           className="absolute z-30 top-full mt-2 w-44 bg-surface border border-line rounded-md shadow-pop p-2 text-2xs"
           role="dialog"

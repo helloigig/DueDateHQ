@@ -1661,13 +1661,13 @@ function TaskTimelineRow({
         role={navigable ? "button" : undefined}
         tabIndex={navigable ? 0 : undefined}
         onClick={() => {
-          if (navigable) navigate(`/clients/${t.clientId}/tasks/${t.taskId}`);
+          if (navigable) navigate(`/clients/${t.clientId}?task=${t.taskId}`);
         }}
         onKeyDown={(e) => {
           if (!navigable) return;
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            navigate(`/clients/${t.clientId}/tasks/${t.taskId}`);
+            navigate(`/clients/${t.clientId}?task=${t.taskId}`);
           }
         }}
         className={cn(
