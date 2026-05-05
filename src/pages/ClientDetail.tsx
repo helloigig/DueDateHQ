@@ -36,7 +36,12 @@ import {
 import { actions, useStore } from "../data/store";
 import { trpc } from "../lib/api/client";
 import { env } from "../config";
-import { useClient, useAddNote } from "../hooks/useClients";
+import {
+  useAddNote,
+  useArchiveClient,
+  useClient,
+  useUpdateClient,
+} from "../hooks/useClients";
 import { useDeadlinesForClient } from "../hooks/useDeadlines";
 import { useTasksForClient } from "../hooks/useTasks";
 import {
@@ -118,6 +123,7 @@ export function ClientDetail() {
   const deadlinesQuery = useDeadlinesForClient(id);
   const client = clientQuery.data ?? null;
   const deadlines = deadlinesQuery.data ?? [];
+  const archiveClientMut = useArchiveClient();
   const [tab, setTab] = useState<Tab>("todo");
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
@@ -216,7 +222,13 @@ export function ClientDetail() {
   );
 
   const onArchiveConfirm = () => {
-    actions.archiveClient(client.id);
+    if (env.useMockData) {
+      actions.archiveClient(client.id);
+    } else {
+      // Real mode hits clients.archive — onSuccess invalidates the
+      // clients cache so the list view drops this row on next render.
+      archiveClientMut.mutate({ id: client.id });
+    }
     setArchiveOpen(false);
     navigate("/clients");
   };
@@ -1852,6 +1864,7 @@ function DocumentsTab({ client }: { client: Client }) {
 function ClientAiSummary({ client }: { client: Client }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
+  const updateClientMut = useUpdateClient();
   // Stub composer — picks a contextual placeholder based on tier so
   // demos read naturally. Phase 2 replaces this with the real signal-
   // composed sentence from the BE.
@@ -1882,9 +1895,20 @@ function ClientAiSummary({ client }: { client: Client }) {
           </button>
           <button
             onClick={() => {
-              actions.updateClient(client.id, {
-                aiSummaryOverride: draft.trim() || null,
-              });
+              const next = draft.trim() || null;
+              if (env.useMockData) {
+                actions.updateClient(client.id, { aiSummaryOverride: next });
+              } else {
+                // Real mode persists via clients.update — the patch
+                // shape on the BE accepts aiSummaryOverride (added in
+                // the same change that introduced this UI). On success
+                // useUpdateClient invalidates clients.get so the
+                // header re-reads the new override.
+                updateClientMut.mutate({
+                  id: client.id,
+                  patch: { aiSummaryOverride: next },
+                });
+              }
               setEditing(false);
             }}
             className="text-xs px-2.5 py-1 rounded bg-accent text-canvas hover:bg-accent-hover"

@@ -3,6 +3,8 @@ import { actions } from "../data/store";
 import type { Client, EntityType, StateCode } from "../types";
 import { STATE_NAMES } from "../types";
 import { useModalDialog } from "../hooks/useModalDialog";
+import { useUpdateClient } from "../hooks/useClients";
+import { env } from "../config";
 import { MigrationPreviewModal } from "./MigrationPreviewModal";
 
 const ENTITY_OPTIONS: EntityType[] = [
@@ -43,6 +45,7 @@ export function EditClientModal({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [migrationOpen, setMigrationOpen] = useState(false);
+  const updateClientMut = useUpdateClient();
 
   useEffect(() => {
     if (open && client) {
@@ -68,14 +71,25 @@ export function EditClientModal({
       JSON.stringify([...client.nexusStates].sort());
 
   const commitSave = () => {
-    actions.updateClient(client.id, {
+    const patch = {
       name: name.trim(),
       entityType: entity,
       primaryState: state,
       nexusStates: nexus,
       contactEmail: email.trim(),
       contactPhone: phone.trim() || undefined,
-    });
+    };
+    if (env.useMockData) {
+      // Optimistic local update so the UI feels instant; the modal close
+      // triggers a re-render of the detail page which reads from the
+      // mock store.
+      actions.updateClient(client.id, patch);
+    } else {
+      // Real mode: hit BE clients.update so the change persists. Cache
+      // invalidation in the hook re-fetches both clients.list and
+      // clients.get so the detail header + roster table refresh.
+      updateClientMut.mutate({ id: client.id, patch });
+    }
     setMigrationOpen(false);
     onClose();
   };
