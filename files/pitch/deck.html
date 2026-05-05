@@ -1,11 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DueDateHQ · Pitch · 2026-05-05</title>
+<title>DueDateHQ · Pitch · 2026-05-06 · Gigi Wu</title>
 <style>
-  /* DESIGN.md tokens — Mercury-aligned cool neutral. */
   :root {
     --canvas: #F8F9FB;
     --surface: #FFFFFF;
@@ -24,7 +23,6 @@
     --warn-bg: #FFFBEB;
     --warn-border: #FCD34D;
     --warn-ink: #92400E;
-    --warn-solid: #D97706;
     --ok-bg: #ECFDF5;
     --ok-border: #86EFAC;
     --ok-ink: #047857;
@@ -35,7 +33,7 @@
     --danger-border: #FCA5A5;
     --danger-ink: #B91C1C;
 
-    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif;
+    --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 
     --pop: 0 2px 8px rgba(15, 23, 42, 0.06);
@@ -45,13 +43,11 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   html, body {
-    height: 100%;
-    overflow: hidden;
+    height: 100%; overflow: hidden;
     background: #1a1a1f;
     font-family: var(--font);
     color: var(--ink-900);
     -webkit-font-smoothing: antialiased;
-    font-feature-settings: "ss01", "cv11";
   }
 
   .stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
@@ -66,11 +62,9 @@
   }
 
   .slide {
-    position: absolute;
-    inset: 0;
-    padding: 6vmin 8vmin;
-    display: none;
-    flex-direction: column;
+    position: absolute; inset: 0;
+    padding: 5vmin 6vmin 7vmin 6vmin;
+    display: none; flex-direction: column;
     background: var(--canvas);
   }
   .slide.active { display: flex; animation: fadeIn 240ms ease-out; }
@@ -78,645 +72,391 @@
   .slide.surface { background: var(--surface); }
   .slide.center { justify-content: center; }
 
-  /* Type scale — bumped from DESIGN.md for projection but proportionally aligned */
-  .micro {
-    font-size: 1.2vmin;
-    font-weight: 600;
-    line-height: 1.4;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--ink-500);
-  }
-  .caption { font-size: 1.4vmin; line-height: 1.55; color: var(--ink-500); }
-  .body { font-size: 1.8vmin; line-height: 1.55; color: var(--ink-700); font-weight: 400; }
-  .lead { font-size: 2.6vmin; line-height: 1.4; color: var(--ink-900); font-weight: 500; letter-spacing: -0.005em; }
-  .h2 { font-size: 4vmin; line-height: 1.15; color: var(--ink-900); font-weight: 600; letter-spacing: -0.015em; }
-  .h1 { font-size: 5.5vmin; line-height: 1.1; color: var(--ink-900); font-weight: 600; letter-spacing: -0.02em; }
-  .display { font-size: 8vmin; line-height: 1; color: var(--ink-900); font-weight: 600; letter-spacing: -0.025em; }
-  .num-lg { font-size: 7vmin; line-height: 1; font-weight: 600; letter-spacing: -0.02em; color: var(--ink-900); font-variant-numeric: tabular-nums; }
-  .num-md { font-size: 4vmin; line-height: 1; font-weight: 600; letter-spacing: -0.015em; color: var(--ink-900); font-variant-numeric: tabular-nums; }
+  .micro { font-size: 1.2vmin; font-weight: 600; line-height: 1.5; letter-spacing: 0.08em; color: var(--ink-500); }
+  .caption { font-size: 1.5vmin; line-height: 1.6; color: var(--ink-500); }
+  .body { font-size: 1.7vmin; line-height: 1.7; color: var(--ink-700); font-weight: 400; }
+  .lead { font-size: 2.4vmin; line-height: 1.55; color: var(--ink-900); font-weight: 500; letter-spacing: -0.005em; }
+  .h2 { font-size: 3.8vmin; line-height: 1.2; color: var(--ink-900); font-weight: 600; letter-spacing: -0.015em; }
+  .h1 { font-size: 5vmin; line-height: 1.15; color: var(--ink-900); font-weight: 600; letter-spacing: -0.02em; }
 
   .accent { color: var(--indigo); }
   .ink-500 { color: var(--ink-500); }
-  .ink-700 { color: var(--ink-700); }
+  .strong { font-weight: 600; color: var(--ink-900); }
 
-  /* Chrome — slide num + title bottom strip */
+  /* === Persistent chrome on every slide === */
   .chrome {
     position: absolute;
-    bottom: 2vmin;
-    left: 8vmin;
-    right: 8vmin;
+    bottom: 1.8vmin;
+    left: 6vmin;
+    right: 6vmin;
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    font-size: 1.1vmin;
-    color: var(--ink-400);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    font-weight: 500;
-    font-family: var(--font-mono);
-  }
-  .chrome .left { display: flex; gap: 1.2vmin; }
-  .chrome .num { color: var(--ink-500); font-weight: 600; }
-
-  /* Pills + chips — DESIGN.md vocabulary */
-  .pill {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.4vmin 1.1vmin;
-    border-radius: 9999px;
     font-size: 1.2vmin;
-    font-weight: 500;
-    line-height: 1.3;
+    color: var(--ink-400);
+    letter-spacing: 0.08em;
+    font-family: var(--font-mono);
+    border-top: 1px solid var(--line);
+    padding-top: 1vmin;
+  }
+  .chrome .brand {
+    font-weight: 700;
+    color: var(--ink-700);
+    letter-spacing: 0.04em;
+    font-family: var(--font);
+    font-size: 1.3vmin;
+  }
+  .chrome .brand .accent { color: var(--indigo); }
+  .chrome .center { color: var(--ink-500); text-transform: uppercase; }
+  .chrome .center .num { color: var(--ink-700); font-weight: 700; margin-right: 0.6vmin; }
+  .chrome .meta { color: var(--ink-400); text-transform: uppercase; }
+
+  .pill {
+    display: inline-flex; align-items: center;
+    padding: 0.4vmin 1.1vmin; border-radius: 9999px;
+    font-size: 1.3vmin; font-weight: 500; line-height: 1.4;
     border: 1px solid transparent;
   }
   .pill.success { background: var(--ok-bg); color: var(--ok-ink); border-color: var(--ok-border); }
   .pill.warn { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-border); }
-  .pill.info { background: var(--info-bg); color: var(--info-ink); border-color: var(--info-border); }
-  .pill.indigo { background: var(--indigo-soft); color: var(--indigo-ink); border-color: rgba(91, 91, 214, 0.2); }
   .pill.silent { background: var(--sunken); color: var(--ink-700); border-color: var(--line); }
+  .pill.indigo { background: var(--indigo-soft); color: var(--indigo-ink); border-color: rgba(91, 91, 214, 0.2); }
 
   .chip {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.3vmin 0.8vmin;
-    background: var(--sunken);
-    color: var(--ink-700);
-    font-size: 1.1vmin;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    border-radius: 4px;
-    text-transform: uppercase;
+    display: inline-flex; align-items: center;
+    padding: 0.3vmin 0.8vmin; background: var(--sunken);
+    color: var(--ink-700); font-size: 1.2vmin;
+    font-weight: 600; letter-spacing: 0.04em;
+    border-radius: 4px; text-transform: uppercase;
     font-family: var(--font-mono);
   }
-  .chip.warn { background: var(--warn-bg); color: var(--warn-ink); }
 
-  /* Card */
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 3vmin;
-  }
-  .card.tight { padding: 2vmin; }
-
-  /* Quiet link */
-  a.link {
-    color: inherit;
-    text-decoration: none;
-    border-bottom: 1px dotted currentColor;
-    transition: color 160ms;
-  }
+  a.link { color: inherit; text-decoration: none; border-bottom: 1px dotted currentColor; transition: color 160ms; }
   a.link:hover { color: var(--indigo); border-bottom-color: var(--indigo); }
 
-  /* Layout helpers */
-  .row { display: flex; gap: 3vmin; }
   .col { display: flex; flex-direction: column; }
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 3vmin; }
-  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3vmin; }
-  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2.5vmin; }
-  .stack-sm > * + * { margin-top: 1vmin; }
-  .stack-md > * + * { margin-top: 2vmin; }
-  .stack-lg > * + * { margin-top: 3vmin; }
-  .grow { flex: 1; }
-  .center-x { text-align: center; }
 
-  .eyebrow { color: var(--ink-500); margin-bottom: 2vmin; }
-  .rule { border-top: 1px solid var(--line); margin: 3vmin 0; }
+  .eyebrow { color: var(--ink-500); margin-bottom: 1.5vmin; }
 
-  /* SLIDE 1 — Title */
-  .slide-title { background: var(--canvas); align-items: center; justify-content: center; }
-  .slide-title .word {
-    font-size: 11vmin;
-    font-weight: 600;
-    line-height: 0.95;
-    letter-spacing: -0.035em;
+  /* === SLIDE 1: Cover === */
+  .cover-slide { background: #FFFFFF; align-items: center; justify-content: center; padding: 0; }
+  .cover-slide .chrome { display: none; }
+  .cover-mark { width: 56%; max-width: 760px; height: auto; display: block; }
+  .cover-foot {
+    position: absolute; bottom: 4vmin; right: 5vmin;
+    font-family: var(--font-mono); font-size: 1.3vmin;
+    color: var(--ink-400); letter-spacing: 0.12em;
   }
-  .slide-title .word .accent { color: var(--indigo); }
-  .slide-title .tag {
-    margin-top: 3vmin;
-    font-size: 2.4vmin;
-    color: var(--ink-500);
-    letter-spacing: -0.01em;
-    font-weight: 400;
-  }
-  .slide-title .meta {
-    margin-top: 8vmin;
-    font-size: 1.3vmin;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--ink-400);
-    font-family: var(--font-mono);
-    display: flex;
-    gap: 1.5vmin;
-    align-items: center;
-  }
-  .slide-title .meta .dot { width: 0.3vmin; height: 0.3vmin; background: var(--ink-400); border-radius: 50%; }
 
-  /* SLIDE 2 — Louisiana hook */
-  .louisiana { display: grid; grid-template-columns: 1.1fr 1fr; gap: 5vmin; align-items: center; }
-  .timestamp-row { display: flex; align-items: baseline; gap: 1.5vmin; margin-bottom: 1.5vmin; }
-  .timestamp-row .ts {
-    font-size: 4vmin; font-weight: 600; line-height: 1; letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums; color: var(--ink-900);
-    font-family: var(--font-mono);
+  /* === SLIDE 2: 场景 (slim) === */
+  .scene-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5vmin; align-items: center; }
+  .scene-time-row { display: flex; align-items: baseline; gap: 1.5vmin; margin-bottom: 1.4vmin; }
+  .scene-time { font-family: var(--font-mono); font-size: 2.6vmin; font-weight: 600; color: var(--ink-900); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; min-width: 9vmin; }
+  .scene-event { font-size: 1.5vmin; color: var(--ink-500); line-height: 1.5; }
+  .scene-event .em { color: var(--ink-900); font-weight: 600; }
+  .scene-punch {
+    margin-top: 3vmin; padding-top: 2vmin; border-top: 1px solid var(--line);
+    font-size: 2.2vmin; line-height: 1.4; color: var(--ink-900); font-weight: 600;
   }
-  .timestamp-row .lbl { font-size: 1.4vmin; color: var(--ink-500); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; }
-  .between-line { width: 1px; height: 3vmin; background: var(--line); margin-left: 2vmin; }
-  .outcome-list { margin-top: 3vmin; padding-top: 3vmin; border-top: 1px solid var(--line); }
-  .outcome-line { display: flex; align-items: baseline; gap: 1.2vmin; padding: 0.6vmin 0; }
-  .outcome-line .n { font-size: 2.2vmin; font-weight: 600; color: var(--ink-900); min-width: 4vmin; font-variant-numeric: tabular-nums; }
-  .outcome-line .t { font-size: 1.8vmin; color: var(--ink-700); }
-
-  .alert-card {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 2.5vmin;
-    box-shadow: var(--pop);
-  }
+  .alert-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.5vmin; box-shadow: var(--pop); }
   .alert-card .top { display: flex; gap: 1vmin; align-items: center; margin-bottom: 1.5vmin; }
-  .alert-card .title { font-size: 1.8vmin; font-weight: 600; color: var(--ink-900); flex: 1; line-height: 1.3; }
-  .alert-card .when { font-size: 1.2vmin; color: var(--ink-400); }
-  .alert-card .summary { font-size: 1.4vmin; color: var(--ink-500); line-height: 1.5; margin-bottom: 1.5vmin; }
+  .alert-card .title { font-size: 1.7vmin; font-weight: 600; color: var(--ink-900); flex: 1; line-height: 1.4; }
+  .alert-card .when { font-size: 1.3vmin; color: var(--ink-400); }
+  .alert-card .summary { font-size: 1.45vmin; color: var(--ink-500); line-height: 1.6; margin-bottom: 1.5vmin; }
   .alert-card .row-pills { display: flex; gap: 0.6vmin; margin-bottom: 1.5vmin; flex-wrap: wrap; }
   .alert-card .actions { display: flex; gap: 0.6vmin; flex-wrap: wrap; }
-  .btn-primary {
-    padding: 0.7vmin 1.3vmin;
-    background: var(--indigo);
-    color: white;
-    font-size: 1.2vmin;
-    font-weight: 500;
-    border-radius: 6px;
-    border: none;
-  }
-  .btn-secondary {
-    padding: 0.7vmin 1.3vmin;
-    background: var(--surface);
-    color: var(--ink-700);
-    font-size: 1.2vmin;
-    font-weight: 500;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-  }
+  .btn-primary { padding: 0.7vmin 1.3vmin; background: var(--indigo); color: white; font-size: 1.3vmin; font-weight: 500; border-radius: 6px; border: none; }
+  .btn-secondary { padding: 0.7vmin 1.3vmin; background: var(--surface); color: var(--ink-700); font-size: 1.3vmin; font-weight: 500; border: 1px solid var(--line); border-radius: 6px; }
 
-  /* SLIDE 3 — Opener */
-  .opener-text {
-    font-size: 5vmin;
-    line-height: 1.18;
-    letter-spacing: -0.02em;
-    color: var(--ink-900);
-    font-weight: 600;
+  /* === SLIDE 3: 痛点 (强力版) === */
+  .pain-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.5vmin; margin-top: 2.5vmin; }
+  .pain-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.8vmin; display: flex; flex-direction: column; }
+  .pain-num { font-family: var(--font-mono); font-size: 1.2vmin; color: var(--indigo-ink); letter-spacing: 0.12em; font-weight: 700; margin-bottom: 0.8vmin; text-transform: uppercase; }
+  .pain-title { font-size: 2.3vmin; font-weight: 600; color: var(--ink-900); line-height: 1.25; margin-bottom: 1.5vmin; letter-spacing: -0.01em; }
+  .pain-cost {
+    background: var(--danger-bg); border: 1px solid var(--danger-border);
+    border-radius: 6px; padding: 1vmin 1.3vmin;
+    margin-bottom: 1.3vmin;
+    display: flex; flex-direction: column; gap: 0.3vmin;
   }
-  .opener-text .strong { color: var(--ink-900); }
-  .opener-text .accent { color: var(--indigo); }
-  .activity-row {
-    margin-top: 5vmin;
-    padding-top: 3vmin;
-    border-top: 1px solid var(--line);
-    display: flex;
-    gap: 1vmin;
-    flex-wrap: wrap;
-  }
-  .act-chip {
-    padding: 0.8vmin 1.4vmin;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    font-size: 1.4vmin;
-    color: var(--ink-700);
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 0.8vmin;
-  }
-  .act-chip .n { font-family: var(--font-mono); font-size: 1.1vmin; color: var(--ink-400); font-weight: 600; }
+  .pain-cost .label { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; color: var(--danger-ink); letter-spacing: 0.1em; text-transform: uppercase; }
+  .pain-cost .val { font-size: 1.5vmin; color: var(--danger-ink); font-weight: 600; line-height: 1.4; }
+  .pain-body { font-size: 1.4vmin; color: var(--ink-700); line-height: 1.65; flex: 1; }
+  .pain-extra { margin-top: 2vmin; padding: 1.5vmin 1.8vmin; background: var(--sunken); border-radius: 6px; border-left: 3px solid var(--ink-400); display: flex; gap: 1.2vmin; align-items: baseline; font-size: 1.4vmin; color: var(--ink-700); line-height: 1.6; }
+  .pain-extra .lead-in { color: var(--ink-900); font-weight: 600; font-size: 1.5vmin; }
 
-  /* SLIDE 4 — Insight bar chart */
-  .insight-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 6vmin; align-items: center; }
-  .bar-chart { position: relative; height: 32vmin; padding-bottom: 3vmin; border-bottom: 1px solid var(--line); }
-  .bar-chart .bars { display: flex; align-items: flex-end; gap: 0.3vmin; height: 100%; }
-  .bar-chart .bar { flex: 1; background: var(--ink-900); border-radius: 1px 1px 0 0; }
-  .bar-chart .bar.faded { background: var(--ink-300); }
-  .bar-chart .ceiling-line { position: absolute; top: 35%; left: 0; right: 0; border-top: 1.5px dashed var(--indigo); }
-  .bar-chart .ceiling-label {
-    position: absolute; top: 31%; right: 0;
-    color: var(--indigo-ink); font-size: 1.2vmin; font-weight: 600;
-    letter-spacing: 0.04em; background: var(--indigo-soft);
-    padding: 0.4vmin 1vmin; border-radius: 4px; border: 1px solid rgba(91, 91, 214, 0.2);
-  }
-  .bar-chart .x-label { position: absolute; bottom: -3vmin; font-size: 1.1vmin; color: var(--ink-400); font-family: var(--font-mono); }
-  .bar-chart .x-left { left: 0; }
-  .bar-chart .x-right { right: 0; }
+  /* === SLIDE 4: 竞争 (精确) === */
+  .compete-table { width: 100%; margin-top: 2.5vmin; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); border-collapse: separate; border-spacing: 0; }
+  .compete-table th, .compete-table td { padding: 1.3vmin 1.5vmin; text-align: left; font-size: 1.4vmin; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .compete-table th { background: var(--sunken); font-weight: 600; color: var(--ink-700); font-size: 1.2vmin; letter-spacing: 0.08em; font-family: var(--font-mono); text-transform: uppercase; }
+  .compete-table th.us { color: var(--indigo-ink); background: var(--indigo-soft); }
+  .compete-table tr:last-child td { border-bottom: none; }
+  .compete-table .cap { font-weight: 500; color: var(--ink-900); }
+  .compete-table .yes { color: var(--ok-ink); font-weight: 600; }
+  .compete-table .no { color: var(--ink-300); }
+  .compete-table .partial { color: var(--ink-500); }
+  .compete-table td.us-col { background: rgba(236, 236, 254, 0.4); }
 
-  /* SLIDE 5 — Lacerte */
-  .compare {
-    display: grid; grid-template-columns: 1fr 1fr; margin-top: 3vmin;
-    border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
-  }
-  .compare-col { padding: 2.5vmin; background: var(--surface); }
-  .compare-col.faded { background: var(--sunken); color: var(--ink-400); }
-  .compare-col .label { font-size: 1.2vmin; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-500); font-weight: 600; margin-bottom: 1.5vmin; font-family: var(--font-mono); }
-  .compare-col.active .label { color: var(--indigo-ink); }
-  .compare-row { padding: 1.5vmin 0; border-top: 1px solid var(--line); font-size: 1.5vmin; line-height: 1.45; color: var(--ink-700); }
-  .compare-col.faded .compare-row { color: var(--ink-400); border-top-color: var(--ink-300); }
+  /* === SLIDE 5: 机会 === */
+  .opp-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 4vmin; align-items: stretch; }
+  .opp-stack { display: flex; flex-direction: column; gap: 1.5vmin; }
+  .opp-row { padding: 1.8vmin; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+  .opp-row .label { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); margin-bottom: 0.5vmin; text-transform: uppercase; }
+  .opp-row .text { font-size: 1.5vmin; color: var(--ink-900); line-height: 1.5; font-weight: 500; }
+  .opp-row .text .strong { font-weight: 700; color: var(--indigo-ink); }
+  .opp-row .text .sub { color: var(--ink-500); font-weight: 400; font-size: 1.4vmin; display: block; margin-top: 0.3vmin; }
 
-  /* SLIDE 6 — 3 user research efforts */
-  .research-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.5vmin; margin-top: 3vmin; }
-  .research-card {
-    background: var(--surface);
-    border: 1px solid var(--line);
+  .market-block { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.5vmin; display: flex; flex-direction: column; justify-content: center; }
+  .market-num { font-size: 6.5vmin; font-weight: 600; line-height: 1; color: var(--ink-900); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .market-num .suffix { font-size: 2vmin; color: var(--ink-500); font-weight: 500; }
+  .market-cap { margin-top: 0.8vmin; font-size: 1.4vmin; color: var(--ink-500); }
+  .market-rule { border-top: 1px solid var(--line); margin: 1.8vmin 0; }
+  .market-expansion { font-size: 1.4vmin; color: var(--ink-700); line-height: 1.7; }
+  .market-expansion .strong { color: var(--ink-900); font-weight: 600; }
+
+  /* === SLIDE 6: 我们做什么 + so-what === */
+  .what-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 5vmin; align-items: center; }
+  .what-text { font-size: 3.6vmin; line-height: 1.35; letter-spacing: -0.015em; color: var(--ink-900); font-weight: 500; }
+  .what-text .strong { font-weight: 700; }
+  .what-text .accent { color: var(--indigo); }
+  .what-row { margin-top: 3vmin; padding-top: 2vmin; border-top: 1px solid var(--line); display: flex; gap: 0.8vmin; flex-wrap: wrap; align-items: center; }
+  .what-chip { padding: 0.7vmin 1.3vmin; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; font-size: 1.4vmin; color: var(--ink-700); font-weight: 500; display: flex; align-items: center; gap: 0.6vmin; }
+  .what-chip .n { font-family: var(--font-mono); font-size: 1.2vmin; color: var(--ink-400); font-weight: 600; }
+  .what-aside { padding: 0.5vmin 1.1vmin; background: var(--sunken); border: 1px dashed var(--line-strong); border-radius: 6px; font-size: 1.3vmin; color: var(--ink-500); font-weight: 500; }
+
+  .so-what {
+    background: var(--indigo-soft);
+    border: 1px solid rgba(91, 91, 214, 0.25);
     border-radius: 8px;
     padding: 2.5vmin;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5vmin;
+    display: flex; flex-direction: column; gap: 1.3vmin;
   }
-  .research-card .method-num {
-    font-family: var(--font-mono);
-    font-size: 1.1vmin;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    color: var(--indigo-ink);
-    text-transform: uppercase;
-  }
-  .research-card .method {
-    font-size: 2.2vmin;
-    font-weight: 600;
-    color: var(--ink-900);
-    letter-spacing: -0.01em;
-    line-height: 1.2;
-  }
-  .research-card .scale {
-    font-size: 3.5vmin;
-    font-weight: 600;
-    color: var(--ink-900);
-    letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
-  }
-  .research-card .scale .unit { font-size: 1.4vmin; color: var(--ink-500); font-weight: 500; }
-  .research-card .desc {
-    font-size: 1.4vmin;
-    color: var(--ink-700);
-    line-height: 1.5;
-    flex: 1;
-  }
-  .research-card .source {
-    font-family: var(--font-mono);
-    font-size: 1vmin;
-    color: var(--ink-400);
-    padding-top: 1.5vmin;
-    border-top: 1px solid var(--line);
-  }
-  .traceability {
-    margin-top: 3vmin;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: var(--surface);
-    overflow: hidden;
-  }
-  .traceability .header {
-    background: var(--sunken);
-    padding: 1vmin 1.8vmin;
-    display: grid;
-    grid-template-columns: 2fr 2fr 0.7fr;
-    gap: 2vmin;
-    font-family: var(--font-mono);
-    font-size: 1.1vmin;
-    font-weight: 600;
-    color: var(--ink-500);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    border-bottom: 1px solid var(--line);
-  }
-  .traceability .row {
-    padding: 0.9vmin 1.8vmin;
-    display: grid;
-    grid-template-columns: 2fr 2fr 0.7fr;
-    gap: 2vmin;
-    font-size: 1.3vmin;
-    color: var(--ink-700);
-    border-top: 1px solid var(--line);
-  }
-  .traceability .row:first-child { border-top: none; }
-  .traceability .row .ref { font-family: var(--font-mono); color: var(--ink-400); font-size: 1.1vmin; }
+  .so-what .label { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--indigo-ink); text-transform: uppercase; margin-bottom: 0.5vmin; }
+  .so-what-item { display: grid; grid-template-columns: 4.5vmin 1fr; gap: 1.2vmin; align-items: start; }
+  .so-what-item .num { font-size: 2.2vmin; font-weight: 600; color: var(--indigo); line-height: 1; letter-spacing: -0.015em; font-variant-numeric: tabular-nums; }
+  .so-what-item .text { font-size: 1.45vmin; color: var(--ink-900); line-height: 1.5; }
+  .so-what-item .text b { color: var(--indigo-ink); }
 
-  /* SLIDE 7 — Wedge quote + SQL */
-  .wedge-quote {
-    font-size: 3.6vmin;
-    line-height: 1.3;
-    letter-spacing: -0.01em;
-    color: var(--ink-900);
-    font-weight: 500;
-    max-width: 92%;
-  }
-  .wedge-attr {
-    margin-top: 2vmin;
-    font-size: 1.3vmin;
-    color: var(--ink-500);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-weight: 500;
-    font-family: var(--font-mono);
-  }
-  .code-block {
-    margin-top: 4vmin;
-    background: var(--ink-900);
-    border-radius: 8px;
-    padding: 2.2vmin 2.5vmin;
-    color: #e2e8f0;
-    font-family: var(--font-mono);
-    font-size: 1.5vmin;
-    line-height: 1.65;
-    box-shadow: var(--pop);
-  }
-  .code-block .keyword { color: #fbbf24; font-weight: 500; }
-  .code-block .string { color: #86efac; }
-  .code-block .comment { color: #64748b; font-style: italic; }
-  .code-block .op { color: #f472b6; }
-  .wedge-payoff {
-    margin-top: 3vmin;
-    padding-top: 2vmin;
-    border-top: 1px solid var(--line);
-    font-size: 1.5vmin;
-    color: var(--ink-700);
-  }
-  .wedge-payoff .arrow { color: var(--indigo); font-weight: 600; }
+  /* === SLIDE 7: Yan Jing 深度 === */
+  .yj-grid { display: grid; grid-template-columns: 1fr 1.3fr; gap: 3.5vmin; margin-top: 1.5vmin; align-items: stretch; }
+  .yj-card-left { background: var(--indigo-soft); border: 1px solid rgba(91, 91, 214, 0.25); border-radius: 12px; padding: 2.8vmin; display: flex; flex-direction: column; gap: 1.8vmin; }
+  .yj-id { display: flex; flex-direction: column; gap: 0.5vmin; }
+  .yj-badge { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--indigo-ink); text-transform: uppercase; }
+  .yj-name { font-size: 3.2vmin; font-weight: 600; color: var(--ink-900); letter-spacing: -0.02em; line-height: 1; }
+  .yj-meta { font-family: var(--font-mono); font-size: 1.25vmin; color: var(--ink-700); letter-spacing: 0.04em; line-height: 1.6; margin-top: 0.4vmin; }
+  .yj-video { display: inline-flex; align-items: center; gap: 0.5vmin; font-size: 1.2vmin; color: var(--ok-ink); background: var(--ok-bg); border: 1px solid var(--ok-border); padding: 0.4vmin 1vmin; border-radius: 9999px; font-weight: 600; align-self: flex-start; letter-spacing: 0.06em; text-transform: uppercase; }
+  .yj-quote { background: var(--surface); border-radius: 8px; padding: 1.8vmin; font-size: 1.6vmin; line-height: 1.55; color: var(--ink-900); font-style: italic; border-left: 3px solid var(--indigo); }
+  .yj-quote .attrib { display: block; margin-top: 0.7vmin; font-style: normal; font-size: 1.2vmin; color: var(--ink-500); font-family: var(--font-mono); letter-spacing: 0.04em; }
+  .yj-bottom-quote { margin-top: auto; padding-top: 1.5vmin; font-size: 1.4vmin; color: var(--indigo-ink); line-height: 1.55; font-style: italic; border-top: 1px solid rgba(91, 91, 214, 0.2); }
 
-  /* SLIDE 8 — Sarah problem */
-  .sarah-id {
-    display: flex;
-    align-items: baseline;
-    gap: 1.5vmin;
-    margin-bottom: 3vmin;
-    padding-bottom: 2vmin;
-    border-bottom: 1px solid var(--line);
-  }
-  .sarah-id .name { font-size: 3.2vmin; font-weight: 600; color: var(--ink-900); letter-spacing: -0.015em; }
-  .sarah-id .meta { font-size: 1.3vmin; color: var(--ink-500); font-family: var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; }
-  .failure-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2vmin; }
-  .failure-card {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 2.5vmin;
-  }
-  .failure-card .marker {
-    font-family: var(--font-mono);
-    font-size: 1.1vmin;
-    color: var(--ink-500);
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    font-weight: 600;
-    margin-bottom: 1vmin;
-  }
-  .failure-card .title { font-size: 2.2vmin; font-weight: 600; color: var(--ink-900); letter-spacing: -0.01em; line-height: 1.2; margin-bottom: 1.5vmin; }
-  .failure-card .desc { font-size: 1.4vmin; color: var(--ink-700); line-height: 1.55; }
+  .yj-conclusions { display: flex; flex-direction: column; gap: 1.2vmin; }
+  .yj-conclusions .ttl { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); margin-bottom: 0.4vmin; text-transform: uppercase; }
+  .yj-concl-item { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 1.4vmin 1.7vmin; display: grid; grid-template-columns: 3vmin 1fr; gap: 1.3vmin; align-items: start; }
+  .yj-concl-item .n { font-size: 1.9vmin; font-weight: 600; line-height: 1; color: var(--indigo); font-variant-numeric: tabular-nums; }
+  .yj-concl-item .body { display: flex; flex-direction: column; gap: 0.3vmin; }
+  .yj-concl-item .ti { font-size: 1.55vmin; font-weight: 600; color: var(--ink-900); line-height: 1.3; }
+  .yj-concl-item .desc { font-size: 1.3vmin; color: var(--ink-700); line-height: 1.55; }
+  .yj-concl-item .ref { font-family: var(--font-mono); font-size: 1.2vmin; color: var(--ink-400); margin-top: 0.2vmin; }
 
-  /* SLIDE 9 — Dashboard mockup */
-  .mockup {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: var(--overlay);
-    margin-top: 1.5vmin;
-    height: 64vmin;
-    display: flex;
-    flex-direction: column;
-  }
-  .mockup-bar {
-    background: var(--sunken);
-    border-bottom: 1px solid var(--line);
-    padding: 1vmin 1.8vmin;
-    display: flex;
-    gap: 1.2vmin;
-    align-items: center;
-    font-size: 1.1vmin;
-  }
+  /* === SLIDE 7B (now 8): Yan Jing Q-threads === */
+  .qthread-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.8vmin; margin-top: 1.5vmin; }
+  .qthread-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 1.7vmin 1.9vmin; display: flex; flex-direction: column; gap: 0.9vmin; }
+  .qthread-card .badge { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--indigo-ink); text-transform: uppercase; }
+  .qthread-card .quote { font-size: 1.5vmin; line-height: 1.5; color: var(--ink-900); font-style: italic; padding: 0.9vmin 1.1vmin; background: var(--canvas); border-left: 2px solid var(--indigo); border-radius: 0 4px 4px 0; }
+  .qthread-card .quote .attrib { display: block; margin-top: 0.4vmin; font-style: normal; font-size: 1.2vmin; color: var(--ink-400); font-family: var(--font-mono); letter-spacing: 0.04em; }
+  .qthread-card .arrow-row { display: grid; grid-template-columns: 2.2vmin 1fr; gap: 0.7vmin; align-items: start; }
+  .qthread-card .arrow-row .arrow { color: var(--indigo); font-weight: 700; font-family: var(--font-mono); font-size: 1.25vmin; }
+  .qthread-card .arrow-row .text { font-size: 1.25vmin; color: var(--ink-700); line-height: 1.55; }
+  .qthread-card .arrow-row .text b { color: var(--ink-900); }
+  .qthread-card .ref { font-family: var(--font-mono); color: var(--ink-400); font-size: 1.2vmin; padding-top: 0.6vmin; border-top: 1px dashed var(--line); }
+
+  /* === SLIDE 9 (was 8): Other 2 interviews === */
+  .methodology-strip { display: grid; grid-template-columns: 2fr 1fr; gap: 2vmin; margin-bottom: 2vmin; padding-bottom: 1.8vmin; border-bottom: 1px solid var(--line); }
+  .questionnaire-block { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 1.5vmin 1.8vmin; }
+  .questionnaire-block .lbl { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); margin-bottom: 0.7vmin; text-transform: uppercase; }
+  .q-list { display: flex; flex-direction: column; gap: 0.4vmin; }
+  .q-item { display: grid; grid-template-columns: 2vmin 1fr; gap: 0.6vmin; align-items: baseline; font-size: 1.25vmin; color: var(--ink-700); line-height: 1.5; }
+  .q-item .qn { font-family: var(--font-mono); font-size: 1.2vmin; color: var(--indigo-ink); font-weight: 700; }
+  .funnel-block { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 1.5vmin 1.8vmin; display: flex; flex-direction: column; gap: 0.6vmin; }
+  .funnel-block .lbl { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); margin-bottom: 0.4vmin; text-transform: uppercase; }
+  .funnel-row { display: grid; grid-template-columns: 3vmin 1fr; gap: 0.7vmin; align-items: baseline; font-size: 1.2vmin; line-height: 1.4; }
+  .funnel-row .n { font-size: 1.5vmin; font-weight: 600; color: var(--ink-900); font-variant-numeric: tabular-nums; line-height: 1; }
+  .funnel-row .desc { color: var(--ink-700); }
+  .funnel-row .desc b { color: var(--ink-900); }
+  .funnel-row.miss .n { color: var(--ink-300); }
+  .funnel-row.miss .desc { color: var(--ink-500); }
+
+  /* === SLIDE 9 (was): Other 2 interviews === */
+  .other-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3vmin; margin-top: 2.5vmin; align-items: stretch; }
+  .other-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.5vmin; display: flex; flex-direction: column; gap: 1.3vmin; }
+  .other-card .badge { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); text-transform: uppercase; }
+  .other-card .name { font-size: 2.4vmin; font-weight: 600; color: var(--ink-900); letter-spacing: -0.015em; line-height: 1.1; }
+  .other-card .meta { font-family: var(--font-mono); font-size: 1.25vmin; color: var(--ink-500); letter-spacing: 0.04em; line-height: 1.55; }
+  .other-section { padding: 1vmin 1.3vmin; background: var(--canvas); border-radius: 6px; border-left: 2px solid var(--indigo); }
+  .other-section .lbl { font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.1em; color: var(--indigo-ink); margin-bottom: 0.4vmin; font-family: var(--font-mono); text-transform: uppercase; }
+  .other-section .text { font-size: 1.35vmin; color: var(--ink-700); line-height: 1.55; }
+  .other-section.confirmed { border-left-color: var(--ok-ink); }
+  .other-section.confirmed .lbl { color: var(--ok-ink); }
+  .other-section.new { border-left-color: var(--warn-ink); }
+  .other-section.new .lbl { color: var(--warn-ink); }
+  .auth-note { margin-top: 2vmin; padding: 1.3vmin 1.6vmin; background: var(--sunken); border-radius: 8px; font-size: 1.3vmin; color: var(--ink-700); line-height: 1.55; border-left: 3px solid var(--ink-300); }
+  .auth-note .strong { font-weight: 600; color: var(--ink-900); }
+
+  /* === SLIDE 9: Insights === */
+  .insights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.2vmin; margin-top: 2.5vmin; }
+  .insight-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.5vmin; display: flex; gap: 1.8vmin; align-items: flex-start; }
+  .insight-card .num { font-size: 3.5vmin; font-weight: 600; color: var(--indigo); line-height: 1; letter-spacing: -0.02em; min-width: 4.5vmin; font-variant-numeric: tabular-nums; }
+  .insight-card .body { flex: 1; }
+  .insight-card .title { font-size: 1.9vmin; font-weight: 600; color: var(--ink-900); margin-bottom: 0.6vmin; line-height: 1.3; letter-spacing: -0.005em; }
+  .insight-card .text { font-size: 1.4vmin; color: var(--ink-700); line-height: 1.6; }
+
+  /* === SLIDE 10: Solution + Demo CTA === */
+  .mockup { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; box-shadow: var(--overlay); margin-top: 1.5vmin; height: 56vmin; display: flex; flex-direction: column; }
+  .mockup-bar { background: var(--sunken); border-bottom: 1px solid var(--line); padding: 1vmin 1.8vmin; display: flex; gap: 1.2vmin; align-items: center; font-size: 1.2vmin; }
   .mockup-bar .dots { display: flex; gap: 0.4vmin; }
   .mockup-bar .dot { width: 0.9vmin; height: 0.9vmin; border-radius: 50%; background: var(--ink-300); }
-  .mockup-bar .url {
-    font-family: var(--font-mono); background: var(--surface); padding: 0.4vmin 0.9vmin;
-    border-radius: 4px; border: 1px solid var(--line); font-size: 1.1vmin;
-    color: var(--ink-500); flex: 1; max-width: 28vmin;
-  }
-  .live-stamp {
-    margin-left: auto; font-size: 1vmin; color: var(--ok-ink);
-    background: var(--ok-bg); padding: 0.3vmin 0.8vmin; border-radius: 9999px;
-    border: 1px solid var(--ok-border); font-weight: 600;
-    letter-spacing: 0.06em; text-transform: uppercase;
-  }
-  .mockup-content { flex: 1; padding: 2.5vmin 3vmin; display: flex; flex-direction: column; gap: 1.8vmin; overflow: hidden; }
-  .mockup-alert {
-    background: var(--warn-bg);
-    border: 1px solid var(--warn-border);
-    border-radius: 6px;
-    padding: 1.3vmin 1.8vmin;
-    display: flex;
-    align-items: center;
-    gap: 1.5vmin;
-  }
+  .mockup-bar .url { font-family: var(--font-mono); background: var(--surface); padding: 0.4vmin 0.9vmin; border-radius: 4px; border: 1px solid var(--line); font-size: 1.2vmin; color: var(--ink-500); flex: 1; max-width: 28vmin; }
+  .live-stamp { margin-left: auto; font-size: 1.2vmin; color: var(--ok-ink); background: var(--ok-bg); padding: 0.3vmin 0.8vmin; border-radius: 9999px; border: 1px solid var(--ok-border); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+  .mockup-content { flex: 1; padding: 2.2vmin 2.5vmin; display: flex; flex-direction: column; gap: 1.5vmin; overflow: hidden; }
+  .mockup-alert { background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 6px; padding: 1.2vmin 1.6vmin; display: flex; align-items: center; gap: 1.5vmin; }
   .mockup-alert .ac-content { flex: 1; }
-  .mockup-alert .ac-title { font-size: 1.4vmin; font-weight: 600; color: var(--warn-ink); margin-bottom: 0.3vmin; }
-  .mockup-alert .ac-meta { font-size: 1.1vmin; color: var(--warn-ink); opacity: 0.85; }
+  .mockup-alert .ac-title { font-size: 1.45vmin; font-weight: 600; color: var(--warn-ink); margin-bottom: 0.3vmin; }
+  .mockup-alert .ac-meta { font-size: 1.2vmin; color: var(--warn-ink); opacity: 0.85; }
   .mockup-alert .ac-actions { display: flex; gap: 0.5vmin; }
-  .mockup-alert .ac-btn {
-    padding: 0.4vmin 0.9vmin; background: var(--surface); border: 1px solid var(--warn-border);
-    color: var(--warn-ink); font-size: 1.1vmin; border-radius: 4px; font-weight: 500;
-  }
-  .mockup-queue { display: flex; flex-direction: column; gap: 0.7vmin; position: relative; flex: 1; overflow: hidden; }
-  .mockup-queue .label-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.3vmin; }
-  .mockup-queue .label {
-    font-size: 1.1vmin; text-transform: uppercase; letter-spacing: 0.1em;
-    color: var(--ink-500); font-weight: 600; font-family: var(--font-mono);
-  }
-  .queue-row {
-    display: flex; align-items: center; gap: 1.3vmin; padding: 1.2vmin 1.4vmin;
-    border: 1px solid var(--line); border-radius: 6px; background: var(--surface);
-  }
-  .queue-row .urg { width: 0.4vmin; height: 3.8vmin; border-radius: 9999px; }
+  .mockup-alert .ac-btn { padding: 0.4vmin 0.9vmin; background: var(--surface); border: 1px solid var(--warn-border); color: var(--warn-ink); font-size: 1.2vmin; border-radius: 4px; font-weight: 500; }
+  .mockup-queue { display: flex; flex-direction: column; gap: 0.6vmin; flex: 1; overflow: hidden; }
+  .mockup-queue .label { font-size: 1.2vmin; letter-spacing: 0.1em; color: var(--ink-500); font-weight: 600; font-family: var(--font-mono); margin-bottom: 0.3vmin; text-transform: uppercase; }
+  .queue-row { display: flex; align-items: center; gap: 1.2vmin; padding: 1.1vmin 1.3vmin; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+  .queue-row .urg { width: 0.4vmin; height: 3.5vmin; border-radius: 9999px; }
   .queue-row .urg.high { background: var(--indigo); }
   .queue-row .urg.med { background: var(--ink-400); }
   .queue-row .urg.low { background: var(--ink-300); }
   .queue-row .qr-content { flex: 1; }
   .queue-row .qr-name { font-size: 1.4vmin; font-weight: 600; color: var(--ink-900); margin-bottom: 0.2vmin; }
-  .queue-row .qr-action { font-size: 1.2vmin; color: var(--ink-500); line-height: 1.4; }
+  .queue-row .qr-action { font-size: 1.25vmin; color: var(--ink-500); line-height: 1.5; }
   .queue-row .qr-action .em { color: var(--indigo-ink); font-weight: 500; }
-  .queue-row .qr-cta {
-    padding: 0.5vmin 1.1vmin; background: var(--indigo); color: white;
-    font-size: 1.1vmin; border-radius: 6px; font-weight: 500;
-  }
-  .annotation {
-    position: absolute; font-size: 1.1vmin; color: var(--indigo-ink); font-weight: 500;
-    font-family: var(--font-mono); letter-spacing: 0.04em; background: var(--indigo-soft);
-    padding: 0.3vmin 0.7vmin; border-radius: 4px; border: 1px dashed rgba(91, 91, 214, 0.3);
-    white-space: nowrap;
-  }
-  .mockup-queue .annotation { right: -2vmin; top: 30%; }
+  .queue-row .qr-cta { padding: 0.5vmin 1.1vmin; background: var(--indigo); color: white; font-size: 1.2vmin; border-radius: 6px; font-weight: 500; }
 
-  /* SLIDE 10 — Why now */
-  .whynow-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.5vmin; margin-top: 3vmin; }
-  .whynow-card {
-    background: var(--surface);
-    border: 1px solid var(--line);
+  .demo-cta-strip {
+    margin-top: 1.5vmin; padding: 1.3vmin 2vmin;
+    background: var(--ink-900); color: var(--canvas);
     border-radius: 8px;
-    padding: 3vmin;
+    display: flex; gap: 2vmin; align-items: center; justify-content: space-between;
   }
-  .whynow-card .marker {
-    font-family: var(--font-mono);
-    font-size: 1.1vmin;
-    color: var(--ink-500);
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    font-weight: 600;
-    margin-bottom: 1.2vmin;
-  }
-  .whynow-card .big {
-    font-size: 4vmin;
-    font-weight: 600;
-    line-height: 1;
-    color: var(--ink-900);
-    letter-spacing: -0.025em;
-    margin-bottom: 1vmin;
-  }
-  .whynow-card .big .small { font-size: 2vmin; color: var(--ink-500); font-weight: 500; }
-  .whynow-card .vs { font-size: 1.2vmin; color: var(--ink-400); margin-bottom: 1.5vmin; }
-  .whynow-card .text { font-size: 1.4vmin; color: var(--ink-700); line-height: 1.55; }
-
-  /* SLIDE 11 — Market */
-  .market-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 5vmin; align-items: center; }
-  .market-stack { display: flex; height: 7vmin; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); margin-top: 2.5vmin; }
-  .market-seg { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 1vmin 0.5vmin; color: white; text-align: center; }
-  .market-seg.solo { background: var(--ink-900); flex: 28; }
-  .market-seg.pro { background: var(--indigo); flex: 12; }
-  .market-seg.team { background: var(--indigo-ink); flex: 5; }
-  .market-seg .name { font-size: 1.3vmin; font-weight: 600; }
-  .market-seg .n { font-family: var(--font-mono); font-size: 1.1vmin; opacity: 0.85; margin-top: 0.2vmin; }
-  .market-arpu { display: flex; margin-top: 0.8vmin; font-family: var(--font-mono); font-size: 1.1vmin; color: var(--ink-500); }
-  .market-arpu .item { padding: 0 0.5vmin; text-align: center; }
-  .market-arpu .item.solo { flex: 28; }
-  .market-arpu .item.pro { flex: 12; }
-  .market-arpu .item.team { flex: 5; }
-  .market-num {
-    font-size: 11vmin; font-weight: 600; line-height: 1; letter-spacing: -0.035em;
-    color: var(--ink-900); font-variant-numeric: tabular-nums;
-  }
-  .market-num .suffix { font-size: 3vmin; color: var(--ink-500); font-weight: 500; }
-  .market-honest {
-    margin-top: 1.5vmin; font-size: 1.8vmin; color: var(--ink-500); font-style: italic;
+  .demo-cta-strip .text { font-size: 1.4vmin; line-height: 1.5; }
+  .demo-cta-strip .text .strong { font-weight: 600; color: white; }
+  .demo-cta-strip .link {
+    font-family: var(--font-mono); font-size: 1.3vmin;
+    background: var(--indigo); color: white;
+    padding: 0.7vmin 1.3vmin; border-radius: 6px; font-weight: 600;
+    text-decoration: none; white-space: nowrap;
   }
 
-  /* SLIDE 12 — Staircase */
-  .staircase {
-    margin-top: 3vmin; height: 30vmin; display: flex; align-items: flex-end; gap: 0.4vmin;
-  }
-  .step {
-    flex: 1; border: 1px solid var(--line); border-bottom: none;
-    border-radius: 6px 6px 0 0; padding: 1.8vmin; display: flex;
-    flex-direction: column; justify-content: flex-end;
-  }
-  .step.y1 { height: 30%; background: var(--sunken); }
-  .step.y3 { height: 55%; background: var(--indigo-soft); border-color: rgba(91, 91, 214, 0.2); }
-  .step.y5 { height: 90%; background: var(--ink-900); border-color: var(--ink-900); color: white; }
-  .step .yr { font-family: var(--font-mono); font-size: 1.1vmin; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-500); margin-bottom: 0.5vmin; }
-  .step.y3 .yr { color: var(--indigo-ink); }
-  .step.y5 .yr { color: var(--ink-300); }
-  .step .step-title { font-size: 1.8vmin; font-weight: 600; line-height: 1.2; margin-bottom: 0.8vmin; color: var(--ink-900); letter-spacing: -0.01em; }
-  .step.y5 .step-title { color: white; }
-  .step .price { font-family: var(--font-mono); font-size: 1.3vmin; color: var(--ink-500); font-weight: 500; }
-  .step.y5 .price { color: var(--ink-300); }
-  .verts {
-    margin-top: 3vmin; padding-top: 2vmin; border-top: 1px solid var(--line);
-    display: flex; justify-content: space-between; align-items: center;
-    font-size: 1.4vmin; color: var(--ink-700);
-  }
-  .verts .tags { display: flex; gap: 0.6vmin; }
+  /* === SLIDE 11: AI layer === */
+  .ai-grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 4vmin; margin-top: 2.5vmin; align-items: start; }
+  .zones { display: flex; flex-direction: column; gap: 1.3vmin; }
+  .zone { padding: 1.8vmin 2vmin; border-radius: 8px; border-left: 4px solid; background: var(--surface); border: 1px solid var(--line); }
+  .zone.green { background: var(--ok-bg); border-color: var(--ok-border); border-left-color: var(--ok-ink); }
+  .zone.yellow { background: var(--warn-bg); border-color: var(--warn-border); border-left-color: var(--warn-ink); }
+  .zone.red { background: var(--danger-bg); border-color: var(--danger-border); border-left-color: var(--danger-ink); }
+  .zone .zone-label { font-size: 1.25vmin; font-weight: 700; letter-spacing: 0.1em; margin-bottom: 0.4vmin; text-transform: uppercase; font-family: var(--font-mono); }
+  .zone.green .zone-label { color: var(--ok-ink); }
+  .zone.yellow .zone-label { color: var(--warn-ink); }
+  .zone.red .zone-label { color: var(--danger-ink); }
+  .zone .zone-rule { font-size: 1.5vmin; color: var(--ink-900); font-weight: 600; line-height: 1.4; }
+  .zone .zone-eg { font-size: 1.3vmin; color: var(--ink-700); margin-top: 0.3vmin; line-height: 1.5; }
+  .code-block { background: var(--ink-900); border-radius: 8px; padding: 2vmin 2.3vmin; color: #e2e8f0; font-family: var(--font-mono); font-size: 1.4vmin; line-height: 1.65; box-shadow: var(--pop); }
+  .code-block .keyword { color: #fbbf24; font-weight: 500; }
+  .code-block .string { color: #86efac; }
+  .code-block .comment { color: #94a3b8; font-style: italic; }
+  .code-block .op { color: #f472b6; }
+  .ai-callout { margin-top: 2vmin; padding: 1.3vmin 1.6vmin; background: var(--indigo-soft); border-radius: 6px; font-size: 1.4vmin; color: var(--indigo-ink); line-height: 1.5; border: 1px solid rgba(91, 91, 214, 0.2); }
+  .ai-callout .strong { font-weight: 600; }
 
-  /* SLIDE 13 — Status */
-  .scale-strip {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 2vmin;
-    margin-bottom: 3vmin; padding-bottom: 3vmin; border-bottom: 1px solid var(--line);
-  }
-  .scale-num .n {
-    font-size: 4.5vmin; line-height: 1; font-weight: 600; letter-spacing: -0.025em;
-    color: var(--ink-900); font-variant-numeric: tabular-nums;
-  }
-  .scale-num .lbl {
-    margin-top: 0.4vmin;
-    font-size: 1.2vmin; color: var(--ink-500); text-transform: uppercase;
-    letter-spacing: 0.1em; font-weight: 600; font-family: var(--font-mono);
-  }
-  .quad-grid {
-    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 2vmin;
-  }
-  .quad {
-    padding: 2.5vmin;
-    background: var(--surface);
-    border: 1px solid var(--line);
+  /* === SLIDE 12: Features === */
+  .feat-table { width: 100%; margin-top: 2.5vmin; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); border-collapse: separate; border-spacing: 0; }
+  .feat-table th, .feat-table td { padding: 1.2vmin 1.4vmin; text-align: left; font-size: 1.35vmin; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .feat-table th { background: var(--sunken); font-weight: 600; color: var(--ink-700); font-size: 1.2vmin; letter-spacing: 0.08em; font-family: var(--font-mono); text-transform: uppercase; }
+  .feat-table tr:last-child td { border-bottom: none; }
+  .feat-table .activity { font-weight: 600; color: var(--ink-900); }
+  .feat-table .modes { font-family: var(--font-mono); font-size: 1.25vmin; color: var(--indigo-ink); font-weight: 600; }
+  .feat-table .day1 { color: var(--ok-ink); font-weight: 600; }
+  .feat-table .p1 { color: var(--ink-500); }
+
+  /* === SLIDE 13: Integrations === */
+  .int-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.8vmin; margin-top: 2.5vmin; }
+  .int-tier { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.2vmin; display: flex; flex-direction: column; gap: 1.3vmin; }
+  .int-tier.tier0 { background: var(--ok-bg); border-color: var(--ok-border); }
+  .int-tier.tier1 { background: var(--indigo-soft); border-color: rgba(91, 91, 214, 0.2); }
+  .int-tier.tier3 { background: var(--sunken); }
+  .int-tier .label { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); text-transform: uppercase; }
+  .int-tier.tier0 .label { color: var(--ok-ink); }
+  .int-tier.tier1 .label { color: var(--indigo-ink); }
+  .int-tier .when { font-size: 1.5vmin; font-weight: 600; color: var(--ink-900); line-height: 1.3; }
+  .int-list { display: flex; flex-direction: column; gap: 0.4vmin; flex: 1; }
+  .int-list .item { font-size: 1.3vmin; color: var(--ink-700); padding: 0.5vmin 0; border-bottom: 1px dashed var(--line); }
+  .int-list .item:last-child { border-bottom: none; }
+  .int-tier .why { font-size: 1.2vmin; color: var(--ink-500); font-style: italic; line-height: 1.5; padding-top: 0.8vmin; border-top: 1px solid var(--line); }
+
+  /* === SLIDE 15: 现状 === */
+  .stat-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2vmin; margin-bottom: 2.5vmin; padding-bottom: 2.5vmin; border-bottom: 1px solid var(--line); }
+  .stat-num .n { font-size: 4.5vmin; line-height: 1; font-weight: 600; letter-spacing: -0.025em; color: var(--ink-900); font-variant-numeric: tabular-nums; }
+  .stat-num .lbl { margin-top: 0.4vmin; font-size: 1.2vmin; color: var(--ink-500); letter-spacing: 0.1em; font-weight: 600; font-family: var(--font-mono); text-transform: uppercase; }
+  .shipped-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1vmin 2vmin; }
+  .shipped-row { display: grid; grid-template-columns: 2vmin 1fr; gap: 1vmin; align-items: baseline; padding: 0.6vmin 0; border-bottom: 1px dashed var(--line); }
+  .shipped-row:last-child { border-bottom: none; }
+  .shipped-row .check { color: var(--ok-ink); font-weight: 700; font-size: 1.5vmin; }
+  .shipped-row .text { font-size: 1.4vmin; color: var(--ink-700); line-height: 1.55; }
+  .shipped-row .text b { color: var(--ink-900); font-weight: 600; }
+
+  /* === SLIDE 16: Roadmap (phase-based) === */
+  .phase-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5vmin; margin-top: 2.5vmin; }
+  .phase-card { padding: 2vmin; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 1.2vmin; }
+  .phase-card.now { background: var(--ok-bg); border-color: var(--ok-border); }
+  .phase-card.q3 { background: var(--indigo-soft); border-color: rgba(91, 91, 214, 0.25); }
+  .phase-card .when { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); text-transform: uppercase; }
+  .phase-card.now .when { color: var(--ok-ink); }
+  .phase-card.q3 .when { color: var(--indigo-ink); }
+  .phase-card .theme { font-size: 1.6vmin; font-weight: 600; color: var(--ink-900); line-height: 1.3; padding-bottom: 0.6vmin; border-bottom: 1px solid var(--line); }
+  .phase-card.now .theme { border-color: rgba(4, 120, 87, 0.25); }
+  .phase-card.q3 .theme { border-color: rgba(91, 91, 214, 0.25); }
+  .phase-card .feats { display: flex; flex-direction: column; gap: 0.6vmin; flex: 1; }
+  .phase-card .feat { font-size: 1.3vmin; color: var(--ink-700); line-height: 1.5; }
+  .phase-card .feat b { color: var(--ink-900); font-weight: 600; }
+  .phase-card .feat::before { content: "·"; margin-right: 0.5vmin; color: var(--ink-400); font-weight: 700; }
+  .phase-card .hook { font-size: 1.2vmin; color: var(--ink-500); font-style: italic; padding-top: 0.8vmin; border-top: 1px dashed var(--line); line-height: 1.5; margin-top: auto; }
+
+  /* === SLIDE 17: Forever-no + Memorable closing === */
+  .closing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3vmin; margin-top: 2vmin; }
+  .forever-col h3 { font-size: 1.35vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--danger-ink); margin-bottom: 1.3vmin; font-family: var(--font-mono); text-transform: uppercase; }
+  .forever-list { display: flex; flex-direction: column; gap: 0.6vmin; }
+  .forever-item { padding: 0.9vmin 1.2vmin; background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--danger-border); border-radius: 6px; display: grid; grid-template-columns: 1fr auto; gap: 1.3vmin; align-items: baseline; }
+  .forever-item .what { font-size: 1.35vmin; color: var(--ink-900); font-weight: 500; }
+  .forever-item .why { font-size: 1.2vmin; color: var(--ink-500); font-style: italic; text-align: right; max-width: 16vmin; line-height: 1.4; }
+
+  .memorable-col h3 { font-size: 1.35vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--indigo-ink); margin-bottom: 1.3vmin; font-family: var(--font-mono); text-transform: uppercase; }
+  .memorable-list { display: flex; flex-direction: column; gap: 1vmin; }
+  .memorable-item {
+    padding: 1.4vmin 1.7vmin;
+    background: var(--ink-900); color: white;
     border-radius: 8px;
-    display: flex; flex-direction: column;
+    display: grid; grid-template-columns: 3vmin 1fr; gap: 1.2vmin; align-items: start;
   }
-  .quad.shipped { background: var(--ok-bg); border-color: var(--ok-border); }
-  .quad .quad-status {
-    font-family: var(--font-mono); font-size: 1.1vmin; text-transform: uppercase;
-    letter-spacing: 0.12em; font-weight: 700; color: var(--ink-500); margin-bottom: 1vmin;
-  }
-  .quad.shipped .quad-status { color: var(--ok-ink); }
-  .quad .quad-title { font-size: 1.9vmin; font-weight: 600; color: var(--ink-900); margin-bottom: 1.2vmin; line-height: 1.2; letter-spacing: -0.01em; }
-  .quad .quad-body { font-size: 1.3vmin; color: var(--ink-700); line-height: 1.5; flex: 1; }
+  .memorable-item .num { font-size: 1.8vmin; font-weight: 600; color: #fbbf24; line-height: 1; font-variant-numeric: tabular-nums; }
+  .memorable-item .body { display: flex; flex-direction: column; gap: 0.3vmin; }
+  .memorable-item .punch { font-size: 1.5vmin; font-weight: 600; color: white; line-height: 1.35; letter-spacing: -0.005em; }
+  .memorable-item .src { font-size: 1.2vmin; color: #94a3b8; font-family: var(--font-mono); letter-spacing: 0.04em; }
 
-  /* SLIDE 14 — Close */
-  .close-slide { background: var(--surface); padding: 8vmin 10vmin; }
-  .close-quote {
-    font-size: 3.5vmin; line-height: 1.25; color: var(--ink-900);
-    letter-spacing: -0.01em; margin-bottom: 5vmin;
-    padding-bottom: 4vmin; border-bottom: 1px solid var(--line);
-    font-weight: 500;
-  }
-  .close-quote .attr {
-    display: block; margin-top: 2vmin; font-size: 1.5vmin; color: var(--ink-500);
-    font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em;
-    font-weight: 500;
-  }
-  .close-line {
-    font-size: 4.5vmin; line-height: 1.2; color: var(--ink-900);
-    letter-spacing: -0.02em; font-weight: 600;
-  }
-  .close-line .accent { color: var(--indigo); }
-  .close-domain {
-    margin-top: 6vmin; font-family: var(--font-mono); font-size: 1.4vmin;
-    color: var(--ink-500); letter-spacing: 0.06em; text-align: right;
-  }
-
-  /* Notes panel */
-  .notes-panel {
-    position: fixed; bottom: 0; left: 0; right: 0;
-    background: rgba(15, 23, 42, 0.96); color: #e2e8f0;
-    padding: 2vmin 4vmin; font-size: 1.5vmin; line-height: 1.5;
-    transform: translateY(100%); transition: transform 200ms ease;
-    z-index: 100; max-height: 35vh; overflow-y: auto;
-    border-top: 1px solid rgba(255,255,255,0.1);
-  }
+  /* Notes panel + help overlay */
+  .notes-panel { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(15, 23, 42, 0.96); color: #e2e8f0; padding: 2vmin 4vmin; font-size: 1.5vmin; line-height: 1.65; transform: translateY(100%); transition: transform 200ms ease; z-index: 100; max-height: 40vh; overflow-y: auto; border-top: 1px solid rgba(255,255,255,0.1); }
   .notes-panel.open { transform: translateY(0); }
-  .notes-panel .label { font-size: 1.1vmin; text-transform: uppercase; letter-spacing: 0.12em; color: #94a3b8; margin-bottom: 0.6vmin; font-weight: 600; }
+  .notes-panel .label { font-size: 1.2vmin; letter-spacing: 0.12em; color: #94a3b8; margin-bottom: 0.6vmin; font-weight: 600; text-transform: uppercase; font-family: var(--font-mono); }
 
-  .help-overlay {
-    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    background: rgba(15, 23, 42, 0.96); color: #e2e8f0;
-    padding: 3vmin; border-radius: 8px; font-size: 1.4vmin;
-    z-index: 200; display: none;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-  }
+  .help-overlay { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(15, 23, 42, 0.96); color: #e2e8f0; padding: 3vmin; border-radius: 8px; font-size: 1.5vmin; z-index: 200; display: none; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
   .help-overlay.open { display: block; }
   .help-overlay h3 { font-size: 2vmin; margin-bottom: 1.5vmin; color: #fbbf24; font-weight: 600; }
-  .help-overlay .key-row { display: flex; justify-content: space-between; gap: 4vmin; margin-bottom: 0.7vmin; align-items: baseline; }
-  .help-overlay kbd {
-    font-family: var(--font-mono); background: rgba(255,255,255,0.1);
-    padding: 0.2vmin 0.7vmin; border-radius: 4px;
-    border: 1px solid rgba(255,255,255,0.2); font-size: 1.2vmin;
-  }
+  .help-overlay .key-row { display: flex; justify-content: space-between; gap: 4vmin; margin-bottom: 0.6vmin; align-items: baseline; }
+  .help-overlay kbd { font-family: var(--font-mono); background: rgba(255,255,255,0.1); padding: 0.2vmin 0.7vmin; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); font-size: 1.3vmin; }
   .help-overlay .desc { color: #94a3b8; }
 
   @media print {
@@ -734,513 +474,818 @@
 <div class="stage">
 <div class="deck" id="deck">
 
-<!-- 1. Title -->
-<section class="slide slide-title active" data-num="01" data-title="Title" data-notes="Hi. This is DueDateHQ. Before I tell you what we do, let me tell you what just happened to one of our users last Tuesday.">
-  <div class="col" style="align-items: center; text-align: center;">
-    <div class="word">DueDate<span class="accent">HQ</span></div>
-    <div class="tag">The client intelligence layer for CPA firms.</div>
-    <div class="meta">
-      <a class="link" href="https://duedatehq.space" target="_blank" rel="noopener">duedatehq.space</a>
-      <span class="dot"></span>
-      <span>May 2026</span>
-    </div>
-  </div>
+<!-- 1. Cover -->
+<section class="slide cover-slide active" data-num="01" data-title="封面" data-notes="封面。这个 pitch deck 卖的是产品想法 — 为什么这个产品该被造、研究怎么进的、产品决策怎么做的。不是融资 deck，不是营销 deck，是讲清楚我们想清楚了什么。">
+  <svg class="cover-mark" viewBox="0 0 953 432" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="DueDateHQ">
+    <rect width="450" height="400" transform="translate(267.127 0.180176) rotate(4.16677)" fill="#F2F2F2"/>
+    <circle cx="319.221" cy="42.076" r="18" transform="rotate(4.16677 319.221 42.076)" fill="#D9D9D9"/>
+    <circle cx="387.041" cy="47.0169" r="18" transform="rotate(4.16677 387.041 47.0169)" fill="#D9D9D9"/>
+    <circle cx="454.861" cy="51.9578" r="18" transform="rotate(4.16677 454.861 51.9578)" fill="#D9D9D9"/>
+    <circle cx="522.682" cy="56.8985" r="18" transform="rotate(4.16677 522.682 56.8985)" fill="#D9D9D9"/>
+    <circle cx="590.502" cy="61.8394" r="18" transform="rotate(4.16677 590.502 61.8394)" fill="#D9D9D9"/>
+    <circle cx="658.322" cy="66.7803" r="18" transform="rotate(4.16677 658.322 66.7803)" fill="#D9D9D9"/>
+    <path d="M45.3619 268.785L20.5966 268.654L20.8498 250.374L45.4588 250.504C51.6045 250.537 56.7941 249.184 61.0274 246.446C65.261 243.656 68.4597 239.585 70.6235 234.231C72.8394 228.878 73.9675 222.4 74.0078 214.796L74.0373 209.249C74.0682 203.416 73.4704 198.282 72.2439 193.849C71.0694 189.415 69.2923 185.682 66.9125 182.648C64.5327 179.615 61.6021 177.334 58.1206 175.805C54.6393 174.224 50.6331 173.421 46.1019 173.397L20.6335 173.262L20.7308 154.903L46.1992 155.038C53.8033 155.079 60.7494 156.417 67.0376 159.055C73.3781 161.641 78.8534 165.342 83.4633 170.158C88.0733 174.974 91.6106 180.722 94.0752 187.402C96.5922 194.03 97.8292 201.406 97.7861 209.531L97.7575 214.922C97.7147 222.995 96.3996 230.357 93.8122 237.011C91.2769 243.664 87.6789 249.374 83.0182 254.141C78.4098 258.856 72.8956 262.499 66.4756 265.069C60.108 267.587 53.0701 268.826 45.3619 268.785ZM34.4806 154.976L33.8777 268.725L10.4405 268.6L11.0435 154.852L34.4806 154.976ZM177.916 155.736L201.275 155.86L200.877 231.015C200.83 239.765 198.916 247.125 195.135 253.095C191.405 259.065 186.251 263.543 179.673 266.529C173.146 269.515 165.638 270.985 157.149 270.94C148.659 270.895 141.115 269.345 134.517 266.289C127.971 263.234 122.838 258.701 119.12 252.692C115.454 246.683 113.644 239.303 113.691 230.553L114.089 155.398L137.526 155.522L137.128 230.678C137.101 235.782 137.886 239.953 139.483 243.19C141.081 246.428 143.386 248.81 146.399 250.336C149.463 251.863 153.079 252.637 157.246 252.659C161.517 252.682 165.14 251.946 168.117 250.451C171.146 248.957 173.45 246.599 175.03 243.379C176.661 240.158 177.491 235.996 177.518 230.892L177.916 155.736ZM296.393 251.835L296.296 270.116L235.75 269.795L235.847 251.514L296.393 251.835ZM244.009 156.087L243.406 269.835L219.969 269.711L220.572 155.963L244.009 156.087ZM288.763 202.653L288.668 220.465L236.013 220.186L236.107 202.374L288.763 202.653ZM296.821 156.367L296.723 174.726L236.255 174.405L236.353 156.046L296.821 156.367ZM344.889 270.373L320.124 270.242L320.377 251.962L344.986 252.092C351.132 252.125 356.321 250.772 360.554 248.034C364.788 245.244 367.987 241.172 370.151 235.819C372.366 230.466 373.495 223.988 373.535 216.384L373.564 210.837C373.595 205.004 372.997 199.87 371.771 195.436C370.596 191.003 368.819 187.27 366.44 184.236C364.06 181.203 361.129 178.921 357.648 177.393C354.166 175.812 350.16 175.009 345.629 174.985L320.161 174.85L320.258 156.491L345.726 156.626C353.33 156.666 360.276 158.005 366.565 160.643C372.905 163.228 378.38 166.929 382.99 171.746C387.6 176.562 391.138 182.31 393.602 188.99C396.119 195.618 397.356 202.994 397.313 211.119L397.285 216.51C397.242 224.582 395.927 231.945 393.339 238.598C390.804 245.252 387.206 250.962 382.545 255.729C377.937 260.444 372.423 264.087 366.003 266.657C359.635 269.175 352.597 270.414 344.889 270.373ZM334.008 156.564L333.405 270.312L309.968 270.188L310.571 156.44L334.008 156.564ZM459.215 176.681L427.778 270.813L402.857 270.68L445.725 157.156L461.584 157.24L459.215 176.681ZM484.418 271.113L453.903 176.653L451.506 157.187L467.521 157.272L509.418 271.245L484.418 271.113ZM483.236 228.762L483.139 247.121L423.062 246.803L423.159 228.444L483.236 228.762ZM561.895 157.772L561.292 271.52L537.933 271.396L538.536 157.648L561.895 157.772ZM596.895 157.957L596.797 176.317L503.986 175.825L504.083 157.465L596.895 157.957ZM686.075 253.9L685.978 272.181L625.432 271.86L625.529 253.579L686.075 253.9ZM633.691 158.152L633.088 271.901L609.651 271.777L610.254 158.028L633.691 158.152ZM678.445 204.718L678.35 222.531L625.695 222.252L625.789 204.439L678.445 204.718ZM686.503 158.432L686.405 176.792L625.937 176.471L626.035 158.112L686.503 158.432ZM815.708 205.446L815.612 223.727L756.237 223.412L756.334 205.131L815.708 205.446ZM763.533 158.841L762.93 272.589L739.493 272.465L740.096 158.716L763.533 158.841ZM832.673 159.207L832.07 272.956L808.711 272.832L809.313 159.083L832.673 159.207ZM914.345 256.517L944.997 281.054L930.164 293.788L899.981 269.253L914.345 256.517ZM946.134 214.028L946.105 219.419C946.059 228.064 944.846 235.819 942.466 242.681C940.138 249.544 936.8 255.386 932.451 260.206C928.103 264.975 922.979 268.62 917.08 271.141C911.182 273.661 904.638 274.903 897.451 274.865C890.316 274.827 883.786 273.516 877.862 270.933C871.938 268.349 866.828 264.65 862.53 259.836C858.233 254.969 854.905 249.092 852.545 242.204C850.238 235.317 849.107 227.551 849.153 218.905L849.182 213.514C849.228 204.816 850.441 197.062 852.821 190.252C855.253 183.39 858.617 177.548 862.914 172.727C867.21 167.906 872.334 164.235 878.285 161.715C884.236 159.194 890.779 157.953 897.914 157.991C905.102 158.029 911.631 159.339 917.503 161.923C923.427 164.506 928.538 168.231 932.835 173.098C937.132 177.964 940.434 183.841 942.741 190.729C945.049 197.564 946.18 205.33 946.134 214.028ZM922.433 219.293L922.463 213.746C922.495 207.705 921.95 202.389 920.829 197.8C919.759 193.211 918.165 189.348 916.046 186.212C913.979 183.076 911.414 180.719 908.349 179.14C905.285 177.509 901.774 176.683 897.815 176.662C893.857 176.641 890.337 177.43 887.256 179.028C884.175 180.574 881.584 182.904 879.484 186.018C877.384 189.132 875.775 192.978 874.657 197.555C873.539 202.133 872.964 207.442 872.932 213.484L872.903 219.031C872.871 225.02 873.39 230.336 874.459 234.977C875.528 239.566 877.096 243.454 879.163 246.642C881.282 249.779 883.873 252.162 886.938 253.793C890.054 255.424 893.591 256.25 897.55 256.271C901.508 256.292 905.002 255.503 908.031 253.905C911.112 252.307 913.703 249.951 915.803 246.837C917.955 243.671 919.59 239.799 920.708 235.222C921.827 230.592 922.402 225.283 922.433 219.293Z" fill="black"/>
+  </svg>
+  <div class="cover-foot">Gigi Wu &nbsp;·&nbsp; May 2026 &nbsp;·&nbsp; <a class="link" href="https://duedatehq.space" target="_blank" rel="noopener">duedatehq.space</a></div>
 </section>
 
-<!-- 2. Louisiana hook -->
-<section class="slide center" data-num="02" data-title="Louisiana, last Tuesday" data-notes="Louisiana DOR posted a hurricane filing extension at 3:14 PM Central. By 7:08 the same day, our user had six affected clients identified, eight deadlines extended, and six client emails drafted in her tone. Her peers using TaxDome and Karbon found out from a client complaint.">
-  <div class="micro eyebrow">Last Tuesday · Louisiana DOR</div>
-  <div class="louisiana">
+<!-- 2. 场景 (slim — no narrative paragraphs) -->
+<section class="slide center" data-num="02" data-title="场景" data-notes="一个具体的周二下午。三个时间戳，一张 alert card。不要叙事化讲，让 timestamps 和右边的 alert card 自己讲。停在最后一句「她从客户那儿得知。每一次都是。」— 让它落下，然后翻页进痛点。">
+  <div class="micro eyebrow">场景 · 一个普通的周二</div>
+  <div class="scene-grid">
     <div class="col">
-      <div class="timestamp-row"><span class="ts">3:14 PM</span><span class="lbl">Hurricane extension posted</span></div>
-      <div class="between-line"></div>
-      <div class="timestamp-row"><span class="ts">7:08 PM</span><span class="lbl">Same day · 3h 54m later</span></div>
-      <div class="outcome-list">
-        <div class="outcome-line"><span class="n">6</span><span class="t">affected clients identified</span></div>
-        <div class="outcome-line"><span class="n">8</span><span class="t">deadlines extended</span></div>
-        <div class="outcome-line"><span class="n">6</span><span class="t">client emails drafted, in her tone</span></div>
-        <div class="outcome-line"><span class="n">90s</span><span class="t">to review and approve all of them</span></div>
-      </div>
-      <div class="lead" style="margin-top: 3vmin; font-size: 2vmin;">
-        Her peers using <strong>TaxDome</strong> or <strong>Karbon</strong> found out from a client complaint.
+      <div class="scene-time-row"><span class="scene-time">3:14 PM</span><span class="scene-event">路易斯安那州税务局发布飓风延期公告</span></div>
+      <div class="scene-time-row"><span class="scene-time">5:08 PM</span><span class="scene-event">第一个客户邮件：<span class="em">「这对我有什么影响？」</span></span></div>
+      <div class="scene-time-row"><span class="scene-time">8:30 PM</span><span class="scene-event">Sarah 在 Excel 里手动比对 49 个客户的州</span></div>
+      <div class="scene-punch">
+        她从客户那儿得知政策变化。<br>
+        每一次都是。
       </div>
     </div>
     <div class="alert-card">
       <div class="top">
         <span class="chip">LA · DOR</span>
-        <span class="title">Hurricane Delta extension</span>
-        <span class="when">2h ago</span>
+        <span class="title">飓风 Delta 延期公告</span>
+        <span class="when">2 小时前</span>
       </div>
-      <div class="summary">Filing deadlines extended through Nov 15 for affected counties. AI parsed 12 fields with high confidence.</div>
+      <div class="summary">受影响郡的申报截止日延至 11/15。AI 已解析 12 个字段。</div>
       <div class="row-pills">
-        <span class="pill silent"><strong style="margin-right: 0.4vmin;">6 clients</strong> · 8 deadlines</span>
-        <span class="pill success">AI parse · high</span>
-        <span class="pill success">AI match · high</span>
+        <span class="pill silent"><strong style="margin-right: 0.4vmin;">6 个客户</strong> · 8 个 deadline</span>
+        <span class="pill success">解析 · 高</span>
       </div>
       <div class="actions">
-        <button class="btn-primary">Draft client emails</button>
-        <button class="btn-secondary">Batch-extend</button>
-        <button class="btn-secondary">Forward bulletin</button>
+        <button class="btn-primary">起草客户邮件</button>
+        <button class="btn-secondary">批量延期</button>
       </div>
     </div>
   </div>
   <div class="chrome">
-    <div class="left"><span class="num">02</span><span>The opening moment</span></div>
-    <div>DueDateHQ · 2026</div>
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">02</span>场景</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
-<!-- 3. 2-sentence opener -->
-<section class="slide surface center" data-num="03" data-title="What we do" data-notes="Here's what we do, in two sentences. A solo CPA can give 10 clients fine-grained service. She physically cannot replicate that across 100. We run the parts of that service a machine can do — across her entire book.">
-  <div class="micro eyebrow">What we do</div>
-  <div class="opener-text">
-    A solo CPA can give <span class="strong">10 clients</span> fine-grained service.<br>
-    She physically can't replicate that across <span class="strong">100</span>.
-    <br><br>
-    DueDateHQ runs the parts a machine can do —<br>
-    <span class="accent">across her entire book.</span>
+<!-- 3. 痛点 (强力版 · 后果导向) -->
+<section class="slide center" data-num="03" data-title="痛点 · 真实后果" data-notes="痛点强力版：每一个痛都用「真实代价」标出来。不是抽象的「不方便」，是真实的钱、真实的时间、真实的关系。讲的时候按红框（真实代价）顺序读，不读 body 段。让钱和后果说话。最下面那行长期痛点是收尾 — partner 退休、知识全丢，事务所价值掉一半。这是为什么资深合伙人愿意付钱。">
+  <div class="micro eyebrow">痛点 · 不是不方便，是真实代价</div>
+  <h2 class="h1">三件事每天压在 CPA 身上。</h2>
+  <div class="pain-grid">
+    <div class="pain-card">
+      <div class="pain-num">痛点 01 · State Alerts</div>
+      <div class="pain-title">客户先知道州的事。</div>
+      <div class="pain-cost">
+        <div class="label">真实代价</div>
+        <div class="val">客户被罚 $500–$2,000<br>CPA 道歉，有时候自己赔</div>
+      </div>
+      <div class="pain-body">50 个州每年发几百条公告。CPA 没工具盯，平均 7 天后才知道。客户在 LinkedIn / Reddit 看到 → 反过来质问 CPA。</div>
+    </div>
+    <div class="pain-card">
+      <div class="pain-num">痛点 02 · Task Management</div>
+      <div class="pain-title">漏 deadline 比迟到贵。</div>
+      <div class="pain-cost">
+        <div class="label">真实代价</div>
+        <div class="val">客户罚款 + 失去客户<br>下年职业责任险涨 15-30%</div>
+      </div>
+      <div class="pain-body">300+ deadline 跨州、跨实体类型。Excel 追不过来。漏一个 = 客户走人 + 保险费涨 + 别的客户听说也走。</div>
+    </div>
+    <div class="pain-card">
+      <div class="pain-num">痛点 03 · File Request</div>
+      <div class="pain-title">三周前开始追，最后一周还在补。</div>
+      <div class="pain-cost">
+        <div class="label">真实代价</div>
+        <div class="val">3-4 个周末加班<br>家庭关系紧张</div>
+      </div>
+      <div class="pain-body">手打 12 封一样的提醒。客户回复散落、文件错件。3-4 月每个周末都在补材料 — 这不是工作量问题，是生活问题。</div>
+    </div>
   </div>
-  <div class="activity-row">
-    <span class="act-chip"><span class="n">01</span>Memory</span>
-    <span class="act-chip"><span class="n">02</span>Predictions</span>
-    <span class="act-chip"><span class="n">03</span>Confirmation</span>
-    <span class="act-chip"><span class="n">04</span>Monitoring</span>
-    <span class="act-chip"><span class="n">05</span>Drafting</span>
-    <span class="act-chip" style="margin-left: auto; background: var(--sunken); color: var(--ink-500); border-style: dashed;">CPA keeps: judgment · signature · relationships</span>
+  <div class="pain-extra">
+    <span class="lead-in">+ 长期痛点：</span>
+    <span>客户 5 年的 pattern（W-2 几月到、K-1 哪家延、谁去年漏报 Schedule E）— 全在 CPA 脑子里。换 staff 全丢，<strong style="color: var(--ink-900);">partner 退休事务所价值掉一半</strong>。</span>
   </div>
   <div class="chrome">
-    <div class="left"><span class="num">03</span><span>The 2-sentence opener</span></div>
-    <div>5 machine-replicated activities</div>
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">03</span>痛点</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
-<!-- 4. Insight -->
-<section class="slide center" data-num="04" data-title="The insight" data-notes="Every CPA software vendor implicitly assumes the CPA picks which clients get fine-grained service. They don't. They run out of hours. The constraint is supply-side capacity. AI's job is to lift the ceiling.">
-  <div class="micro eyebrow">The insight</div>
-  <div class="insight-grid">
-    <div class="col">
-      <h2 class="h1">The bottleneck is <span class="accent">supply-side</span>.<br>Not strategic segmentation.</h2>
-      <div class="body" style="margin-top: 3vmin; max-width: 90%;">
-        Every incumbent assumes the CPA <em>picks</em> which clients get fine-grained service.<br><br>
-        <strong style="color: var(--ink-900);">They don't. They run out of hours.</strong>
+<!-- 4. 竞争对手 (精确 · 可辩护) -->
+<section class="slide center" data-num="04" data-title="竞争 · 6 行可辩护的差异" data-notes="重写为 6 行可辩护的差异。删了之前两行含糊的（Solo CPA 友好、deadline 基础）— 那两行容易被对手反驳。现在每一行都能站得住脚：state 监控独有、affected-client 匹配独有、24h SLA 独有、AI 跨年 pattern 独有、年付/月付差异、永不做 portal/vault/计费 — 这一行反过来证明纪律。">
+  <div class="micro eyebrow">竞争 · 6 行可辩护的差异</div>
+  <h2 class="h1">没有一家做这一行。</h2>
+  <table class="compete-table">
+    <thead>
+      <tr>
+        <th style="width: 36%;">能力</th>
+        <th class="us" style="width: 12.8%;">DueDateHQ</th>
+        <th style="width: 12.8%;">TaxDome</th>
+        <th style="width: 12.8%;">Karbon</th>
+        <th style="width: 12.8%;">Canopy</th>
+        <th style="width: 12.8%;">File In Time</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="cap">50 州税务公告实时监控</td><td class="us-col yes">✓ 独有</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+      <tr><td class="cap">公告 ↔ 受影响客户自动交叉</td><td class="us-col yes">✓ 独有</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+      <tr><td class="cap">灾情延期 24h SLA</td><td class="us-col yes">✓ 独有</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+      <tr><td class="cap">AI 跨年 pattern 识别（per-client 时机）</td><td class="us-col yes">✓ 独有</td><td class="partial">滚动复制</td><td class="partial">AI agents</td><td class="partial">表单填充</td><td class="no">—</td></tr>
+      <tr><td class="cap">月付 · 无年付硬绑</td><td class="us-col yes">✓ $29–99/mo</td><td class="partial">年付为主</td><td class="no">年付</td><td class="no">年付</td><td class="partial">桌面买断</td></tr>
+      <tr><td class="cap">客户 portal · 文件 vault · 计费</td><td class="us-col partial">永不做</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+    </tbody>
+  </table>
+  <div class="caption" style="margin-top: 1.8vmin; font-style: italic; line-height: 1.6;">
+    最后一行是最关键的：他们做"全套"，我们只做一层。<strong style="color: var(--ink-900); font-style: normal;">不抢 portal、vault、计费 — 让我们和 QuickBooks / Lacerte / Gmail 共生，不替代。</strong>
+  </div>
+  <div class="chrome">
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">04</span>竞争</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
+  </div>
+</section>
+
+<!-- 5. 机会 -->
+<section class="slide center" data-num="05" data-title="机会 · why now + 市场" data-notes="Why now + 市场。三件事让生意现在才成立。LLM 这一条不靠具体数字（$3-5/firm/mo 是 forward estimate，未经规模验证）— 改成结构性 claim：这门生意 5 年前是 Bloomberg 数千美元/年订阅，现在 LLM 让独立工具能做。市场自下而上 ~$22M ARR — 楔子小，承认。但平台扩展路径清晰：Y3 顾问层 $200-500/seat、Y5 firm brain $1K-5K/seat、邻接行业 5×。这一页直面「TAM 太小」反对意见。">
+  <div class="micro eyebrow">机会 · Why now + 市场</div>
+  <h2 class="h1">三件事让这个生意"现在"才成立。</h2>
+  <div class="opp-grid" style="margin-top: 2.2vmin;">
+    <div class="opp-stack">
+      <div class="opp-row">
+        <div class="label">Why now · 01 · 经济性</div>
+        <div class="text"><span class="strong">5 年前这是 Bloomberg / CCH 的数千美元/年订阅生意。</span><br><span class="sub">LLM 让独立工具能做 50 州监控 + 解析 + 客户匹配。</span></div>
+      </div>
+      <div class="opp-row">
+        <div class="label">Why now · 02 · 老牌在崩</div>
+        <div class="text"><span class="strong">File In Time 2026 还是 Windows 安装包。</span><br><span class="sub">桌面架构无法做云端 24h SLA。结构跟不上。</span></div>
+      </div>
+      <div class="opp-row">
+        <div class="label">Why now · 03 · Suite 疲劳</div>
+        <div class="text"><span class="strong">TaxDome 年付绑定 + 10–15 小时安装。</span><br><span class="sub">Capterra 上每个差评都在喊"我要一个层，不要又一个套件"。</span></div>
       </div>
     </div>
+    <div class="market-block">
+      <div class="micro" style="margin-bottom: 0.8vmin;">市场 · 自下而上</div>
+      <div class="market-num">~$22M<span class="suffix">/yr</span></div>
+      <div class="market-cap">楔子市场 · 全渗透 ARR · 美国 ~45K solo–10 人事务所</div>
+      <div class="market-rule"></div>
+      <div class="market-expansion">
+        <div style="margin-bottom: 0.7vmin;"><span class="strong">楔子小，平台不小。</span></div>
+        <div>· Y3：Layer B 顾问层 → $200–500/seat</div>
+        <div>· Y5：Firm brain 中型 firm → $1K–5K/seat</div>
+        <div>· 邻接（bookkeeper / EA / fractional CFO）<span class="strong">5× firm 数</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="chrome">
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">05</span>机会</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
+  </div>
+</section>
+
+<!-- 6. 我们做什么 + so-what -->
+<section class="slide surface center" data-num="06" data-title="我们做什么 · so what" data-notes="左边 2 句话讲完 — 这是定位。右边「对 Sarah 来说意味着什么」是 so what — 三个具体可量化的结果。这一页关键：不要让左边的 2 句话停在抽象。右边的 so what 要落到地。读的时候先读完左边，停一下，再读右边「客户量翻倍 / 不再从客户那儿得知 / advisory 多 30%」 — 让数字落下。">
+  <div class="micro eyebrow">我们做什么</div>
+  <div class="what-grid">
     <div class="col">
-      <div class="bar-chart">
-        <div class="bars">
-          <div class="bar" style="height: 95%"></div>
-          <div class="bar" style="height: 92%"></div>
-          <div class="bar" style="height: 90%"></div>
-          <div class="bar" style="height: 88%"></div>
-          <div class="bar" style="height: 87%"></div>
-          <div class="bar" style="height: 85%"></div>
-          <div class="bar" style="height: 84%"></div>
-          <div class="bar" style="height: 82%"></div>
-          <div class="bar" style="height: 80%"></div>
-          <div class="bar" style="height: 78%"></div>
-          <div class="bar faded" style="height: 35%"></div>
-          <div class="bar faded" style="height: 33%"></div>
-          <div class="bar faded" style="height: 32%"></div>
-          <div class="bar faded" style="height: 30%"></div>
-          <div class="bar faded" style="height: 28%"></div>
-          <div class="bar faded" style="height: 26%"></div>
-          <div class="bar faded" style="height: 24%"></div>
-          <div class="bar faded" style="height: 22%"></div>
-          <div class="bar faded" style="height: 20%"></div>
-          <div class="bar faded" style="height: 19%"></div>
-          <div class="bar faded" style="height: 18%"></div>
-          <div class="bar faded" style="height: 17%"></div>
-          <div class="bar faded" style="height: 16%"></div>
-          <div class="bar faded" style="height: 15%"></div>
-          <div class="bar faded" style="height: 14%"></div>
+      <div class="what-text">
+        一个 CPA 能给 <span class="strong">10 个客户</span>精细的服务。<br>
+        给 <span class="strong">100 个</span>就给不动了。
+        <br><br>
+        DueDateHQ 把"精细服务"里机器能做的部分 —<br>
+        <span class="accent">跑遍整本客户簿。</span>
+      </div>
+      <div class="what-row">
+        <span class="what-chip"><span class="n">01</span>记忆</span>
+        <span class="what-chip"><span class="n">02</span>预测</span>
+        <span class="what-chip"><span class="n">03</span>确认</span>
+        <span class="what-chip"><span class="n">04</span>监控</span>
+        <span class="what-chip"><span class="n">05</span>起草</span>
+        <span class="what-aside">CPA 留：判断 · 签字 · 关系</span>
+      </div>
+    </div>
+    <div class="so-what">
+      <div class="label">→ 对 Sarah 来说意味着什么</div>
+      <div class="so-what-item">
+        <span class="num">2×</span>
+        <span class="text"><b>客户人数翻倍 — 不需要加人。</b><br>从 50 到 100 个客户依然能保持精细服务。</span>
+      </div>
+      <div class="so-what-item">
+        <span class="num">0</span>
+        <span class="text"><b>不再从客户那儿得知政策变化。</b><br>州延期 4 小时内通知客户、邮件已起草。</span>
+      </div>
+      <div class="so-what-item">
+        <span class="num">+30%</span>
+        <span class="text"><b>Advisory 收入提升。</b><br>AI 帮她看到 RSU 兑现、薪资跳变 — 从报税员变顾问。</span>
+      </div>
+    </div>
+  </div>
+  <div class="chrome">
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">06</span>我们做什么</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
+  </div>
+</section>
+
+<!-- 7. Yan Jing 深度 -->
+<section class="slide center" data-num="07" data-title="深度访谈 · Yan Jing" data-notes="Yan Jing 是最重要的访谈。15 年合伙人，10 人事务所，600 客户跨 20 州。访谈中文为主、英文术语穿插，全程录像。访谈跨 4 个问题主线，最后浓缩成 5 条 TL;DR — 每一条都直接落到产品架构里。讲法：先放他的 verbatim 中文 quote（关于供给侧瓶颈）让 quote 自己说话；右侧 5 条 TL;DR 一条 10-15 秒过；最后底部那句「AI 不替 CPA 做决定 — AI 让 CPA 看到他原本看不到的信息」是他给的产品框架。这一页不是「我们和某 CPA 聊过」— 是「这个 CPA 写了我们一半的 PRD」。">
+  <div class="micro eyebrow">深度访谈 · 访谈 01 · 最重要的一次</div>
+  <h2 class="h1">他写了我们一半的 PRD。</h2>
+  <div class="yj-grid">
+    <div class="yj-card-left">
+      <div class="yj-id">
+        <div class="yj-badge">访谈 01 · Founding partner</div>
+        <div class="yj-name">Yan Jing</div>
+        <div class="yj-meta">
+          15 年合伙人 · 10 人事务所<br>
+          600 客户 · 跨 20 州 · 国际税方向<br>
+          40+ 软件工具 · SharePoint 主战场
         </div>
-        <div class="ceiling-line"></div>
-        <div class="ceiling-label">↑ AI lifts this</div>
-        <span class="x-label x-left">client #1</span>
-        <span class="x-label x-right">client #100</span>
+        <span class="yj-video">● 录像存档 · 660 行综合</span>
+      </div>
+      <div class="yj-quote">
+        "600 个客户如果每个人都去问一下的话，<br>那好多时间花在."
+        <span class="attrib">— Yan Jing · 间接承认了他记不住所有客户</span>
+      </div>
+      <div class="caption" style="line-height: 1.6; color: var(--ink-700); font-size: 1.35vmin;">
+        他清楚记得 ~50 客户、模糊记得 ~100、剩 450 只能查记录。
+        <strong style="color: var(--ink-900);">这是供给侧天花板。</strong>
+        AI 的职责不是替他做事 — 是让 600 个客户都得到他给前 50 的关注。
+      </div>
+      <div class="yj-bottom-quote">
+        "AI 不替 CPA 做决定 — AI 让 CPA 看到他原本看不到的信息。"<br>
+        <span style="color: var(--ink-500); font-style: normal; font-size: 1.2vmin; font-family: var(--font-mono); letter-spacing: 0.04em;">— 整段访谈的产品框架</span>
+      </div>
+    </div>
+    <div class="yj-conclusions">
+      <div class="ttl">Notes · 5 条 TL;DR · 每一条都落进了产品</div>
+      <div class="yj-concl-item">
+        <span class="n">01</span>
+        <div class="body">
+          <div class="ti">多年历史不是"慢慢变好"，是壁垒。</div>
+          <div class="desc">Day 1 by import — 不是 Year 2 才有。"客户读完'AI 第一年还没数据'就走了。"</div>
+          <div class="ref">→ §1, §4 · Mode A/E · Import Tier 1-4</div>
+        </div>
+      </div>
+      <div class="yj-concl-item">
+        <span class="n">02</span>
+        <div class="body">
+          <div class="ti">Onboarding 必须分 3 层，每层都见价值。</div>
+          <div class="desc">5 分钟（CSV）/ 30 分钟（一个集成）/ 持续（多年导入 + 邮件 OAuth）。每一层独立交付。</div>
+          <div class="ref">→ §2 · Onboarding Layer 1/2/3</div>
+        </div>
+      </div>
+      <div class="yj-concl-item">
+        <span class="n">03</span>
+        <div class="body">
+          <div class="ti">AI 优势不是单户精度，是规模。</div>
+          <div class="desc">单户 CPA 比 AI 强。AI 的边在：让 600 个客户得到他给前 50 的关注。</div>
+          <div class="ref">→ §4 · "Would Lacerte's organizer give this same answer?"</div>
+        </div>
+      </div>
+      <div class="yj-concl-item">
+        <span class="n">04</span>
+        <div class="body">
+          <div class="ti">邮件 + 审计轨迹是信任脊梁。</div>
+          <div class="desc">Stage 1（AI 起草、CPA 审）→ Stage 2 opt-in（满足 3 条件后自动）。Timeline 是 IRS 合规要求。</div>
+          <div class="ref">→ §5, §11 · Phase 1/2 · activity timeline</div>
+        </div>
+      </div>
+      <div class="yj-concl-item">
+        <span class="n">05</span>
+        <div class="body">
+          <div class="ti">最值钱的买家：preparer→advisor 的资深合伙人。</div>
+          <div class="desc">顾问触发 + 流失预警 + 定价情报 + firm brain — 这一层付费意愿最高。</div>
+          <div class="ref">→ §7-8 · Layer B/C · Year 3 / Year 5</div>
+        </div>
       </div>
     </div>
   </div>
   <div class="chrome">
-    <div class="left"><span class="num">04</span><span>Bottleneck is supply-side</span></div>
-    <div>PRD §1.3</div>
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">07</span>Yan Jing 深度</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
-<!-- 5. Lacerte test -->
-<section class="slide surface center" data-num="05" data-title="The Lacerte-organizer test" data-notes="Here's the test we run on every feature. Mechanical rollover is the floor. Pattern recognition is the product.">
-  <div class="micro eyebrow">The test we run on every feature</div>
-  <h2 class="h1">"Would Lacerte's organizer give this same answer?"</h2>
-  <div class="lead" style="margin-top: 1.5vmin; max-width: 80%; font-weight: 400;">
-    If yes, we haven't built anything new.
-    <span class="ink-500" style="font-style: italic;">Mechanical rollover is the floor. Pattern recognition is the product.</span>
-  </div>
-  <div class="compare">
-    <div class="compare-col faded">
-      <div class="label">Lacerte rollover</div>
-      <div class="compare-row">Copy last year's W-2 placeholder</div>
-      <div class="compare-row">Re-use last year's checklist items</div>
-      <div class="compare-row">Carry forward dependents</div>
+<!-- 8. Yan Jing Q-thread mapping -->
+<section class="slide center" data-num="08" data-title="Yan Jing 访谈 · 4 个 Q-thread → 决策" data-notes="Yan Jing 的访谈是按 4 个问题主线展开的：多年历史、邮件 + 审计轨迹、双向同步、决策边界。每个 thread 都直接落进了一个产品决策。这一页把 verbatim 中文 quote 放出来 — 让访谈的真实质感传达。讲的时候每个 quote 读出来后停半秒，再读下面的产品落点。这一页是「研究 → 决策」的可追溯证据。">
+  <div class="micro eyebrow">Yan Jing 访谈 · 4 个问题主线 → 直接落进产品</div>
+  <h2 class="h1">访谈结构本身就是产品决策路径。</h2>
+  <div class="qthread-grid">
+    <div class="qthread-card">
+      <div class="badge">Thread Q1 · 多年历史</div>
+      <div class="quote">"为什么我要先付一年费用，然后等 AI 慢慢学？"<span class="attrib">— 对"AI 越用越懂你"营销话术的直接拒绝</span></div>
+      <div class="arrow-row"><span class="arrow">→</span><span class="text"><b>Onboarding 重写为 3 层（5 分钟 / 30 分钟 / 持续）。</b>Day 1 import = 引擎。产品文案明令禁止"AI is learning"句式。</span></div>
+      <div class="ref">PRD §1.6, §2 · Mode A/E · Import Tier 1-4</div>
     </div>
-    <div class="compare-col active">
-      <div class="label">DueDateHQ AI</div>
-      <div class="compare-row">"This client's W-2 historically arrives Feb 5; this year Feb 12 with no email — should we ask?"</div>
-      <div class="compare-row">"Schedule E was on the checklist 5 years; gone this year — did the client sell the rental?"</div>
-      <div class="compare-row">"K-1 from Apex Fund hasn't arrived by April 8 (came Apr 8 last year, Apr 2 the year before) — flag for early extension."</div>
+    <div class="qthread-card">
+      <div class="badge">Thread Q2 · 邮件 + 审计轨迹</div>
+      <div class="quote">"IRS 来查 client X 的 2023 年报税，事务所必须能调出'我们在 T 时刻问了 Y'。"<span class="attrib">— 审计轨迹是合规要求，不是 nice-to-have</span></div>
+      <div class="arrow-row"><span class="arrow">→</span><span class="text"><b>Stage 1（AI 起草、CPA 审）→ Stage 2 opt-in（满足 3 条件后自动）。</b>activity timeline append-only · IRS 审计可导出 PDF + JSON。</span></div>
+      <div class="ref">PRD §5, §11 · Phase 1/2 · §15.4 audit-trail export</div>
+    </div>
+    <div class="qthread-card">
+      <div class="badge">Thread Q4 · 双向集成</div>
+      <div class="quote">"我有 40 个软件工具，最怕新东西不和它们说话。CCH 内核可能 50 年了。"<span class="attrib">— 反对 suite-replace 路线</span></div>
+      <div class="arrow-row"><span class="arrow">→</span><span class="text"><b>Karbon route（layer-not-suite）。</b>Tier 0/1/2/3 框架 · per-integration 单一 source-of-truth · CCH Axcess 进 forever-no list。</span></div>
+      <div class="ref">PRD §6.4 · §6.5 · forever_no.md</div>
+    </div>
+    <div class="qthread-card">
+      <div class="badge">综合 · 决策边界</div>
+      <div class="quote">"AI 不替 CPA 做决定 — AI 让 CPA 看到他原本看不到的信息。"<span class="attrib">— 整段访谈的产品框架</span></div>
+      <div class="arrow-row"><span class="arrow">→</span><span class="text"><b>绿 / 黄 / 红 区。</b>§5.3 不变量「AI 永不自动确认材料齐」直写在 DB CHECK 约束里。客户可以查代码。</span></div>
+      <div class="ref">PRD §4.5 · §5.3 · arch v0.7 §5</div>
+    </div>
+  </div>
+  <div class="caption" style="margin-top: 1.8vmin; padding: 1.2vmin 1.5vmin; background: var(--indigo-soft); border-radius: 6px; color: var(--indigo-ink); font-size: 1.3vmin; line-height: 1.6;">
+    <strong style="font-weight: 600;">+ 4 个延展 thread</strong>（A 效率层 · B 顾问关系 · C 事务所运营 · D 数据飞轮）→ 分别落到 §6 / §7 / §8 / §13。Year-1 / Year-3 / Year-5 trajectory 由此而来。
+  </div>
+  <div class="chrome">
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">08</span>Yan Jing Q-thread → 决策</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
+  </div>
+</section>
+
+<!-- 9. Other 2 interviews -->
+<section class="slide center" data-num="09" data-title="另两次访谈 · questionnaire + 招募" data-notes="Yan Jing 之外另两位访谈。但更重要：把方法学透明化 — questionnaire 5 问、招募 funnel（Discord 找到 1、LinkedIn DM 30+ 无人理、自有人脉介绍 1）。这是 demo day 上对手大概率没有的 evidence depth。讲的时候顺序：先指 questionnaire 5 个问题（说明研究是有结构的）→ 招募 funnel（说明真实付出 — 30+ 个 LinkedIn DM 无人理这个数字最有说服力）→ L. 和 M. 的具体发现。">
+  <div class="micro eyebrow">另两次访谈 · questionnaire + 招募 funnel</div>
+  <h2 class="h1">两段对话 · 加上不容易的招募过程。</h2>
+  <div class="methodology-strip">
+    <div class="questionnaire-block">
+      <div class="lbl">Questionnaire · 5 个问题（INTERVIEWEE-ASK.md）</div>
+      <div class="q-list">
+        <div class="q-item"><span class="qn">Q1</span><span>讲讲上周一早上 — 从打开电脑到午饭，时间花在哪里？</span></div>
+        <div class="q-item"><span class="qn">Q2</span><span>这季度最近一次差点漏掉 deadline 是什么时候，出了什么问题？</span></div>
+        <div class="q-item"><span class="qn">Q3</span><span>你一般怎么知道州税务局发了延期或规则变化？最近的例子？</span></div>
+        <div class="q-item"><span class="qn">Q4</span><span>哪个工具你试过然后放弃了 — 具体是哪一刻决定不用了？</span></div>
+        <div class="q-item"><span class="qn">Q5</span><span>如果只能自动化你一周里的一件事，会是哪件？</span></div>
+      </div>
+    </div>
+    <div class="funnel-block">
+      <div class="lbl">招募 funnel · 真实数字</div>
+      <div class="funnel-row"><span class="n">1</span><span class="desc"><b>Discord</b> r/TaxProChannel 私信 → L.（响应）</span></div>
+      <div class="funnel-row miss"><span class="n">30+</span><span class="desc"><b>LinkedIn</b> DM cold outreach → 无人回复</span></div>
+      <div class="funnel-row"><span class="n">1</span><span class="desc"><b>自有人脉</b>介绍 → M.（响应）</span></div>
+      <div class="funnel-row" style="margin-top: 0.5vmin; padding-top: 0.5vmin; border-top: 1px dashed var(--line);"><span class="n">~90'</span><span class="desc">每位语义访谈时长 · 非录像（隐私）</span></div>
+    </div>
+  </div>
+  <div class="other-grid">
+    <div class="other-card">
+      <div class="badge">访谈 02 · Solo CPA · Discord 招募</div>
+      <div class="name">L.</div>
+      <div class="meta">3 年独立 · ~40 客户 · 跨 4 州<br>Stack: Excel + Gmail + Lacerte + QBO</div>
+      <div class="other-section confirmed">
+        <div class="lbl">确认了 · 供给侧框架</div>
+        <div class="text">Yan Jing 的供给侧框架在 40 客户级别一样成立。chase loop 是日常之痛，每次截止前 3 周吞掉一整个周末。Q1 答："周一早上 30+ 分钟拼凑上周的事。"</div>
+      </div>
+      <div class="other-section new">
+        <div class="lbl">新增 · 转化失败现场</div>
+        <div class="text">Q4 答：试用过 TaxDome 但放弃 — onboarding 太重，第 3 个客户导入就放弃了。「不愿为不需要的 80% 功能绑定一年。」</div>
+      </div>
+      <div class="other-section">
+        <div class="lbl">决定了 · 落进产品</div>
+        <div class="text">月付、无年锁；Onboarding Layer 1 必须 5 分钟见价值（CSV + 样例数据）— 不强制集成。</div>
+      </div>
+    </div>
+    <div class="other-card">
+      <div class="badge">访谈 03 · 小事务所 Accountant · 人脉介绍</div>
+      <div class="name">M.</div>
+      <div class="meta">5 人事务所 · 2 年经验<br>分到 80 客户 · 仍在 ramp</div>
+      <div class="other-section confirmed">
+        <div class="lbl">确认了 · 知识转移痛</div>
+        <div class="text">小事务所内部知识转移是真实问题。partner 把客户「丢」给 junior，没人系统化记下每个客户去年怎么处理。Q5 答："替我记住 partner 没告诉我的事。"</div>
+      </div>
+      <div class="other-section new">
+        <div class="lbl">新增 · 焦虑的真实形状</div>
+        <div class="text">Q2 答："不知道自己不知道什么"。差点漏的不是技术性 deadline — 是 partner 没交代过的 client-specific 习惯（K-1 哪家基金延、谁需要提早问）。</div>
+      </div>
+      <div class="other-section">
+        <div class="lbl">决定了 · 落进产品</div>
+        <div class="text">Layer C「firm brain」从 P2 可选升级为 Year-5 retention 关键路径。partner 退休后他的 15 年判断不能丢。</div>
+      </div>
     </div>
   </div>
   <div class="chrome">
-    <div class="left"><span class="num">05</span><span>Mechanical rollover vs. pattern recognition</span></div>
-    <div>PRD §1.4</div>
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">09</span>另两次访谈 · 招募 funnel</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
-<!-- 6. THREE user research efforts -->
-<section class="slide center" data-num="06" data-title="User research backbone" data-notes="That insight isn't a hunch. It came from three distinct research efforts: a depth interview with a 15-year CPA partner, a customer journey map across three personas, and a user story map that decomposed the workflow into 7 activities. Most pre-launch companies cannot show three research artifacts at this depth.">
-  <div class="micro eyebrow">The research that produced it</div>
-  <h2 class="h1">Three distinct research efforts.</h2>
-  <div class="research-grid">
-    <div class="research-card">
-      <div class="method-num">Method 01 · Depth interview</div>
-      <div class="method">15-year CPA founder</div>
-      <div class="scale">660<span class="unit"> lines · synthesis</span></div>
-      <div class="desc">
-        Yan Jing, partner at a 10-person firm running 600 clients across 20 states.
-        57 product decisions traced line-by-line to specific things he said.
+<!-- 10. Insights -->
+<section class="slide center" data-num="10" data-title="洞察 · 4 条桥" data-notes="4 条核心洞察。每一条对应一组产品决策。这一页是「研究怎么变成战略」— pitch 的高潮。读 04（信任建在数据库）放慢 — 这是和「我们用 AI」最大区别 — 客户能验代码。">
+  <div class="micro eyebrow">洞察 · 研究→战略的 4 条桥</div>
+  <h2 class="h1">研究没说"做什么功能"。它说了我们错在哪。</h2>
+  <div class="insights-grid">
+    <div class="insight-card">
+      <div class="num">01</div>
+      <div class="body">
+        <div class="title">瓶颈是供给侧，不是质量分层。</div>
+        <div class="text">所有同行假设 CPA <em>选择</em> 哪些客户得到精细服务。错。CPA 不是选 — 是没时间。AI 把天花板抬高，不替 CPA 做事。</div>
       </div>
-      <div class="source">Interview Notes — 15-Year CPA Founder.rtf</div>
     </div>
-    <div class="research-card">
-      <div class="method-num">Method 02 · Journey mapping</div>
-      <div class="method">3 personas × 8 stages</div>
-      <div class="scale">24<span class="unit"> stage cells</span></div>
-      <div class="desc">
-        Sarah Mitchell (primary · solo CPA), Jennifer Wu (compliance-driven), David Park (the onboarding gauntlet). Emotion + churn risk + opportunity zones per stage.
+    <div class="insight-card">
+      <div class="num">02</div>
+      <div class="body">
+        <div class="title">州公告是楔子，多年历史是壁垒。</div>
+        <div class="text">州公告独有 → 拿到 demo。多年客户历史 → 切换成本指数级增长。第一年靠楔子，第二年靠引擎。</div>
       </div>
-      <div class="source">strategy-03-customer-journey.md</div>
     </div>
-    <div class="research-card">
-      <div class="method-num">Method 03 · Story mapping</div>
-      <div class="method">Workflow → release slices</div>
-      <div class="scale">7<span class="unit"> activities · 3 releases</span></div>
-      <div class="desc">
-        Year-round CPA workflow decomposed: setup → onboard → triage → chase → confirm → file → review.
-        Each activity sliced into MVP, R2, R3+ for sequencing discipline.
+    <div class="insight-card">
+      <div class="num">03</div>
+      <div class="body">
+        <div class="title">做"层"，不做"套件"。</div>
+        <div class="text">Yan Jing 40 个工具，最怕新东西不和它们说话。我们和 QuickBooks / Lacerte / Gmail 共生，永不替。</div>
       </div>
-      <div class="source">strategy-04-user-story-map.md</div>
     </div>
-  </div>
-  <div class="traceability">
-    <div class="header">
-      <span>Insight</span>
-      <span>Product decision</span>
-      <span>PRD ref</span>
-    </div>
-    <div class="row">
-      <span>"Solve confirming the client gave 100%..."</span>
-      <span>§5.3 invariant + DB CHECK constraint</span>
-      <span class="ref">§5.3</span>
-    </div>
-    <div class="row">
-      <span>"你不能 1 月 1 号开始就问了."</span>
-      <span>Mode B per-client timing prediction</span>
-      <span class="ref">§4.3</span>
-    </div>
-    <div class="row">
-      <span>David Park trialed 4 competitors before us</span>
-      <span>5-min onboarding L1 · no integrations needed</span>
-      <span class="ref">§8.4</span>
+    <div class="insight-card">
+      <div class="num">04</div>
+      <div class="body">
+        <div class="title">信任建在数据库，不在文案。</div>
+        <div class="text">「AI 越用越懂你」是销售失败话术。§5.3 不变量「AI 永不自动确认材料齐」直接写在 DB 的 CHECK 约束里。客户可以查代码。</div>
+      </div>
     </div>
   </div>
   <div class="chrome">
-    <div class="left"><span class="num">06</span><span>3 research efforts · 1 product</span></div>
-    <div>+ 54 more rows in PRD §0.5</div>
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">10</span>洞察</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
-<!-- 7. Wedge quote + SQL -->
-<section class="slide surface center" data-num="07" data-title="The customer named the price of trust" data-notes="The customer named the price of trust. We paid it. The §5.3 invariant — AI never auto-promotes a checklist item to received_confirmed — is enforced at the database with a CHECK constraint.">
-  <div class="micro eyebrow">From the design partner who runs 600 clients</div>
-  <div class="wedge-quote">"Solve this one pain — confirming the client gave 100% of what's needed — and I'm definitely your first customer."</div>
-  <div class="wedge-attr">Yan Jing · 15-year CPA partner · standing commitment</div>
-  <div class="code-block">
-<span class="comment">-- §5.3 invariant: AI never auto-promotes</span>
-<span class="comment">-- to received_confirmed.</span>
+<!-- 10. Solution + Demo CTA -->
+<section class="slide center" data-num="11" data-title="解决方案 + Demo" data-notes="周一早上 Sarah 看到的实际界面。State alert 条只在有可执行内容时出现 — 不是天天看到。下面是 action queue，9 种来源压缩成 4 个动词。讲的时候真的打开 duedatehq.space/today 给他们看，下面那个黑色 CTA strip 就是邀请打开的入口。">
+  <div class="micro eyebrow">解决方案 · 实时产品 · 可以打开看</div>
+  <div class="mockup">
+    <div class="mockup-bar">
+      <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+      <div class="url">duedatehq.space/today</div>
+      <div class="live-stamp">● 已在生产</div>
+    </div>
+    <div class="mockup-content">
+      <div class="mockup-alert">
+        <div class="ac-content">
+          <div class="ac-title">LA · 飓风 Delta 延期 · 6 个客户受影响</div>
+          <div class="ac-meta">8 个 deadline 待延期 · 6 封邮件已用你的语气起草</div>
+        </div>
+        <div class="ac-actions">
+          <span class="ac-btn">查看</span>
+          <span class="ac-btn">批量延期</span>
+          <span class="ac-btn">转发</span>
+        </div>
+      </div>
+      <div class="mockup-queue">
+        <div class="label">Action Queue · 12 项 · 按紧急度排序</div>
+        <div class="queue-row">
+          <div class="urg high"></div>
+          <div class="qr-content">
+            <div class="qr-name">Emily Chen · 1040</div>
+            <div class="qr-action">W-2 还没收到 · 比她往年的 pattern 晚 7 天 · <span class="em">建议：发一封温和的确认（草稿已生成）</span></div>
+          </div>
+          <span class="qr-cta">查看</span>
+        </div>
+        <div class="queue-row">
+          <div class="urg high"></div>
+          <div class="qr-content">
+            <div class="qr-name">Apex Capital · 1065</div>
+            <div class="qr-action">K-1 截止前 21 天 · 材料齐了 ~30% · <span class="em">建议：发追踪邮件（草稿已生成）</span></div>
+          </div>
+          <span class="qr-cta">查看</span>
+        </div>
+        <div class="queue-row">
+          <div class="urg med"></div>
+          <div class="qr-content">
+            <div class="qr-name">Marcus Rodriguez · 1120-S</div>
+            <div class="qr-action">银行流水已上传 · 与历年 pattern 比对 2 处异常 · <span class="em">建议：定稿前确认</span></div>
+          </div>
+          <span class="qr-cta">查看</span>
+        </div>
+        <div class="queue-row">
+          <div class="urg med"></div>
+          <div class="qr-content">
+            <div class="qr-name">Ridgewood Properties · LLC</div>
+            <div class="qr-action">连续 5 年 Schedule E 今年缺失 · <span class="em">建议：和客户确认（出租物业卖了？）</span></div>
+          </div>
+          <span class="qr-cta">查看</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="demo-cta-strip">
+    <div class="text"><span class="strong">现在就可以打开看。</span> 22 页 · 83 组件 · ~63K 行 TypeScript · Hono + tRPC + Drizzle + Supabase。</div>
+    <a class="link" href="https://duedatehq.space" target="_blank" rel="noopener">duedatehq.space →</a>
+  </div>
+  <div class="chrome">
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">11</span>解决方案 + Demo</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
+  </div>
+</section>
+
+<!-- 11. AI layer -->
+<section class="slide center" data-num="12" data-title="AI 层 · 信任建在架构里" data-notes="信任不是文案，是架构。3 区域 + 1 不变量。绿色 AI 直接做（路由邮件），黄色 AI 提议人审（出站、改状态），红色 AI 永远闭嘴（税额、audit、法规）。§5.3 不变量直接写进 DB CHECK 约束 — 读 ALTER TABLE 那句停一下。这是「AI 越用越懂你」营销话术的反义词。">
+  <div class="micro eyebrow">AI 层 · 信任建在架构里</div>
+  <h2 class="h1">3 个区域 · 1 个不变量。</h2>
+  <div class="ai-grid">
+    <div class="zones">
+      <div class="zone green">
+        <div class="zone-label">🟢 绿区 · AI 直接做</div>
+        <div class="zone-rule">CPA 可随时回滚</div>
+        <div class="zone-eg">入站邮件路由 · 提醒邮件起草</div>
+      </div>
+      <div class="zone yellow">
+        <div class="zone-label">🟡 黄区 · AI 提议、CPA 审</div>
+        <div class="zone-rule">出站、改状态、改钱 — 必过人手</div>
+        <div class="zone-eg">客户邮件发送 · 状态延期 · 文档确认</div>
+      </div>
+      <div class="zone red">
+        <div class="zone-label">🔴 红区 · AI 永不开口</div>
+        <div class="zone-rule">CPA 的专业判断 + 法律责任</div>
+        <div class="zone-eg">税务建议 · audit 风险 · 法规解读</div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="caption" style="margin-bottom: 1vmin; color: var(--ink-700); font-weight: 500;">§5.3 不变量「AI 永不自动确认材料齐」 — 写在 DB 层：</div>
+      <div class="code-block">
+<span class="comment">-- §5.3 不变量：AI 永不把状态自动推进到</span>
+<span class="comment">-- received_confirmed。必须有人类确认者。</span>
 <span class="keyword">ALTER TABLE</span> checklist_item <span class="keyword">ADD CONSTRAINT</span> human_must_confirm
   <span class="keyword">CHECK</span> (
     state <span class="op">!=</span> <span class="string">'received_confirmed'</span>
     <span class="op">OR</span> confirmed_by_user_id <span class="keyword">IS NOT NULL</span>
   );
 </div>
-  <div class="wedge-payoff">
-    <span class="arrow">→</span> The customer named the price of trust. We paid it at the database layer.
-  </div>
-  <div class="chrome">
-    <div class="left"><span class="num">07</span><span>The wedge · the architecture</span></div>
-    <div>arch v0.7 §5</div>
-  </div>
-</section>
-
-<!-- 8. Sarah problem -->
-<section class="slide center" data-num="08" data-title="Sarah Mitchell · 49 clients · 6 states" data-notes="Sarah Mitchell. Solo CPA. 49 active clients across 6 states. She has three failure modes every week. She'll pay $49 a month to fix all three. She will not switch to TaxDome and re-learn her stack.">
-  <div class="micro eyebrow">Primary persona</div>
-  <div class="sarah-id">
-    <span class="name">Sarah Mitchell</span>
-    <span class="meta">Solo CPA · 49 clients · 6 states · 4 years independent</span>
-  </div>
-  <div class="failure-grid">
-    <div class="failure-card">
-      <div class="marker">Failure mode 1</div>
-      <div class="title">Monday-morning anxiety</div>
-      <div class="desc">She reopens her Excel sheet and tries to remember what was urgent before the weekend. Every Monday, reconstructed from short-term memory.</div>
-    </div>
-    <div class="failure-card">
-      <div class="marker">Failure mode 2</div>
-      <div class="title">The chase loop</div>
-      <div class="desc">Three weeks before any deadline, she hand-types the same reminder email twelve times. Some clients respond. Many don't. One inevitably surprises her with a 1099 she didn't ask for.</div>
-    </div>
-    <div class="failure-card">
-      <div class="marker">Failure mode 3</div>
-      <div class="title">The state-change miss</div>
-      <div class="desc">When Louisiana changes an estimated payment rule mid-year, she finds out from a client's complaint, not from her tools.</div>
-    </div>
-  </div>
-  <div class="lead" style="margin-top: 3vmin; font-size: 2vmin; color: var(--ink-700); font-style: italic; font-weight: 400;">
-    She'll pay $49/mo to make all three go away. She will <em>not</em> switch to TaxDome and re-learn her stack.
-  </div>
-  <div class="chrome">
-    <div class="left"><span class="num">08</span><span>The problem · 3 failure modes</span></div>
-    <div>journey · personas.md</div>
-  </div>
-</section>
-
-<!-- 9. Solution mockup -->
-<section class="slide center" data-num="09" data-title="What Sarah sees Monday morning" data-notes="This is what she actually sees. State-alert band on top, conditional. Action queue below — one row per client × email-thread, sorted by urgency. Nine sources collapsed into four verbs: Send, Confirm, Apply, Discuss.">
-  <div class="micro eyebrow">What Sarah sees Monday morning</div>
-  <div class="mockup">
-    <div class="mockup-bar">
-      <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
-      <div class="url">duedatehq.space/today</div>
-      <div class="live-stamp">● Live in production</div>
-    </div>
-    <div class="mockup-content">
-      <div class="mockup-alert">
-        <div class="ac-content">
-          <div class="ac-title">LA · Hurricane Delta extension · 6 of your clients affected</div>
-          <div class="ac-meta">8 deadlines to extend · 6 emails drafted, in your voice</div>
-        </div>
-        <div class="ac-actions">
-          <span class="ac-btn">Review</span>
-          <span class="ac-btn">Batch-extend</span>
-          <span class="ac-btn">Forward</span>
-        </div>
-      </div>
-      <div class="mockup-queue">
-        <div class="label-row">
-          <span class="label">Action Queue · 12 items · sorted by urgency</span>
-        </div>
-        <div class="queue-row">
-          <div class="urg high"></div>
-          <div class="qr-content">
-            <div class="qr-name">Emily Chen · 1040</div>
-            <div class="qr-action">W-2 not yet arrived · 7 days past her pattern · <span class="em">Suggested: soft check-in (draft ready)</span></div>
-          </div>
-          <span class="qr-cta">Review</span>
-        </div>
-        <div class="queue-row">
-          <div class="urg high"></div>
-          <div class="qr-content">
-            <div class="qr-name">Apex Capital · 1065</div>
-            <div class="qr-action">K-1 deadline T-21 · materials ~30% complete · <span class="em">Suggested: send chase email (draft ready)</span></div>
-          </div>
-          <span class="qr-cta">Review</span>
-        </div>
-        <div class="queue-row">
-          <div class="urg med"></div>
-          <div class="qr-content">
-            <div class="qr-name">Marcus Rodriguez · 1120-S</div>
-            <div class="qr-action">Bank statement uploaded · 2 anomalies vs. pattern · <span class="em">Suggested: confirm before close</span></div>
-          </div>
-          <span class="qr-cta">Review</span>
-        </div>
-        <div class="queue-row">
-          <div class="urg med"></div>
-          <div class="qr-content">
-            <div class="qr-name">Ridgewood Properties · LLC</div>
-            <div class="qr-action">Schedule E missing 5-year history · <span class="em">Suggested: discuss with client</span></div>
-          </div>
-          <span class="qr-cta">Review</span>
-        </div>
-        <div class="queue-row">
-          <div class="urg low"></div>
-          <div class="qr-content">
-            <div class="qr-name">Ben Hoffman · 1040</div>
-            <div class="qr-action">All received · awaiting your review · <span class="em">Suggested: confirm</span></div>
-          </div>
-          <span class="qr-cta">Review</span>
-        </div>
-        <div class="annotation">9 sources → 4 verbs</div>
+      <div class="ai-callout">
+        <span class="strong">客户问"AI 会不会替我犯错"，我们答：</span>不会，因为它在数据库层就被禁止了。这不是文案，是约束。
       </div>
     </div>
   </div>
   <div class="chrome">
-    <div class="left"><span class="num">09</span><span>The solution · gap-over-fill</span></div>
-    <div>Today.tsx · ActionQueue.tsx</div>
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">12</span>AI 层</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
-<!-- 10. Why now -->
-<section class="slide center" data-num="10" data-title="Why now · 3 things changed" data-notes="Why now. Three things changed. LLM economics. Desktop incumbents bleeding. Suite fatigue real. Market is begging for a layer.">
-  <div class="micro eyebrow">Why now</div>
-  <h2 class="h1">Three things changed.</h2>
-  <div class="whynow-grid">
-    <div class="whynow-card">
-      <div class="marker">Economics</div>
-      <div class="big">$3–5<span class="small">/firm/mo</span></div>
-      <div class="vs">vs. Bloomberg's $thousands/yr</div>
-      <div class="text">State-DOR scraping + LLM parsing + per-firm portfolio matching at consumer-grade pricing. The <em>layer</em> couldn't exist below $200/mo before LLMs.</div>
-    </div>
-    <div class="whynow-card">
-      <div class="marker">Incumbent decay</div>
-      <div class="big">Windows<br><span class="small">installer</span></div>
-      <div class="vs">File In Time, 2026</div>
-      <div class="text">The closest direct competitor on deadline tracking still ships a desktop installer. Their architecture cannot deliver a 24h cloud SLA on state announcements.</div>
-    </div>
-    <div class="whynow-card">
-      <div class="marker">Suite fatigue</div>
-      <div class="big">10–15h<br><span class="small">setup</span></div>
-      <div class="vs">TaxDome onboarding</div>
-      <div class="text">Annual lock-in plus 10–15 hours of setup is causing measurable churn. The market wants a <em>layer</em>; incumbents structurally can't ship one.</div>
-    </div>
-  </div>
+<!-- 12. Features -->
+<section class="slide center" data-num="13" data-title="产品特性 · 5 件 AI 接管的事" data-notes="5 件机器接管的事 × Mode × Day 1 / P1 节奏 × 痛点 × 关键功能。这一页是产品全景。按行读。Mode A/C/D/F 是 Day 1，Mode B/E 是 P1（需多年历史） — 这个 sequencing 直接来自 Yan Jing 访谈结论 01。">
+  <div class="micro eyebrow">产品特性 · 5 件 AI 接管的事</div>
+  <h2 class="h1">每一件都有 Mode · 痛点 · 节奏。</h2>
+  <table class="feat-table">
+    <thead>
+      <tr>
+        <th style="width: 17%;">机器接管的事</th>
+        <th style="width: 14%;">AI Mode</th>
+        <th style="width: 12%;">Day 1 / P1</th>
+        <th style="width: 28%;">解决的痛点</th>
+        <th style="width: 29%;">关键功能</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="activity">01 · 记忆</td>
+        <td class="modes">Mode A + E</td>
+        <td><span class="day1">A=Day 1</span> · <span class="p1">E=P1</span></td>
+        <td>「上次怎么处理这个客户的我忘了」</td>
+        <td>多年导入（Tier 3-4）· 跨年异常 · 历史 pattern 索引</td>
+      </tr>
+      <tr>
+        <td class="activity">02 · 预测</td>
+        <td class="modes">Mode B</td>
+        <td class="p1">P1（需 1+ 年历史）</td>
+        <td>「不能 1 月 1 号就开始问」</td>
+        <td>Per-client 时机 · TaskMilestone · 「比往年晚 7 天」</td>
+      </tr>
+      <tr>
+        <td class="activity">03 · 确认</td>
+        <td class="modes">Mode C</td>
+        <td class="day1">Day 1</td>
+        <td>「客户给的材料全了吗？」</td>
+        <td>6-状态生命周期 · 异常检测 · §5.3 不变量（DB CHECK）</td>
+      </tr>
+      <tr>
+        <td class="activity">04 · 监控</td>
+        <td class="modes">Mode F</td>
+        <td class="day1">Day 1</td>
+        <td>「我从客户那里知道州又改规则了」</td>
+        <td>50 州 24h SLA · 4 alert 通道 · 受影响客户匹配 · 双层置信度</td>
+      </tr>
+      <tr>
+        <td class="activity">05 · 起草</td>
+        <td class="modes">Mode D</td>
+        <td class="day1">Day 1</td>
+        <td>「3 周追 12 封一样的邮件」</td>
+        <td>Phase 1 必经人审 · 18 模板库 · CPA 自己的语气 · 来源引用</td>
+      </tr>
+    </tbody>
+  </table>
   <div class="chrome">
-    <div class="left"><span class="num">10</span><span>Why now</span></div>
-    <div>positioning §3</div>
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">13</span>产品特性</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
-<!-- 11. Market sizing -->
-<section class="slide center" data-num="11" data-title="Market · bottom-up SAM" data-notes="Market sizing. Bottom-up. The US has roughly 46K accounting firms. ICP is about 45K. Blended ARPU at our pricing is sixty dollars a month. That's a $22M fully-penetrated SAM in the launch wedge. Small. We know.">
-  <div class="micro eyebrow">The wedge — bottom-up SAM</div>
-  <div class="market-grid">
-    <div class="col">
-      <div class="lead">
-        US accounting firms ≈ 46K<br>
-        ICP (solo–10 person) ≈ 45K<br>
-        Blended ARPU ≈ $60/mo
+<!-- 13. Integrations -->
+<section class="slide center" data-num="14" data-title="集成 · Tier 0/1/2/3" data-notes="集成态度即定位。Tier 0 是 Day 1 必装 — 否则产品掉成「楔子 + 手动」。Tier 1 是 P1。Tier 2 是 Phase 2。Tier 3 永不做 — CCH Axcess 在这里因为内核 50 年了没 API（Yan Jing 原话）。强调最后一格：「永不做」也是定位。">
+  <div class="micro eyebrow">集成 · 我们和谁说话</div>
+  <h2 class="h1">4 层集成 · 决定了"层"路线的边界。</h2>
+  <div class="int-grid">
+    <div class="int-tier tier0">
+      <div class="label">Tier 0 · Day 1</div>
+      <div class="when">必装 · 双向</div>
+      <div class="int-list">
+        <div class="item">QuickBooks Online</div>
+        <div class="item">Xero</div>
+        <div class="item">Gmail</div>
+        <div class="item">Outlook</div>
       </div>
-      <div class="market-stack">
-        <div class="market-seg solo"><div class="name">Solo</div><div class="n">28K firms</div></div>
-        <div class="market-seg pro"><div class="name">Pro</div><div class="n">12K</div></div>
-        <div class="market-seg team"><div class="name">Team</div><div class="n">5K</div></div>
+      <div class="why">没这层 = 楔子 + 手动。</div>
+    </div>
+    <div class="int-tier tier1">
+      <div class="label">Tier 1 · P1</div>
+      <div class="when">单向</div>
+      <div class="int-list">
+        <div class="item">Bloomberg / CCH</div>
+        <div class="item">SharePoint / CRM</div>
+        <div class="item">Lacerte · UltraTax</div>
+        <div class="item">Drake · ProSeries</div>
       </div>
-      <div class="market-arpu">
-        <div class="item solo">$29/mo</div>
-        <div class="item pro">$49/mo</div>
-        <div class="item team">$99/mo</div>
+      <div class="why">报税软件历年导入 → 引擎钥匙。</div>
+    </div>
+    <div class="int-tier">
+      <div class="label">Tier 2 · Phase 2</div>
+      <div class="when">打印集成</div>
+      <div class="int-list">
+        <div class="item">Lacerte / UltraTax PDF</div>
+        <div class="item">Drake PDF</div>
+      </div>
+      <div class="why">没 API 的报税软件用 PDF 兜底。</div>
+    </div>
+    <div class="int-tier tier3">
+      <div class="label">Tier 3 · 永不做</div>
+      <div class="when">明确放弃</div>
+      <div class="int-list">
+        <div class="item">CCH Axcess</div>
+        <div class="item">客户付款</div>
+        <div class="item">银行账户访问</div>
+      </div>
+      <div class="why">CCH 内核 50 年了无 API；付款和银行进 PCI 陷阱。</div>
+    </div>
+  </div>
+  <div class="chrome">
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">14</span>集成</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
+  </div>
+</section>
+
+<!-- 15. 现状 - 已 ship 的具体能力 -->
+<section class="slide center" data-num="15" data-title="现状 · 已经在线" data-notes="不是抽象的「我们在 build」 — 是具体的「这些功能已经在 duedatehq.space 上跑」。讲的时候按列读，强调每一项都 demo 可见。22 页这个数字在最右，要求把视线收尾。">
+  <div class="micro eyebrow">现状 · 已经在生产 · 现在就能打开看</div>
+  <h2 class="h1">不是 mockup。这些都在 duedatehq.space 上跑。</h2>
+  <div class="stat-strip">
+    <div class="stat-num"><div class="n">50</div><div class="lbl">州监控管线 · 24h SLA</div></div>
+    <div class="stat-num"><div class="n">4</div><div class="lbl">Alert 通道 · 升级层级</div></div>
+    <div class="stat-num"><div class="n">22</div><div class="lbl">已上线页面</div></div>
+    <div class="stat-num"><div class="n">~63K</div><div class="lbl">行 TypeScript · 83 组件</div></div>
+  </div>
+  <div class="shipped-grid">
+    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>50 州税务公告管线</b> · LLM 解析 + 受影响客户匹配 + 双层置信度</span></div>
+    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>4 个 alert 通道</b> · bell · banner · 阻塞性 modal · /alerts 全档案</span></div>
+    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>Action Queue</b> · 9 种来源压缩成 4 个动词 · urgency 排序</span></div>
+    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>Client fleet view</b> · 多客户跨州状态总览</span></div>
+    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>Multi-state apply wizard</b> · 一个公告批量应用到 N 客户</span></div>
+    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>7-step onboarding flow</b> · 5 分钟见价值 · 不强制集成</span></div>
+    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>公开 <a class="link" href="https://duedatehq.space/changes" target="_blank" rel="noopener">/changes</a> 历档</b> · SEO + 信任信号 · 2 年回填</span></div>
+    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>客户详情 5 tab</b> · Engagement / Habits / Predictions / To Do / Mailbox</span></div>
+    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>Today / Insights / Calendar / Mail / Settings</b> 全部页面</span></div>
+    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>响应式</b> · sidebar 在移动端折叠成 4 项底栏</span></div>
+  </div>
+  <div class="chrome">
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">15</span>现状 · 已经在线</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
+  </div>
+</section>
+
+<!-- 16. Roadmap - 12 个月 4 阶段 (具体功能名 · 无 Mode 抽象) -->
+<section class="slide center" data-num="16" data-title="Roadmap · 12 个月" data-notes="Roadmap 不再用 Mode A/B/C 这种内部抽象。用具体功能名 + 用户能感受到的好处 + 阶段时间。Q3 是商业化（登录 + 集成 + 计费）；Q4 是日常 AI 接入；明年 Q1 是引擎激活；明年 Q2+ 是平台 + 合规。讲的时候按 phase 顺序读，每张卡片读 phase 名 + 1-2 个最强 feature，不要全念。">
+  <div class="micro eyebrow">Roadmap · 接下来 12 个月 · 真的具体</div>
+  <h2 class="h1">从「楔子在线」到「平台开张」的 4 步。</h2>
+  <div class="phase-grid">
+    <div class="phase-card now">
+      <div class="when">✓ 现在 · May 2026</div>
+      <div class="theme">楔子完整 · 已上线</div>
+      <div class="feats">
+        <div class="feat"><b>50 州监控</b> + 4 alert 通道</div>
+        <div class="feat"><b>Action Queue</b> + Client fleet</div>
+        <div class="feat"><b>Multi-state apply</b> wizard</div>
+        <div class="feat">公开 <b>/changes</b> 档案 (SEO)</div>
+      </div>
+      <div class="hook">能 demo · 能让 CPA 试用</div>
+    </div>
+    <div class="phase-card q3">
+      <div class="when">→ Q3 2026 · 商业化</div>
+      <div class="theme">登录 · 集成 · 计费</div>
+      <div class="feats">
+        <div class="feat"><b>Gmail / Outlook 登录</b> (OAuth)</div>
+        <div class="feat"><b>QBO / Xero</b> 双向 sync</div>
+        <div class="feat"><b>Per-task 邮件转发地址</b></div>
+        <div class="feat"><b>计费 + Stripe</b> · 三档 plan 上线 ($29 / $49 / $99)</div>
+        <div class="feat">30 天免试 · 无信用卡</div>
+      </div>
+      <div class="hook">第一笔付费收入 · 第一批付费客户</div>
+    </div>
+    <div class="phase-card">
+      <div class="when">→ Q4 2026 · 日常 AI</div>
+      <div class="theme">把 AI 接入每个 chase loop</div>
+      <div class="feats">
+        <div class="feat"><b>AI 起草客户邮件</b> · 用 CPA 自己语气 · 来源引用</div>
+        <div class="feat"><b>AI 入站异常检测</b> · 比对历年 pattern</div>
+        <div class="feat"><b>AI 自动 checklist</b> · 从历年返工自动生成</div>
+        <div class="feat"><b>每日邮件 digest</b> · CPA 不登录也跟得上</div>
+        <div class="feat"><b>Multi-user (Team tier)</b> · 转交 + 共享</div>
+      </div>
+      <div class="hook">Yan Jing 付钱那一刻 · chase loop 全自动化</div>
+    </div>
+    <div class="phase-card">
+      <div class="when">→ 明年 · 引擎 + 平台</div>
+      <div class="theme">从工具变成事务所大脑</div>
+      <div class="feats">
+        <div class="feat"><b>多年导入</b> · 报税软件 PDF 解析（Lacerte / Drake）</div>
+        <div class="feat"><b>Per-client 时机预测</b> · "比她往年晚 7 天"</div>
+        <div class="feat"><b>顾问触发</b> · RSU / 薪资跳变 / 第二套房</div>
+        <div class="feat"><b>SOC 2 Type II</b> 合规</div>
+        <div class="feat"><b>公开 API</b> · Layer C firm brain 上线</div>
+      </div>
+      <div class="hook">Year-2 retention 论点开始生效</div>
+    </div>
+  </div>
+  <div class="chrome">
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">16</span>Roadmap · 12 个月 · 4 阶段</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
+  </div>
+</section>
+
+<!-- 17. Forever-no + 让人记住的 4 件 (closing) -->
+<section class="slide center" data-num="17" data-title="永不做 + 评委带走的 4 件" data-notes="结尾。左边 forever-no list 展示纪律 — 我们用「不做什么」证明思考深度。右边 4 件深色卡片 — 评委带走的核心记忆点：研究深度（660 行）、客户承诺（Yan Jing first customer）、工程证明（DB CHECK 约束）、产品现实（在线可点）。这 4 个不是营销话术 — 是同 brief 同 demo day 上对手大概率没有的差异化证据。讲完左边，右边一条一条慢读，最后一句「现在就可以打开」是落点。">
+  <div class="micro eyebrow">收尾 · 纪律 + 评委带走的 4 件</div>
+  <h2 class="h1">不做的事，定义了我们做的事。</h2>
+  <div class="closing-grid">
+    <div class="forever-col">
+      <h3>Forever-no · 永不做</h3>
+      <div class="forever-list">
+        <div class="forever-item"><span class="what">客户 portal 作为目的地</span><span class="why">TaxDome 已占 · suite 陷阱</span></div>
+        <div class="forever-item"><span class="what">长期文档 vault</span><span class="why">SharePoint / Drive 已经在</span></div>
+        <div class="forever-item"><span class="what">计费 / 发票</span><span class="why">Stripe + CPACharge 已占</span></div>
+        <div class="forever-item"><span class="what">时间记录</span><span class="why">滑向"差版 TaxDome"</span></div>
+        <div class="forever-item"><span class="what">报税本身</span><span class="why">Lacerte / Drake 已占</span></div>
+        <div class="forever-item"><span class="what">Audit 风险 · 法规解读</span><span class="why">红区 · CPA 法律责任</span></div>
+        <div class="forever-item"><span class="what">CCH Axcess 集成</span><span class="why">内核 50 年 · 无 API</span></div>
       </div>
     </div>
-    <div class="col" style="text-align: right;">
-      <div class="market-num">~$22M<span class="suffix">/yr</span></div>
-      <div class="caption" style="margin-top: 0.5vmin;">ARR · fully penetrated · launch wedge</div>
-      <div class="market-honest">Small. We know.</div>
+    <div class="memorable-col">
+      <h3>评委带走的 4 件 · 同 brief 对手没有的</h3>
+      <div class="memorable-list">
+        <div class="memorable-item">
+          <span class="num">01</span>
+          <div class="body">
+            <div class="punch">他写了我们一半的 PRD。</div>
+            <div class="src">660 行 Yan Jing 录像访谈 + 57 条 traceable 决策 + 2 段非录像 + 透明招募 funnel</div>
+          </div>
+        </div>
+        <div class="memorable-item">
+          <span class="num">02</span>
+          <div class="body">
+            <div class="punch">"Solve this one pain — and I'm definitely your first customer."</div>
+            <div class="src">Yan Jing 标准承诺 · 600 客户 / 10 人事务所 / 20 州 · 不是销售线索是 commitment</div>
+          </div>
+        </div>
+        <div class="memorable-item">
+          <span class="num">03</span>
+          <div class="body">
+            <div class="punch">信任直写在 DB CHECK 约束里 — 客户可以查代码。</div>
+            <div class="src">§5.3 不变量「AI 永不自动确认材料齐」· 不是文案是约束</div>
+          </div>
+        </div>
+        <div class="memorable-item">
+          <span class="num">04</span>
+          <div class="body">
+            <div class="punch">现在就可以打开 <a href="https://duedatehq.space" target="_blank" rel="noopener" style="color: #fbbf24;">duedatehq.space</a>。</div>
+            <div class="src">22 页 / 83 组件 / ~63K 行 / 真实用户在试用 · 不是 prototype 是 production</div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
   <div class="chrome">
-    <div class="left"><span class="num">11</span><span>Bottom-up SAM</span></div>
-    <div>no top-down fluff</div>
-  </div>
-</section>
-
-<!-- 12. Wedge → Platform -->
-<section class="slide surface center" data-num="12" data-title="Wedge → Platform" data-notes="Year three we ship Layer B and pricing power moves to two-to-five hundred a seat. Year five, firm brain, opens mid-tier firms at a thousand to five thousand. Adjacent verticals — same architecture, five-times the firm count.">
-  <div class="micro eyebrow">Wedge → Platform</div>
-  <h2 class="h1">The wedge is small. The intelligence layer is not.</h2>
-  <div class="staircase">
-    <div class="step y1">
-      <div class="yr">Year 1 · now</div>
-      <div class="step-title">Granularity replication</div>
-      <div class="price">$49/seat · ~$22M wedge</div>
-    </div>
-    <div class="step y3">
-      <div class="yr">Year 3</div>
-      <div class="step-title">Layer B · advisory triggers · churn risk · pricing intelligence</div>
-      <div class="price">$200–500/seat</div>
-    </div>
-    <div class="step y5">
-      <div class="yr">Year 5</div>
-      <div class="step-title">Firm brain · captured partner knowledge survives turnover</div>
-      <div class="price">$1K–5K/seat · mid-tier firms</div>
-    </div>
-  </div>
-  <div class="verts">
-    <span><strong>+ adjacent verticals</strong> · same architecture · 5× firm count</span>
-    <div class="tags">
-      <span class="pill silent">Bookkeepers</span>
-      <span class="pill silent">EAs</span>
-      <span class="pill silent">Fractional CFOs</span>
-      <span class="pill silent">International tax</span>
-    </div>
-  </div>
-  <div class="chrome">
-    <div class="left"><span class="num">12</span><span>Three timescales of value</span></div>
-    <div>PRD §1.3</div>
-  </div>
-</section>
-
-<!-- 13. Where we are + what's next -->
-<section class="slide center" data-num="13" data-title="Where we are · what's next" data-notes="Dashboard shipped. 22 pages, 83 components, ~63K lines TypeScript. Action queue, four alert surfaces. Public /changes archive shipped — SEO surface and trust signal. Next on the body — Modes A, C, D shipping together.">
-  <div class="micro eyebrow">Where we are · what's next</div>
-  <div class="scale-strip">
-    <div class="scale-num"><div class="n">22</div><div class="lbl">Shipped pages</div></div>
-    <div class="scale-num"><div class="n">83</div><div class="lbl">Components</div></div>
-    <div class="scale-num"><div class="n">~63K</div><div class="lbl">Lines TypeScript</div></div>
-    <div class="scale-num"><div class="n">4</div><div class="lbl">Alert surfaces · sub-24h SLA</div></div>
-  </div>
-  <div class="quad-grid">
-    <div class="quad shipped">
-      <div class="quad-status">✓ Shipped</div>
-      <div class="quad-title">The dashboard is in production</div>
-      <div class="quad-body">Action queue · 4 alert surfaces (bell · banner · blocking modal · /alerts) · state-announcement pipeline · multi-state apply wizard · 7-step onboarding · public <a class="link" href="https://duedatehq.space/changes" target="_blank" rel="noopener">/changes</a> archive (SEO + trust signal).</div>
-    </div>
-    <div class="quad">
-      <div class="quad-status">→ Next · the body</div>
-      <div class="quad-title">Modes A + C + D ship together</div>
-      <div class="quad-body">Auto-generated checklist · sanity-check inbound · drafted outbound. The chase-loop (Pattern 2) lands as a complete experience, not three half-features.</div>
-    </div>
-    <div class="quad">
-      <div class="quad-status">→ Next · the engine</div>
-      <div class="quad-title">Modes B + E behind import Tier 3</div>
-      <div class="quad-body">Per-client timing · cross-year anomaly. The customer goes from <em>"AI helps me chase"</em> to <em>"AI knows my clients better than I remember."</em></div>
-    </div>
-    <div class="quad">
-      <div class="quad-status">→ Next · the wedge</div>
-      <div class="quad-title">State-monitoring health goes customer-facing</div>
-      <div class="quad-body">From internal SLO ("scraper running 50/50 states · 14m ago") to a customer-facing trust signal. The CPA sees the watchman watching.</div>
-    </div>
-  </div>
-  <div class="chrome">
-    <div class="left"><span class="num">13</span><span>Status · roadmap</span></div>
-    <div>build_priorities.md</div>
-  </div>
-</section>
-
-<!-- 14. Close -->
-<section class="slide close-slide" data-num="14" data-title="Close" data-notes="One closing thought. Yan Jing told us the test. We built the architecture around his words. The §5.3 invariant is the price of his trust, and we paid it at the database layer. The product is the customer's words made into software.">
-  <div class="close-quote">
-    "Solve this one pain — confirming the client gave 100% of what's needed — and I'm definitely your first customer."
-    <span class="attr">— Yan Jing</span>
-  </div>
-  <div class="close-line">
-    We built the architecture around his words.<br><br>
-    <span class="accent">The product is the customer's words made into software.</span>
-  </div>
-  <div class="close-domain">
-    <a class="link" href="https://duedatehq.space" target="_blank" rel="noopener">duedatehq.space</a>
-  </div>
-  <div class="chrome">
-    <div class="left"><span class="num">14</span><span>Close</span></div>
-    <div>end · ?</div>
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">17</span>永不做 + 评委带走的 4 件</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
@@ -1248,19 +1293,19 @@
 </div>
 
 <div class="notes-panel" id="notesPanel">
-  <div class="label">Speaker notes · Slide <span id="notesNum">01</span> · press <kbd>S</kbd> to hide</div>
+  <div class="label">Speaker notes · Slide <span id="notesNum">01</span> · 按 <kbd>S</kbd> 隐藏</div>
   <div id="notesText" style="font-style: italic;">—</div>
 </div>
 
 <div class="help-overlay" id="helpOverlay">
-  <h3>Keyboard shortcuts</h3>
-  <div class="key-row"><kbd>→</kbd> <kbd>Space</kbd> <span class="desc">Next slide</span></div>
-  <div class="key-row"><kbd>←</kbd> <span class="desc">Previous slide</span></div>
-  <div class="key-row"><kbd>1</kbd>—<kbd>9</kbd> <span class="desc">Jump to slide</span></div>
-  <div class="key-row"><kbd>S</kbd> <span class="desc">Toggle speaker notes</span></div>
-  <div class="key-row"><kbd>F</kbd> <span class="desc">Fullscreen</span></div>
-  <div class="key-row"><kbd>Cmd/Ctrl-P</kbd> <span class="desc">Print to PDF</span></div>
-  <div class="key-row"><kbd>?</kbd> <span class="desc">Toggle this help</span></div>
+  <h3>键盘快捷键</h3>
+  <div class="key-row"><kbd>→</kbd> <kbd>Space</kbd> <span class="desc">下一张</span></div>
+  <div class="key-row"><kbd>←</kbd> <span class="desc">上一张</span></div>
+  <div class="key-row"><kbd>1</kbd>—<kbd>9</kbd> <span class="desc">跳到指定页</span></div>
+  <div class="key-row"><kbd>S</kbd> <span class="desc">显示/隐藏 speaker notes</span></div>
+  <div class="key-row"><kbd>F</kbd> <span class="desc">全屏</span></div>
+  <div class="key-row"><kbd>Cmd/Ctrl-P</kbd> <span class="desc">打印 PDF</span></div>
+  <div class="key-row"><kbd>?</kbd> <span class="desc">这个帮助</span></div>
 </div>
 
 <script>
