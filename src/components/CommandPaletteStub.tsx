@@ -76,7 +76,7 @@ export function CommandPaletteStub({ open, onClose }: Props) {
           id: `t-${t.id}`,
           label: `${t.formType} · ${client.name}`,
           hint: `Due ${t.officialDueDate}`,
-          href: `/clients/${client.id}/tasks/${t.id}`,
+          href: `/clients/${client.id}?task=${t.id}`,
           group: "tasks",
           icon: FileText,
         });

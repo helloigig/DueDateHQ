@@ -392,7 +392,7 @@ export function Inbox() {
                     </p>
                   </div>
                   <Link
-                    to={`/clients/${client.id}/tasks/${task.id}`}
+                    to={`/clients/${client.id}?task=${task.id}`}
                     className="text-xs text-ink-500 hover:text-ink-900 px-2 py-1 rounded hover:bg-sunken inline-flex items-center gap-1"
                   >
                     Open <ChevronRight className="w-3 h-3" aria-hidden />

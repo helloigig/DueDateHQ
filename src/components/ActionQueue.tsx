@@ -130,7 +130,7 @@ function navigateForItem(
     item.clientId &&
     item.taskId
   ) {
-    navigate(`/clients/${item.clientId}/tasks/${item.taskId}`);
+    navigate(`/clients/${item.clientId}?task=${item.taskId}`);
     return;
   }
   if (item.surface === "alert_detail") {
