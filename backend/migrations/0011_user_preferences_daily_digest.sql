@@ -30,6 +30,28 @@
 ALTER TABLE "users"
   ADD COLUMN IF NOT EXISTS "preferences" jsonb NOT NULL DEFAULT '{}'::jsonb;
 
+-- Default-on for the daily digest. Backfill existing rows so the
+-- intent is explicit at the data layer (not just in the scheduler's
+-- in-memory fallback). Future user inserts get this same default
+-- when auth.bootstrap runs — see backend/src/trpc/routers/auth.ts.
+--
+-- Idempotent: only writes rows where the dailyDigest key is missing,
+-- so a re-run after a user has opted out won't flip them back on.
+UPDATE "users"
+SET "preferences" = jsonb_set(
+  COALESCE("preferences", '{}'::jsonb),
+  '{dailyDigest}',
+  '{"enabled":true,"sendHour":7,"days":["mon","tue","wed","thu","fri"]}'::jsonb,
+  true
+)
+WHERE NOT ("preferences" ? 'dailyDigest');
+
+-- Going forward, the column default also seeds new users with the
+-- daily-digest payload so insert-then-update isn't required.
+ALTER TABLE "users"
+  ALTER COLUMN "preferences" SET DEFAULT
+  '{"dailyDigest":{"enabled":true,"sendHour":7,"days":["mon","tue","wed","thu","fri"]}}'::jsonb;
+
 CREATE TABLE IF NOT EXISTS "daily_digest_runs" (
   "id"             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "user_id"        uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,

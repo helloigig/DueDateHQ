@@ -75,10 +75,18 @@ export const users = pgTable("users", {
   role: userRole("role").notNull().default("owner"),
   timezone: text("timezone").notNull().default("America/Los_Angeles"),
   // Single jsonb home for UI-level prefs that don't deserve their own
-  // column. See migration 0011 for the daily-digest sub-schema. Use
-  // `UserPreferences` (defined below) on read paths so callers don't
-  // have to remember the shape.
-  preferences: jsonb("preferences").notNull().default({}),
+  // column. See migration 0011 for the daily-digest sub-schema and the
+  // default-on backfill. Use `UserPreferences` (defined below) on read
+  // paths so callers don't have to remember the shape.
+  preferences: jsonb("preferences")
+    .notNull()
+    .default({
+      dailyDigest: {
+        enabled: true,
+        sendHour: 7,
+        days: ["mon", "tue", "wed", "thu", "fri"],
+      },
+    }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .default(sql`now()`),

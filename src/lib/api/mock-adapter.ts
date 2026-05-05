@@ -2754,7 +2754,11 @@ export const mockAdapter = {
       sendHour: number;
       days: Array<"sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat">;
     } = {
-      enabled: false,
+      // Default ON to mirror the BE default (see daily-digest.ts
+      // DEFAULT_DIGEST_PREFS). Users in mock mode see the toggle pre-on
+      // so the demo-workspace flow matches what a fresh real-mode user
+      // would experience post-deploy.
+      enabled: true,
       sendHour: 7,
       days: ["mon", "tue", "wed", "thu", "fri"],
     };
