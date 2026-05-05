@@ -21,7 +21,7 @@ import {
   rowsFromCsv,
   detectSource,
 } from "../data/csvParser";
-import { Check, Upload, AlertTriangle } from "lucide-react";
+import { Check, Upload, AlertTriangle, MinusCircle } from "lucide-react";
 
 type Step = "upload" | "map" | "preview" | "committing" | "done";
 
@@ -32,7 +32,12 @@ const STEP_LABELS: Record<Exclude<Step, "done" | "committing">, string> = {
   preview: "Preview",
 };
 
-export function Import() {
+/**
+ * `chromeless`: when nested in the OnboardingShell, suppress the page-level
+ * H1 + breadcrumb + outer container — the shell already provides those.
+ * Avoids the double-title that broke visual hierarchy on /onboarding/import.
+ */
+export function Import({ chromeless = false }: { chromeless?: boolean } = {}) {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>("upload");
   const [rows, setRows] = useState<DetectedRow[]>(DETECTED_ROWS);
@@ -69,16 +74,24 @@ export function Import() {
     setRows(DETECTED_ROWS);
   };
 
-  return (
-    <div className="max-w-5xl mx-auto px-4 md:px-6 py-6">
-      <Link to="/clients" className="text-sm text-ink-500 hover:underline">
-        ‹ Clients
-      </Link>
-      <h1 className="mt-3 text-xl font-semibold text-ink-900">
-        Upload clients from CSV
-      </h1>
+  const containerClass = chromeless
+    ? ""
+    : "max-w-5xl mx-auto px-4 md:px-6 py-6";
 
-      <ol className="mt-5 mb-6 flex items-center gap-2 text-sm">
+  return (
+    <div className={containerClass}>
+      {!chromeless && (
+        <>
+          <Link to="/clients" className="text-sm text-ink-500 hover:underline">
+            ‹ Clients
+          </Link>
+          <h1 className="mt-3 text-xl font-semibold text-ink-900">
+            Upload clients from CSV
+          </h1>
+        </>
+      )}
+
+      <ol className={`${chromeless ? "" : "mt-5"} mb-6 flex items-center gap-2 text-sm`}>
         {(Object.keys(STEP_LABELS) as Array<keyof typeof STEP_LABELS>).map(
           (s, i) => {
             const done = progressIndex > i;
@@ -309,14 +322,14 @@ function UploadStep({
       <div className="mt-6 flex items-center justify-between">
         <button
           onClick={onDemo}
-          className="text-sm px-3 py-1.5 rounded border border-line hover:bg-canvas text-ink-700"
+          className="text-sm px-3 py-1.5 rounded-md border border-line hover:bg-canvas text-ink-700"
         >
           Try with demo data
         </button>
         <button
           disabled={!hasFile}
           onClick={onNext}
-          className="text-sm px-4 py-2 rounded font-medium text-white bg-indigo hover:bg-indigo-hover disabled:opacity-40"
+          className="text-sm px-4 py-2 rounded-md font-medium text-white bg-indigo hover:bg-indigo-hover disabled:opacity-40"
         >
           Continue →
         </button>
@@ -392,7 +405,10 @@ function MapStep({
                   </span>
                 )}
                 {m.confidence === "ignore" && (
-                  <span className="text-ink-500 text-xs">Ignored</span>
+                  <span className="inline-flex items-center gap-1 text-ink-500 text-xs">
+                    <MinusCircle className="w-3 h-3" aria-hidden />
+                    Ignored
+                  </span>
                 )}
               </td>
             </tr>
@@ -400,16 +416,18 @@ function MapStep({
         </tbody>
       </table>
 
-      <div className="px-5 py-3 bg-canvas rounded-b-lg flex items-center justify-between">
+      {/* Sticky action bar — mirrors PreviewStep so the user's eye learns
+          the same "actions live at the bottom" pattern across the wizard. */}
+      <div className="sticky bottom-0 px-5 py-3 bg-surface border-t border-line rounded-b-lg flex items-center justify-between z-10">
         <button
           onClick={onBack}
-          className="text-sm px-3 py-1.5 rounded border border-line bg-surface hover:bg-canvas"
+          className="text-sm px-3 py-1.5 rounded-md border border-line bg-surface hover:bg-canvas"
         >
           ← Back
         </button>
         <button
           onClick={onNext}
-          className="text-sm px-4 py-2 rounded font-medium text-white bg-indigo hover:bg-indigo-hover"
+          className="text-sm px-4 py-2 rounded-md font-medium text-white bg-indigo hover:bg-indigo-hover"
         >
           Continue →
         </button>
@@ -575,7 +593,7 @@ function PreviewStep({
       <div className="sticky bottom-0 px-5 py-3 bg-surface border-t border-line rounded-b-lg flex items-center justify-between z-10">
         <button
           onClick={onBack}
-          className="text-sm px-3 py-1.5 rounded border border-line bg-surface hover:bg-canvas"
+          className="text-sm px-3 py-1.5 rounded-md border border-line bg-surface hover:bg-canvas"
         >
           ← Back
         </button>
@@ -589,7 +607,7 @@ function PreviewStep({
           <button
             onClick={() => setConfirmOpen(true)}
             disabled={readyCount === 0}
-            className="text-sm px-4 py-2 rounded font-medium text-white bg-indigo hover:bg-indigo-hover disabled:opacity-40"
+            className="text-sm px-4 py-2 rounded-md font-medium text-white bg-indigo hover:bg-indigo-hover disabled:opacity-40"
           >
             Commit {readyCount} client{readyCount === 1 ? "" : "s"} →
           </button>
@@ -894,6 +912,21 @@ function DoneStep({
 }) {
   // fake deadline count: ~12 per client
   const generatedDeadlines = importedCount * 12;
+  // `navigating` shows a transitional loading state on the buttons so the
+  // user sees their click registered even before the next route mounts its
+  // own skeleton. Dashboard already renders DashboardSkeleton while alerts
+  // and the action queue resolve — this just bridges the gap.
+  const [navigating, setNavigating] = useState<"dashboard" | "clients" | null>(
+    null,
+  );
+  const goDashboard = () => {
+    setNavigating("dashboard");
+    onDashboard();
+  };
+  const goClients = () => {
+    setNavigating("clients");
+    onClients();
+  };
   return (
     <div className="bg-surface border border-line rounded-lg p-8 text-center">
       <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
@@ -923,16 +956,32 @@ function DoneStep({
 
       <div className="mt-6 flex items-center justify-center gap-3">
         <button
-          onClick={onDashboard}
-          className="text-sm px-4 py-2 rounded font-medium text-white bg-indigo hover:bg-indigo-hover"
+          onClick={goDashboard}
+          disabled={navigating !== null}
+          className="text-sm px-4 py-2 rounded-md font-medium text-white bg-indigo hover:bg-indigo-hover disabled:opacity-70 disabled:cursor-wait inline-flex items-center gap-2"
         >
-          Go to dashboard →
+          {navigating === "dashboard" ? (
+            <>
+              <Spinner />
+              Loading dashboard…
+            </>
+          ) : (
+            "Go to dashboard →"
+          )}
         </button>
         <button
-          onClick={onClients}
-          className="text-sm px-4 py-2 rounded border border-line hover:bg-canvas"
+          onClick={goClients}
+          disabled={navigating !== null}
+          className="text-sm px-4 py-2 rounded-md border border-line hover:bg-canvas disabled:opacity-70 disabled:cursor-wait inline-flex items-center gap-2"
         >
-          See all clients
+          {navigating === "clients" ? (
+            <>
+              <Spinner />
+              Loading…
+            </>
+          ) : (
+            "See all clients"
+          )}
         </button>
       </div>
 
@@ -940,5 +989,14 @@ function DoneStep({
         You can undo this import from Settings › Imports for the next 7 days.
       </p>
     </div>
+  );
+}
+
+function Spinner() {
+  return (
+    <span
+      className="inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin"
+      aria-hidden
+    />
   );
 }
