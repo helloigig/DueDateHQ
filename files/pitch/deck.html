@@ -377,13 +377,15 @@
 
   /* === SLIDE 13: Integrations === */
   .int-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.8vmin; margin-top: 2.5vmin; }
-  .int-tier { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.2vmin; display: flex; flex-direction: column; gap: 1.3vmin; }
-  .int-tier.tier0 { background: var(--ok-bg); border-color: var(--ok-border); }
-  .int-tier.tier1 { background: var(--indigo-soft); border-color: rgba(91, 91, 214, 0.2); }
-  .int-tier.tier3 { background: var(--sunken); }
+  .int-tier { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.4vmin; display: flex; flex-direction: column; gap: 1.3vmin; position: relative; }
+  .int-tier::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 8px 8px 0 0; background: var(--ink-300); }
+  .int-tier.tier0::before { background: var(--ok-ink); }
+  .int-tier.tier1::before { background: var(--indigo); }
+  .int-tier.tier3::before { background: var(--danger-border); }
   .int-tier .label { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); text-transform: uppercase; }
   .int-tier.tier0 .label { color: var(--ok-ink); }
-  .int-tier.tier1 .label { color: var(--indigo-ink); }
+  .int-tier.tier1 .label { color: var(--indigo); }
+  .int-tier.tier3 .label { color: var(--danger-ink); }
   .int-tier .when { font-size: 1.5vmin; font-weight: 600; color: var(--ink-900); line-height: 1.3; }
   .int-list { display: flex; flex-direction: column; gap: 0.4vmin; flex: 1; }
   .int-list .item { font-size: 1.3vmin; color: var(--ink-700); padding: 0.5vmin 0; border-bottom: 1px dashed var(--line); }
@@ -403,15 +405,14 @@
 
   /* === SLIDE 16: Roadmap (phase-based) === */
   .phase-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5vmin; margin-top: 2.5vmin; }
-  .phase-card { padding: 2vmin; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 1.2vmin; }
-  .phase-card.now { background: var(--ok-bg); border-color: var(--ok-border); }
-  .phase-card.q3 { background: var(--indigo-soft); border-color: rgba(91, 91, 214, 0.25); }
+  .phase-card { padding: 2.2vmin; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 1.2vmin; position: relative; }
+  .phase-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 8px 8px 0 0; background: var(--ink-300); }
+  .phase-card.now::before { background: var(--ok-ink); }
+  .phase-card.q3::before { background: var(--indigo); }
   .phase-card .when { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); text-transform: uppercase; }
   .phase-card.now .when { color: var(--ok-ink); }
-  .phase-card.q3 .when { color: var(--indigo-ink); }
+  .phase-card.q3 .when { color: var(--indigo); }
   .phase-card .theme { font-size: 1.6vmin; font-weight: 600; color: var(--ink-900); line-height: 1.3; padding-bottom: 0.6vmin; border-bottom: 1px solid var(--line); }
-  .phase-card.now .theme { border-color: rgba(4, 120, 87, 0.25); }
-  .phase-card.q3 .theme { border-color: rgba(91, 91, 214, 0.25); }
   .phase-card .feats { display: flex; flex-direction: column; gap: 0.6vmin; flex: 1; }
   .phase-card .feat { font-size: 1.3vmin; color: var(--ink-700); line-height: 1.5; }
   .phase-card .feat b { color: var(--ink-900); font-weight: 600; }
