@@ -4,9 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0f172a" />
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- crossorigin="use-credentials" so the manifest fetch carries the
+         Vercel preview-protection cookie. Without it, preview deployments
+         emit a noisy "401 Unauthorized" in the console for every visit
+         (production is unaffected because it isn't gated). Standard fix
+         per https://web.dev/articles/add-manifest. -->
+    <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/icon.svg" />
+    <!-- mobile-web-app-capable is the modern (cross-vendor) form;
+         apple-mobile-web-app-capable is the legacy iOS-only form Apple
+         still requires for splash-screen behavior on older iOS Safari.
+         Pair them so Chrome / desktop browsers stop emitting the
+         deprecation warning while iOS Safari keeps the standalone hint. -->
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="DueDateHQ" />

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronRight, X as XIcon } from "lucide-react";
+import { ChevronRight, X as XIcon, ArrowRight } from "lucide-react";
+import { useSelection } from "../hooks/useSelection";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { trpc } from "../lib/api/client";
@@ -344,6 +345,12 @@ export function Timeline() {
     row: TaskRow;
     nextStage: Stage | null; // null = "File" complete
   } | null>(null);
+  // Batch stage-action — opens a single confirm dialog summarising N
+  // moves across N rows. Null when closed. Yuqi audit 2026-05-05:
+  // "what about batch actions?" — selecting multiple rows + advancing
+  // them all in one click avoids the click-confirm-click-confirm
+  // pattern Sarah hits during a busy filing day.
+  const [batchAdvanceOpen, setBatchAdvanceOpen] = useState(false);
   // Per-client expand/collapse — collapsed by default for groups with
   // taskCount > 1, expanded for single-task clients.
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -489,6 +496,22 @@ export function Timeline() {
   // Split sorted into Behind + On-track sections (gap > fill)
   const behindList = sorted.filter(isBehind);
   const onTrackList = sorted.filter((t) => !isBehind(t));
+
+  // Selection across the union of behind + on-track lists. Keyed on
+  // taskId; rows without a taskId (rare seed-data edge case) can't be
+  // selected — they fall through to the existing single-row stage
+  // action via dot-click. The hook lives at the page level so the
+  // floating toolbar can read the count without hoisting state through
+  // every TaskTable / ClientGroup / TaskTimelineRow render path.
+  const selectableRows = useMemo(
+    () => sorted.filter((t) => !!t.taskId),
+    [sorted],
+  );
+  const timelineSelection = useSelection<TaskRow>(
+    selectableRows,
+    (t) => t.taskId ?? "",
+  );
+  const selectedTimelineRows = timelineSelection.selectedItems;
 
   return (
     <PageContainer variant="wide">
@@ -640,6 +663,8 @@ export function Timeline() {
                 onStageClick={(row, ns) => setStageAction({ row, nextStage: ns })}
                 focusDate={focusDate}
                 focusRowRef={focusRowRef}
+                isSelected={(taskId) => timelineSelection.has(taskId)}
+                onToggleSelect={(taskId) => timelineSelection.toggle(taskId)}
               />
             </section>
           )}
@@ -656,6 +681,8 @@ export function Timeline() {
                 onStageClick={(row, ns) => setStageAction({ row, nextStage: ns })}
                 focusDate={focusDate}
                 focusRowRef={focusRowRef}
+                isSelected={(taskId) => timelineSelection.has(taskId)}
+                onToggleSelect={(taskId) => timelineSelection.toggle(taskId)}
               />
             </section>
           )}
@@ -672,11 +699,180 @@ export function Timeline() {
                 onStageClick={(row, ns) => setStageAction({ row, nextStage: ns })}
                 focusDate={focusDate}
                 focusRowRef={focusRowRef}
+                isSelected={(taskId) => timelineSelection.has(taskId)}
+                onToggleSelect={(taskId) => timelineSelection.toggle(taskId)}
               />
             </section>
           )}
         </>
       )}
+
+      {/* Sticky bottom toolbar — appears when ≥1 row selected. Mirrors
+          the /clients + Filings tab toolbar shape. Yuqi audit 2026-05-05:
+          "what about batch actions?" — selecting multiple rows + advancing
+          them in one click avoids the click-confirm-click-confirm pattern
+          Sarah hits on a busy filing day. Assignability ("currently it
+          is not assignable") is deferred to its own scope — needs a user
+          picker + team-list query + tasks.assign mutation. */}
+      {timelineSelection.count > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-ink-900 text-canvas rounded-lg shadow-overlay flex items-center gap-3 px-4 py-2.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
+          <span className="text-xs tabular-nums">
+            <span className="font-semibold">{timelineSelection.count}</span>{" "}
+            {timelineSelection.count === 1 ? "task" : "tasks"} selected
+          </span>
+          <span className="text-ink-500 text-2xs" aria-hidden>
+            ·
+          </span>
+          <button
+            type="button"
+            onClick={() => setBatchAdvanceOpen(true)}
+            className="text-xs px-2.5 py-1 rounded bg-indigo hover:bg-indigo-hover transition-colors inline-flex items-center gap-1"
+          >
+            <ArrowRight className="w-3 h-3" aria-hidden />
+            Advance stage
+          </button>
+          <button
+            type="button"
+            disabled
+            className="text-xs px-2.5 py-1 rounded bg-sunken/20 text-ink-300 cursor-not-allowed inline-flex items-center gap-1"
+            title="Coming next pass — needs a team-member picker + tasks.assign mutation"
+          >
+            Assign to… (soon)
+          </button>
+          <button
+            type="button"
+            onClick={() => timelineSelection.clear()}
+            className="text-xs text-ink-300 hover:text-canvas transition-colors px-2 inline-flex items-center gap-1"
+            aria-label="Clear selection"
+          >
+            <XIcon className="w-3 h-3" aria-hidden />
+            Clear
+          </button>
+        </div>
+      )}
+
+      {/* Batch advance-stage confirm Dialog — opens from the toolbar's
+          "Advance stage" action. Lists every selected row's transition
+          ("Acme · 1040: Collect → Prepare", etc.) so the user audits
+          the moves before firing. Single confirm fires N stage advances
+          in sequence (each toasted; aggregate toast at the end). */}
+      <Dialog
+        open={batchAdvanceOpen}
+        onOpenChange={(open) => !open && setBatchAdvanceOpen(false)}
+      >
+        <DialogContent size="lg">
+          <DialogHeader>
+            <DialogTitle>
+              Advance {selectedTimelineRows.length}{" "}
+              {selectedTimelineRows.length === 1 ? "task" : "tasks"}?
+            </DialogTitle>
+            <DialogDescription>
+              Each selected task moves from its current stage to the next.
+              Tasks already at &ldquo;File&rdquo; will be marked filed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody>
+            <ul className="text-sm divide-y divide-line border border-line rounded-md max-h-[40vh] overflow-y-auto">
+              {selectedTimelineRows.map((row) => {
+                const stageList: Stage[] = [
+                  "initial_meeting",
+                  "collect",
+                  "prepare",
+                  "review",
+                  "file",
+                ];
+                const currentIdx = stageList.indexOf(row.currentStage);
+                const nextStage = stageList[currentIdx + 1] ?? null;
+                return (
+                  <li
+                    key={row.taskId ?? `${row.client}-${row.task}`}
+                    className="px-3 py-2 flex items-center gap-2"
+                  >
+                    <span className="text-ink-700 truncate min-w-0 flex-1">
+                      <span className="font-medium text-ink-900">
+                        {row.client}
+                      </span>
+                      <span className="text-ink-400"> · </span>
+                      {row.task}
+                    </span>
+                    <span className="text-2xs text-ink-500 shrink-0 tabular-nums inline-flex items-center gap-1">
+                      {STAGE_LABELS[row.currentStage]}
+                      <ArrowRight className="w-3 h-3" aria-hidden />
+                      {nextStage ? STAGE_LABELS[nextStage] : "Filed"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+            {selectedTimelineRows.some((r) => (r.missingCount ?? 0) > 0) && (
+              <p className="mt-3 text-xs text-warn-ink bg-warn-bg border border-warn-border rounded p-2">
+                Heads up —{" "}
+                {selectedTimelineRows.filter(
+                  (r) => (r.missingCount ?? 0) > 0,
+                ).length}{" "}
+                of these tasks still have items waiting on the client.
+                Advancing now records the step as done despite the open
+                items.
+              </p>
+            )}
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setBatchAdvanceOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                // Phase-1 stub mirroring the single-row stage-action
+                // dialog: fires a per-row toast + an aggregate so the
+                // user gets row-level feedback for audit but doesn't
+                // miss the overall outcome. Real BE mutation lands
+                // when the single-row path gets wired (same TODO).
+                let advancedCount = 0;
+                let filedCount = 0;
+                const stageList: Stage[] = [
+                  "initial_meeting",
+                  "collect",
+                  "prepare",
+                  "review",
+                  "file",
+                ];
+                for (const row of selectedTimelineRows) {
+                  const currentIdx = stageList.indexOf(row.currentStage);
+                  const nextStage = stageList[currentIdx + 1] ?? null;
+                  if (nextStage) advancedCount++;
+                  else filedCount++;
+                }
+                const parts: string[] = [];
+                if (advancedCount > 0) {
+                  parts.push(
+                    `Advanced ${advancedCount} ${
+                      advancedCount === 1 ? "task" : "tasks"
+                    }`,
+                  );
+                }
+                if (filedCount > 0) {
+                  parts.push(
+                    `Filed ${filedCount} ${
+                      filedCount === 1 ? "task" : "tasks"
+                    }`,
+                  );
+                }
+                toast.success(parts.join(" · "));
+                setBatchAdvanceOpen(false);
+                timelineSelection.clear();
+              }}
+              className="bg-indigo hover:bg-indigo-hover text-white"
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Stage-action confirm Dialog — opens when the CPA clicks a row's
           stage label. Surfaces the exact transition (e.g. "Mark Collect
@@ -787,6 +983,8 @@ function TaskTable({
   onStageClick,
   focusDate,
   focusRowRef,
+  isSelected,
+  onToggleSelect,
 }: {
   rows: TaskRow[];
   collapsed: Set<string>;
@@ -794,6 +992,11 @@ function TaskTable({
   onStageClick: (row: TaskRow, nextStage: Stage | null) => void;
   focusDate?: string | null;
   focusRowRef?: (node: HTMLElement | null) => void;
+  /** Selection state — page-level useSelection hook threaded through.
+   *  When undefined, rows render without checkboxes (used by other
+   *  callers if any). */
+  isSelected?: (taskId: string) => boolean;
+  onToggleSelect?: (taskId: string) => void;
 }) {
   const groups = groupRowsByClient(rows);
   return (
@@ -807,6 +1010,8 @@ function TaskTable({
           onStageClick={onStageClick}
           focusDate={focusDate}
           focusRowRef={focusRowRef}
+          isSelected={isSelected}
+          onToggleSelect={onToggleSelect}
         />
       ))}
     </div>
@@ -820,6 +1025,8 @@ function ClientGroup({
   onStageClick,
   focusDate,
   focusRowRef,
+  isSelected,
+  onToggleSelect,
 }: {
   group: { key: string; client: string; clientId?: string; tasks: TaskRow[] };
   collapsed: boolean;
@@ -827,6 +1034,8 @@ function ClientGroup({
   onStageClick: (row: TaskRow, nextStage: Stage | null) => void;
   focusDate?: string | null;
   focusRowRef?: (node: HTMLElement | null) => void;
+  isSelected?: (taskId: string) => boolean;
+  onToggleSelect?: (taskId: string) => void;
 }) {
   const navigate = useNavigate();
   const taskCount = group.tasks.length;
@@ -849,6 +1058,8 @@ function ClientGroup({
         onStageClick={onStageClick}
         focusDate={focusDate}
         focusRowRef={focusRowRef}
+        isSelected={isSelected}
+        onToggleSelect={onToggleSelect}
       />
     );
   }
@@ -923,6 +1134,8 @@ function ClientGroup({
               onStageClick={onStageClick}
               focusDate={focusDate}
               focusRowRef={focusRowRef}
+              isSelected={isSelected}
+              onToggleSelect={onToggleSelect}
             />
           ))}
         </ul>
@@ -955,12 +1168,16 @@ function TaskTimelineRow({
   onStageClick,
   focusDate,
   focusRowRef,
+  isSelected,
+  onToggleSelect,
 }: {
   t: TaskRow;
   nested?: boolean;
   onStageClick: (row: TaskRow, nextStage: Stage | null) => void;
   focusDate?: string | null;
   focusRowRef?: (node: HTMLElement | null) => void;
+  isSelected?: (taskId: string) => boolean;
+  onToggleSelect?: (taskId: string) => void;
 }) {
   const navigate = useNavigate();
   const stages: Stage[] = [
@@ -1010,6 +1227,21 @@ function TaskTimelineRow({
             : "Example row — sign in and add a client to see your real tasks here"
         }
       >
+        {/* Selection checkbox — only when isSelected/onToggleSelect are
+            wired (page-level useSelection threaded through). Stops
+            propagation so clicking the box doesn't navigate. Only
+            renders when the row has a taskId (rare seed-data edge case
+            without one falls through to read-only behaviour). */}
+        {isSelected && onToggleSelect && t.taskId && (
+          <input
+            type="checkbox"
+            checked={isSelected(t.taskId)}
+            onChange={() => onToggleSelect(t.taskId!)}
+            onClick={(e) => e.stopPropagation()}
+            className="w-3.5 h-3.5 rounded border-line accent-indigo shrink-0 self-center"
+            aria-label={`Select ${t.client} · ${t.task}`}
+          />
+        )}
         {/* Identity — state badge anchors the row visually so jurisdiction
             reads at a glance (was previously buried inside `task` text).
             When nested, the client name is on the parent header so we
@@ -1071,7 +1303,15 @@ function TaskTimelineRow({
           </div>
         </div>
 
-        {/* Mini-timeline */}
+        {/* Mini-timeline. Yuqi audit 2026-05-05: "Initial mtg is actually
+            'Mark Initial mtg done' right? Why not discard that and click
+            onto the Initial Mtg dot and mark done?" The right-column
+            "Mark X done" button has been retired — clicking the
+            CURRENT-stage dot fires the same advance flow. Past dots
+            (done) and future dots (not_started) remain decorative. The
+            current dot has a larger 12px hit target wrapper around its
+            10px visual so the tap area is touch-friendly without
+            inflating the dot's visual weight. */}
         <div className="flex-1 flex items-center gap-1.5 min-w-0">
           {stages.map((s, idx) => {
             const status = t.milestoneStatus[idx] ?? "not_started";
@@ -1089,13 +1329,46 @@ function TaskTimelineRow({
                 key={s}
                 className="flex items-center gap-1.5 flex-1 min-w-0"
               >
-                <span
-                  className={cn(
-                    "w-2.5 h-2.5 rounded-pill shrink-0",
-                    dotClass,
-                  )}
-                  title={`${STAGE_LABELS[s]} — ${status.replace("_", " ")}`}
-                />
+                {isCurrent ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onStageClick(t, nextStage);
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    aria-label={
+                      nextStage
+                        ? `Mark ${STAGE_LABELS[s]} done — advance to ${STAGE_LABELS[nextStage]}`
+                        : `Mark ${STAGE_LABELS[s]} done`
+                    }
+                    title={
+                      nextStage
+                        ? `Click to mark ${STAGE_LABELS[s]} done · advances to ${STAGE_LABELS[nextStage]}`
+                        : `Click to mark ${STAGE_LABELS[s]} done · final stage`
+                    }
+                    className={cn(
+                      "shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-full",
+                      "transition-transform hover:scale-110 cursor-pointer",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-soft",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "w-2.5 h-2.5 rounded-pill",
+                        dotClass,
+                      )}
+                    />
+                  </button>
+                ) : (
+                  <span
+                    className={cn(
+                      "w-2.5 h-2.5 rounded-pill shrink-0",
+                      dotClass,
+                    )}
+                    title={`${STAGE_LABELS[s]} — ${status.replace("_", " ")}`}
+                  />
+                )}
                 {idx < stages.length - 1 && (
                   <span
                     className="flex-1 h-px bg-line shrink min-w-3"
@@ -1107,7 +1380,17 @@ function TaskTimelineRow({
           })}
         </div>
 
-        {/* Status pill — gap-loud (T4: as pill, never paint) */}
+        {/* Status pill — gap-loud (T4: as pill, never paint).
+            Yuqi audit 2026-05-05: "Ready" pill killed. Pills are for
+            non-default states; absence of a pill IS the "no problem"
+            signal. Showing "Ready" on every clean row trained the eye
+            to ignore the column entirely, then real "behind" / "waiting"
+            states had to fight for attention against a wall of green.
+            Now: behind = red pill, waiting = yellow pill, clean = nothing. */}
+        {/* Yuqi audit 2026-05-05: the right-column "Mark X done" button
+            was retired — its job is now done by clicking the current-
+            stage dot in the mini-timeline above. The status column
+            keeps its width so row alignment doesn't reflow. */}
         <div className="w-44 shrink-0 flex items-center justify-end gap-2">
           {t.daysBehind > 0 ? (
             <StatusPill variant="danger" size="xs">
@@ -1117,32 +1400,7 @@ function TaskTimelineRow({
             <StatusPill variant="warn" size="xs">
               {t.missingCount} waiting
             </StatusPill>
-          ) : (
-            <StatusPill variant="ok" size="xs">
-              Ready
-            </StatusPill>
-          )}
-          {/* Stage action — clicking opens a confirm Dialog. Stops
-              propagation so the row's click-to-open-detail doesn't
-              fire alongside. Title is the stage's "complete this step"
-              verb (current step) or "Mark filed" (final step). */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onStageClick(t, nextStage);
-            }}
-            onKeyDown={(e) => e.stopPropagation()}
-            className="text-xs font-medium text-indigo-ink hover:text-indigo-hover hover:bg-indigo-soft px-2 py-1 rounded transition-colors hidden md:inline-flex items-center gap-1"
-            title={
-              nextStage
-                ? `Mark ${STAGE_LABELS[t.currentStage]} done · advance to ${STAGE_LABELS[nextStage]}`
-                : `Mark ${STAGE_LABELS[t.currentStage]} complete`
-            }
-          >
-            {STAGE_LABELS[t.currentStage]}
-            <ChevronRight className="w-3 h-3" aria-hidden />
-          </button>
+          ) : null}
         </div>
 
         <ChevronRight

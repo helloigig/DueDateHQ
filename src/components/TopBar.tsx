@@ -32,10 +32,16 @@ export function TopBar() {
 
   return (
     <header className="h-14 shrink-0 bg-surface border-b border-line flex items-center gap-3 px-5">
-      {/* Search affordance — fixed compact width on the left so it
-          doesn't dominate the topbar; right-side actions group pulls
-          to the edge via `ml-auto` on the +New trigger. */}
-      <div className="w-72 shrink-0">
+      {/* Three-zone topbar: spacer / centered search / action cluster.
+          Yuqi audit 2026-05-05 — search was left-pinned at 288px which
+          made it feel like a sidebar prop, not a primary nav move. The
+          topbar's loudest interaction is search, so it earns center
+          stage. The right cluster carries identity (plan badge),
+          create-action (+New), and notifications (bell). Order swap:
+          plan badge moved LEFT of +New so the action sits closest to
+          the bell (the two attention-takers cluster). */}
+      <div className="flex-1 min-w-0" />
+      <div className="w-full max-w-md shrink min-w-0">
         <button
           onClick={() => setPaletteOpen(true)}
           title="Search (⌘K)"
@@ -52,9 +58,13 @@ export function TopBar() {
             className="w-4 h-4 shrink-0 text-ink-400 group-hover:text-ink-500 transition-colors"
             aria-hidden
           />
+          {/* Scope copy uses the canonical sidebar destination names —
+              "Today, Clients, Alerts, Mail" — so the user trains on
+              one vocabulary across nav + search. Don't drift to
+              synonyms ("inbox", "deadlines", "feed") here. */}
           <span className="flex-1 text-left text-sm text-ink-500 truncate">
             <span className="hidden sm:inline">
-              Search clients, deadlines, alerts…
+              Search Today, Clients, Alerts, Mail…
             </span>
             <span className="sm:hidden">Search</span>
           </span>
@@ -69,38 +79,40 @@ export function TopBar() {
           </kbd>
         </button>
       </div>
+      <div className="flex-1 min-w-0 flex items-center justify-end gap-3">
+        <TrialBadge />
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button className="shrink-0 ml-auto">+ New</Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuItem onSelect={() => setModal("client")}>
-            <UserPlus className="w-4 h-4 text-ink-500" aria-hidden />
-            <span className="flex-1">New client</span>
-            <span className="text-2xs text-ink-400">~2 min</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onSelect={() => navigate("/clients")}
-            title="Pick a client first, then add a task on their page"
-          >
-            <FilePlus className="w-4 h-4 text-ink-500" aria-hidden />
-            <span className="flex-1">New task</span>
-            <span className="text-2xs text-ink-400">via client</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => navigate("/import")}>
-            <Upload className="w-4 h-4 text-ink-500" aria-hidden />
-            <span className="flex-1">Upload clients (CSV)</span>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <p className="px-3 py-1.5 text-2xs text-ink-400">
-            Tasks belong to a client. Open the client first, then add a deadline.
-          </p>
-        </DropdownMenuContent>
-      </DropdownMenu>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button className="shrink-0">+ New</Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem onSelect={() => setModal("client")}>
+              <UserPlus className="w-4 h-4 text-ink-500" aria-hidden />
+              <span className="flex-1">New client</span>
+              <span className="text-2xs text-ink-400">~2 min</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => navigate("/clients")}
+              title="Pick a client first, then add a task on their page"
+            >
+              <FilePlus className="w-4 h-4 text-ink-500" aria-hidden />
+              <span className="flex-1">New task</span>
+              <span className="text-2xs text-ink-400">via client</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => navigate("/import")}>
+              <Upload className="w-4 h-4 text-ink-500" aria-hidden />
+              <span className="flex-1">Upload clients (CSV)</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <p className="px-3 py-1.5 text-2xs text-ink-400">
+              Tasks belong to a client. Open the client first, then add a deadline.
+            </p>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-      <TrialBadge />
-      <BellDropdown />
+        <BellDropdown />
+      </div>
 
       {/* Account entrance lives in the Sidebar bottom-left (Linear/Notion
           convention). Avatar + dropdown removed from here so there's a
@@ -113,26 +125,41 @@ export function TopBar() {
 }
 
 /**
- * Calm trial pill in the top bar. Three states:
+ * Plan / trial pill in the top bar. Five states:
  *
- *   - "Pro trial · 28 days left" (info-tone, days > 5)
- *   - "Pro trial · 3 days left"  (warn-tone, days ≤ 5)
- *   - "Trial ended — pick a plan" (danger-tone, expired)
+ *   - "Solo plan" / "Pro plan" / "Team plan"        (neutral, paid + no trial)
+ *   - "Solo · 28-day trial"  (neutral, days > 5, plan name from session.tier)
+ *   - "Solo · 3-day trial"   (warn-tone, days ≤ 5)
+ *   - "Trial ended — pick a plan"                  (danger-tone, expired)
  *
- * Click → /settings/billing. Hidden once the user picks a paid plan
- * (when trialEndsAt is cleared and tier is solo/pro/team with a billing
- * subscription — currently we just check trialEndsAt presence).
+ * Yuqi audit 2026-05-05 — was hardcoded "Pro trial · X days left" even
+ * for Solo accounts (the tier was on session, just unread). Now reads
+ * session.tier so the badge matches the plan the user actually chose.
+ *
+ * Click → /settings/billing. Always rendered when a session exists so
+ * the user can see their plan tier at a glance — not just during trial.
  */
 function TrialBadge() {
   const session = useSession();
   const status = useMemo(() => {
-    if (!session?.trialEndsAt) return null;
+    if (!session) return null;
+    const planName =
+      session.tier === "solo"
+        ? "Solo"
+        : session.tier === "pro"
+          ? "Pro"
+          : session.tier === "team"
+            ? "Team"
+            : "Solo";
+    if (!session.trialEndsAt) {
+      return { tone: "neutral" as const, label: `${planName} plan` };
+    }
     const ms = new Date(session.trialEndsAt).getTime() - Date.now();
     const days = Math.ceil(ms / (24 * 60 * 60 * 1000));
     if (days <= 0) return { tone: "danger" as const, label: "Trial ended — pick a plan" };
-    if (days <= 5) return { tone: "warn" as const, label: `Pro trial · ${days} day${days === 1 ? "" : "s"} left` };
-    return { tone: "neutral" as const, label: `Pro trial · ${days} days left` };
-  }, [session?.trialEndsAt]);
+    if (days <= 5) return { tone: "warn" as const, label: `${planName} · ${days}-day trial` };
+    return { tone: "neutral" as const, label: `${planName} · ${days}-day trial` };
+  }, [session]);
 
   if (!status) return null;
   // The default state uses sunken-tone neutral, NOT info-blue. Info-blue
