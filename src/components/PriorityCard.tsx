@@ -13,6 +13,7 @@ import { actions } from "../data/store";
 import { StateBadge } from "./ui/StateBadge";
 import { useSetDeadlineStatus } from "../hooks/useDeadlines";
 import { env } from "../config";
+import { ClientChip } from "./ClientChip";
 
 type PriorityItem =
   | {
@@ -178,12 +179,12 @@ export function PriorityCard({
               <ScoreIndicator value={item.score} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <Link
-                    to={`/clients/${item.client.id}`}
-                    className="text-sm font-medium text-ink-900 hover:underline truncate"
-                  >
-                    {item.client.name}
-                  </Link>
+                  <ClientChip
+                    client={item.client}
+                    size="sm"
+                    as="link"
+                    showState={false}
+                  />
                   <span className="text-sm text-ink-700 truncate">
                     · {item.deadline.form}
                   </span>

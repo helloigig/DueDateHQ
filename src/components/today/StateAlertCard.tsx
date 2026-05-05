@@ -9,7 +9,7 @@ import {
 import type { Announcement } from "@/types";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { StateBadge } from "@/components/ui/StateBadge";
-import { ClientChip } from "@/components/ui/ClientChip";
+import { ClientChip } from "@/components/ClientChip";
 import { Button } from "@/components/ui/button";
 import { hoursSince, formatLongDate } from "@/data/dateHelpers";
 import { cn } from "@/lib/utils";
@@ -157,7 +157,7 @@ export function StateAlertCard({
         {visibleChips.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap mt-1 ml-12">
             {visibleChips.map((c) => (
-              <ClientChip key={c.id} name={c.name} />
+              <ClientChip key={c.id} client={c} size="sm" as="link" />
             ))}
             {overflow > 0 && (
               <span className="text-xs text-ink-500 px-1.5 tabular-nums">
