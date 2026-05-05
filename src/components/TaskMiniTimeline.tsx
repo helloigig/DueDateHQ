@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, AlertOctagon, Pencil, X } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Sparkles, AlertOctagon, Pencil, X, CalendarRange } from "lucide-react";
 import type { Task, ChecklistItem } from "../types";
 import { trpc } from "../lib/api/client";
+import { useStore } from "../data/store";
 
 // TaskMiniTimeline — per IA v0.7 amendment §3.4.
 //
@@ -192,7 +194,35 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
           isSaving={updateMilestone.isPending}
         />
       )}
+
+      {/* Cross-context jump: see this task lined up against everything
+          else due the same week. Yuqi audit 2026-05-05 — the path-to-
+          filing strip is per-task; for workload context the CPA needs
+          the cross-client view, which is Timeline. One link, one
+          purpose, no duplicate destinations. */}
+      <ViewInTimelineLink task={task} />
     </section>
+  );
+}
+
+/** Resolves the deadline's clientId from the store + emits a deep
+ *  link into Timeline focused on that client + due date. */
+function ViewInTimelineLink({ task }: { task: Task }) {
+  const { deadlines } = useStore();
+  const deadline = deadlines.find((d) => d.id === task.deadlineId);
+  const clientId = deadline?.clientId;
+  if (!clientId) return null;
+  return (
+    <div className="mt-3 pt-2 border-t border-line/70 flex items-center justify-end">
+      <Link
+        to={`/timeline?focus=${task.officialDueDate}&clientId=${clientId}`}
+        className="text-2xs text-ink-500 hover:text-ink-900 hover:underline inline-flex items-center gap-1"
+        title="See what else lands the same week across the firm"
+      >
+        <CalendarRange className="w-3 h-3" aria-hidden />
+        See this task in Timeline
+      </Link>
+    </div>
   );
 }
 

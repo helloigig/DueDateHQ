@@ -203,10 +203,16 @@ export function TaskDetail() {
             items={checklist}
             onOpenEmailDraft={openEmail}
           />
+          {/* Title renamed Activity timeline → Audit log (Yuqi audit
+              2026-05-05). The global /timeline destination owns the
+              "deadlines across clients" surface; this per-task view is
+              an append-only event log for compliance — different unit,
+              different job. Disambiguating the lexicon stops the user
+              from wondering whether the two surfaces are the same. */}
           <ActivityTimeline
             entries={activity}
             scopeDeadlineId={task.deadlineId}
-            title="Activity timeline"
+            title="Audit log"
           />
           <div className="flex items-center justify-end pt-1">
             <button

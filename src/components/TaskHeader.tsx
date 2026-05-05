@@ -8,11 +8,11 @@ import {
   FileDown,
   Package,
   Slash,
+  CalendarRange,
 } from "lucide-react";
 import type { Client, Task } from "../types";
 import { useStore } from "../data/store";
 import { bundleById } from "../data/bundles";
-import { exportAuditTrailJson, exportAuditTrailPdf } from "../lib/audit-trail";
 import { useCoverSheet } from "../hooks/useFilesFromClients";
 import {
   useFileExtensionForTask,
@@ -23,6 +23,7 @@ import { simulateInboundDocument } from "../lib/simulate-inbound";
 import { DeadlineChip, defaultActionsForState } from "./ui/DeadlineChip";
 import { classifyDeadlineState } from "../data/dateHelpers";
 import { TaskActions } from "./TaskActions";
+import { useSession } from "../data/session";
 
 interface Props {
   task: Task;
@@ -36,6 +37,19 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
   const { deadlines } = useStore();
   const updateStatus = useUpdateTaskStatus();
   const fileExtension = useFileExtensionForTask();
+  // Solo-firm chrome elision (Yuqi audit 2026-05-05). For 1-user firms
+  // (session.tier === "solo") the preparer/reviewer split is decorative
+  // — same human is both. Hide the meta line + the Assign control on
+  // the TaskActions menu so the page stops asking a question that has
+  // no answer worth giving.
+  const session = useSession();
+  const isSolo = session?.tier === "solo";
+  // Simulate inbound is a dev-mode helper (fakes a document.received
+  // event into the substrate). Visible to end users it produces noise
+  // in real CPA inboxes — gate behind the same mock flag the cover
+  // sheet uses, so it surfaces in our seeded demo and disappears in
+  // production.
+  const showSimulateInbound = env.useMockData;
   // Trace which service package generated this task — closes the loop
   // between Settings → Service Packages and the daily flow. Educates the CPA
   // on what's driving their workload without lecturing.
@@ -84,7 +98,13 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
               IRS runway when relevant) and exposes state-appropriate actions
               on click. Internal vs official semantics: chip's primary text is
               milestone-driven; official date enters the visible band only
-              once the back-plan has slipped past internal target. */}
+              once the back-plan has slipped past internal target.
+
+              Adjacent "View in Timeline" link: opens /timeline focused on
+              this task's due date so the CPA can see what else lands the
+              same week (cross-client workload context). Yuqi audit
+              2026-05-05: this is the bridge between "this client" and
+              "everything else" that the page used to lack. */}
           <div className="mt-2 flex items-center flex-wrap gap-2">
             <DeadlineChip
               officialDueDate={task.officialDueDate}
@@ -127,22 +147,32 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
                 },
               )}
             />
+            <Link
+              to={`/timeline?focus=${task.officialDueDate}&clientId=${client.id}`}
+              className="text-2xs text-ink-500 hover:text-ink-900 hover:underline inline-flex items-center gap-1"
+              title="See what else lands this week across the firm"
+            >
+              <CalendarRange className="w-3 h-3" aria-hidden />
+              View in Timeline
+            </Link>
           </div>
-          <div className="text-xs text-ink-500 mt-2 flex items-center flex-wrap gap-x-3 gap-y-1">
-            <span>
-              <span className="text-ink-400">Preparer:</span>{" "}
-              <span className="text-ink-900">
-                {task.assignedUser || "Unassigned"}
+          {!isSolo && (
+            <div className="text-xs text-ink-500 mt-2 flex items-center flex-wrap gap-x-3 gap-y-1">
+              <span>
+                <span className="text-ink-400">Preparer:</span>{" "}
+                <span className="text-ink-900">
+                  {task.assignedUser || "Unassigned"}
+                </span>
               </span>
-            </span>
-            <span className="text-ink-300">·</span>
-            <span>
-              <span className="text-ink-400">Reviewer:</span>{" "}
-              <span className={task.reviewerUser ? "text-ink-900" : "text-ink-500"}>
-                {task.reviewerUser ?? "Unassigned"}
+              <span className="text-ink-300">·</span>
+              <span>
+                <span className="text-ink-400">Reviewer:</span>{" "}
+                <span className={task.reviewerUser ? "text-ink-900" : "text-ink-500"}>
+                  {task.reviewerUser ?? "Unassigned"}
+                </span>
               </span>
-            </span>
-          </div>
+            </div>
+          )}
           {task.status === "not_applicable" && task.notApplicableReason && (
             <div className="mt-2 inline-flex items-start gap-1.5 text-xs text-danger-ink bg-danger-bg/40 border border-danger-border rounded px-2 py-1">
               <Slash className="w-3 h-3 shrink-0 mt-0.5 text-danger-solid" aria-hidden />
@@ -201,23 +231,18 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
         </span>
         <span className="ml-auto flex items-center gap-2">
           <CoverSheetButton taskId={task.id} />
-          <button
-            onClick={() => simulateInboundDocument(task.id, client.name)}
-            className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken inline-flex items-center gap-1.5"
-            title="Simulate a client reply with attached document — fires the document.received event"
-          >
-            <Inbox className="w-3 h-3" aria-hidden /> Simulate inbound
-          </button>
-          <button
-            onClick={() => {
-              exportAuditTrailJson(task);
-              exportAuditTrailPdf(task);
-            }}
-            className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken inline-flex items-center gap-1.5"
-            title="IRS audit-trail compliant export"
-          >
-            <FileDown className="w-3 h-3" aria-hidden /> Audit trail
-          </button>
+          {showSimulateInbound && (
+            <button
+              onClick={() => simulateInboundDocument(task.id, client.name)}
+              className="text-xs px-2.5 py-1 rounded border border-line text-ink-700 hover:bg-sunken inline-flex items-center gap-1.5"
+              title="Simulate a client reply with attached document — fires the document.received event (mock mode only)"
+            >
+              <Inbox className="w-3 h-3" aria-hidden /> Simulate inbound
+            </button>
+          )}
+          {/* Audit trail removed from header — consolidated with the
+              Audit pack button at the bottom of the documents column.
+              Two audit entry points was the duplication Yuqi flagged. */}
         </span>
       </div>
     </header>

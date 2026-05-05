@@ -220,10 +220,13 @@ function renderChipText(
   switch (result.state) {
     case "on_track":
       if (!result.activeMilestone) {
+        // Yuqi audit 2026-05-05: "On schedule" is product-jargon —
+        // Sarah doesn't ask "is this on schedule?", she asks "when is
+        // it due?". Lead with the date, the jurisdiction, drop the
+        // tautological status word.
         return (
           <span className={tone.runway}>
-            On schedule · IRS{" "}
-            <DateLabel value={officialDueDate} format="short" />
+            Due <DateLabel value={officialDueDate} format="short" /> · IRS
           </span>
         );
       }

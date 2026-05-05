@@ -66,6 +66,7 @@ import {
   useUpdateTaskStatus,
 } from "../hooks/useTasks";
 import { trpc } from "../lib/api/client";
+import { useSession } from "../data/session";
 
 interface Props {
   task: Task;
@@ -74,6 +75,11 @@ interface Props {
 export function TaskActions({ task }: Props) {
   const [deferOpen, setDeferOpen] = useState(false);
   const [naOpen, setNaOpen] = useState(false);
+  // Solo-firm chrome: there's only one user, so the Assign popover has
+  // nothing to switch between. Hide it for tier === "solo" (Yuqi audit
+  // 2026-05-05).
+  const session = useSession();
+  const isSolo = session?.tier === "solo";
 
   const updateStatus = useUpdateTaskStatus();
   const fileExtension = useFileExtensionForTask();
@@ -136,7 +142,7 @@ export function TaskActions({ task }: Props) {
           </button>
         )}
 
-        <ReassignPopover task={task} />
+        {!isSolo && <ReassignPopover task={task} />}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

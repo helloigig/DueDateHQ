@@ -67,10 +67,16 @@ import { resolveFederalForm } from "../data/canonicalForm";
 import type {
   ActivityEntry,
   ActivityType,
+  ChecklistItem,
   Client,
   ClientNote,
   Deadline,
+  Task,
 } from "../types";
+import {
+  EmailDraftModal,
+  type EmailDraftIntent,
+} from "../components/EmailDraftModal";
 
 // IA v0.8 amendment 2026-05-05 — Engagement tab retired.
 //
@@ -947,6 +953,45 @@ function ToDoTab({
   onOpenDocuments: () => void;
 }) {
   const { checklistItems: storeChecklistItems, tasks: storeTasks } = useStore();
+  // Side-panel email composer state (P0 fix 2026-05-05). Per Yuqi audit:
+  // "Request now" used to be a <Link> that navigated to the task page —
+  // forcing the CPA to re-find the row and click another button. Now the
+  // CTA opens the same EmailDraftModal that TaskDetail uses, in-place.
+  // Same pattern, same chrome, no navigation interrupt.
+  const [emailIntent, setEmailIntent] = useState<EmailDraftIntent | null>(null);
+  const remoteTasks = useTasksForClient(!env.useMockData ? client.id : undefined);
+  // Build a single by-id task lookup that works in both modes. Real mode
+  // uses the BE list; mock mode uses the store. Both shapes expose the
+  // fields EmailDraftModal needs (id, formType, jurisdiction, dates,
+  // status, forwardingEmail).
+  const tasksByIdForCompose = useMemo(() => {
+    const m = new Map<string, Task>();
+    const src = env.useMockData
+      ? storeTasks.filter((t) => t.clientId === client.id)
+      : (remoteTasks as Task[]);
+    for (const t of src) m.set(t.id, t);
+    return m;
+  }, [storeTasks, remoteTasks, client.id]);
+  const openComposeFor = (
+    item: { id: string; label: string; taskId?: string; itemType?: string },
+  ) => {
+    if (!item.taskId) return;
+    const task = tasksByIdForCompose.get(item.taskId);
+    if (!task) return;
+    // Synthesize a minimal ChecklistItem when only the BE-aggregated
+    // todoItem row is in scope. EmailDraftModal reads label + itemType
+    // for its smart-chase composer; the rest is optional.
+    const synthChecklistItem: ChecklistItem = {
+      id: item.id,
+      taskId: item.taskId,
+      label: item.label,
+      itemType: item.itemType ?? "custom",
+      state: "not_requested",
+      order: 0,
+      custom: false,
+    };
+    setEmailIntent({ task, client, checklistItem: synthChecklistItem });
+  };
   // ── Source-of-truth fix (2026-05-05) ───────────────────────────────────
   // Today's Action Queue reads from trpc.todoItems.list (BE-aggregated).
   // ToDoTab used to read from useStore().checklistItems which is empty
@@ -1122,20 +1167,44 @@ function ToDoTab({
                       {ci.label ?? "Item"}
                     </p>
                     <p className="text-2xs text-ink-500 truncate">
-                      {ci.taskName ?? "—"}
+                      {/* Task name is now a link → TaskDetail. Used to be
+                          plain text; per Yuqi 2026-05-05 audit "no way to
+                          enter task from client" — the task name is the
+                          natural entry point and was unclickable. */}
+                      {ci.taskId ? (
+                        <Link
+                          to={taskHref(ci.taskId)}
+                          className="hover:text-ink-900 hover:underline"
+                        >
+                          {ci.taskName ?? "—"}
+                        </Link>
+                      ) : (
+                        <span>{ci.taskName ?? "—"}</span>
+                      )}
                       {days != null && ` · last reminder ${days}d ago`}
                       {ci.state === "not_requested" &&
                         " · First reminder pending"}
                     </p>
                   </div>
-                  <Link
-                    to={taskHref(ci.taskId)}
-                    className="text-2xs px-2 py-1 rounded border border-line bg-surface text-ink-700 hover:bg-sunken shrink-0"
+                  {/* Send reminder / Request now → opens email composer
+                      side panel in place. Was a <Link> that navigated to
+                      TaskDetail and forced the CPA to re-find the row. */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openComposeFor({
+                        id: ci.id,
+                        label: ci.label ?? "Item",
+                        taskId: ci.taskId,
+                      })
+                    }
+                    disabled={!ci.taskId}
+                    className="text-2xs px-2 py-1 rounded border border-line bg-surface text-ink-700 hover:bg-sunken shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {ci.state === "requested_waiting"
-                      ? "Send reminder ↗"
-                      : "Request now ↗"}
-                  </Link>
+                      ? "Send reminder"
+                      : "Request now"}
+                  </button>
                 </li>
               );
             })}
@@ -1168,9 +1237,21 @@ function ToDoTab({
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-ink-900 truncate">{ci.label}</p>
                   <p className="text-2xs text-ink-500 truncate">
-                    {ci.taskName ?? "—"}
+                    {ci.taskId ? (
+                      <Link
+                        to={taskHref(ci.taskId)}
+                        className="hover:text-ink-900 hover:underline"
+                      >
+                        {ci.taskName ?? "—"}
+                      </Link>
+                    ) : (
+                      <span>{ci.taskName ?? "—"}</span>
+                    )}
                   </p>
                 </div>
+                {/* "Review" still navigates — the CPA needs to look at the
+                    inbound document, not draft an email. Different verb,
+                    different destination. */}
                 <Link
                   to={taskHref(ci.taskId)}
                   className="text-2xs px-2 py-1 rounded border border-line text-ink-700 hover:bg-sunken shrink-0"
@@ -1284,6 +1365,14 @@ function ToDoTab({
         {completeCount} item{completeCount === 1 ? "" : "s"} complete this tax
         year (open the related task to see source attachments).
       </p>
+
+      {/* In-place email composer — same chrome the TaskDetail uses, so
+          the CPA never has to leave this client to chase a doc. */}
+      <EmailDraftModal
+        open={!!emailIntent}
+        intent={emailIntent}
+        onClose={() => setEmailIntent(null)}
+      />
     </div>
   );
 }

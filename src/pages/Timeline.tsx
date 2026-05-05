@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { trpc } from "../lib/api/client";
 import { env } from "../config";
@@ -296,7 +296,35 @@ function jurisdictionLabel(j: string): string {
 }
 
 export function Timeline() {
-  const [filter, setFilter] = useState<FilterMode>("waiting");
+  // Focus mode (Yuqi audit 2026-05-05): when arriving from a TaskDetail
+  // due-date or milestone link, the URL carries `?focus=YYYY-MM-DD`
+  // and/or `?clientId=...`. We:
+  //   - default the filter to "all" so the focused row isn't filtered out
+  //   - scroll the matching row into view + flash a ring around it
+  //   - filter the row list to the focused client when `clientId` set
+  // The query params are read once on mount and consumed; user can clear
+  // by clicking "Clear focus" in the focus banner.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusDate = searchParams.get("focus") ?? null;
+  const focusClientId = searchParams.get("clientId") ?? null;
+  const isFocused = !!(focusDate || focusClientId);
+  // Callback ref — React calls this with the matched row's DOM node on
+  // mount, lets us scrollIntoView once the layout has settled. A useRef
+  // would technically work too but the ref-prop type matches React's
+  // strict mode best as a callback.
+  const [focusNode, setFocusNode] = useState<HTMLDivElement | null>(null);
+  const focusRowRef = useCallback((node: HTMLDivElement | null) => {
+    setFocusNode(node);
+  }, []);
+  const clearFocus = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("focus");
+    next.delete("clientId");
+    setSearchParams(next, { replace: true });
+  };
+  const [filter, setFilter] = useState<FilterMode>(
+    isFocused ? "all" : "waiting",
+  );
   const [attr, setAttr] = useState<AttrFilters>(EMPTY_ATTR);
   // Stage-action confirm dialog state — null when closed.
   const [stageAction, setStageAction] = useState<{
@@ -363,6 +391,13 @@ export function Timeline() {
 
   const filtered = useMemo(() => {
     let out = source;
+    // Focus filtering takes precedence over filter chips: when arriving
+    // from a TaskDetail link (?clientId=…), only show rows for that
+    // client. The "Clear focus" banner returns the user to the normal
+    // multi-client view.
+    if (focusClientId) {
+      out = out.filter((t) => t.clientId === focusClientId);
+    }
     if (filter === "waiting") out = out.filter((t) => t.missingCount > 0);
     if (filter === "behind") out = out.filter((t) => t.daysBehind > 0);
     if (attr.jurisdiction.length) {
@@ -379,7 +414,20 @@ export function Timeline() {
       out = out.filter((t) => t.tier && attr.tier.includes(t.tier));
     }
     return out;
-  }, [source, filter, attr]);
+  }, [source, filter, attr, focusClientId]);
+
+  // Auto-scroll to the focused row whenever the matching DOM node
+  // mounts (callback ref fires after layout). The `filtered.length`
+  // dep ensures a re-scroll if the filter chips clip and re-add the
+  // row.
+  useEffect(() => {
+    if (!isFocused) return;
+    if (!focusNode) return;
+    const id = window.setTimeout(() => {
+      focusNode.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+    return () => window.clearTimeout(id);
+  }, [isFocused, focusNode, filtered.length]);
 
   const hasAttrFilters =
     attr.jurisdiction.length + attr.entity.length + attr.tier.length > 0;
@@ -399,9 +447,45 @@ export function Timeline() {
   const behindList = sorted.filter((t) => t.daysBehind > 0);
   const onTrackList = sorted.filter((t) => t.daysBehind === 0);
 
+  // Focused-source label for the banner — describes what the user
+  // arrived from. Empty when no focus param is set.
+  const focusedClientLabel = useMemo(() => {
+    if (!focusClientId) return null;
+    const live = clientsQuery.data?.items ?? [];
+    const c = live.find((x) => x.id === focusClientId);
+    if (c) return c.name;
+    const mock = MOCK_CLIENTS.find((x) => x.id === focusClientId);
+    return mock?.name ?? focusClientId.slice(0, 8);
+  }, [focusClientId, clientsQuery.data]);
+
   return (
     <PageContainer variant="wide">
       <PageHeader title="Timeline" meta={`${kpis.active} active`} />
+
+      {/* Focus banner — shown when the URL carries ?focus= or ?clientId=
+          (deep link from a TaskDetail due-date or milestone date). One
+          line that says what the user is centered on plus a "Clear"
+          chip to drop the filter and return to the normal multi-client
+          view. Per Yuqi audit 2026-05-05: contextual jumps need a clear
+          way back, otherwise the page silently filters and the user
+          wonders why their other tasks vanished. */}
+      {isFocused && (
+        <div className="mb-region px-3 py-2 rounded-md bg-info-bg border border-info-border flex items-center gap-3 text-xs text-info-ink">
+          <span className="font-medium">Focused</span>
+          <span className="text-info-ink/80">
+            {focusDate && <>on {focusDate}</>}
+            {focusDate && focusedClientLabel && " · "}
+            {focusedClientLabel && <>{focusedClientLabel}</>}
+          </span>
+          <button
+            type="button"
+            onClick={clearFocus}
+            className="ml-auto text-2xs px-2 py-0.5 rounded border border-info-border bg-surface text-info-ink hover:bg-info-bg/60"
+          >
+            Clear focus
+          </button>
+        </div>
+      )}
 
       {/* Ambient summary — one line above the filter chips. Replaces
           the previous 3-tile MetricTile grid; the same counts are
@@ -523,6 +607,8 @@ export function Timeline() {
                 collapsed={collapsed}
                 onToggleGroup={toggleGroup}
                 onStageClick={(row, ns) => setStageAction({ row, nextStage: ns })}
+                focusDate={focusDate}
+                focusRowRef={focusRowRef}
               />
             </section>
           )}
@@ -537,6 +623,8 @@ export function Timeline() {
                 collapsed={collapsed}
                 onToggleGroup={toggleGroup}
                 onStageClick={(row, ns) => setStageAction({ row, nextStage: ns })}
+                focusDate={focusDate}
+                focusRowRef={focusRowRef}
               />
             </section>
           )}
@@ -551,6 +639,8 @@ export function Timeline() {
                 collapsed={collapsed}
                 onToggleGroup={toggleGroup}
                 onStageClick={(row, ns) => setStageAction({ row, nextStage: ns })}
+                focusDate={focusDate}
+                focusRowRef={focusRowRef}
               />
             </section>
           )}
@@ -664,11 +754,17 @@ function TaskTable({
   collapsed,
   onToggleGroup,
   onStageClick,
+  focusDate,
+  focusRowRef,
 }: {
   rows: TaskRow[];
   collapsed: Set<string>;
   onToggleGroup: (key: string) => void;
   onStageClick: (row: TaskRow, nextStage: Stage | null) => void;
+  /** ISO date — when set, the row whose officialDueIso matches gets a
+   *  highlight ring and is auto-scrolled into view via focusRowRef. */
+  focusDate?: string | null;
+  focusRowRef?: (node: HTMLDivElement | null) => void;
 }) {
   const groups = groupRowsByClient(rows);
   return (
@@ -680,6 +776,8 @@ function TaskTable({
           collapsed={collapsed.has(g.key)}
           onToggle={() => onToggleGroup(g.key)}
           onStageClick={onStageClick}
+          focusDate={focusDate}
+          focusRowRef={focusRowRef}
         />
       ))}
     </div>
@@ -691,11 +789,15 @@ function ClientGroup({
   collapsed,
   onToggle,
   onStageClick,
+  focusDate,
+  focusRowRef,
 }: {
   group: { key: string; client: string; clientId?: string; tasks: TaskRow[] };
   collapsed: boolean;
   onToggle: () => void;
   onStageClick: (row: TaskRow, nextStage: Stage | null) => void;
+  focusDate?: string | null;
+  focusRowRef?: (node: HTMLDivElement | null) => void;
 }) {
   const navigate = useNavigate();
   const taskCount = group.tasks.length;
@@ -712,7 +814,14 @@ function ClientGroup({
   // Single-task clients render flush (no header row) — header would
   // just duplicate the row's identity column.
   if (taskCount === 1) {
-    return <TaskTimelineRow t={group.tasks[0]} onStageClick={onStageClick} />;
+    return (
+      <TaskTimelineRow
+        t={group.tasks[0]}
+        onStageClick={onStageClick}
+        focusDate={focusDate}
+        focusRowRef={focusRowRef}
+      />
+    );
   }
   return (
     <div>
@@ -783,6 +892,8 @@ function ClientGroup({
               t={t}
               nested
               onStageClick={onStageClick}
+              focusDate={focusDate}
+              focusRowRef={focusRowRef}
             />
           ))}
         </ul>
@@ -813,10 +924,14 @@ function TaskTimelineRow({
   t,
   nested,
   onStageClick,
+  focusDate,
+  focusRowRef,
 }: {
   t: TaskRow;
   nested?: boolean;
   onStageClick: (row: TaskRow, nextStage: Stage | null) => void;
+  focusDate?: string | null;
+  focusRowRef?: (node: HTMLDivElement | null) => void;
 }) {
   const navigate = useNavigate();
   const stages: Stage[] = [
@@ -831,10 +946,15 @@ function TaskTimelineRow({
   // current is the last (file), advance triggers "mark filed" (null).
   const currentIdx = stages.indexOf(t.currentStage);
   const nextStage: Stage | null = stages[currentIdx + 1] ?? null;
+  // Focus highlight — true when the URL's ?focus=YYYY-MM-DD matches
+  // this row's official deadline. Carries the scroll target ref so the
+  // page-level useEffect can scrollIntoView on mount.
+  const isFocusedRow = !!(focusDate && t.officialDueIso === focusDate);
 
   return (
     <li className="list-none">
       <div
+        ref={isFocusedRow ? focusRowRef : undefined}
         role={navigable ? "button" : undefined}
         tabIndex={navigable ? 0 : undefined}
         onClick={() => {
@@ -852,6 +972,9 @@ function TaskTimelineRow({
           nested && "pl-card", // indent under client group header
           navigable ? "hover:bg-sunken cursor-pointer" : "cursor-default",
           "focus-visible:outline-none focus-visible:bg-sunken",
+          // Focus ring + soft fill on the deadline-matched row.
+          isFocusedRow &&
+            "ring-2 ring-info-border bg-info-bg/40 hover:bg-info-bg/60",
         )}
         title={
           navigable
