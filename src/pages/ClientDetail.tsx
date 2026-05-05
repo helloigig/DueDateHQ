@@ -50,7 +50,12 @@ import {
 } from "../hooks/useAiInsights";
 import { PageSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
-import { formatLongDate, parseDate, TODAY } from "../data/dateHelpers";
+import {
+  formatLongDate,
+  formatShortDate,
+  parseDate,
+  TODAY,
+} from "../data/dateHelpers";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import {
   AddDeadlineModal,
@@ -65,16 +70,7 @@ import { PinClientButton } from "../components/Sidebar";
 import { BackLink } from "../components/ui/BackLink";
 import { PageContainer } from "../components/ui/PageContainer";
 import { StateChipGroup } from "../components/StateChipGroup";
-import { MultiSelectChip } from "../components/MultiSelectChip";
-import { cn } from "../lib/utils";
 import { ClientChip } from "../components/ClientChip";
-// Note — ClientChip (the canonical client-identity primitive from PR
-// #135) is intentionally NOT imported here. On dense lists (Action
-// Queue, Mail rows, Alerts chips) the chip is canonical because compact
-// shape wins. On THIS page the client IS the page subject, so we render
-// name + tier + state as a labeled identity strip rather than a single
-// chip — same data, more readable layout for a header. The chip stays
-// the canonical rendering everywhere else.
 import { STATE_NAMES, type StateCode } from "../types";
 import { bundleByName, type FilingBundle } from "../data/bundles";
 import { resolveFederalForm } from "../data/canonicalForm";
@@ -165,17 +161,11 @@ export function ClientDetail() {
     AddDeadlinePrefill | undefined
   >(undefined);
   const [exportOpen, setExportOpen] = useState(false);
-  // Header filters — match Timeline's filter pattern (Year + Form). Empty
-  // arrays = no filter (show everything). Filter state lives at the page
-  // level so it can scope BOTH the To Do tab AND the Filings tab via the
-  // single `filteredDeadlines` projection. Yuqi audit 2026-05-05: client
-  // page top section should mirror Timeline's structure (title + stats +
-  // 2 filters + tabs). At one-client scope the filters that matter are
-  // axes WITHIN the client (year of filing, form type) rather than
-  // axes OF the client (entity, jurisdiction, tier — those are header
-  // identity, not filter knobs).
-  const [yearFilter, setYearFilter] = useState<string[]>([]);
-  const [formFilter, setFormFilter] = useState<string[]>([]);
+  // Year + Form header filters retired 2026-05-06 — they were
+  // duplicating axis-within-client navigation that the Filings tab's
+  // own grouping already covers. `filteredDeadlines` (below) keeps
+  // its name as a pass-through alias so the To Do / Filings / Mailbox
+  // tabs that consume it don't change their prop contracts.
 
   // Default tab — landing on To Do is the right answer when the client
   // has active work to chase / confirm. When To Do would be empty (no
@@ -265,38 +255,9 @@ export function ClientDetail() {
     ),
   );
 
-  // Year + Form filter options — derived from the client's deadlines so
-  // empty rosters don't render dead dropdowns. Sorted: years descending
-  // (most recent first), forms alphabetically.
-  const yearOptions = Array.from(
-    new Set(clientDeadlines.map((d) => d.officialDueDate.slice(0, 4))),
-  )
-    .sort((a, b) => b.localeCompare(a))
-    .map((year) => ({ value: year, label: year }));
-  const formOptions = Array.from(
-    new Set(clientDeadlines.map((d) => d.form)),
-  )
-    .sort()
-    .map((form) => ({ value: form, label: form }));
-
-  // Filter projection — applied to BOTH the To Do tab and the Filings
-  // tab so the year/form chips drive every list on the page consistently.
-  // Empty filter arrays = pass-through (show everything).
-  const filteredDeadlines =
-    yearFilter.length === 0 && formFilter.length === 0
-      ? clientDeadlines
-      : clientDeadlines.filter((d) => {
-          if (
-            yearFilter.length > 0 &&
-            !yearFilter.includes(d.officialDueDate.slice(0, 4))
-          ) {
-            return false;
-          }
-          if (formFilter.length > 0 && !formFilter.includes(d.form)) {
-            return false;
-          }
-          return true;
-        });
+  // Pass-through alias — header filters retired; tabs still consume
+  // `filteredDeadlines` by name.
+  const filteredDeadlines = clientDeadlines;
 
   // Per-client KPIs — match the shape of Timeline's stat strip so the
   // user trains on one mental model across the two surfaces. Computed
@@ -330,9 +291,6 @@ export function ClientDetail() {
     return { active, behind, extended };
   })();
 
-  const hasContact = !!(client.contactEmail || client.contactPhone);
-  const hasFilters = yearFilter.length > 0 || formFilter.length > 0;
-
   const onArchiveConfirm = () => {
     if (env.useMockData) {
       actions.archiveClient(client.id);
@@ -350,34 +308,24 @@ export function ClientDetail() {
       <BackLink fallback="/clients" fallbackLabel="Clients" />
 
 
-      {/* Header layout: stacks vertically on mobile (action group sits BELOW
-          the wrapping H1 + meta) and goes side-by-side at sm+ where there's
-          room. Without the breakpoint, the right-rail buttons crash into a
-          wrapping client name on narrow viewports.
-          Yuqi audit 2026-05-05: "the same structure as Timeline" was about
-          the /clients LIST page (sidebar primary), which already uses
-          PageHeader. ClientDetail intentionally keeps the inline ClientChip
-          cluster — name, tier, state pills, entity, archived all on one
-          row — so the per-client identity reads at a glance without a
-          second meta strip duplicating it. */}
+      {/* Header redesign 2026-05-06.
+          Row 1 — identity (name + entity + states + archived) on the left;
+                  action group (pin / export / edit / archive / + Add deadline)
+                  on the right. Three previously-separate strips (tier-package-
+                  since, contact, stat) collapse into the 2-column body block
+                  below. */}
       <div className="mt-3 flex flex-col sm:flex-row sm:items-start gap-3">
         <div className="flex-1 min-w-0">
-          {/* Row 1: identity. ClientChip (size="lg", showTier, showState)
-              is the canonical rendering of the name+tier+state triplet —
-              this is the migration target of PR #135. Entity-type badge,
-              StateChipGroup (for nexus states beyond primary), and the
-              archived flag remain as siblings since they're not part of
-              the per-client identity tuple. */}
           <div className="flex items-center gap-2 flex-wrap">
             <ClientChip
               client={client}
               size="lg"
               as="span"
-              showTier
-              showState
+              showTier={false}
+              showState={false}
             />
             <span
-              className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line"
+              className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-info-bg/60 text-info-ink border border-info-border font-semibold"
               title="Entity type"
             >
               {entityTypeDisplay(client.entityType)}
@@ -392,201 +340,156 @@ export function ClientDetail() {
               </span>
             )}
           </div>
-          {/* Row 2: meta line — Tier · Packages · Since. Neutral type,
-              label-in-ink-400 / value-in-ink-700 pattern. Stays narrow
-              on purpose: Open-deadlines and Working-on belong to the
-              stat strip below (tone-coded numbers there are the
-              accent), so duplicating them here would dilute the strip's
-              signal. */}
-          <div className="mt-2 text-xs text-ink-500 flex items-baseline flex-wrap gap-x-section gap-y-1">
-            <span>
-              <span className="text-ink-400">Tier</span>{" "}
-              <span className="text-ink-700 font-medium capitalize">
-                {client.tier ?? "standard"}
-              </span>
-            </span>
-            {client.servicePackages.length > 0 && (
-              <span className="inline-flex items-baseline gap-1">
-                <span className="text-ink-400">
-                  {client.servicePackages.length === 1
-                    ? "Package"
-                    : "Packages"}
-                </span>
-                {client.servicePackages.map((p) => (
-                  <PackageChip key={p} packageName={p} client={client} />
-                ))}
-              </span>
-            )}
-            {addedAtLabel && (
-              <span>
-                <span className="text-ink-400">Since</span>{" "}
-                <span className="text-ink-700">{addedAtLabel}</span>
-              </span>
-            )}
-          </div>
         </div>
-        {/* Action group — kept together as a single shrink-0 cluster so the
-            row can never collapse half its buttons. On mobile the parent
-            flex stacks this group below the title; at sm+ it sits inline. */}
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
+        {/* Action group — Pin / Export / Edit collapsed to icon-only (canonical
+            tooltips + aria-labels carry the affordance); Archive stays text
+            (destructive); + Add deadline is the primary CTA in indigo. */}
+        <div className="flex flex-wrap items-center gap-1 shrink-0">
           <PinClientButton clientId={client.id} />
-          <ExportClientsButton clientId={client.id} />
+          <ExportClientsButton clientId={client.id} iconOnly />
+          <button
+            onClick={() => setEditOpen(true)}
+            className="inline-flex items-center justify-center w-8 h-8 rounded-md text-ink-500 hover:text-ink-900 hover:bg-sunken transition-colors"
+            title="Edit client"
+            aria-label="Edit client"
+          >
+            <Pencil className="w-4 h-4" aria-hidden />
+          </button>
+          <button
+            onClick={() => setArchiveOpen(true)}
+            disabled={client.status === "archived"}
+            className="ml-1 text-sm px-3 py-1.5 rounded-md border border-line hover:bg-sunken/40 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Archive
+          </button>
           <button
             onClick={() => {
               setAddDeadlinePrefill(undefined);
               setAddDeadlineOpen(true);
             }}
-            className="text-sm px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover inline-flex items-center gap-1.5"
+            className="text-sm px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover inline-flex items-center gap-1.5 shadow-sm"
             title="Add a new deadline / task for this client"
           >
             <Plus className="w-3.5 h-3.5" aria-hidden />
             Add deadline
           </button>
-          <button
-            onClick={() => setEditOpen(true)}
-            className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40"
-          >
-            Edit
-          </button>
-          <button
-            onClick={() => setArchiveOpen(true)}
-            disabled={client.status === "archived"}
-            className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Archive
-          </button>
         </div>
       </div>
 
-      {/* Primary contact — only renders when we have at least one
-          channel on file. Email is mailto:, phone is tel: so click-to-
-          contact works on mobile + desktop mail/phone clients. Yuqi
-          audit 2026-05-05: "primary contact email + phone should be
-          visible under its name title." */}
-      {hasContact && (
-        <div className="mb-region text-xs text-ink-700 flex items-baseline flex-wrap gap-x-section gap-y-1">
-          {client.contactEmail && (
-            <a
-              href={`mailto:${client.contactEmail}`}
-              className="inline-flex items-baseline gap-1 hover:text-ink-900"
-              title="Send email"
-            >
-              <Mail
-                className="w-3 h-3 text-ink-400 self-center"
-                aria-hidden
-              />
-              {client.contactEmail}
-            </a>
-          )}
-          {client.contactPhone && (
-            <a
-              href={`tel:${client.contactPhone}`}
-              className="inline-flex items-baseline gap-1 hover:text-ink-900"
-              title="Call"
-            >
-              <Phone
-                className="w-3 h-3 text-ink-400 self-center"
-                aria-hidden
-              />
-              {client.contactPhone}
-            </a>
-          )}
-        </div>
-      )}
+      {/* Two-column header body — left: meta + working-on rows;
+          right: auto-generated AI summary card. Stacks on mobile.
+          Year/Form filter chips dropped from the header (filteredDeadlines
+          falls through when state is empty); they can return inside the
+          relevant tab if needed. */}
+      <div className="mt-3 mb-region grid grid-cols-1 md:grid-cols-[1fr,auto] gap-4">
+        <div className="min-w-0 space-y-2">
+          {/* Meta row: primary service package + email-icon-button +
+              phone-icon-button + "Since {date}". Email and phone collapse
+              to icon-only buttons (mailto: / tel:) — saves horizontal
+              space and matches the mockup. */}
+          <div className="text-xs text-ink-700 flex items-center flex-wrap gap-x-2 gap-y-1">
+            {client.servicePackages.length > 0 && (
+              <span className="inline-flex items-center gap-1">
+                {client.servicePackages.slice(0, 1).map((p) => (
+                  <PackageChip key={p} packageName={p} client={client} />
+                ))}
+                {client.servicePackages.length > 1 && (
+                  <span
+                    className="text-2xs text-ink-500"
+                    title={`Also: ${client.servicePackages.slice(1).join(", ")}`}
+                  >
+                    +{client.servicePackages.length - 1}
+                  </span>
+                )}
+              </span>
+            )}
+            {client.contactEmail && (
+              <a
+                href={`mailto:${client.contactEmail}`}
+                className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-line text-ink-500 hover:text-ink-900 hover:bg-sunken transition-colors"
+                title={`Email ${client.contactEmail}`}
+                aria-label={`Email ${client.contactEmail}`}
+              >
+                <Mail className="w-3.5 h-3.5" aria-hidden />
+              </a>
+            )}
+            {client.contactPhone && (
+              <a
+                href={`tel:${client.contactPhone}`}
+                className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-line text-ink-500 hover:text-ink-900 hover:bg-sunken transition-colors"
+                title={`Call ${client.contactPhone}`}
+                aria-label={`Call ${client.contactPhone}`}
+              >
+                <Phone className="w-3.5 h-3.5" aria-hidden />
+              </a>
+            )}
+            {addedAtLabel && (
+              <span className="text-ink-500">
+                Since <span className="text-ink-700">{addedAtLabel}</span>
+              </span>
+            )}
+          </div>
 
-      {/* Stat strip — mirrors Timeline's KPI line. Tone-coded numbers
-          only; no middle dots between metrics (DESIGN.md §Don't —
-          discrete fields use whitespace, dots are within-field). The
-          numbers describe the CLIENT's overall state, not the filtered
-          slice — so a year/form filter doesn't hide the broader
-          picture. "Working on" gets a soft inline mention here too so
-          it stays visible without crowding the title. */}
-      <div className="mb-region text-xs text-ink-500 flex items-baseline gap-x-section gap-y-1 flex-wrap">
-        <span>
-          <span
-            className={cn(
-              "tabular-nums font-semibold",
-              kpis.active > 0 ? "text-ink-700" : "text-ink-400",
-            )}
-          >
-            {kpis.active}
-          </span>{" "}
-          open
-        </span>
-        <span>
-          <span
-            className={cn(
-              "tabular-nums font-semibold",
-              kpis.behind > 0 ? "text-warn-ink" : "text-ink-700",
-            )}
-          >
-            {kpis.behind}
-          </span>{" "}
-          behind internal
-        </span>
-        <span>
-          <span
-            className={cn(
-              "tabular-nums font-semibold",
-              kpis.extended > 0 ? "text-info-ink" : "text-ink-700",
-            )}
-          >
-            {kpis.extended}
-          </span>{" "}
-          on extension
-        </span>
-        {workingOnFormTypes.length > 0 && (
-          <span className="inline-flex items-baseline gap-1 min-w-0">
-            <span className="text-ink-400 shrink-0">Working on</span>
-            <span className="text-ink-700 truncate">
-              {workingOnFormTypes.slice(0, 3).join(", ")}
-              {workingOnFormTypes.length > 3 &&
-                ` +${workingOnFormTypes.length - 3}`}
-            </span>
-          </span>
-        )}
+          {/* Working-on row: N filings + status chip (All on track / N
+              behind / N on extension) + colon + form list. Replaces the
+              former 3-metric stat strip — one short sentence reads
+              faster than three numbers when most clients are on track. */}
+          {kpis.active > 0 && (
+            <div className="text-sm text-ink-700 flex items-baseline flex-wrap gap-x-2 gap-y-1">
+              <span className="text-ink-500">
+                Working on{" "}
+                <span className="font-semibold text-ink-900 tabular-nums">
+                  {kpis.active}
+                </span>{" "}
+                filing{kpis.active === 1 ? "" : "s"}
+              </span>
+              {kpis.behind > 0 ? (
+                <span className="inline-flex items-center gap-1 text-2xs px-1.5 py-0.5 rounded border border-warn-border bg-warn-bg/60 text-warn-ink font-medium">
+                  <AlertTriangle className="w-3 h-3" aria-hidden />
+                  {kpis.behind} behind
+                </span>
+              ) : kpis.extended > 0 ? (
+                <span className="inline-flex items-center gap-1 text-2xs px-1.5 py-0.5 rounded border border-info-border bg-info-bg/60 text-info-ink font-medium">
+                  <FileText className="w-3 h-3" aria-hidden />
+                  {kpis.extended} on extension
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-2xs px-1.5 py-0.5 rounded border border-success-border bg-success-bg/60 text-success-ink font-medium">
+                  <CheckCircle2 className="w-3 h-3" aria-hidden />
+                  All on track
+                </span>
+              )}
+              {workingOnFormTypes.length > 0 && (
+                <span className="text-ink-500 inline-flex items-baseline gap-1 min-w-0">
+                  <span>:</span>
+                  <span className="text-ink-700 truncate">
+                    {workingOnFormTypes.slice(0, 4).join(", ")}
+                    {workingOnFormTypes.length > 4 &&
+                      ` +${workingOnFormTypes.length - 4}`}
+                  </span>
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Override surface — only renders when the user has authored
+              a manual AI summary. Right-rail card carries the
+              auto-summary; the override is its editorial twin. */}
+          <ClientAiSummary client={client} />
+        </div>
+
+        {/* Right rail — auto-generated AI summary card. Compact,
+            single-paragraph; the deeper Advisory + churn-risk surfaces
+            still render below via ClientAiInsightsCard. */}
+        <div className="md:max-w-sm md:w-[22rem]">
+          <ClientAiSummaryCard clientId={client.id} />
+        </div>
       </div>
 
-      {/* Filter chips — Year + Form. Match Timeline's MultiSelectChip
-          pattern + Clear-all button. Filters apply to BOTH the To Do
-          and Filings tabs (via the filteredDeadlines projection) so
-          one knob slices every list on the page consistently. Hidden
-          entirely when there are no deadlines (nothing to filter). */}
-      {clientDeadlines.length > 0 && (
-        <div className="mb-card flex items-center gap-2 flex-wrap">
-          <MultiSelectChip
-            label="Year"
-            options={yearOptions}
-            selected={yearFilter}
-            onChange={setYearFilter}
-          />
-          <MultiSelectChip
-            label="Form"
-            options={formOptions}
-            selected={formFilter}
-            onChange={setFormFilter}
-          />
-          {hasFilters && (
-            <button
-              type="button"
-              onClick={() => {
-                setYearFilter([]);
-                setFormFilter([]);
-              }}
-              className="text-xs text-ink-500 hover:text-ink-900 underline underline-offset-2 ml-1"
-            >
-              Clear all
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* AI behaviour summary — kept (override surfaces here when set).
-          Sits below the structural header so the eye reads identity →
-          stats → filters → tabs first; the AI annotation is contextual
-          flavor for users who've authored an override. */}
-      <ClientAiSummary client={client} />
-
+      {/* Cross-year-insighter advisory triggers + churn-risk deep callout.
+          Kept below the header so they don't crowd identity, but above
+          the tab strip so they're impossible to miss when present. The
+          card returns null entirely when there's nothing to surface. */}
       <ClientAiInsightsCard clientId={client.id} />
 
       <div className="mt-5 border-b border-line flex items-center gap-1 flex-wrap relative">
@@ -1337,6 +1240,7 @@ function ToDoTab({
             taskId: string;
             taskFormType: string;
             taskJurisdiction: string;
+            taskOfficialDueDate?: string | null;
             lastReminderAt?: string | null;
           }>;
         };
@@ -1373,6 +1277,7 @@ function ToDoTab({
       taskName: [ci.taskFormType, ci.taskJurisdiction]
         .filter(Boolean)
         .join(" · "),
+      dueDate: ci.taskOfficialDueDate ?? undefined,
       lastReminderAt: ci.lastReminderAt ?? undefined,
     }));
   }, [liveChecklistItems]);
@@ -1403,6 +1308,7 @@ function ToDoTab({
             taskName: task
               ? [task.formType, task.jurisdiction].filter(Boolean).join(" · ")
               : undefined,
+            dueDate: task?.officialDueDate,
             lastReminderAt: ci.lastReminderAt ?? undefined,
           };
         }),
@@ -1420,14 +1326,55 @@ function ToDoTab({
     (ci) => ci.state === "received_confirmed" || ci.state === "not_applicable",
   ).length;
 
-  // Sort waiting by oldest reminder first (gap-over-fill). Items
-  // without a lastReminderAt (i.e. not_requested) sort to the bottom
-  // since they haven't started the loop yet.
-  const waitingSorted = [...stillWaiting].sort((a, b) => {
-    const at = a.lastReminderAt ? new Date(a.lastReminderAt).getTime() : Infinity;
-    const bt = b.lastReminderAt ? new Date(b.lastReminderAt).getTime() : Infinity;
-    return at - bt;
-  });
+  // Group items by their parent task (one filing = one task = one
+  // deadline). Yuqi audit 2026-05-05 — the previous flat list lost the
+  // CPA's actual mental model: "what does THIS filing still need?"
+  // Grouping by task surfaces the deadline as the unit of work. Within
+  // each group, items keep insertion order from the BE (sorted by
+  // checklistItems.sortOrder). Groups themselves sort by earliest
+  // dueDate so the most-imminent deadline shows first.
+  type WaitingGroup = {
+    taskId: string | undefined;
+    taskName: string;
+    dueDate?: string;
+    items: WaitingItem[];
+    /** Most recent reminder across the group's items — feeds the
+     *  per-group "Last reminder Xd ago" footer. */
+    lastReminderAt?: string;
+  };
+  const groupByTask = (rows: WaitingItem[]): WaitingGroup[] => {
+    const map = new Map<string, WaitingGroup>();
+    for (const row of rows) {
+      const key = row.taskId ?? "__none__";
+      let g = map.get(key);
+      if (!g) {
+        g = {
+          taskId: row.taskId,
+          taskName: row.taskName ?? "Task",
+          dueDate: row.dueDate,
+          items: [],
+          lastReminderAt: undefined,
+        };
+        map.set(key, g);
+      }
+      g.items.push(row);
+      if (row.lastReminderAt) {
+        if (
+          !g.lastReminderAt ||
+          new Date(row.lastReminderAt) > new Date(g.lastReminderAt)
+        ) {
+          g.lastReminderAt = row.lastReminderAt;
+        }
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => {
+      const at = a.dueDate ? parseDate(a.dueDate).getTime() : Infinity;
+      const bt = b.dueDate ? parseDate(b.dueDate).getTime() : Infinity;
+      return at - bt;
+    });
+  };
+  const waitingGroups = useMemo(() => groupByTask(stillWaiting), [stillWaiting]);
+  const reviewGroups = useMemo(() => groupByTask(needsReview), [needsReview]);
 
   // Internal task links use ?task= query form so they open the side
   // panel on this same client page (Yuqi audit 2026-05-05). Falls back
@@ -1438,6 +1385,26 @@ function ToDoTab({
     taskId
       ? `/clients/${client.id}?task=${taskId}`
       : `/clients/${client.id}`;
+
+  /** Per-state human label shown on the right side of each item row.
+   *  Mirrors the screenshot: "Waiting" / "Not requested" / "Unreviewed". */
+  const itemStatusLabel = (s: WaitingItem["state"]): string => {
+    switch (s) {
+      case "requested_waiting":
+        return "Waiting";
+      case "not_requested":
+        return "Not requested";
+      case "received_unreviewed":
+        return "Unreviewed";
+      case "received_issue":
+        return "Issue";
+      default:
+        return "";
+    }
+  };
+
+  const daysAgo = (iso: string): number =>
+    Math.floor((Date.now() - new Date(iso).getTime()) / (24 * 60 * 60 * 1000));
 
   // Derive the unique tasks from BOTH:
   //   (a) the full per-client task list (useTasksForClient / store tasks
@@ -1572,47 +1539,36 @@ function ToDoTab({
         </section>
       )}
 
-      {/* 🚨 STILL WAITING ON CLIENT — primary surface when populated, calm
-          neutral panel when empty. Yuqi audit 2026-05-05: yellow tint on
-          a 0-item section is a category error — yellow is the page's
-          chase/overdue signal, and Sarah will train herself to ignore it
-          if it appears even when nothing is waiting. The panel keeps its
-          identity (heading, count, add-deadline action) regardless, but
-          the warning palette only fires when the count is non-zero. */}
+      {/* 🚨 STILL WAITING ON CLIENT — primary surface. Yuqi note
+          2026-05-05: panel chrome stays neutral even when populated;
+          the warning signal is carried by the small siren icon + the
+          yellow "{N} items" pill. Tinting the whole panel turned the
+          page yellow whenever any item was waiting — overpowered the
+          deadline groups. The pill + icon are enough at a glance. */}
       <section
         aria-labelledby="todo-still-waiting-heading"
-        className={`rounded-md overflow-hidden ${
-          stillWaiting.length > 0
-            ? "border-2 border-warn-border bg-warn-bg/30"
-            : "border border-line bg-surface"
-        }`}
+        className="rounded-md overflow-hidden border border-line bg-surface"
       >
-        <header
-          className={`flex items-baseline gap-2 px-4 py-3 border-b ${
-            stillWaiting.length > 0 ? "border-warn-border" : "border-line"
-          }`}
-        >
+        <header className="flex items-baseline gap-2 px-4 py-3 border-b border-line">
           <h3
             id="todo-still-waiting-heading"
-            className={`inline-flex items-center gap-1.5 text-sm font-semibold ${
-              stillWaiting.length > 0 ? "text-warn-ink" : "text-ink-700"
-            }`}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-900"
           >
-            <Siren className="w-4 h-4" aria-hidden />
+            <Siren className="w-4 h-4 text-warn-ink" aria-hidden />
             Still waiting on client
           </h3>
-          {/* Count badge dropped 2026-05-05 — the per-task chips above
-              now carry the "chase" subset count (matches the items
-              rendered in this section), so duplicating it on the
-              section header was redundant. The list itself is the
-              count when expanded. */}
+          {stillWaiting.length > 0 ? (
+            <span className="text-2xs tabular-nums px-1.5 py-0.5 rounded border border-warn-border text-warn-ink bg-warn-bg/60">
+              {stillWaiting.length} item{stillWaiting.length === 1 ? "" : "s"}
+            </span>
+          ) : (
+            <span className="text-2xs tabular-nums text-ink-500">
+              0 items
+            </span>
+          )}
           <button
             onClick={onAddDeadline}
-            className={`ml-auto text-2xs px-2 py-0.5 rounded border ${
-              stillWaiting.length > 0
-                ? "border-warn-border text-warn-ink hover:bg-warn-bg/60"
-                : "border-line text-ink-700 hover:bg-sunken"
-            }`}
+            className="ml-auto text-2xs px-2 py-0.5 rounded border border-line text-ink-700 hover:bg-sunken"
           >
             + Add deadline
           </button>
@@ -1622,77 +1578,76 @@ function ToDoTab({
             Nothing waiting on this client right now.
           </p>
         ) : (
-          <ul className="divide-y divide-warn-border/50">
-            {waitingSorted.map((ci) => {
-              const days = ci.lastReminderAt
-                ? Math.floor(
-                    (Date.now() - new Date(ci.lastReminderAt).getTime()) /
-                      (24 * 60 * 60 * 1000),
-                  )
-                : null;
+          <div className="divide-y divide-line">
+            {waitingGroups.map((g) => {
+              const days =
+                g.lastReminderAt != null ? daysAgo(g.lastReminderAt) : null;
+              const itemCount = g.items.length;
               return (
-                <li
-                  key={ci.id}
-                  className="flex items-baseline gap-3 px-4 py-2.5"
-                >
-                  <span className="text-warn-ink shrink-0 flex items-center">
-                    {ci.state === "requested_waiting" ? (
-                      <Hourglass className="w-3.5 h-3.5" aria-hidden />
-                    ) : (
-                      <Pause className="w-3.5 h-3.5" aria-hidden />
+                <div key={g.taskId ?? "_"} className="px-4 py-3">
+                  <div className="flex items-baseline gap-2 mb-1.5">
+                    <h4 className="text-sm font-semibold text-ink-900">
+                      {g.taskName}
+                    </h4>
+                    {g.dueDate && (
+                      <span className="text-2xs text-ink-500">
+                        due {formatShortDate(g.dueDate)}
+                      </span>
                     )}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-ink-900 truncate">
-                      {ci.label ?? "Item"}
-                    </p>
-                    <p className="text-2xs text-ink-500 truncate">
-                      {/* Task name is the natural entry into TaskDetail.
-                          Yuqi audit 2026-05-05 — was plain text, no
-                          affordance. Wrap as Link so the eye + the
-                          click both find the path. */}
-                      {ci.taskId ? (
-                        <Link
-                          to={taskHref(ci.taskId)}
-                          className="hover:text-ink-900 hover:underline"
-                        >
-                          {ci.taskName ?? "—"}
-                        </Link>
-                      ) : (
-                        <span>{ci.taskName ?? "—"}</span>
-                      )}
-                      {days != null && ` · last reminder ${days}d ago`}
-                      {ci.state === "not_requested" &&
-                        " · First reminder pending"}
-                    </p>
+                    <span className="text-2xs text-ink-400">·</span>
+                    <span className="text-2xs text-ink-500 tabular-nums">
+                      {itemCount} item{itemCount === 1 ? "" : "s"}
+                    </span>
+                    {/* Honest label — navigates to TaskDetail; the ↗
+                        carries that affordance. The EmailDraftModal /
+                        per-item send live there. */}
+                    <Link
+                      to={taskHref(g.taskId)}
+                      className="ml-auto text-2xs px-2 py-1 rounded border border-line bg-surface text-ink-700 hover:bg-sunken shrink-0"
+                      title="Open task"
+                    >
+                      Open task ↗
+                    </Link>
                   </div>
-                  {/* Honest label: this navigates to TaskDetail (where
-                      the EmailDraftModal lives) — it does NOT compose
-                      from here. The arrow ↗ communicates the navigate.
-                      Earlier copy "Send reminder ↗" / "Request now ↗"
-                      promised an inline send the link can't deliver,
-                      so users hit a dead end. Once the per-row inline
-                      composer is wired, this can flip back to the
-                      action-verb labels with a real onClick. */}
-                  <Link
-                    to={taskHref(ci.taskId)}
-                    className="text-2xs px-2 py-1 rounded border border-line bg-surface text-ink-700 hover:bg-sunken shrink-0"
-                    title={
-                      ci.state === "requested_waiting"
-                        ? "Open task to send a reminder"
-                        : "Open task to request this item"
-                    }
-                  >
-                    Open task ↗
-                  </Link>
-                </li>
+                  <ul className="space-y-1">
+                    {g.items.map((ci) => (
+                      <li
+                        key={ci.id}
+                        className="flex items-baseline gap-2 text-sm"
+                      >
+                        <span className="text-ink-500 shrink-0 flex items-center">
+                          {ci.state === "requested_waiting" ? (
+                            <Hourglass className="w-3.5 h-3.5" aria-hidden />
+                          ) : (
+                            <Pause className="w-3.5 h-3.5" aria-hidden />
+                          )}
+                        </span>
+                        <span className="flex-1 min-w-0 text-ink-900 truncate">
+                          {ci.label ?? "Item"}
+                        </span>
+                        <span className="text-2xs text-ink-500 shrink-0">
+                          {itemStatusLabel(ci.state)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  {days != null && (
+                    <p className="mt-2 text-2xs text-ink-400">
+                      Last reminder {days}d ago.
+                    </p>
+                  )}
+                </div>
               );
             })}
-          </ul>
+          </div>
         )}
       </section>
 
-      {/* ⚠ NEEDS YOUR REVIEW — secondary, expanded by default. */}
+      {/* ⚠ NEEDS YOUR REVIEW — secondary, expanded by default.
+          Same deadline-grouped layout as "Still waiting" so the two
+          panels read as a coherent surface. Header carries an item
+          count + a task count so Sarah can see "5 items across 3
+          tasks" at a glance. */}
       {needsReview.length > 0 && (
         <section className="bg-surface border border-line rounded-md overflow-hidden">
           <header className="flex items-baseline gap-2 px-4 py-3 border-b border-line">
@@ -1702,42 +1657,73 @@ function ToDoTab({
             </h3>
             <span className="text-2xs text-ink-500 tabular-nums">
               {needsReview.length} item{needsReview.length === 1 ? "" : "s"}
+              {reviewGroups.length > 0 && (
+                <>
+                  {" · "}
+                  {reviewGroups.length} task
+                  {reviewGroups.length === 1 ? "" : "s"}
+                </>
+              )}
             </span>
           </header>
-          <ul className="divide-y divide-line">
-            {needsReview.map((ci) => (
-              <li key={ci.id} className="flex items-baseline gap-3 px-4 py-2.5">
-                <span className="shrink-0 flex items-center">
-                  {ci.state === "received_issue" ? (
-                    <AlertTriangle className="w-3.5 h-3.5 text-warn-ink" aria-hidden />
-                  ) : (
-                    <Inbox className="w-3.5 h-3.5 text-ink-500" aria-hidden />
-                  )}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-ink-900 truncate">{ci.label}</p>
-                  <p className="text-2xs text-ink-500 truncate">
-                    {ci.taskId ? (
-                      <Link
-                        to={taskHref(ci.taskId)}
-                        className="hover:text-ink-900 hover:underline"
-                      >
-                        {ci.taskName ?? "—"}
-                      </Link>
-                    ) : (
-                      <span>{ci.taskName ?? "—"}</span>
+          <div className="divide-y divide-line">
+            {reviewGroups.map((g) => {
+              const itemCount = g.items.length;
+              return (
+                <div key={g.taskId ?? "_"} className="px-4 py-3">
+                  <div className="flex items-baseline gap-2 mb-1.5">
+                    <h4 className="text-sm font-semibold text-ink-900">
+                      {g.taskName}
+                    </h4>
+                    {g.dueDate && (
+                      <span className="text-2xs text-ink-500">
+                        due {formatShortDate(g.dueDate)}
+                      </span>
                     )}
-                  </p>
+                    <span className="text-2xs text-ink-400">·</span>
+                    <span className="text-2xs text-ink-500 tabular-nums">
+                      {itemCount} item{itemCount === 1 ? "" : "s"}
+                    </span>
+                    <Link
+                      to={taskHref(g.taskId)}
+                      className="ml-auto text-2xs px-2 py-1 rounded border border-line bg-surface text-ink-700 hover:bg-sunken shrink-0"
+                      title="Open task to review"
+                    >
+                      Review ↗
+                    </Link>
+                  </div>
+                  <ul className="space-y-1">
+                    {g.items.map((ci) => (
+                      <li
+                        key={ci.id}
+                        className="flex items-baseline gap-2 text-sm"
+                      >
+                        <span className="shrink-0 flex items-center">
+                          {ci.state === "received_issue" ? (
+                            <AlertTriangle
+                              className="w-3.5 h-3.5 text-warn-ink"
+                              aria-hidden
+                            />
+                          ) : (
+                            <Inbox
+                              className="w-3.5 h-3.5 text-ink-500"
+                              aria-hidden
+                            />
+                          )}
+                        </span>
+                        <span className="flex-1 min-w-0 text-ink-900 truncate">
+                          {ci.label}
+                        </span>
+                        <span className="text-2xs text-ink-500 shrink-0">
+                          {itemStatusLabel(ci.state)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <Link
-                  to={taskHref(ci.taskId)}
-                  className="text-2xs px-2 py-1 rounded border border-line text-ink-700 hover:bg-sunken shrink-0"
-                >
-                  Review ↗
-                </Link>
-              </li>
-            ))}
-          </ul>
+              );
+            })}
+          </div>
         </section>
       )}
 
@@ -1878,42 +1864,15 @@ function MailboxTab({ client }: { client: Client }) {
  */
 function ClientAiInsightsCard({ clientId }: { clientId: string }) {
   const insights = useAiInsightsForClient(clientId);
-  const facts = useImportedFactsForClient(clientId);
   const open = insights.filter((i) => i.status === "open");
-  const clientQuery = useClient(clientId);
-  const client = clientQuery.data;
 
-  // Layer B advisory triggers — derive from cross-year-insighter. Tag insights by
-  // category for visual grouping. PRD §4.4 Layer B.
+  // 2026-05-06: this card now scopes ONLY to advisory triggers
+  // (cross-year-insighter signals like "wages doubled → 401k convo").
+  // Churn-risk + facts-imported are folded into the header-rail
+  // ClientAiSummaryCard so they don't compete for ink with the deeper
+  // advisory list. PRD §4.4 Layer B.
   const advisoryTriggers = open.filter((i) => i.mode === "E");
-  // Churn-risk early warning — derive from heuristics on response patterns
-  // and declined-advisory flags. Wireframe-grade: a stub heuristic that
-  // counts as "at risk" when the client has open insights AND no recent
-  // confirmed activity. Real implementation reads ImportedFact + activity.
-  const churnRiskScore = computeChurnRiskScore(clientId, open.length);
-  // Suppress churn-risk for newly-added clients — there's no engagement
-  // history to flag yet, so any "elevated" signal is noise. 30-day grace
-  // window aligns with the response-time-trend rolling window the real
-  // implementation will use (PRD §4.4 Layer B).
-  const isNewClient = (() => {
-    if (!client?.addedAt) return true;
-    const added = parseDate(client.addedAt);
-    if (Number.isNaN(added.getTime())) return true;
-    const daysSinceAdded =
-      (TODAY.getTime() - added.getTime()) / (24 * 60 * 60 * 1000);
-    return daysSinceAdded < 30;
-  })();
-  const showChurnRisk = churnRiskScore >= 2 && !isNewClient;
-
-  // Yuqi audit 2026-05-05: the previous empty-state rendered a full-width
-  // info-blue banner reading "AI insights unlock once you import a
-  // prior-year return for this client." That banner sat between the
-  // header meta line and the tab strip on every client without imported
-  // priors — pure visual weight, zero state communicated. The "import a
-  // prior return" prompt belongs in the import wizard, not glued to
-  // every client detail page in info-blue. Hide entirely when nothing to
-  // show; let the page breathe.
-  if (open.length === 0 && facts.length === 0 && !showChurnRisk) {
+  if (advisoryTriggers.length === 0) {
     return null;
   }
 
@@ -1949,34 +1908,68 @@ function ClientAiInsightsCard({ clientId }: { clientId: string }) {
         </div>
       )}
 
-      {/* Layer B: churn risk — early-warning surface so the partner can
-          schedule a check-in BEFORE the client leaves quietly. */}
-      {showChurnRisk && (
-        <div className="bg-warn-bg/40 border border-warn-border rounded-md px-4 py-3">
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xs uppercase tracking-wider text-warn-ink font-semibold">
-              Churn risk
-            </span>
-            <span className="text-2xs text-warn-ink/70">
-              {churnRiskScore >= 4 ? "high" : "elevated"}
-            </span>
-          </div>
-          <p className="text-sm text-ink-900 font-medium mt-1">
-            Schedule a check-in
-          </p>
-          <p className="text-xs text-ink-700 mt-0.5">
-            {churnRiskSignals(churnRiskScore)}
-          </p>
-        </div>
-      )}
+      {/* Churn-risk + facts-filler retired from this card 2026-05-06 —
+          both signals are now folded into the header-rail
+          ClientAiSummaryCard. This card keeps a single responsibility:
+          actionable advisory opportunities. */}
+    </div>
+  );
+}
 
-      {/* arrival-timing / aggregated facts — shown only if no advisory items, since
-          they're more ambient than actionable. */}
-      {advisoryTriggers.length === 0 && facts.length > 0 && (
-        <div className="bg-surface border border-line rounded-md px-4 py-2 text-xs text-ink-500">
-          {facts.length} prior-year facts imported · personalised AI active.
-        </div>
-      )}
+/**
+ * Compact AI summary card for the right rail of the ClientDetail header.
+ * Composes a one-paragraph narrative from prior-year facts + churn-risk
+ * heuristics — the same signals ClientAiInsightsCard surfaces via
+ * structured callouts, but distilled into a single readable sentence so
+ * the CPA's eye reads it at a glance and moves on.
+ *
+ * Returns null when there's nothing meaningful to say (no facts, not at
+ * churn risk) — better silence than a stub.
+ */
+function ClientAiSummaryCard({ clientId }: { clientId: string }) {
+  const facts = useImportedFactsForClient(clientId);
+  const insights = useAiInsightsForClient(clientId);
+  const clientQuery = useClient(clientId);
+  const client = clientQuery.data;
+  const open = insights.filter((i) => i.status === "open");
+  const churnRiskScore = computeChurnRiskScore(clientId, open.length);
+  const isNewClient = (() => {
+    if (!client?.addedAt) return true;
+    const added = parseDate(client.addedAt);
+    if (Number.isNaN(added.getTime())) return true;
+    const daysSinceAdded =
+      (TODAY.getTime() - added.getTime()) / (24 * 60 * 60 * 1000);
+    return daysSinceAdded < 30;
+  })();
+  const showChurnRisk = churnRiskScore >= 2 && !isNewClient;
+
+  if (!client) return null;
+  if (facts.length === 0 && !showChurnRisk) return null;
+
+  const factsLine =
+    facts.length > 0
+      ? `${client.name} has ${facts.length} prior-year fact${facts.length === 1 ? "" : "s"} on file — drafts run on personalised history.`
+      : `${client.name} has no prior-year facts imported yet — drafts run on template defaults.`;
+  const driftLine = showChurnRisk
+    ? churnRiskScore >= 4
+      ? "Strong engagement drift — reach out this week."
+      : churnRiskScore >= 3
+        ? "Engagement drift — worth a quick check-in."
+        : "Minor engagement drift, worth a glance."
+    : null;
+
+  return (
+    <div className="bg-info-bg/30 border border-info-border rounded-md p-4">
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <Sparkles className="w-3.5 h-3.5 text-info-ink" aria-hidden />
+        <span className="text-2xs uppercase tracking-wider font-semibold text-info-ink">
+          AI generated based on history
+        </span>
+      </div>
+      <p className="text-sm text-ink-700 leading-relaxed">
+        {factsLine}
+        {driftLine && <> {driftLine}</>}
+      </p>
     </div>
   );
 }
@@ -1991,14 +1984,6 @@ function computeChurnRiskScore(clientId: string, openInsightCount: number): numb
     .reduce((a, c) => a + c.charCodeAt(0), 0);
   const base = seed % 5; // 0..4
   return base + (openInsightCount > 1 ? 1 : 0);
-}
-
-function churnRiskSignals(score: number): string {
-  if (score >= 4)
-    return "Response time slowed 60% over 3 months · declined last 2 advisory suggestions · dropped 2 services last year. Strong signal — reach out this week.";
-  if (score >= 3)
-    return "Response time slowed · declined a recent advisory suggestion. Soft signal — worth a quick check-in.";
-  return "Slight pattern change in engagement. Keep an eye on it.";
 }
 
 /**

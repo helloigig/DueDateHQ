@@ -31,9 +31,11 @@ interface BulkFilters {
 type Props =
   | ({ filters: BulkFilters; visibleCount: number; clientId?: undefined } & {
       compact?: boolean;
+      iconOnly?: boolean;
     })
   | ({ clientId: string; filters?: undefined; visibleCount?: undefined } & {
       compact?: boolean;
+      iconOnly?: boolean;
     });
 
 export function ExportClientsButton(props: Props) {
@@ -84,6 +86,10 @@ export function ExportClientsButton(props: Props) {
       ? `Export (${props.visibleCount})`
       : "Export";
 
+  const tooltip = props.clientId
+    ? "Export this client + their tasks as CSV"
+    : "Export filtered clients as CSV";
+
   return (
     <span className="relative inline-flex items-center">
       <button
@@ -91,18 +97,19 @@ export function ExportClientsButton(props: Props) {
         onClick={() => void onClick()}
         disabled={pending}
         className={
-          props.compact
-            ? "inline-flex items-center gap-1.5 h-7 text-xs px-2.5 rounded-md border border-line text-ink-700 hover:bg-sunken disabled:opacity-50"
-            : "inline-flex items-center gap-1.5 h-8 text-sm px-3 rounded-md border border-line text-ink-700 hover:bg-sunken disabled:opacity-50"
+          props.iconOnly
+            ? "inline-flex items-center justify-center w-8 h-8 rounded-md text-ink-500 hover:text-ink-900 hover:bg-sunken disabled:opacity-50 transition-colors"
+            : props.compact
+              ? "inline-flex items-center gap-1.5 h-7 text-xs px-2.5 rounded-md border border-line text-ink-700 hover:bg-sunken disabled:opacity-50"
+              : "inline-flex items-center gap-1.5 h-8 text-sm px-3 rounded-md border border-line text-ink-700 hover:bg-sunken disabled:opacity-50"
         }
-        title={
-          props.clientId
-            ? "Export this client + their tasks as CSV"
-            : "Export filtered clients as CSV"
-        }
+        title={pending ? "Exporting…" : tooltip}
+        aria-label={tooltip}
       >
-        <Download className="w-3.5 h-3.5" aria-hidden />
-        {pending ? "Exporting…" : label}
+        <Download className="w-4 h-4" aria-hidden />
+        {!props.iconOnly && (
+          <span>{pending ? "Exporting…" : label}</span>
+        )}
       </button>
       {error && (
         <span className="absolute top-full right-0 mt-1 text-2xs text-danger-ink bg-danger-bg border border-danger-border rounded px-2 py-1 whitespace-nowrap shadow-overlay z-10">
