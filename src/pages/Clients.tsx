@@ -309,7 +309,7 @@ export function Clients() {
   }
   if (clientsQuery.error) {
     return (
-      <div className="max-w-5xl mx-auto px-4 md:px-6 py-6">
+      <PageContainer variant="wide">
         <ErrorState
           title="Couldn't load clients."
           message={
@@ -319,13 +319,13 @@ export function Clients() {
           }
           onRetry={() => clientsQuery.refetch()}
         />
-      </div>
+      </PageContainer>
     );
   }
 
   if (allClients.length === 0) {
     return (
-      <PageContainer>
+      <PageContainer variant="wide">
         {/* Single-purpose direct empty state. The user came to /clients
             deliberately to manage clients — give them one strong action,
             not a re-onboarding menu. */}

@@ -61,6 +61,7 @@ import { ExportModal } from "../components/ExportModal";
 import { ExportClientsButton } from "../components/ExportClientsButton";
 import { PinClientButton } from "../components/Sidebar";
 import { BackLink } from "../components/ui/BackLink";
+import { PageContainer } from "../components/ui/PageContainer";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { STATE_NAMES, type StateCode } from "../types";
 import { bundleByName, type FilingBundle } from "../data/bundles";
@@ -176,7 +177,7 @@ export function ClientDetail() {
   if (clientQuery.isLoading) return <PageSkeleton title="Loading client…" />;
   if (clientQuery.error) {
     return (
-      <div className="max-w-4xl mx-auto px-4 md:px-6 py-6">
+      <PageContainer variant="wide">
         <ErrorState
           title="Couldn't load this client."
           message={
@@ -186,18 +187,18 @@ export function ClientDetail() {
           }
           onRetry={() => clientQuery.refetch()}
         />
-      </div>
+      </PageContainer>
     );
   }
 
   if (!client) {
     return (
-      <div className="max-w-4xl mx-auto px-4 md:px-6 py-10">
+      <PageContainer variant="wide">
         <Link to="/clients" className="text-sm text-ink-500 hover:underline">
           ‹ Clients
         </Link>
         <p className="mt-6 text-ink-700">Client not found.</p>
-      </div>
+      </PageContainer>
     );
   }
 
@@ -229,7 +230,7 @@ export function ClientDetail() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 md:px-6 py-6">
+    <PageContainer variant="wide">
       <BackLink fallback="/clients" fallbackLabel="Clients" />
 
 
@@ -522,7 +523,7 @@ export function ClientDetail() {
         title={`Export — ${client.name}`}
         onClose={() => setExportOpen(false)}
       />
-    </div>
+    </PageContainer>
   );
 }
 
