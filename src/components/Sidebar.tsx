@@ -611,18 +611,23 @@ export function PinClientButton({ clientId }: { clientId: string }) {
       title={pinned ? "Unpin from sidebar" : "Pin to sidebar"}
       aria-label={pinned ? "Unpin from sidebar" : "Pin to sidebar"}
       aria-pressed={pinned}
-      className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors ${
+      // Icon-only — sits in the client-detail action cluster alongside
+      // Export / Edit / Archive (text labels). Yuqi audit 2026-05-05: the
+      // "Pin"/"Pinned" text was visual weight without information; the icon
+      // + tooltip + aria-label carry the affordance just as well, and the
+      // canonical CTA-vs-secondary hierarchy is clearer when secondary
+      // tools collapse to glyphs.
+      className={`inline-flex items-center justify-center w-8 h-8 rounded-md transition-colors ${
         pinned
           ? "text-ink-900 bg-sunken hover:bg-sunken/70"
           : "text-ink-500 hover:text-ink-900 hover:bg-sunken"
       }`}
     >
       {pinned ? (
-        <PinOff className="w-3.5 h-3.5" aria-hidden />
+        <PinOff className="w-4 h-4" aria-hidden />
       ) : (
-        <Pin className="w-3.5 h-3.5" aria-hidden />
+        <Pin className="w-4 h-4" aria-hidden />
       )}
-      <span>{pinned ? "Pinned" : "Pin"}</span>
     </button>
   );
 }
