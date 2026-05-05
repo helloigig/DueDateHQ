@@ -79,10 +79,16 @@ const TONE: Record<
     runway: "text-danger-ink",
   },
   overdue: {
-    wrap: "bg-danger-solid text-canvas border-danger-solid font-semibold",
-    arrow: "text-canvas",
-    delta: "text-canvas",
-    runway: "text-canvas",
+    // Yuqi audit 2026-05-05: the solid-red filled treatment was "too
+    // obvious and ugly" — when half the fleet sits past official, a
+    // wall of solid red just numbs the eye. Drop to the same calm
+    // danger-bg palette the `critical` state uses so the chip reads
+    // as "past official" without screaming. The IRS date itself (now
+    // shown in compact mode too — see renderChipText) is the proof.
+    wrap: "bg-danger-bg text-danger-ink border-danger-border",
+    arrow: "text-danger-ink/70",
+    delta: "text-danger-ink font-medium",
+    runway: "text-danger-ink",
   },
   extension: {
     wrap: "bg-info-bg text-info-ink border-info-border",
@@ -291,15 +297,20 @@ function renderChipText(
         </>
       );
     case "overdue":
+      // Compact mode used to show "OVERDUE · +39d" in solid red — the
+      // signal was loud but the *justification* (the actual IRS date
+      // that's past) was hidden until you hovered the tooltip. Now both
+      // variants show "Past IRS · Mar 15 · +39d" so the chip carries
+      // its own evidence — the eye sees the past date right there
+      // without inferring "OVERDUE" was magic.
       return (
         <>
-          <span className="uppercase tracking-wide">Overdue</span>
-          {!isCompact && (
-            <span>
-              · IRS was <DateLabel value={officialDueDate} format="short" />
-            </span>
-          )}
-          <span>· {signedDeltaLabel(-result.daysBehind)}</span>
+          <span className="font-medium">Past IRS</span>
+          <span className={tone.arrow}>·</span>
+          <DateLabel value={officialDueDate} format="short" />
+          <span className={tone.delta}>
+            · {signedDeltaLabel(-result.daysBehind)}
+          </span>
         </>
       );
     case "extension":
