@@ -38,6 +38,40 @@ export function addDays(d: Date, n: number): Date {
 }
 
 /**
+ * Quarter / period suffix for known recurring federal forms.
+ *
+ * Why it lives here: forms like 941 and 720 are filed multiple times a
+ * year (Q1/Q2/Q3/Q4). When a per-client view groups them by client, the
+ * raw "941 · federal" label repeats N times — the only differentiator
+ * is the IRS due date, which gets pushed into a separate chip and is
+ * easy to miss when scanning. Yuqi audit 2026-05-06: "why are there
+ * three 941? you need to differentiate that". This helper derives
+ * the period from the IRS due date so the row label can read
+ * "941 · Q1 · federal" and disambiguate at a glance.
+ *
+ * 941 / 720 schedule (federal payroll + excise):
+ *   Apr — covers Q1   |   Jul — covers Q2
+ *   Oct — covers Q3   |   Jan-of-next-year — covers Q4
+ *
+ * Returns null when the form isn't on a recognised quarterly schedule
+ * (callers fall back to the bare form name).
+ */
+export function periodSuffix(
+  form: string,
+  dueDate: string,
+): string | null {
+  const formNumber = form.replace(/\s*\(.*\)\s*$/, "").trim().toUpperCase();
+  const month = parseInt(dueDate.slice(5, 7), 10);
+  if (formNumber === "941" || formNumber === "720") {
+    if (month === 4) return "Q1";
+    if (month === 7) return "Q2";
+    if (month === 10) return "Q3";
+    if (month === 1) return "Q4";
+  }
+  return null;
+}
+
+/**
  * Hours between two ISO timestamps (a → b). Positive if b is after a.
  * In mock mode "now" is pinned to a fixed anchor so escalation tiers
  * are deterministic in the demo. In real mode "now" is real-now so
