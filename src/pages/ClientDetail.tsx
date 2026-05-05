@@ -57,6 +57,7 @@ import {
   type AddDeadlinePrefill,
 } from "../components/AddDeadlineModal";
 import { FilingsTab } from "../components/FilingsTab";
+import { TaskPanel } from "../components/TaskPanel";
 import { EditClientModal } from "../components/EditClientModal";
 import { ExportModal } from "../components/ExportModal";
 import { ExportClientsButton } from "../components/ExportClientsButton";
@@ -690,6 +691,25 @@ export function ClientDetail() {
         {tab === "contacts" && <ContactsTab client={client} />}
         {tab === "audit" && <ActivityTab client={client} />}
       </div>
+
+      {/* Task side panel — mounts when the URL carries `?task=:taskId`.
+          Yuqi audit 2026-05-05: "I am thinking to have the task as the
+          side panel to the Client detail page." Right-anchored 640px
+          drawer overlays the page; close clears the query param so the
+          back button + URL share work intuitively. The standalone
+          /clients/:id/tasks/:taskId route stays live as a deep-link
+          fallback for users who land on a task URL directly. */}
+      {searchParams.get("task") && (
+        <TaskPanel
+          clientId={client.id}
+          taskId={searchParams.get("task")!}
+          onClose={() => {
+            const next = new URLSearchParams(searchParams);
+            next.delete("task");
+            setSearchParams(next, { replace: true });
+          }}
+        />
+      )}
 
       <ConfirmDialog
         open={archiveOpen}
@@ -1395,8 +1415,15 @@ function ToDoTab({
     return at - bt;
   });
 
+  // Internal task links use ?task= query form so they open the side
+  // panel on this same client page (Yuqi audit 2026-05-05). Falls back
+  // to /clients/:id when no taskId. External task links (Action Queue,
+  // Mail, Alerts) still navigate to /clients/:id/tasks/:taskId; that
+  // route stays live as a deep-link fallback.
   const taskHref = (taskId?: string) =>
-    taskId ? `/clients/${client.id}/tasks/${taskId}` : `/clients/${client.id}`;
+    taskId
+      ? `/clients/${client.id}?task=${taskId}`
+      : `/clients/${client.id}`;
 
   // Derive the unique tasks from BOTH:
   //   (a) the full per-client task list (useTasksForClient / store tasks
