@@ -13,7 +13,31 @@ import type { AddDeadlinePrefill } from "./AddDeadlineModal";
 import { useTasksForClient } from "../hooks/useTasks";
 import { useSelection } from "../hooks/useSelection";
 import { BatchChaseDrawer } from "./BatchChaseDrawer";
-import { formatLongDate, periodSuffix } from "../data/dateHelpers";
+import { formatLongDate } from "../data/dateHelpers";
+import { StatusPill } from "./ui/StatusPill";
+import { DEADLINE_STATUS_META } from "../lib/statusMeta";
+
+/**
+ * Disambiguate quarterly/monthly federal forms (941 / 720 / 1099-NEC
+ * etc.) — the BE has the same `form` value on each deadline so a
+ * client with three 941s appears as "941 / 941 / 941" with only the
+ * due date to tell them apart. Compute a period suffix from the due
+ * date for known quarterly forms. Yuqi audit 2026-05-06 — "why are
+ * there three 941? you need to differentiate that".
+ */
+function periodSuffix(form: string, dueDate: string): string | null {
+  const formNumber = form.replace(/\s*\(.*\)\s*$/, "").trim().toUpperCase();
+  const month = parseInt(dueDate.slice(5, 7), 10);
+  // Form 941 (quarterly): due Apr / Jul / Oct / Jan-of-next-year
+  // covering Q1 / Q2 / Q3 / Q4 respectively. Same schedule for 720.
+  if (formNumber === "941" || formNumber === "720") {
+    if (month === 4) return "Q1";
+    if (month === 7) return "Q2";
+    if (month === 10) return "Q3";
+    if (month === 1) return "Q4";
+  }
+  return null;
+}
 
 /**
  * FilingsTab — surfaces the federal forms that apply to this client,

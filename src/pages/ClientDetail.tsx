@@ -308,34 +308,24 @@ export function ClientDetail() {
       <BackLink fallback="/clients" fallbackLabel="Clients" />
 
 
-      {/* Header layout: stacks vertically on mobile (action group sits BELOW
-          the wrapping H1 + meta) and goes side-by-side at sm+ where there's
-          room. Without the breakpoint, the right-rail buttons crash into a
-          wrapping client name on narrow viewports.
-          Yuqi audit 2026-05-05: "the same structure as Timeline" was about
-          the /clients LIST page (sidebar primary), which already uses
-          PageHeader. ClientDetail intentionally keeps the inline ClientChip
-          cluster — name, tier, state pills, entity, archived all on one
-          row — so the per-client identity reads at a glance without a
-          second meta strip duplicating it. */}
+      {/* Header redesign 2026-05-06.
+          Row 1 — identity (name + entity + states + archived) on the left;
+                  action group (pin / export / edit / archive / + Add deadline)
+                  on the right. Three previously-separate strips (tier-package-
+                  since, contact, stat) collapse into the 2-column body block
+                  below. */}
       <div className="mt-3 flex flex-col sm:flex-row sm:items-start gap-3">
         <div className="flex-1 min-w-0">
-          {/* Row 1: identity. ClientChip (size="lg", showTier, showState)
-              is the canonical rendering of the name+tier+state triplet —
-              this is the migration target of PR #135. Entity-type badge,
-              StateChipGroup (for nexus states beyond primary), and the
-              archived flag remain as siblings since they're not part of
-              the per-client identity tuple. */}
           <div className="flex items-center gap-2 flex-wrap">
             <ClientChip
               client={client}
               size="lg"
               as="span"
-              showTier
-              showState
+              showTier={false}
+              showState={false}
             />
             <span
-              className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line"
+              className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-info-bg/60 text-info-ink border border-info-border font-semibold"
               title="Entity type"
             >
               {entityTypeDisplay(client.entityType)}
@@ -348,123 +338,6 @@ export function ClientDetail() {
               <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-sunken text-ink-500">
                 Archived
               </span>
-            )}
-          </div>
-          {/* Row 2: meta line — Tier · Packages · Since. Neutral type,
-              label-in-ink-400 / value-in-ink-700 pattern. Stays narrow
-              on purpose: Open-deadlines and Working-on belong to the
-              stat strip below (tone-coded numbers there are the
-              accent), so duplicating them here would dilute the strip's
-              signal. */}
-          <div className="mt-2 text-xs text-ink-500 flex items-baseline flex-wrap gap-x-section gap-y-1">
-            <span>
-              <span className="text-ink-400">Tier</span>{" "}
-              <span className="text-ink-700 font-medium capitalize">
-                {client.tier ?? "standard"}
-              </span>
-            </span>
-            {client.servicePackages.length > 0 && (
-              <span className="inline-flex items-baseline gap-1">
-                <span className="text-ink-400">
-                  {client.servicePackages.length === 1
-                    ? "Package"
-                    : "Packages"}
-                </span>
-                {client.servicePackages.map((p) => (
-                  <PackageChip key={p} packageName={p} client={client} />
-                ))}
-              </span>
-            )}
-            {addedAtLabel && (
-              <span>
-                <span className="text-ink-400">Since</span>{" "}
-                <span className="text-ink-700">{addedAtLabel}</span>
-              </span>
-            )}
-          </div>
-        </div>
-        {/* Action group — kept together as a single shrink-0 cluster so the
-            row can never collapse half its buttons. On mobile the parent
-            flex stacks this group below the title; at sm+ it sits inline. */}
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <PinClientButton clientId={client.id} />
-          <ExportClientsButton clientId={client.id} />
-          <button
-            onClick={() => {
-              setAddDeadlinePrefill(undefined);
-              setAddDeadlineOpen(true);
-            }}
-            className="text-sm px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover inline-flex items-center gap-1.5"
-            title="Add a new deadline / task for this client"
-          >
-            <Plus className="w-3.5 h-3.5" aria-hidden />
-            Add deadline
-          </button>
-          <button
-            onClick={() => setEditOpen(true)}
-            className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40"
-          >
-            Edit
-          </button>
-          <button
-            onClick={() => setArchiveOpen(true)}
-            disabled={client.status === "archived"}
-            className="text-sm px-3 py-1.5 rounded border border-line hover:bg-sunken/40 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Archive
-          </button>
-        </div>
-      </div>
-
-      {/* Primary contact — only renders when we have at least one
-          channel on file. Email is mailto:, phone is tel: so click-to-
-          contact works on mobile + desktop mail/phone clients. Yuqi
-          audit 2026-05-05: "primary contact email + phone should be
-          visible under its name title." */}
-      {hasContact && (
-        <div className="mb-region text-xs text-ink-700 flex items-baseline flex-wrap gap-x-section gap-y-1">
-          {client.contactEmail && (
-            <a
-              href={`mailto:${client.contactEmail}`}
-              className="inline-flex items-baseline gap-1 hover:text-ink-900"
-              title="Send email"
-            >
-              <Mail
-                className="w-3 h-3 text-ink-400 self-center"
-                aria-hidden
-              />
-              {client.contactEmail}
-            </a>
-          )}
-          {client.contactPhone && (
-            <a
-              href={`tel:${client.contactPhone}`}
-              className="inline-flex items-baseline gap-1 hover:text-ink-900"
-              title="Call"
-            >
-              <Phone
-                className="w-3 h-3 text-ink-400 self-center"
-                aria-hidden
-              />
-              {client.contactPhone}
-            </a>
-          )}
-        </div>
-      )}
-
-      {/* Stat strip — mirrors Timeline's KPI line. Tone-coded numbers
-          only; no middle dots between metrics (DESIGN.md §Don't —
-          discrete fields use whitespace, dots are within-field). The
-          numbers describe the CLIENT's overall state, not the filtered
-          slice — so a year/form filter doesn't hide the broader
-          picture. "Working on" gets a soft inline mention here too so
-          it stays visible without crowding the title. */}
-      <div className="mb-region text-xs text-ink-500 flex items-baseline gap-x-section gap-y-1 flex-wrap">
-        <span>
-          <span
-            className={cn(
-              "tabular-nums font-semibold",
-              kpis.active > 0 ? "text-ink-700" : "text-ink-400",
             )}
           </div>
         </div>
