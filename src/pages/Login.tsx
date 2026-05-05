@@ -5,6 +5,7 @@ import { signIn } from "../data/session";
 import { authInputClass } from "./auth/AuthShell";
 import { env } from "../config";
 import { supabase } from "../lib/supabase";
+import { SsoButton } from "../components/SsoButton";
 
 // Lazy: only loaded when the user actually triggers sign-in. Keeps the
 // /login bundle small — `data/store` eagerly imports ~49 mock clients +
@@ -245,6 +246,21 @@ export function Login() {
               {pending ? "Sending link…" : "Send sign-in link"}
             </button>
           </form>
+
+          {/* SSO — visible-but-disabled. OAuth wiring is on the roadmap;
+              we surface the buttons so CPAs see the path exists, with a
+              "Soon" badge so they don't try to click. */}
+          <div className="flex items-center gap-2 my-4">
+            <span className="flex-1 h-px bg-line" aria-hidden />
+            <span className="text-2xs uppercase tracking-wider text-ink-400 font-semibold">
+              or
+            </span>
+            <span className="flex-1 h-px bg-line" aria-hidden />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <SsoButton provider="google" />
+            <SsoButton provider="microsoft" />
+          </div>
 
           <p className="text-2xs text-ink-400 mt-4 text-center">
             No password — just a link.{" "}
