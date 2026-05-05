@@ -29,9 +29,18 @@ interface Props {
   client: Client;
   /** Completion percentage 0-100 from the checklist; renders the progress ring. */
   completionPct?: number;
+  /** Open the Mode D email-draft modal in chase mode. The DeadlineChip
+   *  surfaces this when `recommendedAction === "chase"`. Wired by the
+   *  parent (TaskDetail) so the modal state stays at page scope. */
+  onChase?: () => void;
 }
 
-export function TaskHeader({ task, client, completionPct = 0 }: Props) {
+export function TaskHeader({
+  task,
+  client,
+  completionPct = 0,
+  onChase,
+}: Props) {
   const [copied, setCopied] = useState(false);
   const { deadlines } = useStore();
   const updateStatus = useUpdateTaskStatus();
@@ -108,22 +117,19 @@ export function TaskHeader({ task, client, completionPct = 0 }: Props) {
                   status: task.status,
                 }).recommendedAction,
                 {
-                  onChase: () =>
-                    alert(
-                      "Chase flow opens Mode D draft — wired to existing QuickActionModal in P1",
-                    ),
+                  // Chase opens the Mode D draft modal — handler lives on
+                  // TaskDetail so modal state stays page-scoped.
+                  onChase: onChase,
                   onSubmit: () => updateStatus(task.id, "completed"),
-                  // Phase-1: file-extension routes through the dedicated mutation
+                  // file-extension routes through the dedicated mutation
                   // (cascades to deadline) instead of a free-form status write.
                   onFileExtension: () => fileExtension(task.id),
-                  onAdjustTarget: () =>
-                    alert(
-                      "Adjust target opens TaskMilestone editor — drag the waypoint in the mini-timeline below",
-                    ),
-                  onViewExtension: () =>
-                    alert(
-                      `Extension filed — new IRS deadline ${task.officialDueDate}`,
-                    ),
+                  // onAdjustTarget intentionally omitted — the mini-timeline
+                  // below already exposes drag-the-waypoint as the canonical
+                  // editor; an extra button here was duplicate UX.
+                  // onViewExtension intentionally omitted — the ExtensionBanner
+                  // on TaskDetail already shows submitted/approved + new IRS
+                  // deadline above the header. No need to re-route here.
                 },
               )}
             />

@@ -12,6 +12,7 @@ import { actions } from "../../data/store";
 import { authInputClass } from "./AuthShell";
 import { env } from "../../config";
 import { supabase } from "../../lib/supabase";
+import { SsoButton } from "../../components/SsoButton";
 
 /**
  * Sign-UP — passwordless magic-link, first-time users only.
@@ -211,22 +212,20 @@ export function Signup() {
               />
             </label>
 
-            {/* Firm-already-exists detection (PRD: domain-based discovery) */}
+            {/* Firm-already-exists detection (PRD: domain-based discovery).
+                We surface that the firm exists so the user knows, but the
+                "Request to join" flow needs a BE notification path that
+                isn't built yet — we tell them to ping the owner directly
+                instead of clicking a fake button. When the join-request
+                mutation ships, restore the affordance here. */}
             {knownDomain && (
               <div className="text-xs bg-info-bg border border-info-border rounded px-3 py-2 text-info-ink">
                 <p className="font-medium">
                   {knownDomain.firmName} already exists at this domain.
                 </p>
                 <p className="mt-0.5">
-                  Owner: {knownDomain.ownerName}.{" "}
-                  <button
-                    type="button"
-                    onClick={() => alert("Request sent — wireframe stub")}
-                    className="underline hover:no-underline"
-                  >
-                    Request to join
-                  </button>
-                  {" "}or continue to create your own.
+                  Ask {knownDomain.ownerName} to invite you from
+                  Settings → Team, or continue to create your own firm.
                 </p>
               </div>
             )}
@@ -252,6 +251,20 @@ export function Signup() {
               By continuing you agree to the Terms and Privacy Policy.
             </p>
           </form>
+
+          {/* SSO — visible-but-disabled. Same surface as Login; mirroring
+              keeps the entry feel consistent across signin/signup. */}
+          <div className="flex items-center gap-2 my-4">
+            <span className="flex-1 h-px bg-line" aria-hidden />
+            <span className="text-2xs uppercase tracking-wider text-ink-400 font-semibold">
+              or
+            </span>
+            <span className="flex-1 h-px bg-line" aria-hidden />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <SsoButton provider="google" />
+            <SsoButton provider="microsoft" />
+          </div>
 
           <div className="mt-6 pt-6 border-t border-line space-y-3">
             {/* Joining an existing firm — email-link is primary. Owner clicks
