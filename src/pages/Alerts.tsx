@@ -1255,6 +1255,92 @@ export function Alerts() {
     }
   }, [params.id, selected, announcementsQuery.isLoading, navigate]);
 
+  // If the selected alert lives in a tab other than the current one (e.g.
+  // arriving via deep link from the BlockingAlertsDialog when the alert is
+  // already dismissed), switch to the tab that contains it so the card
+  // shows up in the feed instead of leaving the user staring at an empty
+  // list with a populated pane.
+  useEffect(() => {
+    if (!params.id || !selected) return;
+    const inAffecting =
+      !selected.dismissed && selected.affectedClientIds.length > 0;
+    const inAll = !selected.dismissed;
+    if (tab === "affecting" && !inAffecting) {
+      setTab(inAll ? "all" : "resolved");
+    } else if (tab === "all" && !inAll) {
+      setTab("resolved");
+    } else if (tab === "resolved" && !selected.dismissed) {
+      setTab(inAffecting ? "affecting" : "all");
+    }
+  }, [params.id, selected, tab]);
+
+  // Scroll the selected card into view when arriving via deep link (e.g.
+  // BlockingAlertsDialog → /alerts/:id). Without this, the alert ID
+  // selects the right pane on the right but the card on the left could be
+  // off-screen — users land confused about whether the click "worked".
+  // We walk up to the nearest scrollable ancestor and set its scrollTop
+  // directly. `Element.scrollIntoView({ block: "nearest" })` proved
+  // unreliable inside this nested overflow-y-auto layout (it tries to
+  // scroll outer ancestors that aren't the actual feed container).
+  // Defer to the next frame so refs are populated after the cards mount —
+  // without this, the effect fires before the wrapper ref is registered
+  // when the user lands on /alerts/:id with the announcements query
+  // already cached.
+  // Scroll the selected card into view when arriving via deep link (e.g.
+  // BlockingAlertsDialog → /alerts/:id). The card wrapper carries a
+  // `data-alert-card` attribute so we can query the DOM directly inside
+  // an effect — using a ref callback Map proved unreliable across the
+  // rapid render sequence that fires when the announcements query
+  // resolves mid-mount. We retry every 150ms (up to 2s) using instant
+  // scroll because smooth animation gets cancelled by re-renders during
+  // hydration, leaving the scroller at a partial position.
+  useEffect(() => {
+    if (!params.id) return;
+    const id = params.id;
+    let cancelled = false;
+    let attempts = 0;
+    const tryScroll = () => {
+      if (cancelled) return;
+      attempts += 1;
+      const node = document.querySelector<HTMLElement>(
+        `[data-alert-card="${CSS.escape(id)}"]`,
+      );
+      if (!node) {
+        if (attempts < 14) window.setTimeout(tryScroll, 150);
+        return;
+      }
+      let scroller: HTMLElement | null = node.parentElement;
+      while (scroller) {
+        const overflow = getComputedStyle(scroller).overflowY;
+        if (overflow === "auto" || overflow === "scroll") break;
+        scroller = scroller.parentElement;
+      }
+      if (!scroller) {
+        if (attempts < 14) window.setTimeout(tryScroll, 150);
+        return;
+      }
+      const offsetWithinScroller =
+        node.getBoundingClientRect().top -
+        scroller.getBoundingClientRect().top +
+        scroller.scrollTop;
+      const target = Math.max(0, offsetWithinScroller - 24);
+      if (Math.abs(scroller.scrollTop - target) < 4) {
+        // Already (close to) there. Keep polling for a couple more
+        // ticks in case the list is still hydrating and the card's
+        // final position will shift.
+        if (attempts < 6) window.setTimeout(tryScroll, 150);
+        return;
+      }
+      scroller.scrollTop = target;
+      if (attempts < 14) window.setTimeout(tryScroll, 150);
+    };
+    const initial = window.setTimeout(tryScroll, 80);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(initial);
+    };
+  }, [params.id]);
+
   const handleSelect = (id: string) => {
     navigate(`/alerts/${id}`, { replace: true });
   };
@@ -1771,7 +1857,7 @@ export function Alerts() {
             </div>
           ) : (
             filtered.map((a) => (
-              <div key={a.id}>
+              <div key={a.id} data-alert-card={a.id}>
                 <StateAlertCard
                   a={a}
                   variant="feed"

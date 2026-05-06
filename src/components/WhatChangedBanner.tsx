@@ -21,20 +21,31 @@
 import { Bell, ChevronRight, ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { trpc } from "../lib/api/client";
+import { useAnnouncements } from "../hooks/useAnnouncements";
 
 export function WhatChangedBanner() {
   const triageQuery = trpc.announcements.triageOnFirstLand.useQuery(undefined, {
     staleTime: 30_000,
     refetchOnWindowFocus: false,
   });
+  // Pull the full announcement list to resolve UNIQUE affected clients
+  // across the triage items. Summing per-alert counts double-counts a
+  // client when two alerts touch them (e.g. a NY LLC affected by both
+  // the nexus rule and the penalty waiver). The /alerts header uses
+  // unique clients too — keeping the same metric here avoids the demo
+  // confusion of "24 clients" on Today vs "21 clients" on /alerts.
+  const announcementsQuery = useAnnouncements({ activeOnly: true });
 
   const items = triageQuery.data ?? [];
   if (items.length === 0) return null;
 
-  const totalClients = items.reduce(
-    (acc, i) => acc + i.affectedClientCount,
-    0,
-  );
+  const triageIds = new Set(items.map((i) => i.id));
+  const uniqueClientIds = new Set<string>();
+  for (const a of announcementsQuery.data ?? []) {
+    if (!triageIds.has(a.id)) continue;
+    for (const cid of a.affectedClientIds) uniqueClientIds.add(cid);
+  }
+  const uniqueClientCount = uniqueClientIds.size;
 
   // Two-tier composition. Top row: badge + headline + meta + Review-all
   // affordance. Bottom row: up to 3 alert peeks as inline pills, each a
@@ -63,12 +74,12 @@ export function WhatChangedBanner() {
             <span className="font-medium ml-1">
               new state {items.length === 1 ? "alert" : "alerts"}
             </span>
-            {totalClients > 0 && (
+            {uniqueClientCount > 0 && (
               <>
                 <span className="text-ink-400 mx-1.5">·</span>
-                <span className="text-ink-700 tabular-nums">{totalClients}</span>
+                <span className="text-ink-700 tabular-nums">{uniqueClientCount}</span>
                 <span className="text-ink-500 ml-1">
-                  {totalClients === 1 ? "client affected" : "clients affected"}
+                  {uniqueClientCount === 1 ? "client affected" : "clients affected"}
                 </span>
               </>
             )}

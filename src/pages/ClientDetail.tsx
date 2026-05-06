@@ -31,6 +31,8 @@ import {
   AlertTriangle,
   Bot,
   Pause,
+  Megaphone,
+  ChevronRight,
   type LucideIcon,
 } from "lucide-react";
 import { actions, useStore } from "../data/store";
@@ -42,6 +44,7 @@ import {
   useClient,
   useUpdateClient,
 } from "../hooks/useClients";
+import { useAnnouncements } from "../hooks/useAnnouncements";
 import { useDeadlinesForClient } from "../hooks/useDeadlines";
 import { useTasksForClient } from "../hooks/useTasks";
 import {
@@ -69,6 +72,7 @@ import { ExportClientsButton } from "../components/ExportClientsButton";
 import { PinClientButton } from "../components/Sidebar";
 import { BackLink } from "../components/ui/BackLink";
 import { PageContainer } from "../components/ui/PageContainer";
+import { StateBadge } from "../components/ui/StateBadge";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { ClientChip } from "../components/ClientChip";
 import { STATE_NAMES, type StateCode } from "../types";
@@ -485,6 +489,14 @@ export function ClientDetail() {
           <ClientAiSummaryCard clientId={client.id} />
         </div>
       </div>
+
+      {/* Active state alerts touching this client. Without this section,
+          /clients/:id was the one place in the demo where an affected
+          client showed no signal of the alert affecting them — you could
+          land on Suncoast Advisors with no hint that the FL hurricane
+          prep extension applies. Renders null when there are no active
+          alerts for this client. */}
+      <ClientStateAlertsCard clientId={client.id} />
 
       {/* Cross-year-insighter advisory triggers + churn-risk deep callout.
           Kept below the header so they don't crowd identity, but above
@@ -1855,6 +1867,67 @@ function MailboxTab({ client }: { client: Client }) {
         </p>
       </section>
     </div>
+  );
+}
+
+/**
+ * Active state alerts touching this client. Surfaces the back-edge of the
+ * alert ↔ client relationship — /alerts shows "Affects N clients" with
+ * names, but until now /clients/:id had no reciprocal signal. Renders
+ * null when no active alerts include this client in `affectedClientIds`.
+ */
+function ClientStateAlertsCard({ clientId }: { clientId: string }) {
+  const announcementsQuery = useAnnouncements({ activeOnly: true });
+  const alerts = (announcementsQuery.data ?? []).filter(
+    (a) => !a.dismissed && a.affectedClientIds.includes(clientId),
+  );
+  if (alerts.length === 0) return null;
+  return (
+    <section
+      className="mt-5 bg-warn-bg/40 border border-warn-border/60 rounded-md px-region py-region"
+      aria-label="Active state alerts affecting this client"
+    >
+      <div className="flex items-center gap-2 mb-2.5">
+        <Megaphone className="w-3.5 h-3.5 text-warn-ink shrink-0" aria-hidden />
+        <span className="text-2xs uppercase tracking-wider font-semibold text-warn-ink">
+          Active state {alerts.length === 1 ? "alert" : "alerts"} for this client
+        </span>
+        <span className="text-2xs text-ink-500 tabular-nums ml-auto">
+          {alerts.length}
+        </span>
+      </div>
+      <ul className="flex flex-col gap-1.5">
+        {alerts.map((a) => (
+          <li key={a.id}>
+            <Link
+              to={`/alerts/${a.id}`}
+              className="group flex items-center gap-3 px-2.5 py-2 rounded-md bg-surface/70 border border-warn-border/40 hover:bg-surface hover:border-warn-border/80 transition-colors"
+            >
+              <StateBadge code={a.stateCode} size="sm" />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm text-ink-900 truncate">{a.title}</div>
+                <div className="text-2xs text-ink-500 mt-0.5 truncate">
+                  {a.authority}
+                  {a.newDeadline && (
+                    <>
+                      <span className="mx-1.5 text-ink-300">·</span>
+                      <span>Deadline shifts to {formatLongDate(a.newDeadline)}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              <span className="text-2xs text-ink-500 group-hover:text-ink-900 inline-flex items-center gap-0.5 shrink-0">
+                Review
+                <ChevronRight
+                  className="w-3 h-3 transition-transform group-hover:translate-x-0.5"
+                  aria-hidden
+                />
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
