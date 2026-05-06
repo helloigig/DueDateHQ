@@ -4,46 +4,54 @@ name: DueDateHQ
 description: CPA client-intelligence layer. Calm, dense, scan-first work surface. The differentiator is "state notification + suggested action" — every layout privileges the gap (what's missing), not the fill.
 
 colors:
-  # Surfaces — Mercury-aligned cool neutral (refreshed 2026-05-03 from warm cream).
-  canvas: "#F8F9FB"
+  # Hue-shift rebrand (2026-05-06). Mercury lightness ladder preserved at
+  # every step; hue rotated from cool slate (220°) to sage (~145°). Token
+  # NAME `indigo` kept for component back-compat; value is sage green.
+  canvas: "#F8F9FA"
   surface: "#FFFFFF"
-  sunken: "#F2F3F5"
-  # Text
-  ink-900: "#0F172A"
-  ink-700: "#334155"
-  ink-500: "#64748B"
-  ink-400: "#94A3B8"
-  ink-300: "#CBD5E1"
+  sunken: "#EEF0F2"
+  # Stone — brand swatch, available for muted promotional surfaces
+  stone: "#C8CCB6"
+  # Lime — featured highlight (BrandMark logo dot, "fresh/selected" register)
+  lime: "#E8F1A8"
+  # Text — Mercury L profile (11/27/47/65/84%), sage hue, low saturation
+  ink-900: "#1E2D24"
+  ink-700: "#3A5347"
+  ink-500: "#687F73"
+  ink-400: "#94B0A1"
+  ink-300: "#CADDD0"
   # Border
-  line: "#E2E8F0"
-  line-strong: "#CBD5E1"
-  # Indigo — the next-action accent (T2). New design-system surfaces use this.
-  indigo: "#5B5BD6"
-  indigo-hover: "#4A4AC9"
-  indigo-soft: "#ECECFE"
-  indigo-ink: "#3D3DAF"
-  # Slate accent — legacy back-compat (user-avatar circle, user-menu trigger).
-  # Do NOT use on new surfaces; the next-action color is `indigo`, not slate.
-  accent: "#0F172A"
-  accent-hover: "#1E293B"
+  line: "#DEEBE3"
+  line-strong: "#CADDD0"
+  # Indigo (sage). Mercury indigo had L=60% S=62% white-text 4.6:1 — at
+  # sage hue we drop to L≈38% to preserve perceptual depth (green at L=60
+  # looks lighter than blue at L=60). Soft + ink return to Mercury's
+  # near-white / dark profile so the soft register feels Mercury-comfortable.
+  indigo: "#456E5A"
+  indigo-hover: "#324C3C"
+  indigo-soft: "#E5F0EA"
+  indigo-ink: "#2C4A37"
+  # Accent (legacy) — matches new ink-900
+  accent: "#1E2D24"
+  accent-hover: "#324C3C"
   on-accent: "#FFFFFF"
-  # Status families
-  danger-bg: "#FEF2F2"
-  danger-border: "#FCA5A5"
-  danger-ink: "#B91C1C"
-  danger-solid: "#DC2626"
-  warn-bg: "#FFFBEB"
-  warn-border: "#FCD34D"
-  warn-ink: "#92400E"
-  warn-solid: "#D97706"
-  ok-bg: "#ECFDF5"
-  ok-border: "#86EFAC"
-  ok-ink: "#047857"
-  ok-solid: "#059669"
-  info-bg: "#EFF6FF"
-  info-border: "#93C5FD"
-  info-ink: "#1D4ED8"
-  info-solid: "#2563EB"
+  # Status — Mercury L preserved per slot; hues tuned to brand family
+  danger-bg: "#FDF1ED"
+  danger-border: "#F0A89E"
+  danger-ink: "#A33A30"
+  danger-solid: "#C44A3D"
+  warn-bg: "#FBF3E2"
+  warn-border: "#E0BE8C"
+  warn-ink: "#7E5722"
+  warn-solid: "#A87740"
+  ok-bg: "#EBF3E4"
+  ok-border: "#9CC78F"
+  ok-ink: "#3A6B36"
+  ok-solid: "#4F8A45"
+  info-bg: "#EAF2FB"
+  info-border: "#9CC2EA"
+  info-ink: "#1A4F8B"
+  info-solid: "#2563B8"
 
 typography:
   display:

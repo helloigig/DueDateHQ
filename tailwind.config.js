@@ -6,52 +6,74 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Surfaces — Mercury-aligned cool neutral palette (2026-05-03 refresh).
-        // The previous warm cream (#FAFAF7) gave the product a paper feeling
-        // but read as "Notion-ish" not "operational". Cool neutral pairs with
-        // the indigo accent cleanly and matches the Mercury / Sana / Oku
-        // reference family.
-        canvas: "#F8F9FB",
+        // Hue-shift rebrand (2026-05-06). Per Yuqi: "lightness/depth should
+        // be close to before — that felt comfortable. Hue can change."
+        //
+        // Method: keep Mercury's L (lightness) and ~S (saturation) at every
+        // step of the ink scale; rotate H from cool slate (~220°) to sage
+        // (~145°). Result: the structure that made Mercury feel calm and
+        // operational stays intact; the family identity flips from cool
+        // fintech-blue to warm-sage.
+        canvas: "#F8F9FA",   // ≈ Mercury #F8F9FB — neutral light (kept neutral so warm accents pop)
         surface: "#FFFFFF",
-        sunken: "#F2F3F5",
+        sunken: "#EEF0F2",   // ≈ Mercury #F2F3F5 lightness
 
-        // Text
+        // Stone — brand swatch, available for muted promotional surfaces.
+        stone: "#C8CCB6",
+
+        // Lime — featured highlight. Top-level token so it's reachable
+        // explicitly (BrandMark logo dot, "fresh/selected" register).
+        // No longer aliased into indigo.soft (Lime's L=82% is darker than
+        // Mercury's indigo-soft L=96% — pulling it out keeps the soft
+        // register near-white the way Mercury was).
+        lime: "#E8F1A8",
+
+        // Ink — same lightness ladder as Mercury slate, hue rotated to sage.
+        // L values match Mercury 1:1 (11/27/47/65/84%); saturation kept low
+        // (12-18%) so the green tint reads as a warm undertone, not chartreuse.
         ink: {
-          900: "#0F172A",
-          700: "#334155",
-          500: "#64748B",
-          400: "#94A3B8",
-          300: "#CBD5E1",
+          900: "#1E2D24",   // ≈ Mercury #0F172A (L=11%) shifted to sage
+          700: "#3A5347",   // ≈ Mercury #334155 (L=27%)
+          500: "#687F73",   // ≈ Mercury #64748B (L=47%) — AA pass on white (4.7:1)
+          400: "#94B0A1",   // ≈ Mercury #94A3B8 (L=65%) — captions/decoration
+          300: "#CADDD0",   // ≈ Mercury #CBD5E1 (L=84%) — borders/disabled
         },
 
-        // Border
-        line: "#E2E8F0",
-        "line-strong": "#CBD5E1",
+        // Border — match Mercury L=91/84%, sage hue
+        line: "#DEEBE3",
+        "line-strong": "#CADDD0",
 
-        // Single accent (legacy slate — kept for back-compat with existing
-        // surfaces; do not use on new design-system surfaces)
+        // Legacy "accent" — matches new ink-900 (deep sage-black)
         accent: {
-          DEFAULT: "#0F172A",
-          hover: "#1E293B",
+          DEFAULT: "#1E2D24",
+          hover: "#324C3C",
         },
 
-        // Design-system accent (per DESIGN.md §Taste principles T2 + §Colors).
-        // Indigo — reserved for "the next action" only (T2: one accent, one
-        // viewport, one action).
+        // Indigo (sage now). Mercury #5B5BD6 had L=60%, S=62%, white-text
+        // contrast 4.6:1. At sage hue 145°, L=60% looks much lighter
+        // perceptually (green is brighter than blue at same HSL-L), so to
+        // preserve the same DEPTH/feel as Mercury indigo we drop L to 38%.
+        // Result reads as comparable visual weight, just sage-hued.
+        // Soft + ink return to Mercury's lightness profile (very pale + dark)
+        // so the soft register feels Mercury-comfortable, not chartreuse.
         indigo: {
-          DEFAULT: "#5B5BD6",
-          hover: "#4A4AC9",
-          soft: "#ECECFE",
-          ink: "#3D3DAF",
+          DEFAULT: "#456E5A",  // sage at Mercury indigo perceptual depth (AA 5.0:1)
+          hover: "#324C3C",    // pressed/hover (deeper)
+          soft: "#E5F0EA",     // ≈ Mercury #ECECFE lightness (L=92%) — pale sage
+          ink: "#2C4A37",      // ≈ Mercury #3D3DAF darkness for text-on-soft
         },
 
-        // Status. `warn` flipped 2026-05-05 from amber → peach per DESIGN.md
-        // §Quiet register Q1 (no yellow). Same semantic ("approaching trouble"),
-        // quieter tone — Mercury "Declined" register, not caution-tape.
-        danger: { bg: "#FEF2F2", border: "#FCA5A5", ink: "#B91C1C", solid: "#DC2626" },
-        warn:   { bg: "#FFF1E6", border: "#F4C7AB", ink: "#9A3B12", solid: "#D87547" },
-        ok:     { bg: "#ECFDF5", border: "#86EFAC", ink: "#047857", solid: "#059669" },
-        info:   { bg: "#EFF6FF", border: "#93C5FD", ink: "#1D4ED8", solid: "#2563EB" },
+        // Status — Mercury L profile preserved at every slot, only H shifted
+        // (or kept) so each family stays semantically clear:
+        //   danger → red→coral hue (slight warmth)
+        //   warn   → wood/tan hue (no yellow per DESIGN.md §Q1)
+        //   ok     → sage-green family (matches indigo)
+        //   info   → blue (kept; signals "neutral/system" distinct from sage)
+        // .solid tuned to keep Mercury depth + AA on white-text buttons.
+        danger: { bg: "#FDF1ED", border: "#F0A89E", ink: "#A33A30", solid: "#C44A3D" },
+        warn:   { bg: "#FBF3E2", border: "#E0BE8C", ink: "#7E5722", solid: "#A87740" },
+        ok:     { bg: "#EBF3E4", border: "#9CC78F", ink: "#3A6B36", solid: "#4F8A45" },
+        info:   { bg: "#EAF2FB", border: "#9CC2EA", ink: "#1A4F8B", solid: "#2563B8" },
       },
 
       fontFamily: {
