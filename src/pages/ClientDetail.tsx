@@ -95,13 +95,24 @@ import type {
 // Tier + since + deadline counts now live as a meta line under the
 // client name; the gauge is gone (it was measuring nothing real).
 //
-// Tab strip: To Do | Filings | Mailbox | Notes
+// Tab strip: Work | Mailbox | Notes
 // Held over for deep-link compatibility but routed via overflow menu:
 // documents / contacts / audit.
 //
-// Engagement tab key still mapped for `?tab=engagement` URLs that
-// existed in the wild — it silently aliases to "todo".
+// Yuqi audit 2026-05-06: To Do + Filings merged into a single "Work"
+// tab. The two former tabs were two views of the same task set —
+// To Do filtered to "still waiting / needs review" docs, Filings
+// listed deadlines + status pills — and forced the user to swap tabs
+// to reconcile "what's the plan" vs "what's blocking it." Work
+// renders the filing list (calendar-truth structure) AND the doc
+// checklist (action-truth) on one surface so the relationship is
+// visible without tab-swapping.
+//
+// `todo`, `filings`, and `engagement` are kept as URL aliases so old
+// deep links (?tab=todo, ?tab=filings, ?tab=engagement) silently
+// route to `work` instead of 404'ing.
 type Tab =
+  | "work"
   | "todo"
   | "filings"
   | "mailbox"
@@ -147,7 +158,7 @@ export function ClientDetail() {
   const client = clientQuery.data ?? null;
   const deadlines = deadlinesQuery.data ?? [];
   const archiveClientMut = useArchiveClient();
-  const [tab, setTab] = useState<Tab>("todo");
+  const [tab, setTab] = useState<Tab>("work");
   // Tracks whether the user explicitly clicked a tab. Once true, the
   // default-tab effect below stops auto-switching — Sarah's manual
   // selection wins. Yuqi audit 2026-05-05: "if To Do is empty, default
@@ -171,21 +182,9 @@ export function ClientDetail() {
   // its name as a pass-through alias so the To Do / Filings / Mailbox
   // tabs that consume it don't change their prop contracts.
 
-  // Default tab — landing on To Do is the right answer when the client
-  // has active work to chase / confirm. When To Do would be empty (no
-  // active deadlines), Filings is what Sarah opens to answer "where is
-  // this client at." We auto-switch on first data load, but only if
-  // the user hasn't already clicked a tab — manual selection wins.
-  useEffect(() => {
-    if (tabExplicitRef.current) return;
-    if (!deadlinesQuery.data) return;
-    const hasActive = deadlinesQuery.data.some(
-      (d) => d.status !== "completed" && d.status !== "filed_extension",
-    );
-    if (!hasActive) {
-      setTab("filings");
-    }
-  }, [deadlinesQuery.data]);
+  // Default tab is always Work post-merge (To Do + Filings collapsed
+  // into one surface, so there's no longer a "swap to Filings when
+  // To Do is empty" branch to implement).
 
   useEffect(() => {
     if (searchParams.get("addDeadline") === "1") {
@@ -248,16 +247,18 @@ export function ClientDetail() {
   const activeDeadlineCount = clientDeadlines.filter(
     (d) => d.status !== "completed" && d.status !== "filed_extension"
   ).length;
-  // "Working on" — the distinct formTypes among active deadlines. Used
-  // to badge the client header so the CPA can read at-a-glance which
-  // filings the firm is in the middle of for this client.
-  const workingOnFormTypes = Array.from(
-    new Set(
-      clientDeadlines
-        .filter((d) => d.status !== "completed" && d.status !== "filed_extension")
-        .map((d) => d.form),
-    ),
+  // Header summary — Yuqi audit 2026-05-06: previous version listed every
+  // active form by name ("PA RCT-101 (corporate), PA RCT-101 (final),
+  // 1120 (extension)") which duplicated the Filings tab line-for-line.
+  // The header should be a glance-level summary; the per-form detail
+  // belongs in the Work tab. Compute the soonest official due date so
+  // the header carries the "next thing on the calendar" instead.
+  const activeDeadlines = clientDeadlines.filter(
+    (d) => d.status !== "completed" && d.status !== "filed_extension",
   );
+  const nextDueDate = activeDeadlines
+    .map((d) => d.officialDueDate)
+    .sort()[0];
 
   // Pass-through alias — header filters retired; tabs still consume
   // `filteredDeadlines` by name.
@@ -307,9 +308,19 @@ export function ClientDetail() {
     navigate("/clients");
   };
 
+  // Back-link target — preserves the originating surface when the user
+  // arrived from a non-/clients context. Yuqi audit 2026-05-06: clicking
+  // a client chip on /alerts/:id used to land here with no return path
+  // beyond the browser back button; the back link said "Back to
+  // Clients" regardless of how the user got here. Now: if the URL
+  // carries `?fromAlert=:id`, the link points back at that alert.
+  const fromAlertId = searchParams.get("fromAlert");
+  const backFallback = fromAlertId ? `/alerts/${fromAlertId}` : "/clients";
+  const backLabel = fromAlertId ? "alert" : "Clients";
+
   return (
     <PageContainer variant="wide">
-      <BackLink fallback="/clients" fallbackLabel="Clients" />
+      <BackLink fallback={backFallback} fallbackLabel={backLabel} />
 
 
       {/* Header redesign 2026-05-06.
@@ -436,18 +447,24 @@ export function ClientDetail() {
             )}
           </div>
 
-          {/* Working-on row: N filings + status chip (All on track / N
-              behind / N on extension) + colon + form list. Replaces the
-              former 3-metric stat strip — one short sentence reads
-              faster than three numbers when most clients are on track. */}
+          {/* Header status line: filing count + status chip + next due
+              date. Yuqi audit 2026-05-06: previous version listed every
+              active form by name, duplicating the Filings tab. The
+              header now reads as a glance summary ("3 filings · 1
+              behind · next due May 8") so a CPA scanning the page top
+              can answer "is anything wrong, what's next" without their
+              eye getting pulled into a comma-separated form list. The
+              per-form detail belongs in the Work tab below. */}
           {kpis.active > 0 && (
             <div className="text-sm text-ink-700 flex items-baseline flex-wrap gap-x-2 gap-y-1">
               <span className="text-ink-500">
-                Working on{" "}
                 <span className="font-semibold text-ink-900 tabular-nums">
                   {kpis.active}
                 </span>{" "}
                 filing{kpis.active === 1 ? "" : "s"}
+              </span>
+              <span className="text-ink-300" aria-hidden>
+                ·
               </span>
               {kpis.behind > 0 ? (
                 <span className="inline-flex items-center gap-1 text-2xs px-1.5 py-0.5 rounded border border-warn-border bg-warn-bg/60 text-warn-ink font-medium">
@@ -465,15 +482,18 @@ export function ClientDetail() {
                   All on track
                 </span>
               )}
-              {workingOnFormTypes.length > 0 && (
-                <span className="text-ink-500 inline-flex items-baseline gap-1 min-w-0">
-                  <span>:</span>
-                  <span className="text-ink-700 truncate">
-                    {workingOnFormTypes.slice(0, 4).join(", ")}
-                    {workingOnFormTypes.length > 4 &&
-                      ` +${workingOnFormTypes.length - 4}`}
+              {nextDueDate && (
+                <>
+                  <span className="text-ink-300" aria-hidden>
+                    ·
                   </span>
-                </span>
+                  <span className="text-ink-500">
+                    next due{" "}
+                    <span className="text-ink-900 font-medium">
+                      {formatLongDate(nextDueDate)}
+                    </span>
+                  </span>
+                </>
               )}
             </div>
           )}
@@ -499,18 +519,14 @@ export function ClientDetail() {
       <ClientAiInsightsCard clientId={client.id} />
 
       <div className="mt-5 border-b border-line flex items-center gap-1 flex-wrap relative">
-        {/* Tab order — IA v0.7 §3.3 amendment 2026-05-04: To Do leads
-            because it's the only tab the CPA actually opens during the
-            day (chase / confirm / send). Engagement = contract/scope
-            (what we're paid to do); Filings = past + current + projected
-            timeline; Habits + Predictions fold into Filings as the
-            "Multi-year patterns" section since they describe the same
-            history axis. Notes promoted from sub-section to a real tab
-            so firm-internal memory has its own destination. */}
+        {/* Tab order — Yuqi audit 2026-05-06: Work leads (Filings + To Do
+            merged). Mailbox = inbound thread / chase replies. Notes = firm-
+            internal memory. Documents / Contacts / Audit log live in the
+            overflow ("…") menu — referenced often enough to deep-link, not
+            often enough to earn primary tab real estate. */}
         {(
           [
-            ["todo", "To Do", CircleCheck],
-            ["filings", "Filings", ClipboardList],
+            ["work", "Work", ClipboardList],
             ["mailbox", "Mailbox", Mail],
             ["notes", "Notes", Brain],
           ] as const
@@ -576,37 +592,34 @@ export function ClientDetail() {
       </div>
 
       <div className="mt-5 space-y-5">
-        {/* Both To Do and Filings receive `filteredDeadlines` (year +
-            form filter projection). When no filter is active this is
-            === clientDeadlines, so unfiltered render is identical to
-            before. */}
-        {tab === "todo" && (
-          <ToDoTab
-            client={client}
-            allDeadlines={filteredDeadlines}
-            onAddDeadline={() => setAddDeadlineOpen(true)}
-            onOpenDocuments={() => onTabChange("documents")}
-          />
-        )}
-        {/* Engagement tab retired 2026-05-05 — see type Tab comment.
-            Existing ?tab=engagement deep links silently route to todo. */}
-        {tab === "engagement" && (
-          <ToDoTab
-            client={client}
-            allDeadlines={filteredDeadlines}
-            onAddDeadline={() => setAddDeadlineOpen(true)}
-            onOpenDocuments={() => onTabChange("documents")}
-          />
-        )}
-        {tab === "filings" && (
-          <FilingsTab
-            client={client}
-            deadlines={filteredDeadlines}
-            onAddDeadline={(prefill) => {
-              setAddDeadlinePrefill(prefill);
-              setAddDeadlineOpen(true);
-            }}
-          />
+        {/* Work tab — merged To Do + Filings. Filings (calendar-truth
+            structure) renders first to give the "where is this client
+            at across all filings" overview; ToDo (action-truth) renders
+            below as the per-doc chase work for whichever filings are
+            currently active. They consume the same `filteredDeadlines`
+            so counts always reconcile.
+            Old `?tab=todo`, `?tab=filings`, and `?tab=engagement` deep
+            links silently land here. */}
+        {(tab === "work" ||
+          tab === "todo" ||
+          tab === "filings" ||
+          tab === "engagement") && (
+          <>
+            <FilingsTab
+              client={client}
+              deadlines={filteredDeadlines}
+              onAddDeadline={(prefill) => {
+                setAddDeadlinePrefill(prefill);
+                setAddDeadlineOpen(true);
+              }}
+            />
+            <ToDoTab
+              client={client}
+              allDeadlines={filteredDeadlines}
+              onAddDeadline={() => setAddDeadlineOpen(true)}
+              onOpenDocuments={() => onTabChange("documents")}
+            />
+          </>
         )}
         {tab === "mailbox" && <MailboxTab client={client} />}
         {tab === "notes" && <NotesTab client={client} />}

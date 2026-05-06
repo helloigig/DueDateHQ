@@ -12,6 +12,13 @@ import type { Announcement } from "../types";
 //   · 9d ago     = DISMISSED      (one CPA explicitly dismissed)
 
 export const announcements: Announcement[] = [
+  // The 3 newest active alerts (IL Q1 underpayment, TX No-Tax-Due
+  // threshold, CA LA wildfire Q1 ext) are seeded via `STATE_FEED` in
+  // `mockStateFeed.ts` so their `detectedAt` is `new Date()` at runtime,
+  // putting them at the top of `useAnnouncements()` (sorted desc).
+  // Keeping seed data here to a single source — duplicating the trio
+  // here previously caused the same alert to appear twice in /alerts.
+
   // ── BLOCKBUSTER: 18-client California storm relief ──────────────────
   // The "state notification + suggested actions = THE surface" demo.
   // Sweeps every CA + nexus-CA client. The CPA's first reaction to
@@ -284,7 +291,7 @@ export const announcements: Announcement[] = [
     matchConfidence: "high",
     affectedClientIds: ["c-il-02"],
     read: true,
-    dismissed: false,
+    dismissed: true,
   },
   {
     id: "ann-il-2026-form-revision-correction",
@@ -363,7 +370,7 @@ export const announcements: Announcement[] = [
     matchConfidence: "high",
     affectedClientIds: ["c-nj-01"],
     read: true,
-    dismissed: false,
+    dismissed: true,
   },
   {
     id: "ann-ma-2026-trust-form-revised",
@@ -445,7 +452,7 @@ export const announcements: Announcement[] = [
     matchConfidence: "high",
     affectedClientIds: [],
     read: true,
-    dismissed: false,
+    dismissed: true,
   },
   {
     id: "ann-fl-2026-disaster",

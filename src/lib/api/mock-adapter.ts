@@ -847,19 +847,67 @@ export const mockAdapter = {
         { type: "internal_review", offset: 7 },
         { type: "file", offset: 0 },
       ] as const;
-      const synthesized: TaskMilestoneRow[] = stages.map((s, idx) => ({
-        id: `mock-mil-${input.taskId}-${idx}`,
-        firmId: "mock-firm",
-        taskId: input.taskId,
-        milestoneType: s.type,
-        customLabel: null,
-        targetDate: s.offset === 0 ? due : offsetDays(s.offset),
-        completedDate: null,
-        status: "not_started" as const,
-        blockerReason: null,
-        displayOrder: idx,
-        proposedBy: "ai" as const,
-      }));
+      // Compute the current active phase from real task + checklist state
+      // so synthesized rows reflect reality, not a flat all-not_started
+      // wall. Mirrors the chronological-invariant logic in
+      // TaskMiniTimeline.deriveWaypoints. Yuqi audit 2026-05-06: previously
+      // every Propose-dates click produced 5 not_started rows regardless of
+      // task progress; the timeline then jarringly snapped backward.
+      const checklist = getState().checklistItems.filter(
+        (c) => c.taskId === input.taskId,
+      );
+      const total = checklist.filter((c) => c.state !== "not_applicable").length;
+      const confirmed = checklist.filter(
+        (c) => c.state === "received_confirmed",
+      ).length;
+      const waiting = checklist.filter(
+        (c) =>
+          c.state === "requested_waiting" || c.state === "not_requested",
+      ).length;
+      const reviewPending = checklist.filter(
+        (c) =>
+          c.state === "received_unreviewed" || c.state === "received_issue",
+      ).length;
+      const isComplete = task?.status === "completed";
+      const currentIdx = (() => {
+        if (isComplete) return 5;
+        const scopeConfirmed =
+          total > 0 &&
+          checklist.some(
+            (c) =>
+              c.state === "requested_waiting" ||
+              c.state === "received_unreviewed" ||
+              c.state === "received_issue" ||
+              c.state === "received_confirmed",
+          );
+        if (!scopeConfirmed) return 0;
+        if (waiting > 0) return 1;
+        if (reviewPending > 0) return 2;
+        if (confirmed < total) return 2;
+        return 3;
+      })();
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const isOverdue =
+        task?.status === "overdue" || (todayIso > due && !isComplete);
+      const synthesized: TaskMilestoneRow[] = stages.map((s, idx) => {
+        let status: TaskMilestoneRow["status"];
+        if (idx < currentIdx) status = "done";
+        else if (idx === currentIdx) status = isOverdue ? "overdue" : "in_progress";
+        else status = "not_started";
+        return {
+          id: `mock-mil-${input.taskId}-${idx}`,
+          firmId: "mock-firm",
+          taskId: input.taskId,
+          milestoneType: s.type,
+          customLabel: null,
+          targetDate: s.offset === 0 ? due : offsetDays(s.offset),
+          completedDate: status === "done" ? offsetDays(s.offset) : null,
+          status,
+          blockerReason: null,
+          displayOrder: idx,
+          proposedBy: "ai" as const,
+        };
+      });
       actions.setMilestonesForTask(input.taskId, synthesized);
       return {
         proposed: true,
@@ -1028,9 +1076,15 @@ export const mockAdapter = {
     list: async (input: { activeOnly?: boolean } = {}) => {
       await delay();
       const { announcements } = getState();
-      if (input.activeOnly)
-        return announcements.filter((a) => !a.dismissed);
-      return announcements;
+      // Sort newest-first so callers (Today preview, /alerts feed, bell)
+      // can rely on the order without re-sorting client-side. Yuqi audit
+      // 2026-05-06: Today previously rendered in mock-list order, which
+      // wasn't chronological — the freshest authority drops were buried.
+      const sorted = [...announcements].sort((a, b) =>
+        b.detectedAt.localeCompare(a.detectedAt),
+      );
+      if (input.activeOnly) return sorted.filter((a) => !a.dismissed);
+      return sorted;
     },
     get: async ({ id }: { id: string }) => {
       await delay();

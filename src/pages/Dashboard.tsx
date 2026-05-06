@@ -397,7 +397,7 @@ function StateAlertsPreview({
       return (
         <section className="mb-section">
           <SectionHeader
-            title="Alerts to act on today"
+            title="State alerts"
             meta={
               <span className="inline-flex items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 px-2 h-5 rounded-pill text-2xs font-semibold uppercase tracking-wider bg-info-bg/70 border border-info-border/60 text-info-ink">
