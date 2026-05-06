@@ -91,6 +91,14 @@ export const authRouter = router({
    *
    * Idempotent — if the user already has a firm, returns that firm and
    * does nothing else.
+   *
+   * The new firm is seeded with the same 51-client roster as the demo
+   * workspace so signup → onboarding lands on the populated dashboard,
+   * not an empty one. This matches the precedent set by `bootstrapDemo`
+   * and is what every onboarding exit (manual / import / "Skip for now"
+   * / "Try the demo") expects to see — onboarding/import is currently
+   * "demo magic" anyway, so until real CSV ingest ships, every signup is
+   * effectively a demo prospect and deserves the populated workspace.
    */
   bootstrap: publicProcedure
     .input(
@@ -120,7 +128,9 @@ export const authRouter = router({
             tier: "solo",
             subscriptionStatus: "trialing",
             seatLimit: 1,
-            clientLimit: 50,
+            // Demo seed inserts 51 clients — bump the cap so the new
+            // firm doesn't immediately bounce off it.
+            clientLimit: null,
             trialEndsAt: new Date(Date.now() + 30 * 86_400_000),
           })
           .returning();
@@ -136,6 +146,19 @@ export const authRouter = router({
         });
         return { firmId: firm.id };
       });
+
+      // Seed the new firm with demo content so the dashboard lands on
+      // the same populated workspace as the Try Demo button. Best-effort
+      // — a seed failure shouldn't roll back the firm creation, since
+      // the user is already authenticated and a session.fetch will still
+      // return a valid (empty) workspace they can populate manually.
+      try {
+        await seedDemoFirm({ db, firmId: result.firmId, reseed: false });
+        await seedAnnouncements();
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error("auth.bootstrap.seed_failed", err);
+      }
       return { firmId: result.firmId, alreadyProvisioned: false as const };
     }),
 
