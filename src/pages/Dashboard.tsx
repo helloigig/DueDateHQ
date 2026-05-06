@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useShortcuts } from "../hooks/useKeyboard";
 import { useClients } from "../hooks/useClients";
 import { useTriageDeadlines } from "../hooks/useDeadlines";
@@ -9,32 +9,14 @@ import { useSession } from "../data/session";
 import { ShortcutsModal } from "../components/ShortcutsModal";
 import { DashboardSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
-import {
-  TODAY,
-  toIso,
-  daysBetween,
-  parseDate,
-  hoursSince,
-  escalationTier,
-} from "../data/dateHelpers";
-import { useDashboardPreferences } from "../data/preferences";
+import { TODAY, toIso, hoursSince } from "../data/dateHelpers";
 import { ChaseBanner } from "../components/ChaseBanner";
-import { BlockingAlertsDialog } from "../components/BlockingAlertsDialog";
-import { OnboardingLayer2Widget } from "../components/OnboardingLayer2Widget";
-import { WelcomeTour } from "../components/WelcomeTour";
 import { CapacityStrip } from "../components/CapacityStrip";
-// ModeFHealth removed — the same monitoring signal ("50/50 states ·
-// last scrape 14m ago") is already on /alerts as the ambient line.
-// Two surfaces showing the same health was redundant.
-// import { ModeFHealth } from "../components/ModeFHealth";
 import { ActionQueue } from "../components/ActionQueue";
-import { AlertTriageModal } from "../components/AlertTriageModal";
 import { JustHappenedStrip } from "../components/JustHappenedStrip";
-import { WhatChangedBanner } from "../components/WhatChangedBanner";
 import { AiUsageInfo } from "../components/AiUsageInfo";
 import { PageHeader } from "../components/ui/PageHeader";
 import { DateLabel } from "../components/ui/DateLabel";
-import { MetricTile } from "../components/ui/MetricTile";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { StateAlertCard } from "../components/StateAlertCard";
 import { Megaphone, ChevronRight } from "lucide-react";
@@ -82,8 +64,6 @@ export function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const { prefs, update } = useDashboardPreferences();
-
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   useShortcuts([
@@ -118,67 +98,8 @@ export function Dashboard() {
   //   always shows the alerts; the queue is a derived view, not the only
   //   path.
   const activeBanners = announcements.filter((a) => !a.dismissed);
-  // firmRelevantAlerts (alerts hitting at least one client) still drives
-  // the >72h blocking dialog — that escalation only makes sense when a
-  // client cares about the alert.
-  const firmRelevantAlerts = activeBanners.filter(
-    (a) => a.affectedClientIds.length > 0,
-  );
 
-  const alertsByTier = useMemo(() => {
-    const out = {
-      fresh: [] as Announcement[],
-      reminder: [] as Announcement[],
-      escalated: [] as Announcement[],
-      blocking: [] as Announcement[],
-    };
-    for (const a of firmRelevantAlerts) {
-      out[escalationTier(hoursSince(a.detectedAt))].push(a);
-    }
-    return out;
-  }, [firmRelevantAlerts]);
-
-  // In mock/demo mode TODAY is a fixed constant (2026-04-23), so a single
-  // "Snooze for today" click would otherwise lock the modal off forever.
-  // Bypass the gate in mock mode so every fresh landing re-raises it.
-  const isMockMode = import.meta.env.VITE_USE_MOCK_DATA !== "false";
-  const alertsSnoozedToday =
-    !isMockMode && prefs.alerts_snoozed_until === toIso(TODAY);
-  const showBlockingDialog =
-    alertsByTier.blocking.length > 0 && !alertsSnoozedToday;
-  const [blockingDismissed, setBlockingDismissed] = useState(false);
-
-  // Operational summary. Two distinct signals:
-  //   • pastInternalTarget — task is past its internal target date (1-week
-  //     buffer eaten). Daily-relevant. The signal Sarah actually feels.
-  //   • pastOfficial — task is past the government deadline. Rare. Means
-  //     extension territory. Almost always 0 in a healthy firm.
-  // Plus: dueThisWeek — calendar context. Always shown.
-  const summary = useMemo(() => {
-    const open = tasks.filter((t) => !DONE_STATUSES.has(t.status));
-    const todayIso = toIso(TODAY);
-    const pastInternalTarget = open.filter(
-      (t) => t.internalTargetDate < todayIso && t.officialDueDate >= todayIso,
-    ).length;
-    const pastOfficial = open.filter(
-      (t) => t.officialDueDate < todayIso,
-    ).length;
-    const dueToday = open.filter((t) => t.officialDueDate === todayIso).length;
-    const dueThisWeek = open.filter((t) => {
-      const days = daysBetween(TODAY, parseDate(t.officialDueDate));
-      return days >= 0 && days <= 7;
-    }).length;
-    const activeClients = clients.filter((c) => c.status === "active").length;
-    return {
-      pastInternalTarget,
-      pastOfficial,
-      dueToday,
-      dueThisWeek,
-      activeClients,
-    };
-  }, [tasks, clients]);
-
-  const todayIso = useMemo(() => toIso(TODAY), []);
+  const todayIso = toIso(TODAY);
 
   const hasNoClients = clients.length === 0;
 
@@ -237,16 +158,24 @@ export function Dashboard() {
 
   return (
     <div className="max-w-[1080px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
-      {/* Triage modal — fires once per browser session on first land
-          when the user has alerts that arrived while they were away.
-          Honors the per-user toggle in Settings → Notifications. */}
-      <AlertTriageModal />
+      {/* Today slim-down 2026-05-06 (Yuqi UX walkthrough):
+          The page used to bury Action Queue at scroll position ~2400px
+          under five overlapping framings of the same alert data:
+            - AlertTriageModal (modal on entry)
+            - BlockingAlertsDialog (full-screen modal)
+            - WhatChangedBanner ("Since you were last here")
+            - WelcomeTour banner (showed even on populated workspaces)
+            - 3 KPI tiles (passive numbers — info redundant with queue)
+            - OnboardingLayer2Widget (Connect-QBO nudge below the queue)
+          All removed. Today now reads:
+            PageHeader → JustHappenedStrip (overnight diff, self-vanishes)
+            → StateAlertsPreview (top 3 alerts, single canonical framing)
+            → ActionQueue (the daily work, above the fold)
+            → ChaseBanner (14d+ silent clients, self-vanishes)
+            → CapacityStrip (≥3-staff firms only). */}
 
-      {/* PAGE HEADER ROW — Mercury Home anatomy: H1 left + action button row
-          right. The action row carries the page's "what can I do here right
-          now" affordances (Mercury Home: Send / Transfer / Deposit / Request).
-          Per T2 — only the first action ("Send chase") wears the indigo
-          accent; the rest are ghost pills. */}
+      {/* PAGE HEADER — H1 + date. Action affordances live inside each
+          section (state-alert cards, action-queue rows). */}
       <div className="mb-card flex items-end justify-between gap-region flex-wrap">
         <PageHeader
           className="mb-0"
@@ -261,90 +190,19 @@ export function Dashboard() {
         />
       </div>
 
-      {/* KPI STRIP — operational signal first, legal-miss as conditional
-          secondary. Per the deadline-UX principle: official date is a
-          reference constraint, not the primary daily driver. The signal
-          Sarah feels every day is "behind plan" (past internal target,
-          buffer eaten); legal misses are rare and only loud up when they
-          actually exist. So:
-            • "Behind plan" — always present, amber when nonzero. The
-              operational signal. Counts open tasks where today >
-              internal target but ≤ official deadline.
-            • "Filing today" — calendar context. Always present, neutral.
-            • "Past official" — danger tile, conditional. Only rendered
-              when the count is > 0. Never primary even when present —
-              its job is to alert without re-centering the mental model
-              on the legal date.
-          Pre-PR #92, the second slot flip-flopped between "Past target"
-          and "Past official" depending on count. That flipping conflated
-          two different decisions. Splitting them removes the ambiguity. */}
-      <div
-        className={`mb-card grid grid-cols-1 gap-region ${
-          summary.pastOfficial > 0
-            ? "md:grid-cols-3 max-w-2xl"
-            : "md:grid-cols-2 max-w-md"
-        }`}
-      >
-        <MetricTile
-          label="Behind plan"
-          value={summary.pastInternalTarget}
-          tone={summary.pastInternalTarget > 0 ? "warn" : "neutral"}
-        />
-        <MetricTile
-          label="Filing today"
-          value={summary.dueToday}
-          tone={summary.dueToday > 0 ? "warn" : "neutral"}
-        />
-        {summary.pastOfficial > 0 && (
-          <MetricTile
-            label="Past official"
-            value={summary.pastOfficial}
-            tone="danger"
-          />
-        )}
-      </div>
-
-      {/* First-run orientation — banner + 3-slide modal tour (Hook /
-          Core / Moat). Gated by localStorage so it only fires once per
-          browser. Reintroduced 2026-05-06 per Yuqi: the 3-step intro
-          card was core to the first-time experience and shouldn't have
-          been removed. The banner stage is calm (one line, dismissible);
-          users who want orientation click "60-second tour" to open the
-          slide-deck modal. */}
-      <WelcomeTour />
-
-      {/* ─────────────────────────────────────────────────────────────────
-          Today narrative (5 sections, read top → bottom):
-            1. Just happened — overnight diff (inbound-classifier confirms, replies,
-               anomaly-detector issues). Drained in seconds before chasing starts.
-            2. Action queue — the chase. State alerts pinned at top, then
-               one row per client (max-urgency dot, all outstanding items
-               aggregated, expand to act on individual items).
-            3. Quiet clients — the chase loop's stalled subset (14d+ no
-               reply). Needs a phone call, not another email.
-            4. state-monitor Health — state-monitoring's own monitoring.
-            5. Capacity — staff allocation (≥3-staff firms only).
-          State-alert news (no client matches) drops out as a compact
-          chip above the queue. Pure-news doesn't generate queue rows
-          (state-monitor gates on affectedClientIds.length > 0). */}
-
-      {/* §0: What changed since the user was last here. Banner sits
-          above the just-happened strip so a fresh state alert is the
-          first thing the eye lands on after the H1. Vanishes when
-          there are no new alerts since last visit (no zero-state). */}
-      <WhatChangedBanner />
-
-      {/* §1: Just happened — overnight diff strip. */}
+      {/* §1: Just happened — overnight diff strip. Self-vanishes when
+          confirms + issues + replies all zero, so on a quiet morning
+          the page goes straight to State alerts → Action Queue. */}
       <JustHappenedStrip />
 
-      {/* State alerts — preview surface. Top 3 most-urgent rendered as
+      {/* §2: State alerts — preview surface. Top 3 most-urgent rendered as
           the canonical <StateAlertCard variant="preview"> (same shape
           as /alerts so the user doesn't see two layouts of the same
           data). Click navigates to /alerts/:id where the action lives.
           Empty state shows a calm "all clear" line. */}
       <StateAlertsPreview announcements={activeBanners} />
 
-      {/* §2: Action queue — AI-curated TodoItem feed (PRD §4.8 nine
+      {/* §3: Action queue — AI-curated TodoItem feed (PRD §4.8 nine
           sources, urgency-sorted with waiting_multiplier). State alerts
           pinned at the top of the queue (state-monitor rows render with a
           distinct event-shape variant); per-client rows aggregate every
@@ -353,46 +211,14 @@ export function Dashboard() {
           scale (49 clients × 6 forms = 294 rows). */}
       {!isLegacy && <ActionQueue />}
 
-      {/* §3: Quiet clients — automation has run out. The phone-call
+      {/* §4: Quiet clients — automation has run out. The phone-call
           subset of in-flight chases (14d+ since last reminder, still
           waiting). Self-vanishes when zero. */}
       <ChaseBanner />
 
-      {/* §4: ModeFHealth removed — see import block above. The state-
-          monitoring health signal lives once, on the /alerts page
-          ambient line ("50/50 states monitored · last scrape 14m ago"),
-          which the Dashboard's StateAlertsPreview links into. */}
-
       {/* §5: Capacity — ≥3-staff firms only (gate inside the component).
           Solo Sarah never sees this; mid-firm Yan Jing always does. */}
       <CapacityStrip />
-
-      {/* Onboarding layer-2 nudges (set up forwarding email, connect
-          QBO). Self-gated to fade out once the firm wires the basics. */}
-      <OnboardingLayer2Widget />
-
-      {/* Blocking-alerts overlay — fires only at >72h escalation. Stays as
-          a modal because the spec demands a forced ack at that tier. The
-          totalAffecting prop carries the full "Affecting you" count so
-          the modal can show "5 of {N} affecting you" — clarifying that
-          this popup is a strict subset of the /alerts "Affecting you" tab. */}
-      {showBlockingDialog && !blockingDismissed && (
-        <BlockingAlertsDialog
-          alerts={alertsByTier.blocking}
-          totalAffecting={firmRelevantAlerts.length}
-          onSnooze={(reason) => {
-            update({ alerts_snoozed_until: toIso(TODAY) });
-            if (reason) {
-              console.info("[alerts] snooze logged", {
-                date: toIso(TODAY),
-                reason,
-              });
-            }
-            setBlockingDismissed(true);
-          }}
-          onClose={() => setBlockingDismissed(true)}
-        />
-      )}
 
       <ShortcutsModal
         open={shortcutsOpen}

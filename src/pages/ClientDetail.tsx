@@ -1418,139 +1418,14 @@ function ToDoTab({
   const daysAgo = (iso: string): number =>
     Math.floor((Date.now() - new Date(iso).getTime()) / (24 * 60 * 60 * 1000));
 
-  // Derive the unique tasks from BOTH:
-  //   (a) the full per-client task list (useTasksForClient / store tasks
-  //       in mock mode) — so every task shows, even ones without open
-  //       todoItems right now (Yuqi audit 2026-05-06: previously a
-  //       client with all-confirmed items had an empty Tasks strip
-  //       even though its tasks still existed).
-  //   (b) any items that DO have open todoItems — surfaces the
-  //       open-count badge on the matching chip.
-  // Each task is a first-class navigable unit on this surface;
-  // clicking → TaskDetail.
-  const remoteTasksList = useTasksForClient(
-    !env.useMockData ? client.id : undefined,
-  );
-  const tasksOnPage = useMemo(() => {
-    const seen = new Map<
-      string,
-      { id: string; name: string; chaseCount: number; reviewCount: number }
-    >();
-    // (a) Seed from the canonical per-client task list. Real mode
-    // pulls from BE via useTasksForClient; mock mode reads the store.
-    const sourceTasks = env.useMockData
-      ? storeTasks.filter((t) => t.clientId === client.id)
-      : remoteTasksList;
-    for (const t of sourceTasks) {
-      const taskName =
-        // Live BE shape carries formType + jurisdiction; mock store has
-        // the same fields. Compose a readable label either way.
-        [t.formType, t.jurisdiction].filter(Boolean).join(" · ") ||
-        "Task";
-      seen.set(t.id, {
-        id: t.id,
-        name: taskName,
-        chaseCount: 0,
-        reviewCount: 0,
-      });
-    }
-    // (b) Bucket open items into "chase" (client owes us) vs "review"
-    // (client sent, we owe a confirm/reject). Yuqi audit 2026-05-05:
-    // a single "X waiting" count conflated both buckets, which clashed
-    // with the "Still waiting on client" section name (that section
-    // shows ONLY the chase subset). Split into "X chase · Y review"
-    // so the chip matches the section vocabulary AND surfaces the
-    // review queue at a glance.
-    //   not_requested + requested_waiting → chase  (we're chasing the client)
-    //   received_unreviewed + received_issue → review  (waiting on CPA action)
-    for (const ci of items) {
-      if (!ci.taskId) continue;
-      const isChase =
-        ci.state === "not_requested" || ci.state === "requested_waiting";
-      const isReview =
-        ci.state === "received_unreviewed" || ci.state === "received_issue";
-      if (!isChase && !isReview) continue;
-      const entry = seen.get(ci.taskId);
-      if (entry) {
-        if (isChase) entry.chaseCount += 1;
-        else entry.reviewCount += 1;
-      } else {
-        // Item references a task we didn't see in (a) — fall back to
-        // the item's taskName so the chip still shows.
-        seen.set(ci.taskId, {
-          id: ci.taskId,
-          name: ci.taskName ?? "Task",
-          chaseCount: isChase ? 1 : 0,
-          reviewCount: isReview ? 1 : 0,
-        });
-      }
-    }
-    return Array.from(seen.values()).sort(
-      (a, b) =>
-        b.chaseCount +
-        b.reviewCount -
-        (a.chaseCount + a.reviewCount),
-    );
-  }, [items, remoteTasksList, storeTasks, client.id]);
+  // Tasks chip strip dropped 2026-05-06 — it duplicated the Filings tab
+  // (same per-task navigable units, same chase/review signals). To Do is
+  // the doc-bucket surface (Still waiting / Needs review); Filings is
+  // the per-task surface. The chase/review counts are still readable as
+  // group headers inside the two sections below.
 
   return (
     <div className="space-y-4">
-      {/* Tasks strip — every task on this client as a navigable chip.
-          Open count badge surfaces which task has the most pending
-          work; click → TaskDetail. The To Do view below stays as the
-          per-item gap surface. */}
-      {tasksOnPage.length > 0 && (
-        <section className="bg-surface border border-line rounded-md px-4 py-3">
-          <header className="flex items-baseline gap-2 mb-2">
-            <h3 className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
-              Tasks
-            </h3>
-            <span className="text-2xs text-ink-400">
-              {tasksOnPage.length}{" "}
-              {tasksOnPage.length === 1 ? "active" : "active"}
-            </span>
-          </header>
-          <div className="flex flex-wrap gap-1.5">
-            {tasksOnPage.map((t) => (
-              <Link
-                key={t.id}
-                to={taskHref(t.id)}
-                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded border border-line bg-canvas text-ink-700 hover:bg-sunken hover:text-ink-900 hover:border-line-strong transition-colors"
-                title={
-                  t.chaseCount > 0 || t.reviewCount > 0
-                    ? `${t.name} — ${t.chaseCount} chasing client, ${t.reviewCount} awaiting your review`
-                    : `Open ${t.name}`
-                }
-              >
-                <span className="font-medium">{t.name}</span>
-                {/* Split badge — "chase" subset (warn yellow, matches the
-                    Still-waiting-on-client section's palette) + "review"
-                    subset (info blue, matches the AI-confidence review
-                    palette). Each appears only when its count > 0; both
-                    hide when the task has no open work. The middle dot
-                    separates the two only when both are non-zero. */}
-                {t.chaseCount > 0 && (
-                  <span
-                    className="text-2xs tabular-nums text-warn-ink bg-warn-bg/60 border border-warn-border px-1 py-0.5 rounded"
-                    title={`${t.chaseCount} item${t.chaseCount === 1 ? "" : "s"} the client still owes you`}
-                  >
-                    {t.chaseCount} chase
-                  </span>
-                )}
-                {t.reviewCount > 0 && (
-                  <span
-                    className="text-2xs tabular-nums text-info-ink bg-info-bg/60 border border-info-border px-1 py-0.5 rounded"
-                    title={`${t.reviewCount} item${t.reviewCount === 1 ? "" : "s"} received from the client, awaiting your confirm/reject`}
-                  >
-                    {t.reviewCount} review
-                  </span>
-                )}
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* 🚨 STILL WAITING ON CLIENT — primary surface. Yuqi note
           2026-05-05: panel chrome stays neutral even when populated;
           the warning signal is carried by the small siren icon + the

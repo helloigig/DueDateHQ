@@ -327,7 +327,7 @@ export function Mail() {
                 <li key={r.id}>
                   {r.clientId && r.taskId ? (
                     <Link
-                      to={`/clients/${r.clientId}?task=${r.taskId}`}
+                      to={`/clients/${r.clientId}/tasks/${r.taskId}`}
                       className="group/reminder flex items-center gap-3 px-2 py-2 rounded hover:bg-surface/70 transition-colors text-sm"
                     >
                       {RowInner}
@@ -421,7 +421,7 @@ export function Mail() {
             const hasActions = Boolean(m.id);
             const onClick = () => {
               if (m.taskId && m.clientId) {
-                navigate(`/clients/${m.clientId}?task=${m.taskId}`);
+                navigate(`/clients/${m.clientId}/tasks/${m.taskId}`);
               } else if (m.clientId) {
                 navigate(`/clients/${m.clientId}`);
               } else {
@@ -526,7 +526,7 @@ export function Mail() {
                         discoverable and keyboard-reachable. */}
                     {m.taskId && m.clientId && (
                       <Link
-                        to={`/clients/${m.clientId}?task=${m.taskId}`}
+                        to={`/clients/${m.clientId}/tasks/${m.taskId}`}
                         onClick={(e) => e.stopPropagation()}
                         className="ml-auto inline-flex items-center gap-1 text-2xs px-2 py-0.5 rounded border border-line text-info-ink hover:bg-info-bg/60"
                         aria-label="Open the task this reply belongs to"

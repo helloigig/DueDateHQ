@@ -83,6 +83,12 @@ export function OnboardingFirm() {
   const [calendarProvider, setCalendarProvider] = useState<
     "google" | "outlook" | "apple" | "none"
   >(session?.calendarProvider ?? "google");
+  // Internal-deadline buffer: number of calendar days before the official
+  // due date that the firm wants tasks "done by". Default 14d — covers
+  // most CPA shops' "1-2 week buffer" rule. Editable in Settings → Firm.
+  const [bufferDays, setBufferDays] = useState<number>(
+    session?.internalDeadlineBufferDays ?? 14,
+  );
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Real mode: provision the firm + public.users row in the backend.
@@ -119,6 +125,7 @@ export function OnboardingFirm() {
       tier: session?.tier ?? "pro",
       timeZone,
       calendarProvider,
+      internalDeadlineBufferDays: bufferDays,
     });
     navigate("/onboarding/choose-path");
   };
@@ -206,6 +213,28 @@ export function OnboardingFirm() {
             </select>
           </Field>
         </div>
+
+        <Field
+          label="Internal deadline buffer"
+          hint="How many days before the official due date you want a filing finished. Drives Today's 'behind plan' nudges and the chase cadence start point. Most firms run 7-21 days; 14 is the default."
+        >
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={60}
+              value={bufferDays}
+              onChange={(e) => {
+                const n = Number.parseInt(e.target.value, 10);
+                if (Number.isFinite(n)) setBufferDays(Math.max(1, Math.min(60, n)));
+              }}
+              className="w-20 border border-line rounded px-3 py-2 text-sm tabular-nums"
+            />
+            <span className="text-sm text-ink-600">
+              days before the official deadline
+            </span>
+          </div>
+        </Field>
 
         {submitError && (
           <div className="text-xs text-danger-ink bg-danger-bg border border-danger-border rounded px-3 py-2">

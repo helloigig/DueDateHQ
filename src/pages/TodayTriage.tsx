@@ -284,7 +284,7 @@ export function TodayTriage() {
           onSkip();
           break;
         case "Escape":
-          navigate("/design/today");
+          navigate("/");
           break;
       }
     };
