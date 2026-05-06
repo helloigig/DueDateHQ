@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
+  ArrowRight,
   Upload,
   UserPlus,
   Sparkles,
@@ -27,33 +28,54 @@ export function OnboardingChoosePath() {
       title="Bring your roster in"
       subtitle="Drop a CSV, connect your accounting tool, or start with a few clients."
     >
-      {/* Primary — CSV upload */}
+      {/* Primary — CSV upload. Hero card with gradient bg, icon tile,
+          eyebrow + headline composition matching the rest of the
+          product's status surface anatomy. */}
       <Link
         to="/onboarding/import"
-        className="block bg-surface border border-line rounded-md p-6 hover:bg-sunken hover:shadow-pop transition-all group"
+        className="block bg-gradient-to-br from-indigo-soft/60 via-indigo-soft/30 to-canvas border border-indigo/30 rounded-lg p-card transition-all group hover:shadow-pop hover:border-indigo/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2"
       >
         <div className="flex items-start gap-4">
-          <span className="w-12 h-12 rounded-md bg-sunken border border-line flex items-center justify-center text-ink-700 shrink-0">
+          <span
+            aria-hidden
+            className="w-12 h-12 rounded-md bg-indigo text-white flex items-center justify-center shrink-0 shadow-[inset_0_-1px_0_rgba(0,0,0,0.12)]"
+          >
             <Upload className="w-5 h-5" aria-hidden />
           </span>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-base font-semibold text-ink-900">
-                Upload a CSV
-              </h3>
-              <span className="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-warn-bg text-warn-ink border border-warn-border">
+              <p className="text-2xs font-semibold uppercase tracking-wider text-indigo-ink">
                 Recommended
-              </span>
+              </p>
             </div>
-            <p className="text-sm text-ink-500 mt-1">
-              Drag a roster from your existing tool. AI auto-maps the columns.
+            <h3 className="text-lg font-semibold text-ink-900 mt-0.5 leading-snug">
+              Upload your client roster
+            </h3>
+            <p className="text-sm text-ink-500 mt-1.5 leading-relaxed">
+              Drag a CSV from File In Time, TaxDome, ProConnect, QuickBooks, or any spreadsheet. AI maps the columns and shows you exactly what your workspace will look like — before you commit to anything.
+            </p>
+            <p className="text-xs text-indigo font-medium mt-3 inline-flex items-center gap-1 group-hover:gap-1.5 transition-all">
+              Continue
+              <ArrowRight
+                className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5"
+                aria-hidden
+              />
             </p>
           </div>
         </div>
       </Link>
 
+      {/* OR divider — soft horizontal rule with a centered "or" label */}
+      <div className="mt-card mb-card flex items-center gap-3">
+        <span className="flex-1 h-px bg-line" aria-hidden />
+        <span className="text-2xs uppercase tracking-wider text-ink-400 font-semibold">
+          or
+        </span>
+        <span className="flex-1 h-px bg-line" aria-hidden />
+      </div>
+
       {/* 3-tile row — QuickBooks, Xero, Add manually */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <ConnectTile
           icon={<QboLogo />}
           title="Connect QuickBooks"
@@ -78,14 +100,20 @@ export function OnboardingChoosePath() {
         />
       </div>
 
-      {/* Demo + Skip on the same line */}
-      <div className="mt-8 pt-6 border-t border-line flex items-center gap-6 text-xs">
+      {/* Demo + Skip — bottom escape hatches. Demo gets a soft pill
+          treatment so curious users notice it without it competing
+          with the primary upload flow. */}
+      <div className="mt-section pt-card border-t border-line flex items-center gap-6 text-xs">
         <Link
           to="/onboarding/demo"
-          className="inline-flex items-center gap-1.5 text-ink-700 hover:text-ink-900"
+          className="group/demo inline-flex items-center gap-1.5 px-3 h-8 rounded-md bg-sunken hover:bg-line text-ink-700 hover:text-ink-900 font-medium transition-colors"
         >
-          <Sparkles className="w-3.5 h-3.5" aria-hidden />
+          <Sparkles className="w-3.5 h-3.5 text-indigo" aria-hidden />
           Try the demo workspace
+          <ArrowRight
+            className="w-3 h-3 transition-transform group-hover/demo:translate-x-0.5"
+            aria-hidden
+          />
         </Link>
         <button
           type="button"
@@ -93,7 +121,7 @@ export function OnboardingChoosePath() {
             updateSession({ onboardingComplete: true });
             navigate("/", { replace: true });
           }}
-          className="text-ink-500 hover:text-ink-900 underline"
+          className="text-ink-400 hover:text-ink-700 underline underline-offset-2 ml-auto"
         >
           Skip for now
         </button>
@@ -122,7 +150,7 @@ function ConnectTile({
   onClick?: () => void;
 }) {
   const className =
-    "text-left bg-surface border border-line rounded-md p-4 hover:border-accent hover:shadow-pop transition-all flex items-start gap-3";
+    "group/tile text-left bg-surface border border-line rounded-md p-4 hover:bg-sunken hover:shadow-pop transition-all flex items-start gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2";
   const inner = (
     <>
       <span className="w-9 h-9 rounded-md flex items-center justify-center shrink-0">

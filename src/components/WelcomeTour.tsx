@@ -49,32 +49,40 @@ export function WelcomeTour() {
   if (stage === "banner") {
     return (
       <aside
-        className="bg-surface border border-line rounded-md px-4 py-2.5 flex items-center gap-3"
+        className="mb-card group bg-gradient-to-br from-info-bg/70 via-info-bg/55 to-info-bg/40 border border-info-border/70 rounded-md px-region py-region flex items-center gap-3 transition-shadow hover:shadow-pop"
         aria-label="Welcome"
       >
-        <Sparkles
-          className="w-3.5 h-3.5 text-info-ink shrink-0"
+        <span
           aria-hidden
-        />
-        <p className="flex-1 min-w-0 text-xs text-ink-700">
-          <span className="text-2xs uppercase tracking-wider text-ink-500 font-semibold mr-2">
-            New here
-          </span>
-          <span className="text-ink-900">DueDateHQ surfaces what changed</span>
-          <span className="text-ink-500">
-            {" "}— state alerts, deadlines slipping past your buffer, clients
-            who&apos;ve gone quiet.{" "}
-          </span>
-        </p>
+          className="w-9 h-9 rounded-md bg-info-bg border border-info-border/60 flex items-center justify-center text-info-ink shrink-0 shadow-[inset_0_-1px_0_rgba(29,78,216,0.06)]"
+        >
+          <Sparkles className="w-4 h-4" aria-hidden />
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="text-2xs font-semibold uppercase tracking-wider text-info-ink/80">
+            Welcome to DueDateHQ
+          </p>
+          <p className="text-sm text-ink-900 mt-0.5 leading-snug">
+            <span className="font-medium">We surface what changed</span>
+            <span className="text-ink-500">
+              {" "}— state alerts, deadlines slipping past your buffer, clients
+              who&apos;ve gone quiet.
+            </span>
+          </p>
+        </div>
         <button
           onClick={() => setStage("modal")}
-          className="text-2xs text-ink-700 hover:text-ink-900 hover:bg-sunken px-2 py-1 rounded inline-flex items-center gap-1 shrink-0"
+          className="text-xs font-medium text-info-ink hover:text-info-ink/80 inline-flex items-center gap-1 shrink-0 px-3 h-8 rounded-md bg-surface/70 border border-info-border/40 hover:bg-surface hover:border-info-border/80 transition-colors group/cta"
         >
-          60-second tour <ArrowRight className="w-3 h-3" aria-hidden />
+          60-second tour
+          <ArrowRight
+            className="w-3 h-3 transition-transform group-hover/cta:translate-x-0.5"
+            aria-hidden
+          />
         </button>
         <button
           onClick={persist}
-          className="text-ink-400 hover:text-ink-700 shrink-0"
+          className="text-ink-400 hover:text-ink-700 shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-md hover:bg-info-bg/40 transition-colors"
           aria-label="Dismiss welcome banner"
         >
           <X className="w-3.5 h-3.5" aria-hidden />
@@ -97,62 +105,72 @@ export function WelcomeTour() {
       role="dialog"
       aria-modal="true"
       aria-label="Welcome tour"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 backdrop-blur-[2px] p-4 animate-in fade-in duration-200"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) closeModal();
       }}
     >
-      <div className="bg-surface border border-line rounded-lg shadow-overlay w-full max-w-lg overflow-hidden">
+      <div className="relative bg-surface border border-line rounded-lg shadow-overlay w-full max-w-lg overflow-hidden animate-in zoom-in-95 fade-in duration-200">
         <button
           onClick={closeModal}
-          className="absolute top-3 right-3 text-ink-400 hover:text-ink-900 p-1 rounded"
+          className="absolute top-3 right-3 z-10 w-7 h-7 inline-flex items-center justify-center rounded-md text-ink-400 hover:text-ink-700 hover:bg-sunken/60 transition-colors"
           aria-label="Close tour"
         >
           <X className="w-4 h-4" />
         </button>
 
-        <div className="bg-canvas border-b border-line h-48 sm:h-56 flex items-center justify-center px-6">
+        {/* Hero visual zone — soft gradient panel that frames the slide
+            illustration. The gradient anchors the slide rhythm so each
+            of the three slides feels like one chapter of one book. */}
+        <div className="bg-gradient-to-br from-canvas via-sunken/40 to-canvas border-b border-line h-52 sm:h-60 flex items-center justify-center px-6">
           {current.visual}
         </div>
 
-        <div className="px-6 py-5">
-          <p className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
+        <div className="px-region py-card">
+          <p className="text-2xs font-semibold uppercase tracking-wider text-indigo-ink">
             {current.eyebrow}
           </p>
-          <h2 className="text-xl font-semibold text-ink-900 mt-1">
+          <h2 className="text-xl font-semibold text-ink-900 mt-1.5 leading-snug">
             {current.title}
           </h2>
           <p className="text-sm text-ink-500 mt-2 leading-relaxed">
             {current.body}
           </p>
 
-          <div className="flex items-center justify-between mt-5 pt-4 border-t border-line">
-            <div className="flex gap-1.5" aria-label="Tour progress">
+          <div className="flex items-center justify-between mt-card pt-region border-t border-line">
+            <div className="flex gap-1.5 items-center" aria-label="Tour progress">
               {slides.map((_, i) => (
                 <span
                   key={i}
                   className={[
-                    "w-1.5 h-1.5 rounded-full transition-colors",
-                    i === slide ? "bg-ink-900" : "bg-ink-300",
+                    "h-1.5 rounded-full transition-all duration-200",
+                    i === slide
+                      ? "w-6 bg-indigo"
+                      : i < slide
+                        ? "w-1.5 bg-ink-700"
+                        : "w-1.5 bg-ink-300",
                   ].join(" ")}
                 />
               ))}
+              <span className="ml-2 text-2xs text-ink-500 tabular-nums">
+                {slide + 1} of {slides.length}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               {slide > 0 && (
                 <button
                   onClick={() => setSlide((s) => Math.max(0, s - 1))}
-                  className="text-xs px-3 py-1.5 rounded text-ink-500 hover:bg-sunken inline-flex items-center gap-1"
+                  className="text-xs h-9 px-3 rounded-md text-ink-700 hover:bg-sunken font-medium inline-flex items-center gap-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2"
                 >
-                  <ArrowLeft className="w-3 h-3" aria-hidden /> Back
+                  <ArrowLeft className="w-3.5 h-3.5" aria-hidden /> Back
                 </button>
               )}
               <button
                 onClick={isLast ? closeModal : () => setSlide((s) => s + 1)}
-                className="text-sm px-4 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover inline-flex items-center gap-1.5"
+                className="text-sm h-9 px-4 rounded-md bg-indigo text-white hover:bg-indigo-hover font-medium inline-flex items-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2"
               >
                 {isLast ? "Got it" : "Next"}
-                {!isLast && <ArrowRight className="w-3 h-3" aria-hidden />}
+                {!isLast && <ArrowRight className="w-3.5 h-3.5" aria-hidden />}
               </button>
             </div>
           </div>

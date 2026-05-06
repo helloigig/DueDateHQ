@@ -21,15 +21,15 @@ import { useDashboardPreferences } from "../data/preferences";
 import { ChaseBanner } from "../components/ChaseBanner";
 import { BlockingAlertsDialog } from "../components/BlockingAlertsDialog";
 import { OnboardingLayer2Widget } from "../components/OnboardingLayer2Widget";
-// import { WelcomeTour } from "../components/WelcomeTour"; // hidden per user direction
+import { WelcomeTour } from "../components/WelcomeTour";
 import { CapacityStrip } from "../components/CapacityStrip";
 // ModeFHealth removed — the same monitoring signal ("50/50 states ·
 // last scrape 14m ago") is already on /alerts as the ambient line.
 // Two surfaces showing the same health was redundant.
 // import { ModeFHealth } from "../components/ModeFHealth";
 import { ActionQueue } from "../components/ActionQueue";
-import { JustHappenedStrip } from "../components/JustHappenedStrip";
 import { AlertTriageModal } from "../components/AlertTriageModal";
+import { JustHappenedStrip } from "../components/JustHappenedStrip";
 import { WhatChangedBanner } from "../components/WhatChangedBanner";
 import { AiUsageInfo } from "../components/AiUsageInfo";
 import { PageHeader } from "../components/ui/PageHeader";
@@ -247,7 +247,7 @@ export function Dashboard() {
           now" affordances (Mercury Home: Send / Transfer / Deposit / Request).
           Per T2 — only the first action ("Send chase") wears the indigo
           accent; the rest are ghost pills. */}
-      <div className="mb-region flex items-end justify-between gap-region flex-wrap">
+      <div className="mb-card flex items-end justify-between gap-region flex-wrap">
         <PageHeader
           className="mb-0"
           title={
@@ -304,10 +304,14 @@ export function Dashboard() {
         )}
       </div>
 
-      {/* WelcomeTour hidden per user direction — adds noise on the daily
-          surface; reintroduce as an onboarding-only banner gated on
-          firstSession if we want a tour later. */}
-      {/* <WelcomeTour /> */}
+      {/* First-run orientation — banner + 3-slide modal tour (Hook /
+          Core / Moat). Gated by localStorage so it only fires once per
+          browser. Reintroduced 2026-05-06 per Yuqi: the 3-step intro
+          card was core to the first-time experience and shouldn't have
+          been removed. The banner stage is calm (one line, dismissible);
+          users who want orientation click "60-second tour" to open the
+          slide-deck modal. */}
+      <WelcomeTour />
 
       {/* ─────────────────────────────────────────────────────────────────
           Today narrative (5 sections, read top → bottom):
@@ -368,10 +372,14 @@ export function Dashboard() {
       <OnboardingLayer2Widget />
 
       {/* Blocking-alerts overlay — fires only at >72h escalation. Stays as
-          a modal because the spec demands a forced ack at that tier. */}
+          a modal because the spec demands a forced ack at that tier. The
+          totalAffecting prop carries the full "Affecting you" count so
+          the modal can show "5 of {N} affecting you" — clarifying that
+          this popup is a strict subset of the /alerts "Affecting you" tab. */}
       {showBlockingDialog && !blockingDismissed && (
         <BlockingAlertsDialog
           alerts={alertsByTier.blocking}
+          totalAffecting={firmRelevantAlerts.length}
           onSnooze={(reason) => {
             update({ alerts_snoozed_until: toIso(TODAY) });
             if (reason) {
@@ -525,16 +533,24 @@ function StateAlertsPreview({
       <SectionHeader
         title="Escalated alerts"
         meta={
-          escalated.length === 1
-            ? "1 past 72h SLA — act today"
-            : `${escalated.length} past 72h SLA — act today`
+          <span className="inline-flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-2 h-5 rounded-pill text-2xs font-semibold uppercase tracking-wider bg-warn-bg/70 border border-warn-border/60 text-warn-ink">
+              <span className="tabular-nums">{escalated.length}</span>
+              past 72h SLA
+            </span>
+            <span className="text-2xs text-ink-500">act today</span>
+          </span>
         }
         action={
           <Link
             to="/alerts"
-            className="text-xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-1"
+            className="text-xs font-medium text-ink-500 hover:text-ink-900 inline-flex items-center gap-1 px-2 h-7 rounded-md hover:bg-sunken/60 transition-colors group"
           >
-            All alerts <ChevronRight className="w-3 h-3" aria-hidden />
+            All alerts
+            <ChevronRight
+              className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5"
+              aria-hidden
+            />
           </Link>
         }
       />
@@ -550,14 +566,18 @@ function StateAlertsPreview({
         ))}
       </div>
       {routineCount > 0 && (
-        <div className="mt-3 flex justify-center">
+        <div className="mt-card flex justify-center">
           <Link
             to="/alerts"
-            className="inline-flex items-center gap-1 text-xs text-ink-500 hover:text-ink-900 hover:underline underline-offset-[3px] decoration-[1.5px]"
+            className="group inline-flex items-center gap-1.5 text-xs font-medium text-ink-500 hover:text-ink-900 px-3 h-8 rounded-md border border-line bg-surface hover:bg-sunken transition-colors"
           >
-            {routineCount} more routine{" "}
-            {routineCount === 1 ? "alert" : "alerts"} on /alerts
-            <ChevronRight className="w-3.5 h-3.5" aria-hidden />
+            <span className="tabular-nums">{routineCount}</span>
+            more routine{" "}
+            {routineCount === 1 ? "alert" : "alerts"}
+            <ChevronRight
+              className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5"
+              aria-hidden
+            />
           </Link>
         </div>
       )}
