@@ -9,6 +9,7 @@ import {
 import { OnboardingShell } from "../../components/OnboardingShell";
 import { OAuthWireframeModal } from "../../components/OAuthWireframeModal";
 import { updateSession } from "../../data/session";
+import { actions } from "../../data/store";
 
 /**
  * Step 2 — bring your roster in. CSV is the primary affordance; QBO/Xero
@@ -118,6 +119,7 @@ export function OnboardingChoosePath() {
         <button
           type="button"
           onClick={() => {
+            actions.resetToSeeds();
             updateSession({ onboardingComplete: true });
             navigate("/", { replace: true });
           }}

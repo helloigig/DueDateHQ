@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { OnboardingShell } from "../../components/OnboardingShell";
 import { updateSession } from "../../data/session";
-import { useStore } from "../../data/store";
+import { actions, useStore } from "../../data/store";
 
 /**
  * Onboarding done. The proof-of-Day-1 moment.
@@ -46,6 +46,7 @@ export function OnboardingDone() {
 
   const finish = () => {
     setOpening(true);
+    actions.resetToSeeds();
     updateSession({ onboardingComplete: true });
     navigate("/", { replace: true });
   };
