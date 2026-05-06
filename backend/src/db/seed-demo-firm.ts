@@ -7,18 +7,43 @@
  * Called from `auth.bootstrapDemo` (tRPC) — fires when a user signs in
  * as demo@duedatehq.com so the firm always converges on the seeded set.
  *
+ * What's seeded (in dependency order):
+ *   1. Clients — 51 rows
+ *   2. Deadlines — ~70 rows, internal_target_date = official - 7d
+ *   3. Tasks — one per active/overdue/in-progress deadline (so Timeline
+ *      and the Today summary tiles have something to count)
+ *   4. TaskMilestones — 5 per task (initial_meeting → file), status
+ *      derived deterministically from target_date vs today so the fleet
+ *      stack renders a believable mix of done / in-progress / not-started
+ *   5. ChecklistItems — 4 per task in a deterministic role-mix (Mode A
+ *      received-unreviewed, Mode B requested-waiting, Mode C
+ *      received-issue, etc.) so todoItems.list aggregates to a populated
+ *      Action queue
+ *   6. EmailDrafts — Mode D draft-ready rows for ~1 in 7 tasks
+ *
  * Idempotency:
  *   • Clients: idempotent on (firm_id, name). Re-runs skip existing rows.
  *   • Deadlines: idempotent on (firm_id, client_id, form_type, official_due_date).
+ *   • Tasks: idempotent on (deadline_id) — at most one task per deadline.
+ *   • Milestones: idempotent on (task_id, milestone_type).
+ *   • ChecklistItems: idempotent on (task_id, label).
+ *   • EmailDrafts: idempotent on (task_id, subject).
  *
  * Re-running this function after edits will INSERT new rows but won't
  * UPDATE existing ones — treat the seed as immutable once landed. To
  * change a row, ship a follow-up mutation (or wipe the demo firm and
  * re-seed; clients are firm-scoped so cascade-delete cleans up cleanly).
  */
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { db as DbType } from "./client.js";
-import { clients, deadlines } from "./schema.js";
+import {
+  checklistItems,
+  clients,
+  deadlines,
+  emailDrafts,
+  taskMilestones,
+  tasks,
+} from "./schema.js";
 
 interface DemoClient {
   /** Stable handle so deadlines can reference clients before insert. */
@@ -240,7 +265,157 @@ interface SeedResult {
   clientsExisting: number;
   deadlinesInserted: number;
   deadlinesExisting: number;
+  tasksInserted: number;
+  tasksExisting: number;
+  milestonesInserted: number;
+  checklistsInserted: number;
+  draftsInserted: number;
 }
+
+// "Today" anchor for milestone/checklist status derivation. Defaults to
+// real now() but the test harness can override so seed snapshots stay
+// stable across runs without smearing on each calendar day.
+const SEED_TODAY = new Date(
+  process.env.DEMO_SEED_TODAY ?? new Date().toISOString().slice(0, 10),
+);
+const MS_PER_DAY = 86_400_000;
+const isoDate = (d: Date) => d.toISOString().slice(0, 10);
+const addDays = (d: Date, n: number) =>
+  new Date(d.getTime() + n * MS_PER_DAY);
+const daysBetween = (a: Date, b: Date) =>
+  Math.round((a.getTime() - b.getTime()) / MS_PER_DAY);
+
+// Deterministic 6-char base36 hash for forwardingEmailLocalPart. Must be
+// stable across re-runs (so re-seeds don't allocate new rows) and globally
+// unique (the column has a UNIQUE constraint).
+function djb2(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h).toString(36).slice(0, 6).padStart(6, "0");
+}
+
+function slug(s: string, max = 16) {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, max) || "x";
+}
+
+function forwardingLocalPart(
+  firmId: string,
+  clientName: string,
+  formType: string,
+  dueDate: string,
+) {
+  const tail = djb2(`${firmId}|${clientName}|${formType}|${dueDate}`);
+  const first = clientName.split(" ")[0] ?? "task";
+  return `${slug(first)}-${slug(formType)}-${tail}`;
+}
+
+// Statuses considered "live work" — the seed only spawns tasks +
+// milestones + checklists for these. Completed/filed_extension/deferred
+// deadlines stay as historical context (Clients page, prior-year facts).
+const ACTIVE_DEADLINE_STATUSES = new Set([
+  "not_started",
+  "in_progress",
+  "overdue",
+]);
+
+type DeadlineStatus = DemoDeadline["status"];
+
+// Five-step default milestone schedule. Targets are deltas relative to
+// the official due date — clamped to 0 so an overdue deadline still
+// renders sensible past targets.
+const MILESTONE_SCHEDULE: Array<{
+  type:
+    | "initial_meeting"
+    | "collect_materials"
+    | "prepare_workpapers"
+    | "internal_review"
+    | "client_review"
+    | "file";
+  daysBefore: number;
+}> = [
+  { type: "collect_materials", daysBefore: 45 },
+  { type: "prepare_workpapers", daysBefore: 21 },
+  { type: "internal_review", daysBefore: 14 },
+  { type: "client_review", daysBefore: 7 },
+  { type: "file", daysBefore: 0 },
+];
+
+// Five role mixes for checklist items. Index = task position (stable
+// after sorting by deadline + form), so the same demo firm always has
+// the same items in the same shape after re-seed.
+//
+// Each role array has 4 items so the FE DotStack renders 4 dots —
+// matches the "1 of 4 received and waiting your confirm" copy.
+type ChecklistRole = {
+  state:
+    | "not_requested"
+    | "requested_waiting"
+    | "received_unreviewed"
+    | "received_confirmed"
+    | "received_issue";
+  /** -1 = no reminder yet (not_requested role). Other values are days ago. */
+  remindedDaysAgo: number;
+  aiConfidence: string | null;
+  aiFlagReason: string | null;
+};
+
+const CHECKLIST_ROLES: ChecklistRole[][] = [
+  // 0: "all received unreviewed" — Mode A piles 4 confirms onto Today.
+  [
+    { state: "received_unreviewed", remindedDaysAgo: 2, aiConfidence: "0.92", aiFlagReason: null },
+    { state: "received_unreviewed", remindedDaysAgo: 2, aiConfidence: "0.88", aiFlagReason: null },
+    { state: "received_unreviewed", remindedDaysAgo: 2, aiConfidence: "0.95", aiFlagReason: null },
+    { state: "received_unreviewed", remindedDaysAgo: 2, aiConfidence: "0.81", aiFlagReason: null },
+  ],
+  // 1: "all waiting" — Mode B chase row, last reminder 5d ago.
+  [
+    { state: "requested_waiting", remindedDaysAgo: 5, aiConfidence: null, aiFlagReason: null },
+    { state: "requested_waiting", remindedDaysAgo: 5, aiConfidence: null, aiFlagReason: null },
+    { state: "requested_waiting", remindedDaysAgo: 5, aiConfidence: null, aiFlagReason: null },
+    { state: "requested_waiting", remindedDaysAgo: 5, aiConfidence: null, aiFlagReason: null },
+  ],
+  // 2: "mixed" — Mode C anomaly + Mode B chase + 1 confirmed.
+  [
+    { state: "received_issue", remindedDaysAgo: 3, aiConfidence: "0.62", aiFlagReason: "Amount differs from prior year by >20% — confirm with client" },
+    { state: "requested_waiting", remindedDaysAgo: 8, aiConfidence: null, aiFlagReason: null },
+    { state: "requested_waiting", remindedDaysAgo: 8, aiConfidence: null, aiFlagReason: null },
+    { state: "received_confirmed", remindedDaysAgo: -1, aiConfidence: null, aiFlagReason: null },
+  ],
+  // 3: "fresh" — T-21 hit, never asked yet (Mode B with not_requested).
+  [
+    { state: "not_requested", remindedDaysAgo: -1, aiConfidence: null, aiFlagReason: null },
+    { state: "not_requested", remindedDaysAgo: -1, aiConfidence: null, aiFlagReason: null },
+    { state: "not_requested", remindedDaysAgo: -1, aiConfidence: null, aiFlagReason: null },
+    { state: "not_requested", remindedDaysAgo: -1, aiConfidence: null, aiFlagReason: null },
+  ],
+  // 4: "advanced" — mostly confirmed, one Mode A item still waiting.
+  [
+    { state: "received_confirmed", remindedDaysAgo: -1, aiConfidence: null, aiFlagReason: null },
+    { state: "received_confirmed", remindedDaysAgo: -1, aiConfidence: null, aiFlagReason: null },
+    { state: "received_confirmed", remindedDaysAgo: -1, aiConfidence: null, aiFlagReason: null },
+    { state: "received_unreviewed", remindedDaysAgo: 1, aiConfidence: "0.79", aiFlagReason: null },
+  ],
+];
+
+// Common-document checklist labels — picked per task index so different
+// tasks have different shopping lists. Item type is best-effort categorical
+// for the FE to colour code; not load-bearing.
+const CHECKLIST_LABELS: Array<{ label: string; itemType: string }> = [
+  { label: "W-2 (current year)", itemType: "income" },
+  { label: "1099-NEC", itemType: "income" },
+  { label: "1099-INT / 1099-DIV", itemType: "income" },
+  { label: "K-1 schedule", itemType: "income" },
+  { label: "Bank statements (Q4)", itemType: "support" },
+  { label: "Mortgage interest (1098)", itemType: "deduction" },
+  { label: "Charitable contribution receipts", itemType: "deduction" },
+  { label: "Prior-year return (PDF)", itemType: "support" },
+  { label: "QuickBooks export", itemType: "support" },
+  { label: "Vehicle mileage log", itemType: "deduction" },
+  { label: "Health insurance 1095", itemType: "support" },
+  { label: "Estimated payment record", itemType: "payment" },
+];
 
 /**
  * Idempotently seed the demo firm with 51 clients + ~70 deadlines.
@@ -326,6 +501,13 @@ export async function seedDemoFirm({
       deadlinesExisting++;
       continue;
     }
+    // Internal target = official - 7 days. Drives the Dashboard's
+    // "Behind plan" tile (counts open tasks where today > internal target
+    // but ≤ official deadline). Without this, a healthy firm whose
+    // deadlines are all 1-2 weeks out would show 0 across every signal
+    // tile despite being mid-chase.
+    const officialDate = new Date(d.officialDueDate);
+    const internalTargetDate = isoDate(addDays(officialDate, -7));
     await db.insert(deadlines).values({
       firmId,
       clientId,
@@ -342,12 +524,308 @@ export async function seedDemoFirm({
       jurisdiction: d.jurisdiction,
       officialDueDate: d.officialDueDate,
       adjustedDueDate: d.officialDueDate,
+      internalTargetDate,
       status: d.status,
     });
     deadlinesInserted++;
   }
 
-  // Acquire silence the unused warning when no client matched (defensive).
+  // ───────────────────────────────────────────────────────────────────
+  // Tasks + milestones + checklists + drafts
+  //
+  // Re-fetch deadlines after the insert pass so we have ids for both
+  // pre-existing and freshly inserted rows. Limit to ACTIVE statuses —
+  // the seed deliberately leaves completed/filed/deferred deadlines
+  // task-less so the historical buckets read as "already filed, no open
+  // work" rather than "Sarah forgot to mark these done".
+  // ───────────────────────────────────────────────────────────────────
+  const allDeadlines = await db
+    .select({
+      id: deadlines.id,
+      clientId: deadlines.clientId,
+      formType: deadlines.formType,
+      officialDueDate: deadlines.officialDueDate,
+      status: deadlines.status,
+    })
+    .from(deadlines)
+    .where(eq(deadlines.firmId, firmId));
+
+  // Stable ordering — matches CHECKLIST_ROLES indexing so re-runs land in
+  // the same role mix per task.
+  const activeDeadlines = allDeadlines
+    .filter((d) =>
+      ACTIVE_DEADLINE_STATUSES.has(d.status as DeadlineStatus),
+    )
+    .sort((a, b) =>
+      a.officialDueDate === b.officialDueDate
+        ? a.formType.localeCompare(b.formType)
+        : a.officialDueDate.localeCompare(b.officialDueDate),
+    );
+
+  // Index existing tasks by deadlineId so we don't double-spawn.
+  const activeDeadlineIds = activeDeadlines.map((d) => d.id);
+  const existingTasks = activeDeadlineIds.length
+    ? await db
+        .select({
+          id: tasks.id,
+          deadlineId: tasks.deadlineId,
+        })
+        .from(tasks)
+        .where(
+          and(
+            eq(tasks.firmId, firmId),
+            inArray(tasks.deadlineId, activeDeadlineIds),
+          ),
+        )
+    : [];
+  const taskIdByDeadline = new Map(
+    existingTasks.map((t) => [t.deadlineId, t.id]),
+  );
+
+  // Resolve client name per deadline (needed for forwarding-email + draft
+  // recipient). Build once so we don't N+1 the loop.
+  const clientNameById = new Map(
+    (
+      await db
+        .select({ id: clients.id, name: clients.name, email: clients.contactEmail })
+        .from(clients)
+        .where(eq(clients.firmId, firmId))
+    ).map((c) => [c.id, { name: c.name, email: c.email }]),
+  );
+
+  let tasksInserted = 0;
+  let tasksExisting = 0;
+
+  for (const d of activeDeadlines) {
+    if (taskIdByDeadline.has(d.id)) {
+      tasksExisting++;
+      continue;
+    }
+    const c = clientNameById.get(d.clientId);
+    if (!c) continue;
+    const local = forwardingLocalPart(
+      firmId,
+      c.name,
+      d.formType,
+      d.officialDueDate,
+    );
+    // Default task status = not_started; flip to overdue/in_progress to
+    // match the parent deadline so the tasks list reflects the underlying
+    // urgency without a follow-up update pass.
+    const initialTaskStatus =
+      d.status === "overdue"
+        ? "overdue"
+        : d.status === "in_progress"
+          ? "in_progress"
+          : "not_started";
+    const [inserted] = await db
+      .insert(tasks)
+      .values({
+        firmId,
+        deadlineId: d.id,
+        forwardingEmailLocalPart: local,
+        status: initialTaskStatus,
+      })
+      .returning({ id: tasks.id });
+    if (!inserted) continue;
+    taskIdByDeadline.set(d.id, inserted.id);
+    tasksInserted++;
+  }
+
+  // ───────────────────────────────────────────────────────────────────
+  // Milestones — 5 per task, status derived from target_date vs today.
+  // ───────────────────────────────────────────────────────────────────
+  const taskIdList = Array.from(taskIdByDeadline.values());
+  const existingMilestones = taskIdList.length
+    ? await db
+        .select({
+          taskId: taskMilestones.taskId,
+          milestoneType: taskMilestones.milestoneType,
+        })
+        .from(taskMilestones)
+        .where(
+          and(
+            eq(taskMilestones.firmId, firmId),
+            inArray(taskMilestones.taskId, taskIdList),
+          ),
+        )
+    : [];
+  const existingMilestoneSet = new Set(
+    existingMilestones.map((m) => `${m.taskId}|${m.milestoneType}`),
+  );
+
+  let milestonesInserted = 0;
+
+  for (const d of activeDeadlines) {
+    const taskId = taskIdByDeadline.get(d.id);
+    if (!taskId) continue;
+    const officialDate = new Date(d.officialDueDate);
+
+    for (let idx = 0; idx < MILESTONE_SCHEDULE.length; idx++) {
+      const step = MILESTONE_SCHEDULE[idx]!;
+      if (existingMilestoneSet.has(`${taskId}|${step.type}`)) continue;
+      const target = addDays(officialDate, -step.daysBefore);
+      const targetIso = isoDate(target);
+      // Status mapping:
+      //   target > today + 7d → not_started
+      //   target ∈ [today-2d, today+7d] → in_progress
+      //   target < today - 2d → done (with completedDate = targetIso)
+      const delta = daysBetween(target, SEED_TODAY);
+      let status:
+        | "not_started"
+        | "in_progress"
+        | "done"
+        | "blocked"
+        | "overdue" = "not_started";
+      let completedDate: string | null = null;
+      if (delta < -2) {
+        status = "done";
+        completedDate = targetIso;
+      } else if (delta <= 7) {
+        status = "in_progress";
+      }
+      // The final "file" milestone is special — only mark it done if the
+      // parent deadline itself is completed. Otherwise leave as
+      // not_started even if the target date is past, so an overdue task
+      // doesn't pretend it's filed.
+      if (step.type === "file" && d.status !== "completed") {
+        status = delta < 0 ? "overdue" : "not_started";
+        completedDate = null;
+      }
+      await db.insert(taskMilestones).values({
+        firmId,
+        taskId,
+        milestoneType: step.type,
+        targetDate: targetIso,
+        completedDate,
+        displayOrder: idx,
+        proposedBy: "ai",
+        status,
+      });
+      milestonesInserted++;
+    }
+  }
+
+  // ───────────────────────────────────────────────────────────────────
+  // Checklists — 4 items per task in a deterministic role mix. Drives
+  // todoItems.list (Today's Action queue) — Mode A confirms, Mode B
+  // chase rows, Mode C anomaly flags.
+  // ───────────────────────────────────────────────────────────────────
+  const existingChecklists = taskIdList.length
+    ? await db
+        .select({
+          taskId: checklistItems.taskId,
+          label: checklistItems.label,
+        })
+        .from(checklistItems)
+        .where(
+          and(
+            eq(checklistItems.firmId, firmId),
+            inArray(checklistItems.taskId, taskIdList),
+          ),
+        )
+    : [];
+  const existingChecklistSet = new Set(
+    existingChecklists.map((c) => `${c.taskId}|${c.label}`),
+  );
+
+  let checklistsInserted = 0;
+
+  for (let i = 0; i < activeDeadlines.length; i++) {
+    const d = activeDeadlines[i]!;
+    const taskId = taskIdByDeadline.get(d.id);
+    if (!taskId) continue;
+    const role = CHECKLIST_ROLES[i % CHECKLIST_ROLES.length]!;
+    // Stagger which 4 labels each task pulls so different tasks ask for
+    // different documents — keeps the demo varied at a glance.
+    const labelStart = (i * 3) % CHECKLIST_LABELS.length;
+    for (let j = 0; j < role.length; j++) {
+      const labelDef =
+        CHECKLIST_LABELS[(labelStart + j) % CHECKLIST_LABELS.length]!;
+      if (existingChecklistSet.has(`${taskId}|${labelDef.label}`)) continue;
+      const r = role[j]!;
+      const lastReminderAt =
+        r.remindedDaysAgo >= 0
+          ? addDays(SEED_TODAY, -r.remindedDaysAgo)
+          : null;
+      // received_confirmed has the §5.3 invariant — only a user can
+      // confirm. Mark the actor as user (we don't have a user id in
+      // scope; null on stateChangedByUserId is allowed). All other
+      // states are written by system here.
+      const stateChangedByKind =
+        r.state === "received_confirmed" ? "user" : "system";
+      await db.insert(checklistItems).values({
+        firmId,
+        taskId,
+        label: labelDef.label,
+        itemType: labelDef.itemType,
+        sortOrder: j,
+        state: r.state,
+        stateChangedByKind,
+        aiConfidence: r.aiConfidence,
+        aiFlagReason: r.aiFlagReason,
+        // received_issue surfaces aiFlagSeverity in the FE — set medium
+        // so it renders as amber rather than uncategorised.
+        aiFlagSeverity: r.aiFlagReason ? "medium" : null,
+        lastReminderAt,
+      });
+      checklistsInserted++;
+    }
+  }
+
+  // ───────────────────────────────────────────────────────────────────
+  // Email drafts — Mode D draft-ready, ~1 in 7 active tasks. Surfaces
+  // as "Review draft · …" rows in Today's Action queue.
+  // ───────────────────────────────────────────────────────────────────
+  const existingDrafts = taskIdList.length
+    ? await db
+        .select({
+          taskId: emailDrafts.taskId,
+          subject: emailDrafts.subject,
+        })
+        .from(emailDrafts)
+        .where(
+          and(
+            eq(emailDrafts.firmId, firmId),
+            inArray(emailDrafts.taskId, taskIdList),
+          ),
+        )
+    : [];
+  const existingDraftSet = new Set(
+    existingDrafts.map((d) => `${d.taskId}|${d.subject}`),
+  );
+
+  let draftsInserted = 0;
+
+  for (let i = 0; i < activeDeadlines.length; i++) {
+    if (i % 7 !== 0) continue;
+    const d = activeDeadlines[i]!;
+    const taskId = taskIdByDeadline.get(d.id);
+    if (!taskId) continue;
+    const c = clientNameById.get(d.clientId);
+    if (!c?.email) continue;
+    const subject = `Quick update on your ${d.formType}`;
+    if (existingDraftSet.has(`${taskId}|${subject}`)) continue;
+    const body = [
+      `Hi — just a heads up that your ${d.formType} is due ${d.officialDueDate}.`,
+      "",
+      "I've drafted the response below. A few items are still outstanding; please review and reply with anything we missed.",
+      "",
+      "— Sarah",
+    ].join("\n");
+    await db.insert(emailDrafts).values({
+      firmId,
+      taskId,
+      status: "draft",
+      toAddress: c.email,
+      subject,
+      body,
+      tone: "neutral",
+    });
+    draftsInserted++;
+  }
+
+  // Defensive — silence unused-import warning when no rows match.
   void and;
 
   return {
@@ -355,5 +833,10 @@ export async function seedDemoFirm({
     clientsExisting,
     deadlinesInserted,
     deadlinesExisting,
+    tasksInserted,
+    tasksExisting,
+    milestonesInserted,
+    checklistsInserted,
+    draftsInserted,
   };
 }
