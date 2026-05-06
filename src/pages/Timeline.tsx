@@ -126,12 +126,18 @@ type TaskRow = {
   assigneeName?: string | null;
 };
 
+// Stage labels — vocabulary aligned with the locked 5-stage model 2026-05-06:
+// Scope (was "Initial mtg") → Collecting → Preparing → Signature
+// (was "Review" — internal review folds into Preparing's expanded
+// detail) → Filed. Type values keep their backend-canonical names
+// (initial_meeting, review) so the BE migration can land separately
+// without breaking persisted task state. Only the rendered copy moves.
 const STAGE_LABELS: Record<Stage, string> = {
-  initial_meeting: "Initial mtg",
-  collect: "Collect",
-  prepare: "Prepare",
-  review: "Review",
-  file: "File",
+  initial_meeting: "Scope",
+  collect: "Collecting",
+  prepare: "Preparing",
+  review: "Signature",
+  file: "Filed",
 };
 
 // Static fallback rows used when the live BE returns nothing AND the user

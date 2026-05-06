@@ -40,6 +40,17 @@ function targetDate(officialDueDate: string, days: number): string {
   return `${y}-${m}-${day}`;
 }
 
+/**
+ * Default internal-deadline buffer in days, matching the FirmSession
+ * field collected during onboarding (Settings → Firm). Mock seed bakes
+ * this value into every task's internalTargetDate so demo state aligns
+ * with the field's default. When the firm changes their buffer, live
+ * mode recomputes per-task targets server-side; mock mode currently
+ * keeps the seed (the field is stored but recompute on change is a BE
+ * mutation that doesn't exist in mock yet).
+ */
+const DEFAULT_BUFFER_DAYS = 14;
+
 function deadlineStatusToTaskStatus(s: Deadline["status"]): TaskStatus {
   return s as TaskStatus;
 }
@@ -60,8 +71,16 @@ export function buildTasksFromDeadlines(deadlines: Deadline[]): Task[] {
       formType: d.form,
       jurisdiction: d.jurisdiction,
       officialDueDate: d.officialDueDate,
-      internalTargetDate: targetDate(d.officialDueDate, 7),
-      clientPrepDate: targetDate(d.officialDueDate, 14),
+      // Internal target = official − DEFAULT_BUFFER_DAYS. The buffer is
+      // a per-firm setting (FirmSession.internalDeadlineBufferDays,
+      // collected in onboarding, default 14d). Mock seed uses the
+      // matching default so demo state lines up with what the user
+      // configured. Live mode: backend recomputes per-task internal
+      // targets when the firm's buffer changes.
+      internalTargetDate: targetDate(d.officialDueDate, DEFAULT_BUFFER_DAYS),
+      // clientPrepDate = official − (buffer + 7d). Adds an additional
+      // week before the internal target to chase clients for documents.
+      clientPrepDate: targetDate(d.officialDueDate, DEFAULT_BUFFER_DAYS + 7),
       status: deadlineStatusToTaskStatus(d.status),
       forwardingEmail: makeForwardingEmail(
         client?.name ?? "Client",
