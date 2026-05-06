@@ -197,7 +197,7 @@ export function Sidebar() {
                 {!collapsed && to === "/alerts" && alertsAffectingCount > 0 && (
                   <CountBadge
                     count={alertsAffectingCount}
-                    tone="danger"
+                    tone="neutral"
                     className="ml-auto"
                     title={`${alertsAffectingCount} ${
                       alertsAffectingCount === 1 ? "client" : "clients"
@@ -205,7 +205,7 @@ export function Sidebar() {
                   />
                 )}
                 {collapsed && to === "/alerts" && alertsAffectingCount > 0 && (
-                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-danger-solid" />
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-warn-solid" />
                 )}
                 {/* Clients caption — active roster size (excludes archived /
                     inactive / prospect). */}

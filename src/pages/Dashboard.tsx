@@ -29,7 +29,6 @@ import { CapacityStrip } from "../components/CapacityStrip";
 // import { ModeFHealth } from "../components/ModeFHealth";
 import { ActionQueue } from "../components/ActionQueue";
 import { JustHappenedStrip } from "../components/JustHappenedStrip";
-import { AlertTriageModal } from "../components/AlertTriageModal";
 import { WhatChangedBanner } from "../components/WhatChangedBanner";
 import { AiUsageInfo } from "../components/AiUsageInfo";
 import { PageHeader } from "../components/ui/PageHeader";
@@ -237,17 +236,20 @@ export function Dashboard() {
 
   return (
     <div className="max-w-[1080px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
-      {/* Triage modal — fires once per browser session on first land
-          when the user has alerts that arrived while they were away.
-          Honors the per-user toggle in Settings → Notifications. */}
-      <AlertTriageModal />
+      {/* AlertTriageModal removed 2026-05-06 — it fired in addition to
+          BlockingAlertsDialog, putting two back-to-back modals on every
+          first land (especially the demo workspace). The inline
+          <WhatChangedBanner> covers the ambient "what's new since you
+          were last here" cue without interruption; <BlockingAlertsDialog>
+          stays for the >72h SLA forced ack. Per Q5 confidence: pick one
+          surface per concept. */}
 
       {/* PAGE HEADER ROW — Mercury Home anatomy: H1 left + action button row
           right. The action row carries the page's "what can I do here right
           now" affordances (Mercury Home: Send / Transfer / Deposit / Request).
           Per T2 — only the first action ("Send chase") wears the indigo
           accent; the rest are ghost pills. */}
-      <div className="mb-region flex items-end justify-between gap-region flex-wrap">
+      <div className="mb-card flex items-end justify-between gap-region flex-wrap">
         <PageHeader
           className="mb-0"
           title={
