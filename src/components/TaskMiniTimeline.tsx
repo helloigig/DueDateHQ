@@ -536,12 +536,29 @@ function Waypoint({
     }
   })();
 
+  // Hover tooltip — combines label + date + status into a single readable
+  // string so the user can confirm what each dot represents without
+  // squinting at the truncated text below. Includes blocker reason or
+  // missing-count when relevant.
+  const tooltipText = (() => {
+    const parts: string[] = [wp.label];
+    if (wp.targetDate) parts.push(formatShort(wp.targetDate));
+    parts.push(statusLabel);
+    let text = parts.join(" · ");
+    if (wp.blockerReason) text += ` — ${wp.blockerReason}`;
+    else if (wp.missingBadge && wp.missingBadge > 0) {
+      text += ` — ${wp.missingBadge} item${wp.missingBadge === 1 ? "" : "s"} waiting`;
+    }
+    return text;
+  })();
+
   return (
     <div
       role="button"
       tabIndex={0}
       aria-label={`${wp.label} — ${statusLabel}`}
       aria-pressed={isSelected}
+      title={tooltipText}
       onClick={(e) => {
         e.stopPropagation();
         onSelect();
