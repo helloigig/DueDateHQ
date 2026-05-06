@@ -40,6 +40,15 @@ import { importedFacts as seedImportedFacts } from "./mockImportedFacts";
 import { aiInsights as seedAiInsights } from "./mockAiInsights";
 import { emailDrafts as seedEmailDrafts } from "./mockEmailDrafts";
 
+// Milestone rows are typed by the canonical tRPC `TaskMilestoneRow`
+// (router.ts:43) — re-imported here so cascades (task complete → all
+// milestones done) can mutate them as one transaction. The state was
+// hoisted 2026-05-06 from a module-private Map in mock-adapter so the
+// cascade hub in updateTaskStatus can reach it. Status enum stays at 5
+// states for BE-shape parity, but only `done` vs. not-`done` matters
+// to the UI.
+import type { TaskMilestoneRow } from "../lib/api/router";
+
 interface State {
   clients: Client[];
   deadlines: Deadline[];
@@ -55,6 +64,11 @@ interface State {
   /** Per-task note feed — Phase-1 promotion of v0.7 stub. Distinct
    *  from `clients.notes` and `clientNotes`. */
   taskNotes: TaskNote[];
+  /** Per-task milestones, keyed by taskId. Plain object (not Map) so it
+   *  round-trips through localStorage. Synthesized lazily by
+   *  `taskMilestones.proposeForTask` in mock-adapter and mutated by
+   *  `markTaskComplete` for the task→milestones cascade. */
+  milestones: Record<string, TaskMilestoneRow[]>;
 }
 
 // v4 bump: hydrate now defaults to EMPTY state (was: full demo seeds). The
@@ -81,6 +95,7 @@ function emptyState(): State {
     aiInsights: [],
     emailDrafts: [],
     taskNotes: [],
+    milestones: {},
   };
 }
 
@@ -100,6 +115,7 @@ function seedState(): State {
     aiInsights: seedAiInsights,
     emailDrafts: seedEmailDrafts,
     taskNotes: [],
+    milestones: {},
   };
 }
 
@@ -124,6 +140,7 @@ function hydrate(): State {
       aiInsights: parsed.aiInsights ?? fallback.aiInsights,
       emailDrafts: parsed.emailDrafts ?? fallback.emailDrafts,
       taskNotes: parsed.taskNotes ?? fallback.taskNotes,
+      milestones: parsed.milestones ?? fallback.milestones,
     };
   } catch {
     return emptyState();
@@ -215,7 +232,6 @@ function statusLabel(s: DeadlineStatus): string {
       not_started: "not started",
       in_progress: "in progress",
       completed: "complete",
-      deferred: "deferred",
       filed_extension: "filed extension",
       overdue: "overdue",
     } as Record<DeadlineStatus, string>
@@ -288,9 +304,23 @@ function appendActivity(
 // ---------- actions ----------
 
 export const actions = {
+  /** Set deadline status. Delegates to `updateTaskStatus` when the
+   *  caller is moving the deadline to a terminal state and a matching
+   *  Task exists, so cascades (task→milestones, completedAt/By stamping)
+   *  fire from a single hub regardless of which surface the user clicked.
+   *  Surfaces that work in deadline-space (PriorityCard, QuickActionModal)
+   *  go through this; surfaces in task-space go through updateTaskStatus
+   *  directly. */
   setDeadlineStatus(id: string, status: DeadlineStatus) {
     const d = state.deadlines.find((x) => x.id === id);
     if (!d) return;
+    const matchedTask = state.tasks.find((t) => t.deadlineId === id);
+    if (matchedTask && (status === "completed" || status === "in_progress" || status === "not_started")) {
+      // Hub delegation — drives the cascade through one path. Other
+      // statuses (filed_extension) have their own dedicated actions.
+      this.updateTaskStatus(matchedTask.id, status as TaskStatus);
+      return;
+    }
     state = {
       ...state,
       deadlines: state.deadlines.map((x) =>
@@ -298,7 +328,7 @@ export const actions = {
           ? {
               ...x,
               status,
-              completedAt: status === "completed" ? "2026-04-23" : x.completedAt,
+              completedAt: status === "completed" ? nowIso() : x.completedAt,
             }
           : x
       ),
@@ -312,6 +342,10 @@ export const actions = {
     emit();
   },
 
+  // PRD §8.5 — official date is immutable. Deferring shifts the firm's
+  // working date (`internalDueDate`) only; status stays whatever it was
+  // (deferring is a reschedule, not a terminal state — `deferred` was
+  // killed 2026-05-06). Mirrors `deferTask` below.
   deferDeadline(id: string, newDateIso: string) {
     const d = state.deadlines.find((x) => x.id === id);
     if (!d) return;
@@ -319,14 +353,18 @@ export const actions = {
       ...state,
       deadlines: state.deadlines.map((x) =>
         x.id === id
-          ? { ...x, status: "deferred", officialDueDate: newDateIso }
+          ? {
+              ...x,
+              internalDueDate: newDateIso,
+              status: x.status === "not_started" ? "in_progress" : x.status,
+            }
           : x
       ),
     };
     appendActivity(
       d.clientId,
       "status_change",
-      `Deferred ${d.form} to ${newDateIso}`,
+      `Deferred ${d.form} working date to ${newDateIso}`,
       id
     );
     emit();
@@ -917,10 +955,48 @@ export const actions = {
 
   // -------- Layer 2-4 actions (Task / ChecklistItem / Email / AI insights) --------
 
-  /** Update a Task's status. Mirrored to the underlying Deadline. */
+  /** Update a Task's status. Mirrored to the underlying Deadline.
+   *
+   *  Cascade rules (locked 2026-05-06):
+   *    • status → "completed" cascades DOWN: every milestone row in
+   *      `state.milestones[taskId]` is set to `done` with completedDate
+   *      stamped to today. One combined `status_change` activity event
+   *      summarises the whole cascade so undo can reverse it as a unit.
+   *    • status → anything else (including reopening from completed)
+   *      leaves milestones untouched. Reopening clears completedAt/By
+   *      on the task so the audit trail doesn't claim it's still done.
+   *    • `not_applicable` and `filed_extension` use their own dedicated
+   *      actions (markTaskNotApplicable / fileTaskExtension) — those
+   *      don't cascade to milestones (we preserve the historical record
+   *      of which phases ran before the kill / extension).
+   */
   updateTaskStatus(taskId: string, status: TaskStatus) {
     const t = state.tasks.find((x) => x.id === taskId);
     if (!t) return;
+
+    const isCompleting = status === "completed";
+    const isReopening = t.status === "completed" && status !== "completed";
+    const today = nowIso().slice(0, 10);
+
+    // Cascade-down — only on transitions INTO completed.
+    const cascadeMilestones = isCompleting
+      ? (state.milestones[taskId] ?? []).map((m) =>
+          m.status === "done"
+            ? m
+            : {
+                ...m,
+                status: "done" as const,
+                completedDate: m.completedDate ?? today,
+                blockerReason: null,
+              }
+        )
+      : null;
+    const cascadedCount = cascadeMilestones
+      ? cascadeMilestones.filter(
+          (m, i) => m !== (state.milestones[taskId] ?? [])[i]
+        ).length
+      : 0;
+
     state = {
       ...state,
       tasks: state.tasks.map((x) =>
@@ -928,22 +1004,113 @@ export const actions = {
           ? {
               ...x,
               status,
-              completedAt: status === "completed" ? nowIso() : x.completedAt,
-              completedBy:
-                status === "completed" ? currentUserName() : x.completedBy,
+              completedAt: isCompleting
+                ? nowIso()
+                : isReopening
+                  ? undefined
+                  : x.completedAt,
+              completedBy: isCompleting
+                ? currentUserName()
+                : isReopening
+                  ? undefined
+                  : x.completedBy,
             }
           : x
       ),
       deadlines: state.deadlines.map((d) =>
-        d.id === t.deadlineId ? { ...d, status: status as DeadlineStatus } : d
+        d.id === t.deadlineId
+          ? {
+              ...d,
+              status: status as DeadlineStatus,
+              completedAt: isCompleting
+                ? nowIso()
+                : isReopening
+                  ? undefined
+                  : d.completedAt,
+            }
+          : d
       ),
+      milestones: cascadeMilestones
+        ? { ...state.milestones, [taskId]: cascadeMilestones }
+        : state.milestones,
     };
-    appendActivity(
-      t.clientId,
-      "status_change",
-      `Task ${t.formType}: ${statusLabel(status as DeadlineStatus)}`,
-      t.deadlineId
-    );
+
+    const summary = isCompleting
+      ? cascadedCount > 0
+        ? `Marked ${t.formType} complete · ${cascadedCount} milestone${cascadedCount === 1 ? "" : "s"} cascaded to done`
+        : `Marked ${t.formType} complete`
+      : `Task ${t.formType}: ${statusLabel(status as DeadlineStatus)}`;
+    appendActivity(t.clientId, "status_change", summary, t.deadlineId);
+    emit();
+  },
+
+  /** Replace the milestone rows for a task. Used by mock-adapter's
+   *  `taskMilestones.proposeForTask` so synthesized rows persist into
+   *  the store state (and thus survive page reloads + cascades). */
+  setMilestonesForTask(taskId: string, rows: TaskMilestoneRow[]) {
+    state = {
+      ...state,
+      milestones: { ...state.milestones, [taskId]: rows },
+    };
+    emit();
+  },
+
+  /** Patch a single milestone row. Used by mock-adapter's
+   *  `taskMilestones.update`. If the patch sets status === "done" on the
+   *  File milestone, the cascade-up is handled by the caller (the BE
+   *  in real-mode; the FE hook in mock-mode) — we do not auto-complete
+   *  the parent task from here, to keep the cascade entry-point single. */
+  updateMilestone(
+    taskId: string,
+    milestoneId: string,
+    patch: Partial<
+      Pick<TaskMilestoneRow, "status" | "targetDate" | "blockerReason">
+    >
+  ) {
+    const rows = state.milestones[taskId];
+    if (!rows) return;
+    const today = nowIso().slice(0, 10);
+    state = {
+      ...state,
+      milestones: {
+        ...state.milestones,
+        [taskId]: rows.map((m) =>
+          m.id === milestoneId
+            ? {
+                ...m,
+                ...patch,
+                completedDate:
+                  patch.status === "done"
+                    ? (m.completedDate ?? today)
+                    : patch.status && patch.status !== "done"
+                      ? null
+                      : m.completedDate,
+              }
+            : m
+        ),
+      },
+    };
+    emit();
+  },
+
+  /** Detect-blockers cascade — bulk patch from the AI blocker pass. */
+  patchMilestonesBulk(
+    taskId: string,
+    patches: Array<{ id: string; status?: TaskMilestoneRow["status"]; blockerReason?: string | null }>
+  ) {
+    const rows = state.milestones[taskId];
+    if (!rows) return;
+    const byId = new Map(patches.map((p) => [p.id, p] as const));
+    state = {
+      ...state,
+      milestones: {
+        ...state.milestones,
+        [taskId]: rows.map((m) => {
+          const p = byId.get(m.id);
+          return p ? { ...m, ...p } : m;
+        }),
+      },
+    };
     emit();
   },
 
@@ -1168,8 +1335,12 @@ export const actions = {
     emit();
   },
 
-  /** Defer a task (cascades to deadline). PRD §8.5 — official date is
-   *  immutable; only the working date moves. */
+  /** Defer a task — push the working date. PRD §8.5: official date is
+   *  immutable. `deferred` was killed 2026-05-06 as a terminal status —
+   *  deferring is a reschedule, not an ending. The task and the matched
+   *  deadline both shift to `in_progress` if they were `not_started`;
+   *  otherwise status is preserved. The new date lands on
+   *  `deadline.internalDueDate` (the working/firm-set target). */
   deferTask(taskId: string, newDate: string, reason?: string) {
     const t = state.tasks.find((x) => x.id === taskId);
     if (!t) return;
@@ -1179,7 +1350,11 @@ export const actions = {
         x.id === taskId
           ? {
               ...x,
-              status: "deferred" as TaskStatus,
+              status:
+                x.status === "not_started"
+                  ? ("in_progress" as TaskStatus)
+                  : x.status,
+              internalTargetDate: newDate,
               notApplicableReason: undefined,
               notApplicableAt: undefined,
             }
@@ -1189,8 +1364,11 @@ export const actions = {
         d.id === t.deadlineId
           ? {
               ...d,
-              status: "deferred" as DeadlineStatus,
-              adjustedDueDate: newDate,
+              internalDueDate: newDate,
+              status:
+                d.status === "not_started"
+                  ? ("in_progress" as DeadlineStatus)
+                  : d.status,
             }
           : d
       ),
@@ -1198,7 +1376,7 @@ export const actions = {
     appendActivity(
       t.clientId,
       "status_change",
-      `Deferred to ${newDate}${reason ? ` — ${reason}` : ""}`,
+      `Deferred working date to ${newDate}${reason ? ` — ${reason}` : ""}`,
       t.deadlineId
     );
     emit();

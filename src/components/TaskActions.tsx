@@ -65,9 +65,8 @@ import {
   useReassignTask,
   useUpdateTaskStatus,
 } from "../hooks/useTasks";
-import { useChecklist } from "../hooks/useChecklist";
 import { trpc } from "../lib/api/client";
-import { toast } from "sonner";
+import { MarkCompleteDialog } from "./MarkCompleteDialog";
 
 interface Props {
   task: Task;
@@ -76,53 +75,23 @@ interface Props {
 export function TaskActions({ task }: Props) {
   const [deferOpen, setDeferOpen] = useState(false);
   const [naOpen, setNaOpen] = useState(false);
-  // Mark-complete dialog (Yuqi audit 2026-05-05): the previous
-  // window.confirm gave one line of text and one OK button — marking
-  // a task complete with 0% checklist confirmed is a quiet way to lose
-  // a 1099. The new Dialog surfaces the actual checklist state, calls
-  // out un-confirmed items, and adds extra friction (a typed "complete"
-  // confirmation) when fewer than 80% of relevant items are confirmed.
+  // Mark-complete dialog — surface lives in MarkCompleteDialog.tsx and
+  // is shared with PriorityCard + TaskMiniTimeline (File pillar). Yuqi
+  // audit 2026-05-06: the typed-"complete" override was friction theater;
+  // dropped in favor of a single "Close anyway" button when the
+  // checklist is <80% confirmed. Showing the un-confirmed list is the
+  // real safeguard.
   const [markCompleteOpen, setMarkCompleteOpen] = useState(false);
-  const [completionTyped, setCompletionTyped] = useState("");
 
   const updateStatus = useUpdateTaskStatus();
   const fileExtension = useFileExtensionForTask();
-  const checklist = useChecklist(task.id);
-
-  // Checklist gating math — denominator excludes not_applicable so the
-  // ratio matches what the CPA visually sees on the page (n/a items
-  // never block completion). The 80% threshold is the line below
-  // which we require a typed confirmation; ≥80% follows the original
-  // single-click confirm flow.
-  const relevantItems = checklist.filter((c) => c.state !== "not_applicable");
-  const confirmedItems = relevantItems.filter(
-    (c) => c.state === "received_confirmed",
-  );
-  const pendingItems = relevantItems.filter(
-    (c) =>
-      c.state === "not_requested" ||
-      c.state === "requested_waiting" ||
-      c.state === "received_unreviewed" ||
-      c.state === "received_issue",
-  );
-  const completionPct =
-    relevantItems.length === 0
-      ? 0
-      : Math.round((confirmedItems.length / relevantItems.length) * 100);
-  const isLowConfidence = completionPct < 80 && relevantItems.length > 0;
 
   const isCompleted = task.status === "completed";
   const isNotApplicable = task.status === "not_applicable";
 
   const onMarkComplete = () => {
     if (isCompleted) return;
-    setCompletionTyped("");
     setMarkCompleteOpen(true);
-  };
-  const onConfirmMarkComplete = () => {
-    updateStatus(task.id, "completed");
-    setMarkCompleteOpen(false);
-    toast.success(`${task.formType} marked complete`);
   };
 
   const onReopen = () => {
@@ -163,29 +132,17 @@ export function TaskActions({ task }: Props) {
             <RotateCcw className="w-3.5 h-3.5" aria-hidden /> Re-open
           </button>
         ) : (
-          // Mark complete — primary CTA. Yuqi audit 2026-05-06: the
-          // "0 of 1 confirmed" line below the button created a
-          // hanging asymmetric column that wrecked the row alignment
-          // — and the amber low-confidence styling made the canonical
-          // CTA read like a warning. Both fixed:
-          //   • Button stays the canonical indigo regardless of
-          //     checklist state. The Dialog (opened on click) carries
-          //     the low-confidence guard rail with the typed-confirm
-          //     override; the button itself shouldn't second-guess
-          //     the user before they've even clicked.
-          //   • The "X of Y confirmed" count is dropped from this
-          //     row. The same number is already visible in the
-          //     "Still waiting on client · X of Y items" header on
-          //     the checklist section directly below — no need to
-          //     duplicate it on the button row and break alignment.
+          // Mark complete — primary CTA. Single canonical indigo
+          // regardless of checklist state; the dialog (opened on click)
+          // surfaces the un-confirmed items if any, and presents one
+          // button: "Mark complete" or "Close anyway" depending on
+          // confidence. Button shouldn't second-guess the user before
+          // they've clicked. The "X of Y confirmed" count is already
+          // visible in the checklist section header directly below.
           <button
             onClick={onMarkComplete}
             className="text-sm px-3 py-1.5 rounded-md inline-flex items-center gap-1.5 bg-indigo text-white hover:bg-indigo-hover"
-            title={
-              isLowConfidence
-                ? `Only ${completionPct}% confirmed — you'll be asked to type to confirm`
-                : "Close this task"
-            }
+            title="Close this task"
           >
             <Check className="w-3.5 h-3.5" aria-hidden /> Mark complete
           </button>
@@ -242,114 +199,11 @@ export function TaskActions({ task }: Props) {
         onOpenChange={setNaOpen}
         task={task}
       />
-      <Dialog open={markCompleteOpen} onOpenChange={setMarkCompleteOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {isLowConfidence
-                ? `Mark ${task.formType} complete with un-confirmed items?`
-                : `Mark ${task.formType} complete?`}
-            </DialogTitle>
-            <DialogDescription>
-              {isLowConfidence
-                ? "This task has documents the client hasn't returned. Closing now skips the chase loop."
-                : "Closes the task and routes it to History. You can re-open it if something arrives later."}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogBody>
-            {/* Checklist snapshot — surfaces the actual state so the
-                CPA isn't asked to confirm against memory. */}
-            {relevantItems.length === 0 ? (
-              <p className="text-sm text-ink-500">
-                No checklist items on this task — completing closes it
-                directly.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-baseline gap-2 text-sm">
-                  <span
-                    className={`tabular-nums font-semibold ${
-                      isLowConfidence ? "text-warn-ink" : "text-ok-ink"
-                    }`}
-                  >
-                    {confirmedItems.length} of {relevantItems.length}
-                  </span>
-                  <span className="text-ink-500">items confirmed</span>
-                  <span
-                    className={`ml-auto text-2xs tabular-nums px-1.5 py-0.5 rounded ${
-                      isLowConfidence
-                        ? "bg-warn-bg text-warn-ink border border-warn-border"
-                        : "bg-ok-bg text-ok-ink border border-ok-border"
-                    }`}
-                  >
-                    {completionPct}%
-                  </span>
-                </div>
-                {pendingItems.length > 0 && (
-                  <div className="bg-warn-bg/50 border border-warn-border rounded px-3 py-2.5">
-                    <p className="text-2xs uppercase tracking-wider text-warn-ink font-semibold mb-1.5">
-                      {pendingItems.length} item
-                      {pendingItems.length === 1 ? "" : "s"} not confirmed
-                    </p>
-                    <ul className="text-xs text-ink-700 space-y-0.5">
-                      {pendingItems.slice(0, 6).map((it) => (
-                        <li key={it.id} className="truncate">
-                          • {it.label}
-                        </li>
-                      ))}
-                      {pendingItems.length > 6 && (
-                        <li className="text-ink-500">
-                          … +{pendingItems.length - 6} more
-                        </li>
-                      )}
-                    </ul>
-                  </div>
-                )}
-                {isLowConfidence && (
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="mark-complete-confirm"
-                      className="text-2xs uppercase tracking-wider text-ink-500 font-semibold block"
-                    >
-                      Type{" "}
-                      <code className="font-mono text-ink-900">complete</code>{" "}
-                      to override
-                    </label>
-                    <input
-                      id="mark-complete-confirm"
-                      type="text"
-                      autoFocus
-                      value={completionTyped}
-                      onChange={(e) => setCompletionTyped(e.target.value)}
-                      placeholder="complete"
-                      className="w-full text-sm border border-line rounded px-2.5 py-1.5 bg-canvas text-ink-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-          </DialogBody>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setMarkCompleteOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={onConfirmMarkComplete}
-              disabled={
-                isLowConfidence &&
-                completionTyped.trim().toLowerCase() !== "complete"
-              }
-              className="bg-indigo hover:bg-indigo-hover text-canvas"
-            >
-              <Check className="w-3.5 h-3.5" aria-hidden />
-              {isLowConfidence ? "Override and complete" : "Mark complete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MarkCompleteDialog
+        open={markCompleteOpen}
+        onOpenChange={setMarkCompleteOpen}
+        task={task}
+      />
     </>
   );
 }
@@ -594,8 +448,9 @@ function NotApplicableDialog({
           <DialogTitle tone="danger">Mark not applicable</DialogTitle>
           <DialogDescription>
             Use when this filing is no longer relevant — client fired,
-            entity dissolved, switched filing status. Distinct from
-            "deferred" (which pushes the date).
+            entity dissolved, switched filing status. Distinct from a
+            deferral (which pushes the working date and keeps the task
+            active).
           </DialogDescription>
         </DialogHeader>
         <DialogBody>

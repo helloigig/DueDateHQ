@@ -30,8 +30,7 @@ export function Calendar() {
     const open = deadlines.filter(
       (d) =>
         d.status !== "completed" &&
-        d.status !== "filed_extension" &&
-        d.status !== "deferred",
+        d.status !== "filed_extension",
     );
     const todayIso = TODAY.toISOString().slice(0, 10);
     const overdue = open.filter((d: Deadline) => d.officialDueDate < todayIso);

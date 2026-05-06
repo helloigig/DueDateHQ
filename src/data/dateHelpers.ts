@@ -236,7 +236,6 @@ export interface DeadlineStateInput {
     | "not_started"
     | "in_progress"
     | "completed"
-    | "deferred"
     | "filed_extension"
     | "overdue"
     | "not_applicable";
