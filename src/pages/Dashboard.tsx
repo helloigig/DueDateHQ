@@ -366,6 +366,20 @@ function StateAlertsPreview({
     return b.detectedAt.localeCompare(a.detectedAt);
   });
 
+  // Today shows only the top 3 most-impactful action-today alerts.
+  // The rest fold into the "+N more" footer that links to /alerts.
+  // Without this cap, busy mornings (10+ alerts past SLA) buried the
+  // Action Queue under a wall of full alert cards — exactly the
+  // "what's the actual next thing I do" friction this page is supposed
+  // to solve. /alerts remains the workshop for everything beyond top 3.
+  const ACTION_TODAY_PREVIEW_MAX = 3;
+  const visibleActionToday = sortedActionToday.slice(
+    0,
+    ACTION_TODAY_PREVIEW_MAX,
+  );
+  const hiddenActionToday = sortedActionToday.length - visibleActionToday.length;
+  const moreCount = hiddenActionToday + routineCount;
+
   return (
     <section className="mb-section">
       <SectionHeader
@@ -393,7 +407,7 @@ function StateAlertsPreview({
         }
       />
       <div className="flex flex-col gap-card">
-        {sortedActionToday.map((a) => (
+        {visibleActionToday.map((a) => (
           <StateAlertCard
             key={a.id}
             a={a}
@@ -403,15 +417,14 @@ function StateAlertsPreview({
           />
         ))}
       </div>
-      {routineCount > 0 && (
+      {moreCount > 0 && (
         <div className="mt-card flex justify-center">
           <Link
             to="/alerts"
             className="group inline-flex items-center gap-1.5 text-xs font-medium text-ink-500 hover:text-ink-900 px-3 h-8 rounded-md border border-line bg-surface hover:bg-sunken transition-colors"
           >
-            <span className="tabular-nums">{routineCount}</span>
-            more routine{" "}
-            {routineCount === 1 ? "alert" : "alerts"}
+            <span className="tabular-nums">{moreCount}</span>
+            more {moreCount === 1 ? "alert" : "alerts"} on /alerts
             <ChevronRight
               className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5"
               aria-hidden

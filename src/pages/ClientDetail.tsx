@@ -380,12 +380,14 @@ export function ClientDetail() {
         </div>
       </div>
 
-      {/* Two-column header body — left: meta + working-on rows;
-          right: auto-generated AI summary card. Stacks on mobile.
-          Year/Form filter chips dropped from the header (filteredDeadlines
-          falls through when state is empty); they can return inside the
-          relevant tab if needed. */}
-      <div className="mt-3 mb-region grid grid-cols-1 md:grid-cols-[1fr,auto] gap-4">
+      {/* Header body — meta line + working-on row. The right-rail
+          ClientAiSummaryCard ("AI generated based on history" + "X prior-
+          year facts on file") was dropped 2026-05-06: the copy was meta-
+          narration about AI rather than a concrete signal, mirrored
+          forever-no-list "AI is learning" pattern, and ate header
+          real estate. Concrete advisory signals already surface as
+          Opportunities and inside Activity tab. */}
+      <div className="mt-3 mb-region">
         <div className="min-w-0 space-y-2">
           {/* Meta row: primary service package + email-icon-button +
               phone-icon-button + "Since {date}". Email and phone collapse
@@ -477,16 +479,8 @@ export function ClientDetail() {
           )}
 
           {/* Override surface — only renders when the user has authored
-              a manual AI summary. Right-rail card carries the
-              auto-summary; the override is its editorial twin. */}
+              a manual AI summary. */}
           <ClientAiSummary client={client} />
-        </div>
-
-        {/* Right rail — auto-generated AI summary card. Compact,
-            single-paragraph; the deeper Advisory + churn-risk surfaces
-            still render below via ClientAiInsightsCard. */}
-        <div className="md:max-w-sm md:w-[22rem]">
-          <ClientAiSummaryCard clientId={client.id} />
         </div>
       </div>
 
@@ -1756,52 +1750,85 @@ function ClientStateAlertsCard({ clientId }: { clientId: string }) {
   const alerts = (announcementsQuery.data ?? []).filter(
     (a) => !a.dismissed && a.affectedClientIds.includes(clientId),
   );
+  const [expanded, setExpanded] = useState(false);
+
   if (alerts.length === 0) return null;
+
+  // Collapsed by default 2026-05-06: a 7-alert block at the top of
+  // every client page swallowed first-screen real estate before the
+  // CPA could see Tasks / To Do. The summary line carries the
+  // count + per-alert action lives one click away inside this section
+  // (or directly on /alerts). Auto-expanded only when there's a single
+  // alert (no signal vs noise concern with N=1).
+  const showList = expanded || alerts.length === 1;
+  const headerLabel = `Active state ${alerts.length === 1 ? "alert" : "alerts"} for this client`;
+
   return (
     <section
       className="mt-5 bg-warn-bg/40 border border-warn-border/60 rounded-md px-region py-region"
       aria-label="Active state alerts affecting this client"
     >
-      <div className="flex items-center gap-2 mb-2.5">
+      <button
+        type="button"
+        onClick={() => setExpanded((x) => !x)}
+        disabled={alerts.length === 1}
+        aria-expanded={showList}
+        aria-controls={`client-alerts-${clientId}`}
+        className="w-full flex items-center gap-2 text-left disabled:cursor-default"
+      >
         <Megaphone className="w-3.5 h-3.5 text-warn-ink shrink-0" aria-hidden />
         <span className="text-2xs uppercase tracking-wider font-semibold text-warn-ink">
-          Active state {alerts.length === 1 ? "alert" : "alerts"} for this client
+          {headerLabel}
         </span>
-        <span className="text-2xs text-ink-500 tabular-nums ml-auto">
-          {alerts.length}
+        <span className="text-2xs text-ink-500 tabular-nums">
+          · {alerts.length}
         </span>
-      </div>
-      <ul className="flex flex-col gap-1.5">
-        {alerts.map((a) => (
-          <li key={a.id}>
-            <Link
-              to={`/alerts/${a.id}`}
-              className="group flex items-center gap-3 px-2.5 py-2 rounded-md bg-surface/70 border border-warn-border/40 hover:bg-surface hover:border-warn-border/80 transition-colors"
-            >
-              <StateBadge code={a.stateCode} size="sm" />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-ink-900 truncate">{a.title}</div>
-                <div className="text-2xs text-ink-500 mt-0.5 truncate">
-                  {a.authority}
-                  {a.newDeadline && (
-                    <>
-                      <span className="mx-1.5 text-ink-300">·</span>
-                      <span>Deadline shifts to {formatLongDate(a.newDeadline)}</span>
-                    </>
-                  )}
+        {alerts.length > 1 && (
+          <span className="ml-auto text-2xs text-warn-ink inline-flex items-center gap-0.5">
+            {expanded ? "Hide" : "Show"}
+            <ChevronRight
+              className={`w-3 h-3 transition-transform ${expanded ? "rotate-90" : ""}`}
+              aria-hidden
+            />
+          </span>
+        )}
+      </button>
+      {showList && (
+        <ul
+          id={`client-alerts-${clientId}`}
+          className="flex flex-col gap-1.5 mt-2.5"
+        >
+          {alerts.map((a) => (
+            <li key={a.id}>
+              <Link
+                to={`/alerts/${a.id}`}
+                className="group flex items-center gap-3 px-2.5 py-2 rounded-md bg-surface/70 border border-warn-border/40 hover:bg-surface hover:border-warn-border/80 transition-colors"
+              >
+                <StateBadge code={a.stateCode} size="sm" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-ink-900 truncate">{a.title}</div>
+                  <div className="text-2xs text-ink-500 mt-0.5 truncate">
+                    {a.authority}
+                    {a.newDeadline && (
+                      <>
+                        <span className="mx-1.5 text-ink-300">·</span>
+                        <span>Deadline shifts to {formatLongDate(a.newDeadline)}</span>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <span className="text-2xs text-ink-500 group-hover:text-ink-900 inline-flex items-center gap-0.5 shrink-0">
-                Review
-                <ChevronRight
-                  className="w-3 h-3 transition-transform group-hover:translate-x-0.5"
-                  aria-hidden
-                />
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+                <span className="text-2xs text-ink-500 group-hover:text-ink-900 inline-flex items-center gap-0.5 shrink-0">
+                  Review
+                  <ChevronRight
+                    className="w-3 h-3 transition-transform group-hover:translate-x-0.5"
+                    aria-hidden
+                  />
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
@@ -1864,75 +1891,11 @@ function ClientAiInsightsCard({ clientId }: { clientId: string }) {
   );
 }
 
-/**
- * Compact AI summary card for the right rail of the ClientDetail header.
- * Composes a one-paragraph narrative from prior-year facts + churn-risk
- * heuristics — the same signals ClientAiInsightsCard surfaces via
- * structured callouts, but distilled into a single readable sentence so
- * the CPA's eye reads it at a glance and moves on.
- *
- * Returns null when there's nothing meaningful to say (no facts, not at
- * churn risk) — better silence than a stub.
- */
-function ClientAiSummaryCard({ clientId }: { clientId: string }) {
-  const facts = useImportedFactsForClient(clientId);
-  const insights = useAiInsightsForClient(clientId);
-  const clientQuery = useClient(clientId);
-  const client = clientQuery.data;
-  const open = insights.filter((i) => i.status === "open");
-  const churnRiskScore = computeChurnRiskScore(clientId, open.length);
-  const isNewClient = (() => {
-    if (!client?.addedAt) return true;
-    const added = parseDate(client.addedAt);
-    if (Number.isNaN(added.getTime())) return true;
-    const daysSinceAdded =
-      (TODAY.getTime() - added.getTime()) / (24 * 60 * 60 * 1000);
-    return daysSinceAdded < 30;
-  })();
-  const showChurnRisk = churnRiskScore >= 2 && !isNewClient;
-
-  if (!client) return null;
-  if (facts.length === 0 && !showChurnRisk) return null;
-
-  const factsLine =
-    facts.length > 0
-      ? `${client.name} has ${facts.length} prior-year fact${facts.length === 1 ? "" : "s"} on file — drafts run on personalised history.`
-      : `${client.name} has no prior-year facts imported yet — drafts run on template defaults.`;
-  const driftLine = showChurnRisk
-    ? churnRiskScore >= 4
-      ? "Strong engagement drift — reach out this week."
-      : churnRiskScore >= 3
-        ? "Engagement drift — worth a quick check-in."
-        : "Minor engagement drift, worth a glance."
-    : null;
-
-  return (
-    <div className="bg-info-bg/30 border border-info-border rounded-md p-4">
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <Sparkles className="w-3.5 h-3.5 text-info-ink" aria-hidden />
-        <span className="text-2xs uppercase tracking-wider font-semibold text-info-ink">
-          AI generated based on history
-        </span>
-      </div>
-      <p className="text-sm text-ink-700 leading-relaxed">
-        {factsLine}
-        {driftLine && <> {driftLine}</>}
-      </p>
-    </div>
-  );
-}
-
-/** Wireframe heuristic for churn risk. Real implementation per PRD §4.4
- *  Layer B uses response-time trends + declined-advisory count + reduced
- *  service-package count. Here we stub it deterministically off clientId. */
-function computeChurnRiskScore(clientId: string, openInsightCount: number): number {
-  // Use a deterministic per-client seed so demo is stable.
-  const seed = clientId
-    .split("")
-    .reduce((a, c) => a + c.charCodeAt(0), 0);
-  const base = seed % 5; // 0..4
-  return base + (openInsightCount > 1 ? 1 : 0);
-}
+// ClientAiSummaryCard + computeChurnRiskScore removed 2026-05-06 —
+// see header-body comment above. The right-rail "AI generated based on
+// history" narrative was meta-narration without a concrete call to
+// action; concrete advisory signals already surface as Opportunities
+// cards and inside the Activity feed.
 
 /**
  * Documents tab — IA §3.3. Longitudinal table: rows = document types,
