@@ -1489,25 +1489,13 @@ function ClientGroup({
   );
   const totalWaiting = group.tasks.reduce((s, t) => s + t.missingCount, 0);
   const tier = group.tasks[0]?.tier;
-  // Single-task clients render flush (no header row) — header would
-  // just duplicate the row's identity column.
-  if (taskCount === 1) {
-    return (
-      <TaskTimelineRow
-        t={group.tasks[0]}
-        onStageClick={onStageClick}
-        focusDate={focusDate}
-        focusRowRef={focusRowRef}
-        isSelected={isSelected}
-        onToggleSelect={onToggleSelect}
-        teamMembers={teamMembers}
-        teamLoading={teamLoading}
-        currentUserId={currentUserId}
-        onPrimeTeamQuery={onPrimeTeamQuery}
-        onAssignRow={onAssignRow}
-      />
-    );
-  }
+  // Always render through the grouped layout — even single-task
+  // clients get a header. Keeps demo (mostly 1-task clients) and
+  // live (3+ tasks per client) visually identical: one header per
+  // client, nested rows beneath. Without this, the demo's "Behind
+  // schedule" section showed ungrouped flush rows while the live
+  // "On track" section showed group headers, and the two modes
+  // looked like different products.
   return (
     <div>
       <div
@@ -1551,7 +1539,7 @@ function ClientGroup({
         </button>
         {tier && <TimelineTierPill tier={tier} />}
         <span className="text-xs text-ink-500 tabular-nums shrink-0">
-          {taskCount} tasks
+          {taskCount} {taskCount === 1 ? "task" : "tasks"}
         </span>
         <div className="ml-auto flex items-center gap-2 shrink-0">
           {worstBehind > 0 ? (
