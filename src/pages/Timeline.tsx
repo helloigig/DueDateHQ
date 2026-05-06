@@ -895,11 +895,12 @@ export function Timeline() {
         </span>
       </div>
 
-      {/* Attribute filters — second axis (jurisdiction / entity / tier).
-          Hierarchy: chips below answer "what's the workflow state?",
-          these answer "what slice of the fleet?" Multi-select; compose
-          with the chips. Mirrors the Clients page filter row. */}
-      <div className="mb-region flex items-center gap-2 flex-wrap">
+      {/* Filters row — attribute slices (Jurisdiction / Entity / Tier)
+          and workflow-state chips (All tasks / Awaiting docs / Behind)
+          share one line. Hierarchy is positional: dropdowns on the left
+          ("what slice of the fleet?"), chips on the right ("what state?").
+          Both compose. */}
+      <div className="mb-card flex items-center gap-2 flex-wrap">
         <MultiSelectChip
           label="Jurisdiction"
           options={jurisdictionOptions}
@@ -922,36 +923,34 @@ export function Timeline() {
           <button
             type="button"
             onClick={() => setAttr(EMPTY_ATTR)}
-            className="text-xs text-ink-500 hover:text-ink-900 underline underline-offset-2 ml-1"
+            className="text-xs text-ink-500 hover:text-ink-900 underline underline-offset-2"
           >
-            Clear all
+            Clear
           </button>
         )}
-      </div>
-
-      {/* Workflow-state chips — single source of truth via shared FilterChip */}
-      <div className="flex items-center gap-1 mb-card">
-        <FilterChip
-          active={filter === "all"}
-          count={kpis.active}
-          onClick={() => setFilter("all")}
-        >
-          All tasks
-        </FilterChip>
-        <FilterChip
-          active={filter === "waiting"}
-          count={kpis.waiting}
-          onClick={() => setFilter("waiting")}
-        >
-          Awaiting docs
-        </FilterChip>
-        <FilterChip
-          active={filter === "behind"}
-          count={kpis.behind}
-          onClick={() => setFilter("behind")}
-        >
-          Behind
-        </FilterChip>
+        <div className="flex items-center gap-1 ml-auto">
+          <FilterChip
+            active={filter === "all"}
+            count={kpis.active}
+            onClick={() => setFilter("all")}
+          >
+            All tasks
+          </FilterChip>
+          <FilterChip
+            active={filter === "waiting"}
+            count={kpis.waiting}
+            onClick={() => setFilter("waiting")}
+          >
+            Awaiting docs
+          </FilterChip>
+          <FilterChip
+            active={filter === "behind"}
+            count={kpis.behind}
+            onClick={() => setFilter("behind")}
+          >
+            Behind
+          </FilterChip>
+        </div>
       </div>
 
       {/* Sections */}
@@ -1488,7 +1487,6 @@ function ClientGroup({
     0,
   );
   const totalWaiting = group.tasks.reduce((s, t) => s + t.missingCount, 0);
-  const tier = group.tasks[0]?.tier;
   // Always render through the grouped layout — even single-task
   // clients get a header. Keeps demo (mostly 1-task clients) and
   // live (3+ tasks per client) visually identical: one header per
@@ -1537,24 +1535,15 @@ function ClientGroup({
         >
           {group.client}
         </button>
-        {tier && <TimelineTierPill tier={tier} />}
         <span className="text-xs text-ink-500 tabular-nums shrink-0">
           {taskCount} {taskCount === 1 ? "task" : "tasks"}
         </span>
-        <div className="ml-auto flex items-center gap-2 shrink-0">
-          {worstBehind > 0 ? (
-            <StatusPill variant="danger" size="xs">
-              worst {worstBehind}d behind
-            </StatusPill>
-          ) : totalWaiting > 0 ? (
-            <StatusPill variant="warn" size="xs">
-              {totalWaiting} waiting
-            </StatusPill>
-          ) : (
-            <StatusPill variant="ok" size="xs">
-              On track
-            </StatusPill>
-          )}
+        <div className="ml-auto flex items-center gap-2 shrink-0 text-xs text-ink-500">
+          {worstBehind > 0
+            ? `worst ${worstBehind}d behind`
+            : totalWaiting > 0
+              ? `${totalWaiting} waiting`
+              : "On track"}
         </div>
       </div>
       {!collapsed && (
@@ -1579,24 +1568,6 @@ function ClientGroup({
         </ul>
       )}
     </div>
-  );
-}
-
-function TimelineTierPill({ tier }: { tier: ClientTier }) {
-  const styles =
-    tier === "premium"
-      ? "bg-indigo-soft text-indigo-ink border-indigo-soft"
-      : "bg-sunken text-ink-700 border-line";
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center text-2xs font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0",
-        styles,
-      )}
-      title={`${tier === "premium" ? "Premium" : "Standard"} tier client`}
-    >
-      {tier === "premium" ? "Premium" : "Standard"}
-    </span>
   );
 }
 
@@ -1690,11 +1661,13 @@ function TaskTimelineRow({
             aria-label={`Select ${t.client} · ${t.task}`}
           />
         )}
-        {/* Identity — state badge anchors the row visually so jurisdiction
-            reads at a glance (was previously buried inside `task` text).
-            When nested, the client name is on the parent header so we
-            drop it here to avoid duplication. */}
-        <div className="w-64 shrink-0 min-w-0 flex items-start gap-2.5">
+        {/* Identity — state badge + bold task name + compact deadline
+            chip, all on one line. Identity now flex-grows (was a fixed
+            w-64) so long task strings have room to stay inline with the
+            chip instead of wrapping. Client name + tier badge are
+            handled by the parent ClientGroup header — no per-row
+            duplication after the always-grouped unification. */}
+        <div className="flex-1 min-w-0 flex items-center gap-2.5">
           {t.jurisdiction && (
             <StateBadge
               code={
@@ -1705,62 +1678,48 @@ function TaskTimelineRow({
               size="sm"
             />
           )}
-          <div className="flex-1 min-w-0">
-            {!nested && (
-              <div className="flex items-center gap-2 mb-0.5">
-                <div className="text-sm font-semibold text-ink-900 truncate flex-1 min-w-0">
-                  {t.client}
-                </div>
-                {t.tier && <TimelineTierPill tier={t.tier} />}
-              </div>
+          <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-semibold text-ink-900 truncate">
+              {t.task}
+            </span>
+            {t.officialDueIso ? (
+              <DeadlineChip
+                variant="compact"
+                officialDueDate={t.officialDueIso}
+                internalTargetDate={t.internalDueIso}
+                currentMilestoneTargetDate={t.internalDueIso}
+                currentMilestoneLabel={STAGE_LABELS[t.currentStage]}
+                status={
+                  t.currentStage === "file" &&
+                  t.daysBehind === 0 &&
+                  t.missingCount === 0
+                    ? "completed"
+                    : undefined
+                }
+                originalBufferDays={
+                  t.formClass === "quarterly"
+                    ? 3
+                    : t.formClass === "monthly"
+                      ? 2
+                      : 7
+                }
+              />
+            ) : (
+              <span className="text-2xs text-ink-400">due {t.dueDate}</span>
             )}
-            <div
-              className={cn(
-                "text-xs",
-                nested ? "text-ink-700" : "text-ink-500",
-              )}
-            >
-              <span className="truncate">{t.task}</span>
-              <span className="text-ink-400 mx-1">·</span>
-              {t.officialDueIso ? (
-                <DeadlineChip
-                  variant="compact"
-                  officialDueDate={t.officialDueIso}
-                  internalTargetDate={t.internalDueIso}
-                  currentMilestoneTargetDate={t.internalDueIso}
-                  currentMilestoneLabel={STAGE_LABELS[t.currentStage]}
-                  status={
-                    t.currentStage === "file" &&
-                    t.daysBehind === 0 &&
-                    t.missingCount === 0
-                      ? "completed"
-                      : undefined
-                  }
-                  originalBufferDays={
-                    t.formClass === "quarterly"
-                      ? 3
-                      : t.formClass === "monthly"
-                        ? 2
-                        : 7
-                  }
-                />
-              ) : (
-                <span className="text-ink-400">due {t.dueDate}</span>
-              )}
-            </div>
           </div>
         </div>
 
-        {/* Mini-timeline. Yuqi audit 2026-05-05: "Initial mtg is actually
-            'Mark Initial mtg done' right? Why not discard that and click
-            onto the Initial Mtg dot and mark done?" The right-column
-            "Mark X done" button has been retired — clicking the
-            CURRENT-stage dot fires the same advance flow. Past dots
-            (done) and future dots (not_started) remain decorative. The
-            current dot has a larger 12px hit target wrapper around its
-            10px visual so the tap area is touch-friendly without
-            inflating the dot's visual weight. */}
-        <div className="flex-1 flex items-center gap-1.5 min-w-0">
+        {/* Right rail — three items grouped together with ~20px (gap-5)
+            between: mini-timeline · assignee · status pill. Pulling them
+            into a single shrink-0 cluster keeps the row's right edge
+            visually anchored regardless of how long the identity text
+            is on the left.
+            Mini-timeline: clicking the CURRENT-stage dot fires the
+            advance flow (Yuqi audit 2026-05-05). Past dots (done) and
+            future dots (not_started) are decorative. */}
+        <div className="flex items-center gap-5 shrink-0">
+        <div className="w-44 flex items-center gap-1.5">
           {stages.map((s, idx) => {
             const status = t.milestoneStatus[idx] ?? "not_started";
             const isCurrent = s === t.currentStage;
@@ -1836,7 +1795,7 @@ function TaskTimelineRow({
             actionable, not just decorative.
             Yuqi audit 2026-05-05: "Timeline currently it is not assignable." */}
         <div
-          className="w-20 shrink-0 flex items-center justify-center"
+          className="shrink-0 flex items-center justify-center"
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => {
@@ -1917,7 +1876,7 @@ function TaskTimelineRow({
             was retired — its job is now done by clicking the current-
             stage dot in the mini-timeline above. The status column
             keeps its width so row alignment doesn't reflow. */}
-        <div className="w-44 shrink-0 flex items-center justify-end gap-2">
+        <div className="shrink-0 flex items-center justify-end">
           {t.daysBehind > 0 ? (
             <StatusPill variant="danger" size="xs">
               {t.daysBehind}d behind
@@ -1927,6 +1886,7 @@ function TaskTimelineRow({
               {t.missingCount} waiting
             </StatusPill>
           ) : null}
+        </div>
         </div>
 
         <ChevronRight
