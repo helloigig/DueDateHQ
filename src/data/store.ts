@@ -1079,10 +1079,13 @@ export const actions = {
             ? {
                 ...m,
                 ...patch,
+                // `done` stamps completedDate; any other explicit status
+                // transition clears it; a status-less patch (date or
+                // blocker only) leaves completedDate alone.
                 completedDate:
                   patch.status === "done"
                     ? (m.completedDate ?? today)
-                    : patch.status && patch.status !== "done"
+                    : patch.status
                       ? null
                       : m.completedDate,
               }
