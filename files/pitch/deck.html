@@ -815,59 +815,27 @@
   .notes-panel.open { transform: translateY(0); }
   .notes-panel .label { font-size: 1.2vmin; letter-spacing: 0.12em; color: #94a3b8; margin-bottom: 0.6vmin; font-weight: 600; text-transform: uppercase; font-family: var(--font-mono); }
 
-  .help-overlay {
-    position: fixed; top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    background: var(--surface);
-    color: var(--ink-900);
-    padding: 3.2vmin 3.6vmin;
-    border-radius: 12px;
-    font-size: 1.5vmin;
-    z-index: 200;
-    display: none;
-    min-width: 38vmin;
-    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.32), 0 0 0 1px var(--line);
+  /* === Cover nav · 封面左下 prev/next · subtle === */
+  .cover-nav {
+    position: absolute;
+    bottom: 4vmin;
+    left: 5vmin;
+    display: flex;
+    gap: 1.4vmin;
+    z-index: 10;
+  }
+  .cover-nav button {
+    background: none;
+    border: none;
+    padding: 0.4vmin 0.6vmin;
+    color: var(--ink-300);
     font-family: var(--font);
+    font-size: 1.8vmin;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 160ms;
   }
-  .help-overlay.open { display: block; }
-  .help-overlay h3 {
-    font-size: 1.3vmin;
-    margin-bottom: 2vmin;
-    padding-bottom: 1.2vmin;
-    border-bottom: 1px solid var(--line);
-    color: var(--ink-500);
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    font-family: var(--font-mono);
-  }
-  .help-overlay .key-row {
-    display: grid;
-    grid-template-columns: 9vmin 1fr;
-    gap: 2.4vmin;
-    margin-bottom: 1.1vmin;
-    align-items: baseline;
-  }
-  .help-overlay .key-row:last-child { margin-bottom: 0; }
-  .help-overlay kbd {
-    font-family: var(--font-mono);
-    background: var(--sunken);
-    padding: 0.4vmin 0.9vmin;
-    border-radius: 5px;
-    border: 1px solid var(--line);
-    border-bottom-width: 2px;
-    font-size: 1.25vmin;
-    font-weight: 600;
-    color: var(--ink-900);
-    line-height: 1.4;
-    text-align: center;
-    min-width: 3vmin;
-  }
-  .help-overlay .desc {
-    color: var(--ink-700);
-    font-size: 1.4vmin;
-    line-height: var(--lh-meta);
-  }
+  .cover-nav button:hover { color: var(--ink-700); }
 
   @media print {
     @page { size: 16in 9in; margin: 0; }
@@ -875,7 +843,7 @@
     .stage { position: static; height: auto; display: block; }
     .deck { width: 16in; height: 9in; box-shadow: none; page-break-after: always; }
     .slide { display: flex !important; position: relative; height: 9in; }
-    .notes-panel, .help-overlay { display: none !important; }
+    .notes-panel, .cover-nav { display: none !important; }
   }
 </style>
 </head>
@@ -897,6 +865,10 @@
     <path d="M45.3619 268.785L20.5966 268.654L20.8498 250.374L45.4588 250.504C51.6045 250.537 56.7941 249.184 61.0274 246.446C65.261 243.656 68.4597 239.585 70.6235 234.231C72.8394 228.878 73.9675 222.4 74.0078 214.796L74.0373 209.249C74.0682 203.416 73.4704 198.282 72.2439 193.849C71.0694 189.415 69.2923 185.682 66.9125 182.648C64.5327 179.615 61.6021 177.334 58.1206 175.805C54.6393 174.224 50.6331 173.421 46.1019 173.397L20.6335 173.262L20.7308 154.903L46.1992 155.038C53.8033 155.079 60.7494 156.417 67.0376 159.055C73.3781 161.641 78.8534 165.342 83.4633 170.158C88.0733 174.974 91.6106 180.722 94.0752 187.402C96.5922 194.03 97.8292 201.406 97.7861 209.531L97.7575 214.922C97.7147 222.995 96.3996 230.357 93.8122 237.011C91.2769 243.664 87.6789 249.374 83.0182 254.141C78.4098 258.856 72.8956 262.499 66.4756 265.069C60.108 267.587 53.0701 268.826 45.3619 268.785ZM34.4806 154.976L33.8777 268.725L10.4405 268.6L11.0435 154.852L34.4806 154.976ZM177.916 155.736L201.275 155.86L200.877 231.015C200.83 239.765 198.916 247.125 195.135 253.095C191.405 259.065 186.251 263.543 179.673 266.529C173.146 269.515 165.638 270.985 157.149 270.94C148.659 270.895 141.115 269.345 134.517 266.289C127.971 263.234 122.838 258.701 119.12 252.692C115.454 246.683 113.644 239.303 113.691 230.553L114.089 155.398L137.526 155.522L137.128 230.678C137.101 235.782 137.886 239.953 139.483 243.19C141.081 246.428 143.386 248.81 146.399 250.336C149.463 251.863 153.079 252.637 157.246 252.659C161.517 252.682 165.14 251.946 168.117 250.451C171.146 248.957 173.45 246.599 175.03 243.379C176.661 240.158 177.491 235.996 177.518 230.892L177.916 155.736ZM296.393 251.835L296.296 270.116L235.75 269.795L235.847 251.514L296.393 251.835ZM244.009 156.087L243.406 269.835L219.969 269.711L220.572 155.963L244.009 156.087ZM288.763 202.653L288.668 220.465L236.013 220.186L236.107 202.374L288.763 202.653ZM296.821 156.367L296.723 174.726L236.255 174.405L236.353 156.046L296.821 156.367ZM344.889 270.373L320.124 270.242L320.377 251.962L344.986 252.092C351.132 252.125 356.321 250.772 360.554 248.034C364.788 245.244 367.987 241.172 370.151 235.819C372.366 230.466 373.495 223.988 373.535 216.384L373.564 210.837C373.595 205.004 372.997 199.87 371.771 195.436C370.596 191.003 368.819 187.27 366.44 184.236C364.06 181.203 361.129 178.921 357.648 177.393C354.166 175.812 350.16 175.009 345.629 174.985L320.161 174.85L320.258 156.491L345.726 156.626C353.33 156.666 360.276 158.005 366.565 160.643C372.905 163.228 378.38 166.929 382.99 171.746C387.6 176.562 391.138 182.31 393.602 188.99C396.119 195.618 397.356 202.994 397.313 211.119L397.285 216.51C397.242 224.582 395.927 231.945 393.339 238.598C390.804 245.252 387.206 250.962 382.545 255.729C377.937 260.444 372.423 264.087 366.003 266.657C359.635 269.175 352.597 270.414 344.889 270.373ZM334.008 156.564L333.405 270.312L309.968 270.188L310.571 156.44L334.008 156.564ZM459.215 176.681L427.778 270.813L402.857 270.68L445.725 157.156L461.584 157.24L459.215 176.681ZM484.418 271.113L453.903 176.653L451.506 157.187L467.521 157.272L509.418 271.245L484.418 271.113ZM483.236 228.762L483.139 247.121L423.062 246.803L423.159 228.444L483.236 228.762ZM561.895 157.772L561.292 271.52L537.933 271.396L538.536 157.648L561.895 157.772ZM596.895 157.957L596.797 176.317L503.986 175.825L504.083 157.465L596.895 157.957ZM686.075 253.9L685.978 272.181L625.432 271.86L625.529 253.579L686.075 253.9ZM633.691 158.152L633.088 271.901L609.651 271.777L610.254 158.028L633.691 158.152ZM678.445 204.718L678.35 222.531L625.695 222.252L625.789 204.439L678.445 204.718ZM686.503 158.432L686.405 176.792L625.937 176.471L626.035 158.112L686.503 158.432ZM815.708 205.446L815.612 223.727L756.237 223.412L756.334 205.131L815.708 205.446ZM763.533 158.841L762.93 272.589L739.493 272.465L740.096 158.716L763.533 158.841ZM832.673 159.207L832.07 272.956L808.711 272.832L809.313 159.083L832.673 159.207ZM914.345 256.517L944.997 281.054L930.164 293.788L899.981 269.253L914.345 256.517ZM946.134 214.028L946.105 219.419C946.059 228.064 944.846 235.819 942.466 242.681C940.138 249.544 936.8 255.386 932.451 260.206C928.103 264.975 922.979 268.62 917.08 271.141C911.182 273.661 904.638 274.903 897.451 274.865C890.316 274.827 883.786 273.516 877.862 270.933C871.938 268.349 866.828 264.65 862.53 259.836C858.233 254.969 854.905 249.092 852.545 242.204C850.238 235.317 849.107 227.551 849.153 218.905L849.182 213.514C849.228 204.816 850.441 197.062 852.821 190.252C855.253 183.39 858.617 177.548 862.914 172.727C867.21 167.906 872.334 164.235 878.285 161.715C884.236 159.194 890.779 157.953 897.914 157.991C905.102 158.029 911.631 159.339 917.503 161.923C923.427 164.506 928.538 168.231 932.835 173.098C937.132 177.964 940.434 183.841 942.741 190.729C945.049 197.564 946.18 205.33 946.134 214.028ZM922.433 219.293L922.463 213.746C922.495 207.705 921.95 202.389 920.829 197.8C919.759 193.211 918.165 189.348 916.046 186.212C913.979 183.076 911.414 180.719 908.349 179.14C905.285 177.509 901.774 176.683 897.815 176.662C893.857 176.641 890.337 177.43 887.256 179.028C884.175 180.574 881.584 182.904 879.484 186.018C877.384 189.132 875.775 192.978 874.657 197.555C873.539 202.133 872.964 207.442 872.932 213.484L872.903 219.031C872.871 225.02 873.39 230.336 874.459 234.977C875.528 239.566 877.096 243.454 879.163 246.642C881.282 249.779 883.873 252.162 886.938 253.793C890.054 255.424 893.591 256.25 897.55 256.271C901.508 256.292 905.002 255.503 908.031 253.905C911.112 252.307 913.703 249.951 915.803 246.837C917.955 243.671 919.59 239.799 920.708 235.222C921.827 230.592 922.402 225.283 922.433 219.293Z" fill="black"/>
   </svg>
   <div class="cover-foot">Gigi Wu &nbsp;·&nbsp; May 2026 &nbsp;·&nbsp; <a class="link" href="https://duedatehq.space" target="_blank" rel="noopener">duedatehq.space</a></div>
+  <div class="cover-nav">
+    <button type="button" data-nav="prev" aria-label="上一页">&larr;</button>
+    <button type="button" data-nav="next" aria-label="下一页">&rarr;</button>
+  </div>
 </section>
 
 <!-- 2. 场景 · 真实访谈 quote -->
@@ -1554,24 +1526,12 @@
   <div id="notesText" style="font-style: italic;">—</div>
 </div>
 
-<div class="help-overlay" id="helpOverlay">
-  <h3>键盘快捷键</h3>
-  <div class="key-row"><kbd>→</kbd> <kbd>Space</kbd> <span class="desc">下一张</span></div>
-  <div class="key-row"><kbd>←</kbd> <span class="desc">上一张</span></div>
-  <div class="key-row"><kbd>1</kbd>—<kbd>9</kbd> <span class="desc">跳到指定页</span></div>
-  <div class="key-row"><kbd>S</kbd> <span class="desc">显示/隐藏 speaker notes</span></div>
-  <div class="key-row"><kbd>F</kbd> <span class="desc">全屏</span></div>
-  <div class="key-row"><kbd>Cmd/Ctrl-P</kbd> <span class="desc">打印 PDF</span></div>
-  <div class="key-row"><kbd>?</kbd> <span class="desc">这个帮助</span></div>
-</div>
-
 <script>
 (function() {
   const slides = document.querySelectorAll('.slide');
   const notesPanel = document.getElementById('notesPanel');
   const notesText = document.getElementById('notesText');
   const notesNum = document.getElementById('notesNum');
-  const helpOverlay = document.getElementById('helpOverlay');
   let current = 0;
   let notesOpen = false;
 
@@ -1605,12 +1565,6 @@
         if (!document.fullscreenElement) document.documentElement.requestFullscreen();
         else document.exitFullscreen();
         break;
-      case '?': case '/':
-        helpOverlay.classList.toggle('open');
-        break;
-      case 'Escape':
-        helpOverlay.classList.remove('open');
-        break;
       default:
         if (e.key >= '1' && e.key <= '9') show(parseInt(e.key, 10) - 1);
     }
@@ -1618,9 +1572,18 @@
 
   document.getElementById('deck').addEventListener('click', function(e) {
     if (e.target.tagName === 'A' || e.target.closest('a')) return;
+    if (e.target.closest('button')) return;
     const w = window.innerWidth;
     if (e.clientX < w * 0.3) prev();
     else if (e.clientX > w * 0.7) next();
+  });
+
+  document.querySelectorAll('.cover-nav button').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (btn.dataset.nav === 'next') next();
+      else prev();
+    });
   });
 
   const hash = window.location.hash.slice(1);
@@ -1630,8 +1593,6 @@
     show(0);
   }
 
-  helpOverlay.classList.add('open');
-  setTimeout(() => helpOverlay.classList.remove('open'), 2200);
 })();
 </script>
 
