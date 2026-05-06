@@ -82,32 +82,40 @@ export function BlockingAlertsDialog({
           {alerts.map((a) => {
             const h = Math.round(hoursSince(a.detectedAt));
             return (
-              <li
-                key={a.id}
-                className="group px-region py-3 flex items-center gap-3 hover:bg-sunken/60 transition-colors"
-              >
-                {/* Match the header icon tile size (w-9 h-9) for visual
-                    consistency. Bumped from size="sm" (w-7 h-7) per
-                    Yuqi audit. */}
-                <StateBadge code={a.stateCode} size="md" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-ink-900 truncate">
-                    {a.title}
-                  </div>
-                  <div className="text-2xs text-ink-500 mt-1">
-                    <span className="tabular-nums">{a.affectedClientIds.length}</span>{" "}
-                    {a.affectedClientIds.length === 1 ? "client" : "clients"}
-                    <span className="mx-1.5 text-ink-300">·</span>
-                    <span className="tabular-nums">{h}h</span> unactioned
-                  </div>
-                </div>
+              <li key={a.id}>
+                {/* Whole row is the deep link — clicking anywhere on the
+                    row (state badge, title, count, button) lands on the
+                    same alert. Previously only the Review button was the
+                    Link, so the row felt clickable but slipped on misses.
+                    The inner "Review" affordance is rendered as a span
+                    inside the Link to preserve the visual cue without
+                    nesting interactive elements. */}
                 <Link
                   to={`/alerts/${a.id}`}
                   onClick={onClose}
-                  className="text-sm h-9 px-3 rounded-md bg-indigo text-white hover:bg-indigo-hover shrink-0 inline-flex items-center gap-1 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2"
+                  className="group px-region py-3 flex items-center gap-3 hover:bg-sunken/60 focus-visible:outline-none focus-visible:bg-sunken/60 transition-colors"
                 >
-                  Review
-                  <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                  {/* Match the header icon tile size (w-9 h-9) for visual
+                      consistency. */}
+                  <StateBadge code={a.stateCode} size="md" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-ink-900 truncate">
+                      {a.title}
+                    </div>
+                    <div className="text-2xs text-ink-500 mt-1">
+                      <span className="tabular-nums">{a.affectedClientIds.length}</span>{" "}
+                      {a.affectedClientIds.length === 1 ? "client" : "clients"}
+                      <span className="mx-1.5 text-ink-300">·</span>
+                      <span className="tabular-nums">{h}h</span> unactioned
+                    </div>
+                  </div>
+                  <span
+                    aria-hidden
+                    className="text-sm h-9 px-3 rounded-md bg-indigo text-white group-hover:bg-indigo-hover shrink-0 inline-flex items-center gap-1 font-medium transition-colors"
+                  >
+                    Review
+                    <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                  </span>
                 </Link>
               </li>
             );
