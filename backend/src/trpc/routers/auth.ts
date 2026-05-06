@@ -180,23 +180,30 @@ export const authRouter = router({
    */
   createDemoSession: publicProcedure.mutation(async () => {
     // Step 1: ensure the demo Supabase user exists. Admin createUser
-    // is idempotent when the email already exists — it returns the
-    // existing user as a non-fatal error we treat as success.
+    // is idempotent in spirit — every call after the first returns
+    // the "already exists" error which we treat as success. Earlier
+    // version regex'd for `/already (registered|exists)/i` which
+    // missed Supabase's actual message "A user with this email
+    // address has already been registered" (note the "been"). Match
+    // on HTTP status (422) + a broader keyword set so the check is
+    // robust to Supabase's exact wording.
     const created = await supabaseAdmin.auth.admin.createUser({
       email: DEMO_EMAIL,
       email_confirm: true, // skip the confirm-your-email step entirely
       user_metadata: { full_name: "Sarah Mitchell" },
     });
-    if (
-      created.error &&
-      // "User already registered" is the expected outcome on every call
-      // after the first. Any other error is fatal.
-      !/already (registered|exists)/i.test(created.error.message)
-    ) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: created.error.message,
-      });
+    if (created.error) {
+      const msg = created.error.message ?? "";
+      const status = (created.error as { status?: number }).status;
+      const isAlreadyExists =
+        status === 422 ||
+        /already|exists|registered|duplicate/i.test(msg);
+      if (!isAlreadyExists) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `createUser_failed: ${msg}`,
+        });
+      }
     }
 
     // Step 2: generate a magic-link URL the FE can navigate to. The
@@ -215,7 +222,7 @@ export const authRouter = router({
     if (error || !data?.properties?.action_link) {
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
-        message: error?.message ?? "no_action_link",
+        message: `generateLink_failed: ${error?.message ?? "no_action_link"}`,
       });
     }
     return { actionLink: data.properties.action_link };
