@@ -168,22 +168,16 @@
   .btn-primary { padding: 0.7vmin 1.3vmin; background: var(--indigo); color: white; font-size: 1.3vmin; font-weight: 500; border-radius: 6px; border: none; }
   .btn-secondary { padding: 0.7vmin 1.3vmin; background: var(--surface); color: var(--ink-700); font-size: 1.3vmin; font-weight: 500; border: 1px solid var(--line); border-radius: 6px; }
 
-  /* === SLIDE 3: 痛点 (强力版) === */
-  .pain-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.5vmin; margin-top: 2.5vmin; }
-  .pain-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.8vmin; display: flex; flex-direction: column; }
-  .pain-num { font-family: var(--font-mono); font-size: 1.2vmin; color: var(--indigo-ink); letter-spacing: 0.12em; font-weight: 700; margin-bottom: 0.8vmin; text-transform: uppercase; }
-  .pain-title { font-size: 2.3vmin; font-weight: 600; color: var(--ink-900); line-height: 1.25; margin-bottom: 1.5vmin; letter-spacing: -0.01em; }
-  .pain-cost {
-    background: var(--danger-bg); border: 1px solid var(--danger-border);
-    border-radius: 6px; padding: 1vmin 1.3vmin;
-    margin-bottom: 1.3vmin;
-    display: flex; flex-direction: column; gap: 0.3vmin;
-  }
-  .pain-cost .label { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; color: var(--danger-ink); letter-spacing: 0.1em; text-transform: uppercase; }
-  .pain-cost .val { font-size: 1.5vmin; color: var(--danger-ink); font-weight: 600; line-height: 1.4; }
-  .pain-body { font-size: 1.4vmin; color: var(--ink-700); line-height: 1.65; flex: 1; }
-  .pain-extra { margin-top: 2vmin; padding: 1.5vmin 1.8vmin; background: var(--sunken); border-radius: 6px; border-left: 3px solid var(--ink-400); display: flex; gap: 1.2vmin; align-items: baseline; font-size: 1.4vmin; color: var(--ink-700); line-height: 1.6; }
-  .pain-extra .lead-in { color: var(--ink-900); font-weight: 600; font-size: 1.5vmin; }
+  /* === SLIDE 3: 痛点 (sourced · 无戏剧化) === */
+  .pain-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3vmin; margin-top: 2.5vmin; }
+  .pain-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.8vmin; display: flex; flex-direction: column; gap: 1.2vmin; }
+  .pain-num { font-family: var(--font-mono); font-size: 1.2vmin; color: var(--ink-500); letter-spacing: 0.12em; font-weight: 700; text-transform: uppercase; }
+  .pain-title { font-size: 2.2vmin; font-weight: 600; color: var(--ink-900); line-height: 1.25; letter-spacing: -0.01em; }
+  .pain-body { font-size: 1.4vmin; color: var(--ink-700); line-height: 1.7; }
+  .pain-quote { font-size: 1.4vmin; color: var(--ink-900); line-height: 1.55; padding-top: 1.2vmin; border-top: 1px dashed var(--line); font-style: italic; }
+  .pain-quote .src { display: block; margin-top: 0.4vmin; font-size: 1.15vmin; color: var(--ink-400); font-family: var(--font-mono); letter-spacing: 0.04em; font-style: normal; }
+  .pain-extra { margin-top: 2.5vmin; padding-top: 2vmin; border-top: 1px solid var(--line); display: flex; gap: 1.5vmin; align-items: baseline; font-size: 1.35vmin; color: var(--ink-700); line-height: 1.65; }
+  .pain-extra .lead-in { color: var(--ink-500); font-weight: 700; font-size: 1.2vmin; letter-spacing: 0.1em; text-transform: uppercase; font-family: var(--font-mono); }
 
   /* === SLIDE 4: 竞争 (精确) === */
   .compete-table { width: 100%; margin-top: 2.5vmin; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); border-collapse: separate; border-spacing: 0; }
@@ -225,13 +219,13 @@
   .what-aside { padding: 0.5vmin 1.1vmin; background: var(--sunken); border: 1px dashed var(--line-strong); border-radius: 6px; font-size: 1.3vmin; color: var(--ink-500); font-weight: 500; }
 
   .so-what {
-    background: var(--indigo-soft);
-    border: 1px solid rgba(91, 91, 214, 0.25);
+    background: var(--surface);
+    border: 1px solid var(--line);
     border-radius: 8px;
     padding: 2.5vmin;
     display: flex; flex-direction: column; gap: 1.3vmin;
   }
-  .so-what .label { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--indigo-ink); text-transform: uppercase; margin-bottom: 0.5vmin; }
+  .so-what .label { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); text-transform: uppercase; margin-bottom: 0.5vmin; }
   .so-what-item { display: grid; grid-template-columns: 4.5vmin 1fr; gap: 1.2vmin; align-items: start; }
   .so-what-item .num { font-size: 2.2vmin; font-weight: 600; color: var(--indigo); line-height: 1; letter-spacing: -0.015em; font-variant-numeric: tabular-nums; }
   .so-what-item .text { font-size: 1.45vmin; color: var(--ink-900); line-height: 1.5; }
@@ -239,7 +233,8 @@
 
   /* === SLIDE 7: Yan Jing 深度 === */
   .yj-grid { display: grid; grid-template-columns: 1fr 1.3fr; gap: 3.5vmin; margin-top: 1.5vmin; align-items: stretch; }
-  .yj-card-left { background: var(--indigo-soft); border: 1px solid rgba(91, 91, 214, 0.25); border-radius: 12px; padding: 2.8vmin; display: flex; flex-direction: column; gap: 1.8vmin; }
+  .yj-card-left { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.8vmin; display: flex; flex-direction: column; gap: 1.8vmin; position: relative; }
+  .yj-card-left::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 8px 8px 0 0; background: var(--indigo); }
   .yj-id { display: flex; flex-direction: column; gap: 0.5vmin; }
   .yj-badge { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--indigo-ink); text-transform: uppercase; }
   .yj-name { font-size: 3.2vmin; font-weight: 600; color: var(--ink-900); letter-spacing: -0.02em; line-height: 1; }
@@ -453,14 +448,14 @@
   .memorable-list { display: flex; flex-direction: column; gap: 1vmin; }
   .memorable-item {
     padding: 1.4vmin 1.7vmin;
-    background: var(--ink-900); color: white;
+    background: var(--surface); border: 1px solid var(--line);
     border-radius: 8px;
     display: grid; grid-template-columns: 3vmin 1fr; gap: 1.2vmin; align-items: start;
   }
-  .memorable-item .num { font-size: 1.8vmin; font-weight: 600; color: #fbbf24; line-height: 1; font-variant-numeric: tabular-nums; }
+  .memorable-item .num { font-size: 1.8vmin; font-weight: 600; color: var(--indigo); line-height: 1; font-variant-numeric: tabular-nums; }
   .memorable-item .body { display: flex; flex-direction: column; gap: 0.3vmin; }
-  .memorable-item .punch { font-size: 1.5vmin; font-weight: 600; color: white; line-height: 1.35; letter-spacing: -0.005em; }
-  .memorable-item .src { font-size: 1.2vmin; color: #94a3b8; font-family: var(--font-mono); letter-spacing: 0.04em; }
+  .memorable-item .punch { font-size: 1.5vmin; font-weight: 600; color: var(--ink-900); line-height: 1.35; letter-spacing: -0.005em; }
+  .memorable-item .src { font-size: 1.2vmin; color: var(--ink-500); font-family: var(--font-mono); letter-spacing: 0.04em; }
 
   /* Notes panel + help overlay */
   .notes-panel { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(15, 23, 42, 0.96); color: #e2e8f0; padding: 2vmin 4vmin; font-size: 1.5vmin; line-height: 1.65; transform: translateY(100%); transition: transform 200ms ease; z-index: 100; max-height: 40vh; overflow-y: auto; border-top: 1px solid rgba(255,255,255,0.1); }
@@ -543,40 +538,31 @@
 
 <!-- 3. 痛点 (强力版 · 后果导向) -->
 <section class="slide center" data-num="03" data-title="痛点 · 真实后果" data-notes="痛点强力版：每一个痛都用「真实代价」标出来。不是抽象的「不方便」，是真实的钱、真实的时间、真实的关系。讲的时候按红框（真实代价）顺序读，不读 body 段。让钱和后果说话。最下面那行长期痛点是收尾 — partner 退休、知识全丢，事务所价值掉一半。这是为什么资深合伙人愿意付钱。">
-  <div class="micro eyebrow">痛点 · 不是不方便，是真实代价</div>
-  <h2 class="h1">三件事每天压在 CPA 身上。</h2>
+  <div class="micro eyebrow">痛点 · Sarah Mitchell（primary persona） · 三个 failure mode</div>
+  <h2 class="h1">三件事每周压在她身上。</h2>
   <div class="pain-grid">
     <div class="pain-card">
-      <div class="pain-num">痛点 01 · State Alerts</div>
-      <div class="pain-title">客户先知道州的事。</div>
-      <div class="pain-cost">
-        <div class="label">真实代价</div>
-        <div class="val">客户被罚 $500–$2,000<br>CPA 道歉，有时候自己赔</div>
-      </div>
-      <div class="pain-body">50 个州每年发几百条公告。CPA 没工具盯，平均 7 天后才知道。客户在 LinkedIn / Reddit 看到 → 反过来质问 CPA。</div>
+      <div class="pain-num">Failure mode 01</div>
+      <div class="pain-title">Monday-morning anxiety</div>
+      <div class="pain-body">她重新打开 Excel，试着想起周末前哪些事是急的。每周一都是从短期记忆里重建工作。没有系统视图。</div>
+      <div class="pain-quote">「我现在花在搞清楚这周要做什么的时间，比实际做事的时间还多。」<span class="src">— Sarah Mitchell · 01-product-brief.md</span></div>
     </div>
     <div class="pain-card">
-      <div class="pain-num">痛点 02 · Task Management</div>
-      <div class="pain-title">漏 deadline 比迟到贵。</div>
-      <div class="pain-cost">
-        <div class="label">真实代价</div>
-        <div class="val">客户罚款 + 失去客户<br>下年职业责任险涨 15-30%</div>
-      </div>
-      <div class="pain-body">300+ deadline 跨州、跨实体类型。Excel 追不过来。漏一个 = 客户走人 + 保险费涨 + 别的客户听说也走。</div>
+      <div class="pain-num">Failure mode 02</div>
+      <div class="pain-title">The chase loop</div>
+      <div class="pain-body">每个 deadline 前 3 周开始发邮件追客户要材料。有的回了，很多没回，有的她忘了 follow up。最后总有一个客户拿出她没要过的 1099。</div>
+      <div class="pain-quote">「Solve this one pain — confirming the client gave 100% of what's needed — and I'm definitely your first customer.」<span class="src">— Yan Jing · 660 行访谈综合</span></div>
     </div>
     <div class="pain-card">
-      <div class="pain-num">痛点 03 · File Request</div>
-      <div class="pain-title">三周前开始追，最后一周还在补。</div>
-      <div class="pain-cost">
-        <div class="label">真实代价</div>
-        <div class="val">3-4 个周末加班<br>家庭关系紧张</div>
-      </div>
-      <div class="pain-body">手打 12 封一样的提醒。客户回复散落、文件错件。3-4 月每个周末都在补材料 — 这不是工作量问题，是生活问题。</div>
+      <div class="pain-num">Failure mode 03</div>
+      <div class="pain-title">The state-change miss</div>
+      <div class="pain-body">当州改了 estimated payment 规则，她从客户的投诉里得知，不是从工具。「IRS 给 LA County 延期到 10 月，一位 CPA 从客户的 group chat 看到，发现自己 6 个客户已经过了原 deadline。」</div>
+      <div class="pain-quote"><span class="src" style="font-style: italic; color: var(--ink-500);">来自匿名 CPA 访谈 · strategy-02-problem-statement.md · personas.md</span></div>
     </div>
   </div>
   <div class="pain-extra">
-    <span class="lead-in">+ 长期痛点：</span>
-    <span>客户 5 年的 pattern（W-2 几月到、K-1 哪家延、谁去年漏报 Schedule E）— 全在 CPA 脑子里。换 staff 全丢，<strong style="color: var(--ink-900);">partner 退休事务所价值掉一半</strong>。</span>
+    <span class="lead-in">+ 长期</span>
+    <span>partner 脑子里的 5 年客户 pattern（哪家基金 K-1 总是 8 月才到、谁去年漏报 Schedule E）— 换 staff 就丢。来自 M. 访谈：「她需要系统替她记 partner 没告诉她的事。」</span>
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
@@ -1353,7 +1339,7 @@
         <div class="memorable-item">
           <span class="num">04</span>
           <div class="body">
-            <div class="punch">现在就可以打开 <a href="https://duedatehq.space" target="_blank" rel="noopener" style="color: #fbbf24;">duedatehq.space</a>。</div>
+            <div class="punch">现在就可以打开 <a class="link" href="https://duedatehq.space" target="_blank" rel="noopener" style="color: var(--indigo);">duedatehq.space</a>。</div>
             <div class="src">50 州监控在跑 · 4 alert 通道 · Action Queue 真实排序 · /changes 公开档案 · 不是 prototype 是 production</div>
           </div>
         </div>
