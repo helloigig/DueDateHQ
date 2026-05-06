@@ -6,6 +6,7 @@ import { db } from "../../db/client.js";
 import { firms, teamInvites, users } from "../../db/schema.js";
 import { ALL_STATES } from "../../lib/states.js";
 import { seedDemoFirm } from "../../db/seed-demo-firm.js";
+import { supabaseAdmin } from "../../auth/supabase.js";
 
 const DEMO_EMAIL = "demo@duedatehq.com";
 const DEMO_FIRM_NAME = "Mitchell CPA (demo)";
@@ -158,6 +159,68 @@ export const authRouter = router({
    * inserts 0 new rows. Safe to call from a post-signin auth bridge
    * that doesn't know whether it's the user's first or 50th login.
    */
+  /**
+   * Mints a one-click sign-in URL for the demo workspace. The Login
+   * page calls this BEFORE any auth — the browser then navigates to
+   * the returned URL, Supabase processes the embedded token, signs the
+   * user in as demo@duedatehq.com, and redirects back to /. The
+   * SupabaseAuthBridge picks up SIGNED_IN, sees the pending flag, and
+   * calls bootstrapDemo to populate the firm.
+   *
+   * Why server-side: Supabase's client-side `signInWithOtp` requires a
+   * deliverable email (MX records, validation rules). demo@duedatehq.com
+   * is a synthetic address with no inbox, so the OTP path errors out
+   * with "Email address ... is invalid". `auth.admin.generateLink`
+   * bypasses email sending entirely and returns the action URL directly
+   * — exactly what we want for a public demo button.
+   *
+   * Idempotent on the user side: re-calling creates a fresh link each
+   * time but the user row is reused (createUser is upsert-y when the
+   * email already exists, returning the existing user).
+   */
+  createDemoSession: publicProcedure.mutation(async () => {
+    // Step 1: ensure the demo Supabase user exists. Admin createUser
+    // is idempotent when the email already exists — it returns the
+    // existing user as a non-fatal error we treat as success.
+    const created = await supabaseAdmin.auth.admin.createUser({
+      email: DEMO_EMAIL,
+      email_confirm: true, // skip the confirm-your-email step entirely
+      user_metadata: { full_name: "Sarah Mitchell" },
+    });
+    if (
+      created.error &&
+      // "User already registered" is the expected outcome on every call
+      // after the first. Any other error is fatal.
+      !/already (registered|exists)/i.test(created.error.message)
+    ) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: created.error.message,
+      });
+    }
+
+    // Step 2: generate a magic-link URL the FE can navigate to. The
+    // `redirectTo` lands the user back on the dashboard root after
+    // Supabase processes the token; our SupabaseAuthBridge will pick
+    // up SIGNED_IN and call bootstrapDemo from there.
+    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+      type: "magiclink",
+      email: DEMO_EMAIL,
+      options: {
+        redirectTo: process.env.PUBLIC_APP_URL
+          ? `${process.env.PUBLIC_APP_URL}/`
+          : undefined,
+      },
+    });
+    if (error || !data?.properties?.action_link) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: error?.message ?? "no_action_link",
+      });
+    }
+    return { actionLink: data.properties.action_link };
+  }),
+
   bootstrapDemo: publicProcedure.mutation(async ({ ctx }) => {
     if (!ctx.user) {
       throw new TRPCError({ code: "UNAUTHORIZED" });

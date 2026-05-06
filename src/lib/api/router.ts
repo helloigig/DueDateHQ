@@ -196,12 +196,18 @@ export const appRouter = t.router({
           alreadyProvisioned: boolean;
         }> => NOT_IMPL()
       ),
-    /** Demo workspace bootstrap. Called by Login.tsx tryDemo() after
-     *  the user signs in via Supabase magic link to demo@duedatehq.com.
-     *  Provisions the demo firm if missing AND idempotently seeds the
-     *  51-client roster + deadlines. Returns counts so the FE can show
-     *  a one-line "demo populated" toast. Backend FORBIDS calls from
-     *  any other email. */
+    /** Mints a one-click sign-in URL for the demo workspace via
+     *  Supabase admin API. The FE navigates to the returned link;
+     *  Supabase processes the token and signs the user in as
+     *  demo@duedatehq.com without sending an email. */
+    createDemoSession: t.procedure.mutation(
+      async (): Promise<{ actionLink: string }> => NOT_IMPL()
+    ),
+    /** Demo workspace bootstrap. Called by SupabaseAuthBridge after
+     *  the user signs in as demo@duedatehq.com (via createDemoSession
+     *  → action link). Provisions the demo firm if missing AND
+     *  idempotently seeds the 51-client roster + deadlines. Backend
+     *  FORBIDS calls from any other email. */
     bootstrapDemo: t.procedure.mutation(
       async (): Promise<{
         firmId: string;

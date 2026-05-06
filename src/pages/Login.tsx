@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Sparkles, ArrowRight, ArrowLeft, Mail } from "lucide-react";
+import { ArrowLeft, Mail } from "lucide-react";
 import { signIn } from "../data/session";
 import { authInputClass } from "./auth/AuthShell";
 import { env } from "../config";
 import { supabase } from "../lib/supabase";
+import { trpc } from "../lib/api/client";
 import { SsoButton } from "../components/SsoButton";
 
 // Lazy: only loaded when the user actually triggers sign-in. Keeps the
@@ -42,6 +43,7 @@ export function Login() {
   const [email, setEmail] = useState("");
   const [pending, setPending] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const createDemoSession = trpc.auth.createDemoSession.useMutation();
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,44 +155,30 @@ export function Login() {
       return;
     }
 
-    // Real-mode: send a Supabase magic link to demo@duedatehq.com. The
-    // user clicks the link in email → SupabaseAuthBridge picks up the
-    // SIGNED_IN event → sees the `bootstrap_demo_pending` flag we set
-    // here and calls `auth.bootstrapDemo` to provision the firm + seed
-    // the 51 clients. We use `shouldCreateUser: true` so the very first
-    // demo click on a fresh deploy works (no preexisting Supabase user).
+    // Real-mode: ask the BE to mint a one-click sign-in URL via
+    // Supabase admin API (auth.admin.generateLink), then navigate to
+    // it. This bypasses Supabase's email-deliverability check on the
+    // synthetic demo@duedatehq.com address — no real inbox required.
+    // SupabaseAuthBridge picks up the SIGNED_IN event after the
+    // redirect and calls auth.bootstrapDemo to populate the firm.
     setSubmitError(null);
     setPending(true);
     try {
       localStorage.setItem("duedatehq.bootstrap_demo_pending", "1");
-      const { error } = await supabase().auth.signInWithOtp({
-        email: "demo@duedatehq.com",
-        options: {
-          shouldCreateUser: true,
-          emailRedirectTo: `${window.location.origin}/`,
-        },
-      });
-      if (error) {
-        // Wipe the flag — the magic link never went out so there's
-        // nothing to bootstrap on return.
-        localStorage.removeItem("duedatehq.bootstrap_demo_pending");
-        const msg = error.message.toLowerCase();
-        if (msg.includes("rate") || msg.includes("too many")) {
-          setSubmitError(
-            "Too many demo signins in the last hour. Wait ~60 minutes.",
-          );
-        } else {
-          setSubmitError(error.message);
-        }
-        return;
-      }
-      // The "sent" view explains the magic link to the user; the real
-      // bootstrap happens inside SupabaseAuthBridge after they click.
-      setEmail("demo@duedatehq.com");
-      setStep("sent");
-    } finally {
+      const { actionLink } = await createDemoSession.mutateAsync();
+      window.location.href = actionLink;
+    } catch (err) {
+      localStorage.removeItem("duedatehq.bootstrap_demo_pending");
+      const msg = err instanceof Error ? err.message : String(err);
+      setSubmitError(
+        msg.includes("fetch") || msg.includes("network")
+          ? "Couldn't reach the demo service. Try again in a moment."
+          : msg,
+      );
       setPending(false);
     }
+    // Note: `setPending(false)` only runs on error — on success we
+    // navigate away so the spinner state doesn't matter.
   };
 
   // Link-sent confirmation view
@@ -316,38 +304,25 @@ export function Login() {
           </p>
         </div>
 
-        {/* Demo workspace — visible in both mock + real mode now that
-            tryDemo() supports both. In real mode it sends a Supabase
-            magic link to demo@duedatehq.com and bootstraps the demo
-            firm via auth.bootstrapDemo on return. Hidden only when
-            the user is following an invite — they're joining a
-            specific firm and shouldn't be detoured into the demo. */}
+        {/* Demo workspace — quiet inline link, not a CTA card. Real
+            users have a job to do (sign in or sign up); the demo is a
+            secondary path for prospects, so it gets the smallest
+            visual weight that still makes it discoverable.
+            Hidden when following an invite (the user is joining a
+            specific firm and shouldn't be detoured into the demo). */}
         {!inviteToken && (
-          <button
-            onClick={() => void tryDemo()}
-            disabled={pending}
-            className="w-full mt-3 bg-surface border border-line hover:border-accent rounded-md p-4 text-left transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <div className="flex items-start gap-3">
-              <span className="w-8 h-8 rounded-full bg-info-bg border border-info-border text-info-ink flex items-center justify-center shrink-0">
-                <Sparkles className="w-3.5 h-3.5" aria-hidden />
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-ink-900">
-                  Try the demo workspace
-                </p>
-                <p className="text-xs text-ink-500 mt-0.5">
-                  {env.useMockAuth
-                    ? "51 fake clients, live state alerts, 3 years of prior history. No email, no waiting — just see how it works."
-                    : "51 fake clients, live state alerts, 3 years of prior history. We'll email a one-time sign-in link to demo@duedatehq.com."}
-                </p>
-              </div>
-              <ArrowRight
-                className="w-4 h-4 text-ink-400 mt-2 group-hover:text-ink-900 transition-colors"
-                aria-hidden
-              />
-            </div>
-          </button>
+          <p className="text-2xs text-ink-400 mt-3 text-center">
+            <button
+              onClick={() => void tryDemo()}
+              disabled={pending}
+              className="text-ink-500 underline hover:text-ink-900 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Or try the demo workspace
+            </button>{" "}
+            <span className="text-ink-400">
+              · 51 fake clients, no signup
+            </span>
+          </p>
         )}
       </div>
     </div>
