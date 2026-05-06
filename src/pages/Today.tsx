@@ -10,7 +10,7 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { ActionQueue } from "@/components/ActionQueue";
 import { TimelineDayRow } from "@/components/today/TimelineDayRow";
-import { StateAlertCard, type AffectedClient } from "@/components/today/StateAlertCard";
+import { StateAlertCard, type AffectedClient } from "@/components/StateAlertCard";
 import { type DotStackUrgency } from "@/components/ui/DotStack";
 import { clients as MOCK_CLIENTS } from "@/data/mockClients";
 import { deadlines as MOCK_DEADLINES } from "@/data/mockDeadlines";
@@ -292,9 +292,10 @@ export function Today() {
             {announcements.map((a) => (
               <StateAlertCard
                 key={a.id}
-                announcement={a}
+                a={a}
+                variant="today"
                 affectedClients={affectedFor(a)}
-                onOpen={() => navigate(`/alerts/${a.id}`)}
+                onSelect={() => navigate(`/alerts/${a.id}`)}
                 onSnooze={() => {
                   dismissMutation.mutate({ id: a.id });
                   toast.success("Snoozed until tomorrow");

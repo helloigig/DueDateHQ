@@ -380,12 +380,14 @@ export function ClientDetail() {
         </div>
       </div>
 
-      {/* Two-column header body — left: meta + working-on rows;
-          right: auto-generated AI summary card. Stacks on mobile.
-          Year/Form filter chips dropped from the header (filteredDeadlines
-          falls through when state is empty); they can return inside the
-          relevant tab if needed. */}
-      <div className="mt-3 mb-region grid grid-cols-1 md:grid-cols-[1fr,auto] gap-4">
+      {/* Header body — meta line + working-on row. The right-rail
+          ClientAiSummaryCard ("AI generated based on history" + "X prior-
+          year facts on file") was dropped 2026-05-06: the copy was meta-
+          narration about AI rather than a concrete signal, mirrored
+          forever-no-list "AI is learning" pattern, and ate header
+          real estate. Concrete advisory signals already surface as
+          Opportunities and inside Activity tab. */}
+      <div className="mt-3 mb-region">
         <div className="min-w-0 space-y-2">
           {/* Meta row: primary service package + email-icon-button +
               phone-icon-button + "Since {date}". Email and phone collapse
@@ -477,16 +479,8 @@ export function ClientDetail() {
           )}
 
           {/* Override surface — only renders when the user has authored
-              a manual AI summary. Right-rail card carries the
-              auto-summary; the override is its editorial twin. */}
+              a manual AI summary. */}
           <ClientAiSummary client={client} />
-        </div>
-
-        {/* Right rail — auto-generated AI summary card. Compact,
-            single-paragraph; the deeper Advisory + churn-risk surfaces
-            still render below via ClientAiInsightsCard. */}
-        <div className="md:max-w-sm md:w-[22rem]">
-          <ClientAiSummaryCard clientId={client.id} />
         </div>
       </div>
 
@@ -1418,139 +1412,14 @@ function ToDoTab({
   const daysAgo = (iso: string): number =>
     Math.floor((Date.now() - new Date(iso).getTime()) / (24 * 60 * 60 * 1000));
 
-  // Derive the unique tasks from BOTH:
-  //   (a) the full per-client task list (useTasksForClient / store tasks
-  //       in mock mode) — so every task shows, even ones without open
-  //       todoItems right now (Yuqi audit 2026-05-06: previously a
-  //       client with all-confirmed items had an empty Tasks strip
-  //       even though its tasks still existed).
-  //   (b) any items that DO have open todoItems — surfaces the
-  //       open-count badge on the matching chip.
-  // Each task is a first-class navigable unit on this surface;
-  // clicking → TaskDetail.
-  const remoteTasksList = useTasksForClient(
-    !env.useMockData ? client.id : undefined,
-  );
-  const tasksOnPage = useMemo(() => {
-    const seen = new Map<
-      string,
-      { id: string; name: string; chaseCount: number; reviewCount: number }
-    >();
-    // (a) Seed from the canonical per-client task list. Real mode
-    // pulls from BE via useTasksForClient; mock mode reads the store.
-    const sourceTasks = env.useMockData
-      ? storeTasks.filter((t) => t.clientId === client.id)
-      : remoteTasksList;
-    for (const t of sourceTasks) {
-      const taskName =
-        // Live BE shape carries formType + jurisdiction; mock store has
-        // the same fields. Compose a readable label either way.
-        [t.formType, t.jurisdiction].filter(Boolean).join(" · ") ||
-        "Task";
-      seen.set(t.id, {
-        id: t.id,
-        name: taskName,
-        chaseCount: 0,
-        reviewCount: 0,
-      });
-    }
-    // (b) Bucket open items into "chase" (client owes us) vs "review"
-    // (client sent, we owe a confirm/reject). Yuqi audit 2026-05-05:
-    // a single "X waiting" count conflated both buckets, which clashed
-    // with the "Still waiting on client" section name (that section
-    // shows ONLY the chase subset). Split into "X chase · Y review"
-    // so the chip matches the section vocabulary AND surfaces the
-    // review queue at a glance.
-    //   not_requested + requested_waiting → chase  (we're chasing the client)
-    //   received_unreviewed + received_issue → review  (waiting on CPA action)
-    for (const ci of items) {
-      if (!ci.taskId) continue;
-      const isChase =
-        ci.state === "not_requested" || ci.state === "requested_waiting";
-      const isReview =
-        ci.state === "received_unreviewed" || ci.state === "received_issue";
-      if (!isChase && !isReview) continue;
-      const entry = seen.get(ci.taskId);
-      if (entry) {
-        if (isChase) entry.chaseCount += 1;
-        else entry.reviewCount += 1;
-      } else {
-        // Item references a task we didn't see in (a) — fall back to
-        // the item's taskName so the chip still shows.
-        seen.set(ci.taskId, {
-          id: ci.taskId,
-          name: ci.taskName ?? "Task",
-          chaseCount: isChase ? 1 : 0,
-          reviewCount: isReview ? 1 : 0,
-        });
-      }
-    }
-    return Array.from(seen.values()).sort(
-      (a, b) =>
-        b.chaseCount +
-        b.reviewCount -
-        (a.chaseCount + a.reviewCount),
-    );
-  }, [items, remoteTasksList, storeTasks, client.id]);
+  // Tasks chip strip dropped 2026-05-06 — it duplicated the Filings tab
+  // (same per-task navigable units, same chase/review signals). To Do is
+  // the doc-bucket surface (Still waiting / Needs review); Filings is
+  // the per-task surface. The chase/review counts are still readable as
+  // group headers inside the two sections below.
 
   return (
     <div className="space-y-4">
-      {/* Tasks strip — every task on this client as a navigable chip.
-          Open count badge surfaces which task has the most pending
-          work; click → TaskDetail. The To Do view below stays as the
-          per-item gap surface. */}
-      {tasksOnPage.length > 0 && (
-        <section className="bg-surface border border-line rounded-md px-4 py-3">
-          <header className="flex items-baseline gap-2 mb-2">
-            <h3 className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
-              Tasks
-            </h3>
-            <span className="text-2xs text-ink-400">
-              {tasksOnPage.length}{" "}
-              {tasksOnPage.length === 1 ? "active" : "active"}
-            </span>
-          </header>
-          <div className="flex flex-wrap gap-1.5">
-            {tasksOnPage.map((t) => (
-              <Link
-                key={t.id}
-                to={taskHref(t.id)}
-                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded border border-line bg-canvas text-ink-700 hover:bg-sunken hover:text-ink-900 hover:border-line-strong transition-colors"
-                title={
-                  t.chaseCount > 0 || t.reviewCount > 0
-                    ? `${t.name} — ${t.chaseCount} chasing client, ${t.reviewCount} awaiting your review`
-                    : `Open ${t.name}`
-                }
-              >
-                <span className="font-medium">{t.name}</span>
-                {/* Split badge — "chase" subset (warn yellow, matches the
-                    Still-waiting-on-client section's palette) + "review"
-                    subset (info blue, matches the AI-confidence review
-                    palette). Each appears only when its count > 0; both
-                    hide when the task has no open work. The middle dot
-                    separates the two only when both are non-zero. */}
-                {t.chaseCount > 0 && (
-                  <span
-                    className="text-2xs tabular-nums text-warn-ink bg-warn-bg/60 border border-warn-border px-1 py-0.5 rounded"
-                    title={`${t.chaseCount} item${t.chaseCount === 1 ? "" : "s"} the client still owes you`}
-                  >
-                    {t.chaseCount} chase
-                  </span>
-                )}
-                {t.reviewCount > 0 && (
-                  <span
-                    className="text-2xs tabular-nums text-info-ink bg-info-bg/60 border border-info-border px-1 py-0.5 rounded"
-                    title={`${t.reviewCount} item${t.reviewCount === 1 ? "" : "s"} received from the client, awaiting your confirm/reject`}
-                  >
-                    {t.reviewCount} review
-                  </span>
-                )}
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* 🚨 STILL WAITING ON CLIENT — primary surface. Yuqi note
           2026-05-05: panel chrome stays neutral even when populated;
           the warning signal is carried by the small siren icon + the
@@ -1881,52 +1750,85 @@ function ClientStateAlertsCard({ clientId }: { clientId: string }) {
   const alerts = (announcementsQuery.data ?? []).filter(
     (a) => !a.dismissed && a.affectedClientIds.includes(clientId),
   );
+  const [expanded, setExpanded] = useState(false);
+
   if (alerts.length === 0) return null;
+
+  // Collapsed by default 2026-05-06: a 7-alert block at the top of
+  // every client page swallowed first-screen real estate before the
+  // CPA could see Tasks / To Do. The summary line carries the
+  // count + per-alert action lives one click away inside this section
+  // (or directly on /alerts). Auto-expanded only when there's a single
+  // alert (no signal vs noise concern with N=1).
+  const showList = expanded || alerts.length === 1;
+  const headerLabel = `Active state ${alerts.length === 1 ? "alert" : "alerts"} for this client`;
+
   return (
     <section
       className="mt-5 bg-warn-bg/40 border border-warn-border/60 rounded-md px-region py-region"
       aria-label="Active state alerts affecting this client"
     >
-      <div className="flex items-center gap-2 mb-2.5">
+      <button
+        type="button"
+        onClick={() => setExpanded((x) => !x)}
+        disabled={alerts.length === 1}
+        aria-expanded={showList}
+        aria-controls={`client-alerts-${clientId}`}
+        className="w-full flex items-center gap-2 text-left disabled:cursor-default"
+      >
         <Megaphone className="w-3.5 h-3.5 text-warn-ink shrink-0" aria-hidden />
         <span className="text-2xs uppercase tracking-wider font-semibold text-warn-ink">
-          Active state {alerts.length === 1 ? "alert" : "alerts"} for this client
+          {headerLabel}
         </span>
-        <span className="text-2xs text-ink-500 tabular-nums ml-auto">
-          {alerts.length}
+        <span className="text-2xs text-ink-500 tabular-nums">
+          · {alerts.length}
         </span>
-      </div>
-      <ul className="flex flex-col gap-1.5">
-        {alerts.map((a) => (
-          <li key={a.id}>
-            <Link
-              to={`/alerts/${a.id}`}
-              className="group flex items-center gap-3 px-2.5 py-2 rounded-md bg-surface/70 border border-warn-border/40 hover:bg-surface hover:border-warn-border/80 transition-colors"
-            >
-              <StateBadge code={a.stateCode} size="sm" />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-ink-900 truncate">{a.title}</div>
-                <div className="text-2xs text-ink-500 mt-0.5 truncate">
-                  {a.authority}
-                  {a.newDeadline && (
-                    <>
-                      <span className="mx-1.5 text-ink-300">·</span>
-                      <span>Deadline shifts to {formatLongDate(a.newDeadline)}</span>
-                    </>
-                  )}
+        {alerts.length > 1 && (
+          <span className="ml-auto text-2xs text-warn-ink inline-flex items-center gap-0.5">
+            {expanded ? "Hide" : "Show"}
+            <ChevronRight
+              className={`w-3 h-3 transition-transform ${expanded ? "rotate-90" : ""}`}
+              aria-hidden
+            />
+          </span>
+        )}
+      </button>
+      {showList && (
+        <ul
+          id={`client-alerts-${clientId}`}
+          className="flex flex-col gap-1.5 mt-2.5"
+        >
+          {alerts.map((a) => (
+            <li key={a.id}>
+              <Link
+                to={`/alerts/${a.id}`}
+                className="group flex items-center gap-3 px-2.5 py-2 rounded-md bg-surface/70 border border-warn-border/40 hover:bg-surface hover:border-warn-border/80 transition-colors"
+              >
+                <StateBadge code={a.stateCode} size="sm" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-ink-900 truncate">{a.title}</div>
+                  <div className="text-2xs text-ink-500 mt-0.5 truncate">
+                    {a.authority}
+                    {a.newDeadline && (
+                      <>
+                        <span className="mx-1.5 text-ink-300">·</span>
+                        <span>Deadline shifts to {formatLongDate(a.newDeadline)}</span>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <span className="text-2xs text-ink-500 group-hover:text-ink-900 inline-flex items-center gap-0.5 shrink-0">
-                Review
-                <ChevronRight
-                  className="w-3 h-3 transition-transform group-hover:translate-x-0.5"
-                  aria-hidden
-                />
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+                <span className="text-2xs text-ink-500 group-hover:text-ink-900 inline-flex items-center gap-0.5 shrink-0">
+                  Review
+                  <ChevronRight
+                    className="w-3 h-3 transition-transform group-hover:translate-x-0.5"
+                    aria-hidden
+                  />
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
@@ -1989,75 +1891,11 @@ function ClientAiInsightsCard({ clientId }: { clientId: string }) {
   );
 }
 
-/**
- * Compact AI summary card for the right rail of the ClientDetail header.
- * Composes a one-paragraph narrative from prior-year facts + churn-risk
- * heuristics — the same signals ClientAiInsightsCard surfaces via
- * structured callouts, but distilled into a single readable sentence so
- * the CPA's eye reads it at a glance and moves on.
- *
- * Returns null when there's nothing meaningful to say (no facts, not at
- * churn risk) — better silence than a stub.
- */
-function ClientAiSummaryCard({ clientId }: { clientId: string }) {
-  const facts = useImportedFactsForClient(clientId);
-  const insights = useAiInsightsForClient(clientId);
-  const clientQuery = useClient(clientId);
-  const client = clientQuery.data;
-  const open = insights.filter((i) => i.status === "open");
-  const churnRiskScore = computeChurnRiskScore(clientId, open.length);
-  const isNewClient = (() => {
-    if (!client?.addedAt) return true;
-    const added = parseDate(client.addedAt);
-    if (Number.isNaN(added.getTime())) return true;
-    const daysSinceAdded =
-      (TODAY.getTime() - added.getTime()) / (24 * 60 * 60 * 1000);
-    return daysSinceAdded < 30;
-  })();
-  const showChurnRisk = churnRiskScore >= 2 && !isNewClient;
-
-  if (!client) return null;
-  if (facts.length === 0 && !showChurnRisk) return null;
-
-  const factsLine =
-    facts.length > 0
-      ? `${client.name} has ${facts.length} prior-year fact${facts.length === 1 ? "" : "s"} on file — drafts run on personalised history.`
-      : `${client.name} has no prior-year facts imported yet — drafts run on template defaults.`;
-  const driftLine = showChurnRisk
-    ? churnRiskScore >= 4
-      ? "Strong engagement drift — reach out this week."
-      : churnRiskScore >= 3
-        ? "Engagement drift — worth a quick check-in."
-        : "Minor engagement drift, worth a glance."
-    : null;
-
-  return (
-    <div className="bg-info-bg/30 border border-info-border rounded-md p-4">
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <Sparkles className="w-3.5 h-3.5 text-info-ink" aria-hidden />
-        <span className="text-2xs uppercase tracking-wider font-semibold text-info-ink">
-          AI generated based on history
-        </span>
-      </div>
-      <p className="text-sm text-ink-700 leading-relaxed">
-        {factsLine}
-        {driftLine && <> {driftLine}</>}
-      </p>
-    </div>
-  );
-}
-
-/** Wireframe heuristic for churn risk. Real implementation per PRD §4.4
- *  Layer B uses response-time trends + declined-advisory count + reduced
- *  service-package count. Here we stub it deterministically off clientId. */
-function computeChurnRiskScore(clientId: string, openInsightCount: number): number {
-  // Use a deterministic per-client seed so demo is stable.
-  const seed = clientId
-    .split("")
-    .reduce((a, c) => a + c.charCodeAt(0), 0);
-  const base = seed % 5; // 0..4
-  return base + (openInsightCount > 1 ? 1 : 0);
-}
+// ClientAiSummaryCard + computeChurnRiskScore removed 2026-05-06 —
+// see header-body comment above. The right-rail "AI generated based on
+// history" narrative was meta-narration without a concrete call to
+// action; concrete advisory signals already surface as Opportunities
+// cards and inside the Activity feed.
 
 /**
  * Documents tab — IA §3.3. Longitudinal table: rows = document types,

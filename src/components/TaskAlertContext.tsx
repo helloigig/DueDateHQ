@@ -5,9 +5,15 @@ import type { Client, Task } from "../types";
 import { StateBadge } from "./ui/StateBadge";
 
 /**
- * Soft-blocks accidental ignorance: shown at the top of Task detail when the
- * task's client is in an unread alert's affected list. Doesn't actually
- * prevent action — just surfaces the context at the moment it matters.
+ * Soft-blocks accidental ignorance: shown at the top of Task detail when an
+ * unread alert affects this client AND plausibly touches this specific task
+ * (matched by jurisdiction). Without the task-level scope this banner used
+ * to repeat every alert touching the client — Sarah just saw the same
+ * 7-alert summary on the Client page, then again as a banner on every
+ * task. The match below narrows to alerts whose jurisdiction matches the
+ * task's (federal-form tasks see federal alerts; state-form tasks see
+ * alerts for their state). Routine alerts that only touch other forms on
+ * this client stay on /alerts where they belong.
  *
  * The principle: state alerts are never globally must-read (too disruptive),
  * but they're contextually surfaced when relevant. PRD §7.2 accuracy SLA +
@@ -18,13 +24,18 @@ interface Props {
   client: Client;
 }
 
-export function TaskAlertContext({ client }: Props) {
+export function TaskAlertContext({ task, client }: Props) {
   const { announcements } = useStore();
-  const affecting = announcements.filter(
-    (a) =>
-      !a.dismissed &&
-      a.affectedClientIds.includes(client.id)
-  );
+  const affecting = announcements.filter((a) => {
+    if (a.dismissed) return false;
+    if (!a.affectedClientIds.includes(client.id)) return false;
+    // Jurisdiction match: federal-task ↔ federal alerts (rare since
+    // alerts are state-issued); state-task ↔ alerts for that state.
+    // This drops the cross-jurisdiction noise that made the banner
+    // duplicate the client-level "ACTIVE STATE ALERTS" list.
+    if (task.jurisdiction === "federal") return a.stateCode === ("federal" as unknown as typeof a.stateCode);
+    return a.stateCode === task.jurisdiction;
+  });
 
   if (affecting.length === 0) return null;
   const lead = affecting[0];

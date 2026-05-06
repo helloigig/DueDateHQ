@@ -1,8 +1,17 @@
-import { CalendarClock, Check } from "lucide-react";
+import {
+  CalendarClock,
+  Check,
+  ChevronRight,
+  Forward,
+  Mail,
+  MoonStar,
+  Sparkles,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { StateBadge } from "@/components/ui/StateBadge";
 import { Avatar } from "@/components/ui/Avatar";
+import { Button } from "@/components/ui/button";
 import { formatLongDate, hoursSince } from "@/data/dateHelpers";
 import { clients as MOCK_CLIENTS } from "@/data/mockClients";
 import type { Announcement } from "@/types";
@@ -16,17 +25,21 @@ type ClientLike = {
 
 /**
  * StateAlertCard — the canonical alert presentation. Single source of
- * truth for /alerts (variant="feed") and Dashboard's preview section
- * (variant="preview"). One pattern, two readings — closes the
- * "Dashboard renders alerts differently from /alerts" duplication.
+ * truth across /alerts (variant="feed"), Dashboard's preview section
+ * (variant="preview"), and Today's state-alert section (variant="today").
+ * One pattern, three readings — closes the "every surface renders alerts
+ * differently" duplication.
  *
  * Variants:
- *   - "feed"    — full workshop card. Click selects (left pane). Hover
- *                 reveals a `Send N` chip. Used by /alerts.
+ *   - "feed"    — full workshop card. Click selects (left pane). Used by
+ *                 /alerts; the right co-pilot pane carries the actions.
  *   - "preview" — Dashboard preview. Click navigates to /alerts/:id.
- *                 No hover action chip — the indigo CTA on every card
- *                 was a T2 violation when 10 of them stacked. Action
- *                 surface lives on /alerts.
+ *                 No action footer — the indigo CTA on every card was
+ *                 a T2 violation when 10 of them stacked.
+ *   - "today"   — Today's state-alert band. Same body as preview, plus
+ *                 an inline action footer (Review draft / Apply new
+ *                 deadline / Forward / Snooze) because Today has no
+ *                 co-pilot pane to host actions.
  */
 
 type Tone = "danger" | "warn" | "info";
@@ -87,18 +100,25 @@ export function affectedClientsFor(
 
 export interface StateAlertCardProps {
   a: Announcement;
-  variant?: "feed" | "preview";
+  variant?: "feed" | "preview" | "today";
   /** Selected ring (feed variant only). */
   selected?: boolean;
   /** Faded "handled this session" treatment (feed variant only). */
   handled?: boolean;
-  /** Click handler — feed: select the card; preview: navigate to /alerts/:id. */
+  /** Click handler — feed: select the card; preview/today: navigate to /alerts/:id. */
   onSelect: () => void;
+  /** Snooze handler — only rendered when variant="today" (Today owns the
+   *  action footer; /alerts variants delegate to the co-pilot pane). */
+  onSnooze?: () => void;
   /** Live client roster used to resolve recipient chips. When omitted,
    *  falls back to MOCK_CLIENTS (legacy callers / design previews).
    *  Real-mode callers pass tRPC `clients.list().items` so chips reflect
-   *  the firm's actual roster. */
+   *  the firm's actual roster. Ignored when `affectedClients` is set. */
   clientSource?: ReadonlyArray<ClientLike>;
+  /** Pre-resolved affected client list — overrides internal resolution.
+   *  Today passes this directly so it can join with its already-fetched
+   *  client roster without re-resolving. */
+  affectedClients?: ReadonlyArray<AffectedClient>;
   /** Optional — kept for callers that still pass it; the feed-card hover
    *  Send chip was retired in favor of the co-pilot pane's wired Send. */
   onComplete?: (id: string) => void;
@@ -110,14 +130,18 @@ export function StateAlertCard({
   selected = false,
   handled = false,
   onSelect,
+  onSnooze,
   clientSource,
+  affectedClients,
   onComplete: _onComplete,
 }: StateAlertCardProps) {
   const tone = TYPE_TONE[a.type];
-  const affected = affectedClientsFor(a, clientSource);
+  const affected = affectedClients ?? affectedClientsFor(a, clientSource);
   const visibleChips = affected.slice(0, 5);
   const overflow = Math.max(0, affected.length - visibleChips.length);
   const isFeed = variant === "feed";
+  const isToday = variant === "today";
+  const affectedCount = a.affectedClientIds.length;
 
   return (
     <div
@@ -221,12 +245,55 @@ export function StateAlertCard({
         </div>
       )}
 
-      {/* Zone 3 — primary action moved into the co-pilot pane on the
-          right where the per-client draft preview, recipient toggles,
-          and Edit/Refine controls live. The card itself is the entry
-          point: click to select, then act in the pane. Removing the
-          inline Send avoids two parallel send paths that were drifting
-          out of sync (the inline one was toast-only). */}
+      {/* ── Zone 3 — actions ──────────────────────────────────────
+          feed/preview: action footer hidden — /alerts owns the action
+          surface in the right co-pilot pane; preview lets the user
+          click through to it. today: rendered inline because Today has
+          no co-pilot pane and the action would otherwise be an extra
+          click away through /alerts. */}
+      {isToday && (
+        <div
+          className="border-t border-dashed border-line px-region pt-3 pb-3 flex items-center gap-2 flex-wrap"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span className="text-micro uppercase tracking-wider font-semibold text-indigo-ink inline-flex items-center gap-1">
+            <Sparkles aria-hidden />
+            AI suggested
+          </span>
+          <Button
+            size="sm"
+            onClick={onSelect}
+            className="bg-indigo hover:bg-indigo-hover text-surface"
+          >
+            <Mail aria-hidden />
+            Review draft for {affectedCount}{" "}
+            {affectedCount === 1 ? "client" : "clients"}
+            <ChevronRight aria-hidden />
+          </Button>
+          {a.newDeadline && (
+            <Button size="sm" variant="outline" onClick={onSelect}>
+              <CalendarClock aria-hidden />
+              Apply new deadline
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={onSelect}>
+            <Forward aria-hidden />
+            Forward bulletin
+          </Button>
+          {onSnooze && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onSnooze}
+              aria-label="Snooze until tomorrow"
+              className="ml-auto"
+            >
+              <MoonStar aria-hidden />
+              Snooze
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

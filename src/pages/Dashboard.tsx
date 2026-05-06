@@ -15,21 +15,20 @@ import {
   daysBetween,
   parseDate,
   hoursSince,
-  escalationTier,
 } from "../data/dateHelpers";
-import { useDashboardPreferences } from "../data/preferences";
 import { ChaseBanner } from "../components/ChaseBanner";
-import { BlockingAlertsDialog } from "../components/BlockingAlertsDialog";
-import { OnboardingLayer2Widget } from "../components/OnboardingLayer2Widget";
-import { WelcomeTour } from "../components/WelcomeTour";
 import { CapacityStrip } from "../components/CapacityStrip";
 // ModeFHealth removed — the same monitoring signal ("50/50 states ·
 // last scrape 14m ago") is already on /alerts as the ambient line.
 // Two surfaces showing the same health was redundant.
-// import { ModeFHealth } from "../components/ModeFHealth";
+// AlertTriageModal / WelcomeTour / BlockingAlertsDialog /
+// OnboardingLayer2Widget removed in the F1 slim-down: stacked modals
+// + first-run banners + bottom widget all fired on entry, burying
+// MorningTriage and Action Queue. MorningTriage now carries the
+// triage signal; the >72h subset is covered by the warn-tinted
+// "past 48h" badge + CompactAlertRow ordering inside StateAlertsPreview.
 import { ActionQueue } from "../components/ActionQueue";
 import { MorningTriage } from "../components/MorningTriage";
-import { AlertTriageModal } from "../components/AlertTriageModal";
 import { trpc } from "../lib/api/client";
 import { AiUsageInfo } from "../components/AiUsageInfo";
 import { PageHeader } from "../components/ui/PageHeader";
@@ -80,8 +79,6 @@ export function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const { prefs, update } = useDashboardPreferences();
-
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   useShortcuts([
@@ -116,35 +113,6 @@ export function Dashboard() {
   //   always shows the alerts; the queue is a derived view, not the only
   //   path.
   const activeBanners = announcements.filter((a) => !a.dismissed);
-  // firmRelevantAlerts (alerts hitting at least one client) still drives
-  // the >72h blocking dialog — that escalation only makes sense when a
-  // client cares about the alert.
-  const firmRelevantAlerts = activeBanners.filter(
-    (a) => a.affectedClientIds.length > 0,
-  );
-
-  const alertsByTier = useMemo(() => {
-    const out = {
-      fresh: [] as Announcement[],
-      reminder: [] as Announcement[],
-      escalated: [] as Announcement[],
-      blocking: [] as Announcement[],
-    };
-    for (const a of firmRelevantAlerts) {
-      out[escalationTier(hoursSince(a.detectedAt))].push(a);
-    }
-    return out;
-  }, [firmRelevantAlerts]);
-
-  // In mock/demo mode TODAY is a fixed constant (2026-04-23), so a single
-  // "Snooze for today" click would otherwise lock the modal off forever.
-  // Bypass the gate in mock mode so every fresh landing re-raises it.
-  const isMockMode = import.meta.env.VITE_USE_MOCK_DATA !== "false";
-  const alertsSnoozedToday =
-    !isMockMode && prefs.alerts_snoozed_until === toIso(TODAY);
-  const showBlockingDialog =
-    alertsByTier.blocking.length > 0 && !alertsSnoozedToday;
-  const [blockingDismissed, setBlockingDismissed] = useState(false);
 
   // Operational summary. Two distinct signals:
   //   • pastInternalTarget — task is past its internal target date (1-week
@@ -235,11 +203,6 @@ export function Dashboard() {
 
   return (
     <div className="max-w-[1080px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
-      {/* Triage modal — fires once per browser session on first land
-          when the user has alerts that arrived while they were away.
-          Honors the per-user toggle in Settings → Notifications. */}
-      <AlertTriageModal />
-
       {/* PAGE HEADER ROW — Mercury Home anatomy: H1 left + action button row
           right. The action row carries the page's "what can I do here right
           now" affordances (Mercury Home: Send / Transfer / Deposit / Request).
@@ -268,13 +231,6 @@ export function Dashboard() {
           per-item next-gestures (anomalies, replies, inbound to
           confirm) live in the action queue's TodoItem feed below. */}
       <MorningTriage summary={summary} />
-
-      {/* First-run orientation — banner + 3-slide modal tour (Hook /
-          Core / Moat). Gated by localStorage so it only fires once per
-          browser. Reintroduced 2026-05-06 per Yuqi: the 3-step intro
-          card was core to the first-time experience and shouldn't have
-          been removed. */}
-      <WelcomeTour />
 
       {/* State alerts — preview surface with compact one-line rows
           (CompactAlertRow). Top 3 action-today rows + a freshness chip
@@ -306,33 +262,6 @@ export function Dashboard() {
       {/* §5: Capacity — ≥3-staff firms only (gate inside the component).
           Solo Sarah never sees this; mid-firm Yan Jing always does. */}
       <CapacityStrip />
-
-      {/* Onboarding layer-2 nudges (set up forwarding email, connect
-          QBO). Self-gated to fade out once the firm wires the basics. */}
-      <OnboardingLayer2Widget />
-
-      {/* Blocking-alerts overlay — fires only at >72h escalation. Stays as
-          a modal because the spec demands a forced ack at that tier. The
-          totalAffecting prop carries the full "Affecting you" count so
-          the modal can show "5 of {N} affecting you" — clarifying that
-          this popup is a strict subset of the /alerts "Affecting you" tab. */}
-      {showBlockingDialog && !blockingDismissed && (
-        <BlockingAlertsDialog
-          alerts={alertsByTier.blocking}
-          totalAffecting={firmRelevantAlerts.length}
-          onSnooze={(reason) => {
-            update({ alerts_snoozed_until: toIso(TODAY) });
-            if (reason) {
-              console.info("[alerts] snooze logged", {
-                date: toIso(TODAY),
-                reason,
-              });
-            }
-            setBlockingDismissed(true);
-          }}
-          onClose={() => setBlockingDismissed(true)}
-        />
-      )}
 
       <ShortcutsModal
         open={shortcutsOpen}

@@ -409,11 +409,11 @@ function milestonesToWaypoints(
     label: string;
     canonical: string;
   }> = [
-    { type: "initial_meeting", label: "Initial mtg", canonical: "initial_meeting" },
-    { type: "collect", label: "Collect", canonical: "collect_materials" },
-    { type: "prepare", label: "Prepare", canonical: "prepare_workpapers" },
-    { type: "review", label: "Review", canonical: "internal_review" },
-    { type: "file", label: "File", canonical: "file" },
+    { type: "initial_meeting", label: "Scope", canonical: "initial_meeting" },
+    { type: "collect", label: "Collecting", canonical: "collect_materials" },
+    { type: "prepare", label: "Preparing", canonical: "prepare_workpapers" },
+    { type: "review", label: "Signature", canonical: "internal_review" },
+    { type: "file", label: "Filed", canonical: "file" },
   ];
   const waiting = checklist.filter(
     (c) =>
@@ -940,13 +940,13 @@ function deriveWaypoints(task: Task, checklist: ChecklistItem[]): Waypoint[] {
   return [
     {
       type: "initial_meeting",
-      label: "Initial mtg",
+      label: "Scope",
       targetDate: initialMeeting,
       status: initialStatus,
     },
     {
       type: "collect",
-      label: "Collect",
+      label: "Collecting",
       targetDate: clientPrep,
       status: collectStatus,
       missingBadge:
@@ -956,7 +956,7 @@ function deriveWaypoints(task: Task, checklist: ChecklistItem[]): Waypoint[] {
     },
     {
       type: "prepare",
-      label: "Prepare",
+      label: "Preparing",
       targetDate: target,
       status: prepareStatus,
       missingBadge:
@@ -966,13 +966,13 @@ function deriveWaypoints(task: Task, checklist: ChecklistItem[]): Waypoint[] {
     },
     {
       type: "review",
-      label: "Review",
+      label: "Signature",
       targetDate: review,
       status: reviewStatus,
     },
     {
       type: "file",
-      label: "File",
+      label: "Filed",
       targetDate: due,
       status: fileStatus,
     },
