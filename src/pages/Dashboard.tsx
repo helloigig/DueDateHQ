@@ -28,15 +28,13 @@ import { CapacityStrip } from "../components/CapacityStrip";
 // Two surfaces showing the same health was redundant.
 // import { ModeFHealth } from "../components/ModeFHealth";
 import { ActionQueue } from "../components/ActionQueue";
-import { JustHappenedStrip } from "../components/JustHappenedStrip";
+import { MorningTriage } from "../components/MorningTriage";
 import { AlertTriageModal } from "../components/AlertTriageModal";
 import { WhatChangedBanner } from "../components/WhatChangedBanner";
 import { AiUsageInfo } from "../components/AiUsageInfo";
 import { PageHeader } from "../components/ui/PageHeader";
 import { DateLabel } from "../components/ui/DateLabel";
-import { MetricTile } from "../components/ui/MetricTile";
 import { SectionHeader } from "../components/ui/SectionHeader";
-import { StateAlertCard } from "../components/StateAlertCard";
 import { Megaphone, ChevronRight } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { Announcement } from "../types";
@@ -261,77 +259,19 @@ export function Dashboard() {
         />
       </div>
 
-      {/* KPI STRIP — operational signal first, legal-miss as conditional
-          secondary. Per the deadline-UX principle: official date is a
-          reference constraint, not the primary daily driver. The signal
-          Sarah feels every day is "behind plan" (past internal target,
-          buffer eaten); legal misses are rare and only loud up when they
-          actually exist. So:
-            • "Behind plan" — always present, amber when nonzero. The
-              operational signal. Counts open tasks where today >
-              internal target but ≤ official deadline.
-            • "Filing today" — calendar context. Always present, neutral.
-            • "Past official" — danger tile, conditional. Only rendered
-              when the count is > 0. Never primary even when present —
-              its job is to alert without re-centering the mental model
-              on the legal date.
-          Pre-PR #92, the second slot flip-flopped between "Past target"
-          and "Past official" depending on count. That flipping conflated
-          two different decisions. Splitting them removes the ambiguity. */}
-      <div
-        className={`mb-card grid grid-cols-1 gap-region ${
-          summary.pastOfficial > 0
-            ? "md:grid-cols-3 max-w-2xl"
-            : "md:grid-cols-2 max-w-md"
-        }`}
-      >
-        <MetricTile
-          label="Behind plan"
-          value={summary.pastInternalTarget}
-          tone={summary.pastInternalTarget > 0 ? "warn" : "neutral"}
-        />
-        <MetricTile
-          label="Filing today"
-          value={summary.dueToday}
-          tone={summary.dueToday > 0 ? "warn" : "neutral"}
-        />
-        {summary.pastOfficial > 0 && (
-          <MetricTile
-            label="Past official"
-            value={summary.pastOfficial}
-            tone="danger"
-          />
-        )}
-      </div>
+      {/* §1: Morning triage — the directive layer.
+          Replaces the dual KPI tiles + JustHappened chip strip. When
+          anything actionable is non-zero (past official / filing today /
+          anomalies / behind plan / replies / inbound to confirm), render
+          banner-weight cards in blocking-first priority. When all zero,
+          collapse to a single one-liner so the page yields its space to
+          the queue immediately below. The point is to answer "what must
+          I touch NOW or TODAY?" before the eye reaches the queue. */}
+      <MorningTriage summary={summary} />
 
-      {/* WelcomeTour hidden per user direction — adds noise on the daily
-          surface; reintroduce as an onboarding-only banner gated on
-          firstSession if we want a tour later. */}
-      {/* <WelcomeTour /> */}
-
-      {/* ─────────────────────────────────────────────────────────────────
-          Today narrative (5 sections, read top → bottom):
-            1. Just happened — overnight diff (inbound-classifier confirms, replies,
-               anomaly-detector issues). Drained in seconds before chasing starts.
-            2. Action queue — the chase. State alerts pinned at top, then
-               one row per client (max-urgency dot, all outstanding items
-               aggregated, expand to act on individual items).
-            3. Quiet clients — the chase loop's stalled subset (14d+ no
-               reply). Needs a phone call, not another email.
-            4. state-monitor Health — state-monitoring's own monitoring.
-            5. Capacity — staff allocation (≥3-staff firms only).
-          State-alert news (no client matches) drops out as a compact
-          chip above the queue. Pure-news doesn't generate queue rows
-          (state-monitor gates on affectedClientIds.length > 0). */}
-
-      {/* §0: What changed since the user was last here. Banner sits
-          above the just-happened strip so a fresh state alert is the
-          first thing the eye lands on after the H1. Vanishes when
-          there are no new alerts since last visit (no zero-state). */}
+      {/* §2: What changed since the user was last here. State-alert news
+          banner (since-last-visit) — vanishes when nothing's new. */}
       <WhatChangedBanner />
-
-      {/* §1: Just happened — overnight diff strip. */}
-      <JustHappenedStrip />
 
       {/* State alerts — preview surface. Top 3 most-urgent rendered as
           the canonical <StateAlertCard variant="preview"> (same shape
@@ -438,7 +378,6 @@ function StateAlertsPreview({
   announcements: Announcement[];
 }) {
   const navigate = useNavigate();
-  const clientsQuery = useClients();
 
   // Empty: monitoring assurance, calm.
   if (announcements.length === 0) {
@@ -520,14 +459,21 @@ function StateAlertsPreview({
     return b.detectedAt.localeCompare(a.detectedAt);
   });
 
+  // Cap at 3 — Today's purpose is "act on the most urgent now," not browse
+  // every escalation. Anything past 3 lives on /alerts.
+  const PREVIEW_CAP = 3;
+  const previewed = sortedEscalated.slice(0, PREVIEW_CAP);
+  const overflow =
+    escalated.length - previewed.length + Math.max(0, routineCount);
+
   return (
     <section className="mb-section">
       <SectionHeader
-        title="Escalated alerts"
+        title="Alerts to act on today"
         meta={
           escalated.length === 1
-            ? "1 past 72h SLA — act today"
-            : `${escalated.length} past 72h SLA — act today`
+            ? "1 past 72h SLA"
+            : `${escalated.length} past 72h SLA`
         }
         action={
           <Link
@@ -538,30 +484,82 @@ function StateAlertsPreview({
           </Link>
         }
       />
-      <div className="flex flex-col gap-card">
-        {sortedEscalated.map((a) => (
-          <StateAlertCard
-            key={a.id}
-            a={a}
-            variant="preview"
-            onSelect={() => navigate(`/alerts/${a.id}`)}
-            clientSource={clientsQuery.data?.items}
-          />
-        ))}
-      </div>
-      {routineCount > 0 && (
-        <div className="mt-3 flex justify-center">
+      <div className="bg-surface border border-line rounded-md overflow-hidden">
+        <ul className="divide-y divide-line" role="list">
+          {previewed.map((a) => (
+            <CompactAlertRow
+              key={a.id}
+              announcement={a}
+              onClick={() => navigate(`/alerts/${a.id}`)}
+            />
+          ))}
+        </ul>
+        {overflow > 0 && (
           <Link
             to="/alerts"
-            className="inline-flex items-center gap-1 text-xs text-ink-500 hover:text-ink-900 hover:underline underline-offset-[3px] decoration-[1.5px]"
+            className="block w-full px-region py-2 text-xs text-ink-500 hover:text-ink-900 hover:bg-sunken/40 border-t border-line text-center"
           >
-            {routineCount} more routine{" "}
-            {routineCount === 1 ? "alert" : "alerts"} on /alerts
-            <ChevronRight className="w-3.5 h-3.5" aria-hidden />
+            {overflow} more {overflow === 1 ? "alert" : "alerts"} on /alerts →
           </Link>
-        </div>
-      )}
+        )}
+      </div>
     </section>
+  );
+}
+
+// CompactAlertRow — one-line summary of a single state alert. Strips
+// down the StateAlertCard's full presentation (title + body + affected
+// client list + nexus pill + source URL) to just the essentials Sarah
+// needs to decide whether to act NOW: state, summary headline, affected
+// count, recency, and a deadline-shift pill if applicable. Click lands
+// on /alerts/:id where the full detail + actions live.
+function CompactAlertRow({
+  announcement,
+  onClick,
+}: {
+  announcement: Announcement;
+  onClick: () => void;
+}) {
+  const hours = hoursSince(announcement.detectedAt);
+  const recency =
+    hours < 1
+      ? "just now"
+      : hours < 24
+        ? `${hours}h ago`
+        : `${Math.floor(hours / 24)}d ago`;
+  const affectedCount = announcement.affectedClientIds.length;
+  // Use the title as the one-line headline (it's the distilled "Economic
+  // nexus threshold lowered to $300,000" form). Summary is a longer body
+  // paragraph — that lives on /alerts/:id, not here.
+  const headline = announcement.title;
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onClick}
+        className="w-full text-left px-region py-2.5 flex items-center gap-3 hover:bg-sunken/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo/40"
+      >
+        <span className="inline-flex items-center justify-center min-w-[28px] h-5 px-1.5 rounded text-2xs font-semibold bg-sunken text-ink-700 shrink-0 tabular-nums">
+          {announcement.stateCode}
+        </span>
+        <span className="flex-1 min-w-0 truncate text-sm text-ink-900">
+          {headline}
+        </span>
+        {announcement.newDeadline && (
+          <span className="text-2xs px-1.5 py-0.5 rounded bg-warn-bg text-warn-ink shrink-0 hidden sm:inline-block">
+            moves deadline
+          </span>
+        )}
+        <span className="text-xs text-ink-500 shrink-0 tabular-nums">
+          {affectedCount} {affectedCount === 1 ? "client" : "clients"} ·{" "}
+          {recency}
+        </span>
+        <ChevronRight
+          className="w-3.5 h-3.5 text-ink-400 shrink-0"
+          aria-hidden
+        />
+      </button>
+    </li>
   );
 }
 
