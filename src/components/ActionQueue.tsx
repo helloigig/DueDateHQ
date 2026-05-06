@@ -28,6 +28,7 @@ import { cn } from "../lib/utils";
 import {
   buildQueueRows,
   summarizeClientGroup,
+  summarizeClientGroupTasks,
   type ClientGroupRow,
   type BulkBatchRow,
   type QueueTodoItem,
@@ -112,11 +113,12 @@ export function ActionQueue() {
     <section className="mb-section" aria-labelledby="action-queue-heading">
       <SectionHeader
         title={<span id="action-queue-heading">Action queue</span>}
-        meta={
-          rows.length === 1
-            ? `${rows.length} client · ${items.length} ${items.length === 1 ? "item" : "items"}`
-            : `${rows.length} clients · ${items.length} items`
-        }
+        // Yuqi audit 2026-05-06: section header meta normalized to
+        // "{count} {entity-noun}" across Today / ActionQueue / Timeline so
+        // the strip reads consistently. Items lead because they're the
+        // unit the user acts on; the client count is implied by the row
+        // grouping below.
+        meta={`${items.length} ${items.length === 1 ? "item" : "items"} across ${rows.length} ${rows.length === 1 ? "client" : "clients"}`}
       />
       <div className="bg-surface border border-line rounded-md overflow-hidden">
         <ul className="divide-y divide-line" role="list">
@@ -227,13 +229,8 @@ function ClientGroupRowView({
   const [open, setOpen] = useState(false);
   const [bundleOpen, setBundleOpen] = useState(false);
   const summary = summarizeClientGroup(row);
+  const taskScope = summarizeClientGroupTasks(row);
   const checklistStates = aggregateChecklistStates(row.items);
-  // Pending = anything not confirmed / not_applicable (the chase loop
-  // is still open). The mockup's "{N} items pending · last sent {Y}d
-  // ago" footer reads this number.
-  const pendingCount = checklistStates.filter(
-    (c) => c.state !== "received_confirmed" && c.state !== "not_applicable",
-  ).length;
   // "last sent Yd ago" — derive from the max `daysBehind` across Send
   // items in this group. daysBehind is the chase-loop's stuck duration
   // (days since the most recent reminder), so the max across this
@@ -431,30 +428,31 @@ function ClientGroupRowView({
                 />
               )}
             </div>
-            {/* Title — verb summary, big and bold per the mockup
-                ("Send 7 reminders · across TX Franchise + 941"). */}
+            {/* Title — verb breakdown, big and bold. The expanded child
+                list below shows exactly the same N items that this
+                summary describes; the row's footer count agrees. */}
             <h3 className="text-base font-semibold text-ink-900 leading-snug">
               {summary}
             </h3>
-            {/* Dot row + status line — dots above, "{N} items pending ·
-                last sent {Y}d ago" below. The dots tell the chase-loop
-                story; the line gives the count + recency at a glance. */}
+            {/* Meta row: dot stack (chase-loop status across the items)
+                + task scope ("across F-1120") + last-sent recency.
+                The action count is implicit in the verb breakdown above
+                — we don't print "{N} items pending" again because that
+                drifted from `summary` whenever the two used different
+                denominators. */}
             <div className="mt-2 flex items-center gap-2 flex-wrap">
               <DotStack
                 states={checklistStates.map((c) => c.state)}
                 maxVisible={12}
               />
-              <span className="text-xs text-ink-500">
-                {pendingCount} {pendingCount === 1 ? "item" : "items"} pending
-                {lastSentDays != null && (
-                  <>
-                    {" · "}
-                    <span className="text-ink-400">
-                      last sent {lastSentDays}d ago
-                    </span>
-                  </>
-                )}
-              </span>
+              {taskScope && (
+                <span className="text-xs text-ink-500">{taskScope}</span>
+              )}
+              {lastSentDays != null && (
+                <span className="text-xs text-ink-400">
+                  · last sent {lastSentDays}d ago
+                </span>
+              )}
             </div>
           </div>
         </button>

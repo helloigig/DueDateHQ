@@ -74,9 +74,20 @@ export function Sidebar() {
           : storeClients,
     [liveClientsRaw, storeClients],
   );
-  // Alerts caption: count of unique CLIENTS affected by active (non-dismissed)
-  // alerts — the actionable number ("how many of MY clients does this touch")
-  // not the raw alert count. Matches the way Sarah scans the bell.
+  // Alerts caption: count of active (non-dismissed) alerts.
+  //
+  // Yuqi audit 2026-05-06: previously this counted unique CLIENTS
+  // affected (a different denominator from every other sidebar badge,
+  // which all report "count the entity this destination is named
+  // for"). The mismatch made the sidebar number ambiguous — users
+  // didn't know if "21" meant 21 alerts or 21 clients touched. Rule
+  // is now: each badge reports the count of the named entity. Affected
+  // client count moved into the alert card body ("Affects N clients"
+  // zone) where it belongs. Hover title still explains both.
+  const activeAlertsCount = useMemo(
+    () => announcements.filter((a) => !a.dismissed).length,
+    [announcements],
+  );
   const alertsAffectingCount = useMemo(() => {
     const set = new Set<string>();
     for (const a of announcements) {
@@ -174,21 +185,24 @@ export function Sidebar() {
                 )}
                 <Icon className="w-4 h-4 shrink-0" aria-hidden />
                 {!collapsed && <span className="flex-1">{label}</span>}
-                {/* Alerts caption — # of CLIENTS the active announcements
-                    touch (not raw alert count). Yuqi audit 2026-05-05: the
-                    bare number "9+" was confusing — what does it count?
-                    Title now spells it out so hover disambiguates. */}
-                {!collapsed && to === "/alerts" && alertsAffectingCount > 0 && (
+                {/* Alerts caption — # of ACTIVE ALERTS (matches sidebar
+                    convention: each badge counts the entity its
+                    destination is named for). Hover title spells out
+                    the secondary "X clients affected" so the auxiliary
+                    number stays one breath away. */}
+                {!collapsed && to === "/alerts" && activeAlertsCount > 0 && (
                   <CountBadge
-                    count={alertsAffectingCount}
+                    count={activeAlertsCount}
                     tone="neutral"
                     className="ml-auto"
-                    title={`${alertsAffectingCount} ${
+                    title={`${activeAlertsCount} active ${
+                      activeAlertsCount === 1 ? "alert" : "alerts"
+                    } · ${alertsAffectingCount} ${
                       alertsAffectingCount === 1 ? "client" : "clients"
-                    } affected by active alerts`}
+                    } affected`}
                   />
                 )}
-                {collapsed && to === "/alerts" && alertsAffectingCount > 0 && (
+                {collapsed && to === "/alerts" && activeAlertsCount > 0 && (
                   <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-warn-solid" />
                 )}
                 {/* Clients caption — active roster size (excludes archived /

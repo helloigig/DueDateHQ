@@ -14,6 +14,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/button";
 import { formatLongDate, hoursSince } from "@/data/dateHelpers";
 import { clients as MOCK_CLIENTS } from "@/data/mockClients";
+import { TOPIC_LABEL, TOPIC_TONE } from "@/data/announcementLabels";
 import type { Announcement } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -25,42 +26,30 @@ type ClientLike = {
 
 /**
  * StateAlertCard — the canonical alert presentation. Single source of
- * truth across /alerts (variant="feed"), Dashboard's preview section
- * (variant="preview"), and Today's state-alert section (variant="today").
- * One pattern, three readings — closes the "every surface renders alerts
- * differently" duplication.
+ * truth across /alerts (variant="feed") and Today's state-alert section
+ * (variant="today"). One pattern, two readings.
  *
  * Variants:
  *   - "feed"    — full workshop card. Click selects (left pane). Used by
  *                 /alerts; the right co-pilot pane carries the actions.
- *   - "preview" — Dashboard preview. Click navigates to /alerts/:id.
- *                 No action footer — the indigo CTA on every card was
- *                 a T2 violation when 10 of them stacked.
- *   - "today"   — Today's state-alert band. Same body as preview, plus
- *                 an inline action footer (Review draft / Apply new
+ *   - "today"   — Today's state-alert band. Same body as feed, plus an
+ *                 inline action footer (Review draft / Apply new
  *                 deadline / Forward / Snooze) because Today has no
  *                 co-pilot pane to host actions.
+ *
+ * Yuqi audit 2026-05-06: the third "preview" variant (used by an early
+ * Dashboard mock that no longer exists) was retired. It was a footerless
+ * version of "today" that meant the user couldn't tell at a glance what
+ * actions were available without clicking through. Dashboard now uses a
+ * separate `StateAlertsPreview` component for its compact surface.
  */
 
-type Tone = "danger" | "warn" | "info";
-
-const TYPE_LABEL: Record<Announcement["type"], string> = {
-  disaster_extension: "Disaster ext.",
-  penalty_relief: "Penalty relief",
-  pte_change: "PTE change",
-  form_change: "Form change",
-  rate_change: "Rate change",
-  nexus_change: "Nexus change",
-};
-
-const TYPE_TONE: Record<Announcement["type"], Tone> = {
-  disaster_extension: "warn",
-  penalty_relief: "info",
-  pte_change: "info",
-  form_change: "info",
-  rate_change: "info",
-  nexus_change: "warn",
-};
+// TOPIC_LABEL + TYPE_TONE moved to `data/announcementLabels.ts` as
+// TOPIC_LABEL / TOPIC_TONE so the Today card, /alerts feed card, and
+// /alerts detail pane share one source. The prior local copy here
+// drifted out of sync — the detail pane used a neutral pill, the card
+// used info blue, and the same "Penalty relief" label looked like two
+// different concepts to the user.
 
 function timeAgoShort(iso: string): string {
   const h = hoursSince(iso);
@@ -100,7 +89,7 @@ export function affectedClientsFor(
 
 export interface StateAlertCardProps {
   a: Announcement;
-  variant?: "feed" | "preview" | "today";
+  variant?: "feed" | "today";
   /** Selected ring (feed variant only). */
   selected?: boolean;
   /** Faded "handled this session" treatment (feed variant only). */
@@ -135,7 +124,7 @@ export function StateAlertCard({
   affectedClients,
   onComplete: _onComplete,
 }: StateAlertCardProps) {
-  const tone = TYPE_TONE[a.type];
+  const tone = TOPIC_TONE[a.type];
   const affected = affectedClients ?? affectedClientsFor(a, clientSource);
   const visibleChips = affected.slice(0, 5);
   const overflow = Math.max(0, affected.length - visibleChips.length);
@@ -176,7 +165,7 @@ export function StateAlertCard({
           <div className="mt-1 flex items-center gap-2 text-xs text-ink-500">
             <span className="truncate flex-1 min-w-0">{a.authority}</span>
             <StatusPill variant={tone} size="xs" className="shrink-0">
-              {TYPE_LABEL[a.type]}
+              {TOPIC_LABEL[a.type]}
             </StatusPill>
             <span className="tabular-nums shrink-0 text-ink-400">
               {timeAgoShort(a.detectedAt)}
@@ -190,7 +179,7 @@ export function StateAlertCard({
           <p className="mt-2 text-sm text-ink-700 leading-snug line-clamp-1">
             {a.summary && a.summary.trim()
               ? a.summary
-              : `${a.authority} published a ${TYPE_LABEL[a.type].toLowerCase()} for ${a.affectedClientIds.length} of your clients. Open the detail pane for the full text.`}
+              : `${a.authority} published a ${TOPIC_LABEL[a.type].toLowerCase()} for ${a.affectedClientIds.length} of your clients. Open the detail pane for the full text.`}
           </p>
           {handled && (
             <div className="mt-2 inline-flex items-center gap-1 text-2xs font-medium text-ok-ink bg-ok-bg border border-ok-border rounded px-1.5 py-0.5">
@@ -215,7 +204,11 @@ export function StateAlertCard({
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
                 {visibleChips.map((c) => (
-                  <AffectedClientChip key={c.id} client={c} />
+                  <AffectedClientChip
+                    key={c.id}
+                    client={c}
+                    fromAlertId={a.id}
+                  />
                 ))}
                 {overflow > 0 && (
                   <span className="text-xs text-ink-500 px-1.5 tabular-nums">
@@ -308,11 +301,24 @@ export function StateAlertCard({
  * through" affordance. Keeping the primitive split preserves the
  * ClientChip contract while giving this surface its own framed shape.
  */
-function AffectedClientChip({ client }: { client: AffectedClient }) {
+function AffectedClientChip({
+  client,
+  fromAlertId,
+}: {
+  client: AffectedClient;
+  fromAlertId?: string;
+}) {
   const firstLetter = (client.name.trim()[0] ?? "?").toUpperCase();
+  // Carry the alert id along so ClientDetail can render a "Back to
+  // alert" reverse link in its header. Avoids the dead-end where the
+  // user clicks a chip from /alerts/:id, lands on /clients/:id, and
+  // has no way back without browser back.
+  const to = fromAlertId
+    ? `/clients/${client.id}?fromAlert=${fromAlertId}`
+    : `/clients/${client.id}`;
   return (
     <Link
-      to={`/clients/${client.id}`}
+      to={to}
       className="inline-flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-pill border border-line bg-surface hover:bg-sunken hover:border-line-strong transition-colors min-w-0 max-w-full"
       onClick={(e) => e.stopPropagation()}
       title={client.name}

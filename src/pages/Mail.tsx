@@ -233,7 +233,7 @@ export function Mail() {
             const hasActions = Boolean(m.id);
             const onClick = () => {
               if (m.taskId && m.clientId) {
-                navigate(`/clients/${m.clientId}/tasks/${m.taskId}`);
+                navigate(`/clients/${m.clientId}?task=${m.taskId}`);
               } else if (m.clientId) {
                 navigate(`/clients/${m.clientId}`);
               } else {
@@ -338,7 +338,7 @@ export function Mail() {
                         discoverable and keyboard-reachable. */}
                     {m.taskId && m.clientId && (
                       <Link
-                        to={`/clients/${m.clientId}/tasks/${m.taskId}`}
+                        to={`/clients/${m.clientId}?task=${m.taskId}`}
                         onClick={(e) => e.stopPropagation()}
                         className="ml-auto inline-flex items-center gap-1 text-2xs px-2 py-0.5 rounded border border-line text-info-ink hover:bg-info-bg/60"
                         aria-label="Open the task this reply belongs to"

@@ -14,6 +14,25 @@ export const TOPIC_LABEL: Record<AnnouncementType, string> = {
   nexus_change: "Nexus change",
 };
 
+/**
+ * StatusPill variant for each AnnouncementType. Lives in the shared
+ * labels module so the Today card, the /alerts feed card, and the
+ * /alerts detail pane render the same pill chrome — the prior gap
+ * (Today used `info` blue, detail pane used neutral gray) made the
+ * "Penalty relief" pill look like two different concepts.
+ */
+export const TOPIC_TONE: Record<
+  AnnouncementType,
+  "info" | "warn" | "danger" | "neutral"
+> = {
+  disaster_extension: "warn",
+  penalty_relief: "info",
+  pte_change: "info",
+  form_change: "info",
+  rate_change: "info",
+  nexus_change: "warn",
+};
+
 export const TAX_TYPE_LABEL: Record<TaxType, string> = {
   income: "Income",
   sales_use: "Sales/Use",

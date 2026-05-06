@@ -145,8 +145,20 @@ export function buildQueueRows(items: QueueTodoItem[]): QueueRow[] {
   });
 }
 
-// Summarize the items for a client group as a single sentence, e.g.
-//   "Send 2 reminders · Confirm 1 inbound · across 1040 + 1040-ES"
+// Summarize the items for a client group as a single sentence verb
+// breakdown, e.g. "Send 2 reminders · Confirm 1 inbound · Resolve 1 flag".
+//
+// Yuqi audit 2026-05-06: the prior version emitted a "{verbs} · across
+// {tasks}" string that didn't reconcile with the row's separate
+// "{N} items pending" footer (different denominators — verbs counts
+// only Send/Confirm/Discuss/Apply, items pending counted every non-
+// confirmed checklist row). Split: this returns ONLY the verb
+// breakdown so the displayed action count = sum of verbs in the
+// summary. The "across {tasks}" fragment moved to
+// `summarizeClientGroupTasks` so the row can render it on its own
+// meta line, and `summarizeClientGroupCount` returns the integer the
+// summary expands to (collapsed-row footer can read it without
+// recomputing).
 export function summarizeClientGroup(group: ClientGroupRow): string {
   const parts: string[] = [];
   const verbOrder: MockTodoItem["verb"][] = [
@@ -167,11 +179,29 @@ export function summarizeClientGroup(group: ClientGroupRow): string {
     const [s, p] = verbNoun[v];
     parts.push(`${v} ${n} ${n === 1 ? s : p}`);
   }
+  return parts.join(" · ");
+}
+
+/** Total action count across all verbs — the integer the row footer
+ *  shows to match the verb breakdown returned by `summarizeClientGroup`. */
+export function summarizeClientGroupCount(group: ClientGroupRow): number {
+  const verbOrder: MockTodoItem["verb"][] = [
+    "Send",
+    "Confirm",
+    "Discuss",
+    "Apply",
+  ];
+  let total = 0;
+  for (const v of verbOrder) total += group.verbCounts[v] ?? 0;
+  return total;
+}
+
+/** Task-scope fragment, e.g. "across 1040 + 1040-ES" or "across 4 tasks". */
+export function summarizeClientGroupTasks(group: ClientGroupRow): string | null {
   const tasks = Array.from(
     new Set(group.items.map((i) => i.task).filter((t): t is string => !!t)),
   );
-  if (tasks.length > 0) {
-    parts.push(`across ${tasks.slice(0, 3).join(" + ")}${tasks.length > 3 ? ` +${tasks.length - 3}` : ""}`);
-  }
-  return parts.join(" · ");
+  if (tasks.length === 0) return null;
+  if (tasks.length <= 3) return `across ${tasks.join(" + ")}`;
+  return `across ${tasks.slice(0, 3).join(" + ")} +${tasks.length - 3}`;
 }

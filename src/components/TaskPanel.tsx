@@ -1,6 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { CheckCircle2, FileDown, X, Sparkles, ExternalLink } from "lucide-react";
+import { CheckCircle2, FileDown, X, Sparkles } from "lucide-react";
 import { TaskHeader } from "./TaskHeader";
 import { TaskMiniTimeline } from "./TaskMiniTimeline";
 import { ChecklistList } from "./ChecklistList";
@@ -170,14 +169,10 @@ export function TaskPanel({ clientId, taskId, onClose }: Props) {
             </span>
           </h2>
         </div>
-        <Link
-          to={`/clients/${client.id}/tasks/${task.id}`}
-          className="text-xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-sunken"
-          title="Open as full page"
-        >
-          <ExternalLink className="w-3 h-3" aria-hidden />
-          Open page
-        </Link>
+        {/* "Open page" deep-link retired 2026-05-06: the standalone
+            TaskDetail layout was producing two divergent UIs for the
+            same object and losing panel state on transition. Panel is
+            now the single canonical task surface. */}
         <button
           type="button"
           onClick={onClose}
@@ -306,14 +301,7 @@ export function TaskPanel({ clientId, taskId, onClose }: Props) {
             </button>
             {insightsExpanded && (
               <p className="text-xs text-ink-500 mt-2 px-3">
-                Full AI insights live on the task page —{" "}
-                <Link
-                  to={`/clients/${client.id}/tasks/${task.id}`}
-                  className="underline hover:text-ink-900"
-                >
-                  open page
-                </Link>
-                .
+                Click any fact above to drill into its source thread.
               </p>
             )}
           </div>

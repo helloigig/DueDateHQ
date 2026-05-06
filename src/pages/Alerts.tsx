@@ -31,7 +31,9 @@ import {
   SOURCE_AUTHORITY_TOOLTIP,
   TAX_TYPE_LABEL,
   TOPIC_LABEL,
+  TOPIC_TONE,
 } from "@/data/announcementLabels";
+import { StatusPill } from "@/components/ui/StatusPill";
 import {
   useAnnouncements,
   useDismissAnnouncement,
@@ -311,60 +313,81 @@ function AlertContextSection({ announcement: a }: { announcement: Announcement }
   };
   const isLowConfidence =
     a.parseConfidence === "low" || a.matchConfidence === "low";
+  const topicTone = TOPIC_TONE[a.type];
 
   return (
     <section className="px-region pt-region pb-region">
-      {/* Authority line + type pill */}
-      <div className="flex items-center gap-2 flex-wrap text-xs">
-        <span className="font-medium text-ink-900">{a.authority}</span>
-        <span className="text-ink-300" aria-hidden>·</span>
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line">
+      {/* Authority — given its own line so the issuing body reads as the
+          primary attribution, not a chip in a soup of other chips.
+          Yuqi audit 2026-05-06: prior version mashed authority + type +
+          tax + retroactive + source-class onto one line at text-xs and
+          all read like equally-weighted neutral pills. */}
+      <p className="text-xs text-ink-500">
+        <span className="font-medium text-ink-700">{a.authority}</span>
+      </p>
+
+      {/* Classification chips — type + tax type + retroactive + source.
+          Type pill now uses StatusPill with the shared TOPIC_TONE so it
+          matches the Today card and the feed card exactly. */}
+      <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+        <StatusPill variant={topicTone} size="xs">
           {TOPIC_LABEL[a.type]}
-        </span>
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line">
+        </StatusPill>
+        <StatusPill variant="neutral" size="xs">
           {TAX_TYPE_LABEL[a.taxType]}
-        </span>
+        </StatusPill>
         {a.retroactive && (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-warn-bg text-warn-ink border border-warn-border">
+          <StatusPill variant="warn" size="xs">
             <History className="w-3 h-3" aria-hidden />
             Retroactive
-          </span>
+          </StatusPill>
         )}
         <span
-          className="inline-flex items-center px-1.5 py-0.5 rounded bg-sunken text-ink-500 border border-line"
+          className="inline-flex items-center px-1.5 py-0.5 rounded bg-sunken text-ink-500 border border-line text-[11px] font-medium"
           title={SOURCE_AUTHORITY_TOOLTIP[a.sourceAuthority]}
         >
           {SOURCE_AUTHORITY_LABEL[a.sourceAuthority]}
         </span>
       </div>
 
-      {/* Dates row — issuance / effective / new deadline. Renders only the
-          slots that are populated (effectiveDate + newDeadline are both
-          optional on the type). */}
-      <div className="mt-2 flex items-center gap-x-3 gap-y-1 flex-wrap text-xs text-ink-500">
-        <span>
-          Issued <span className="text-ink-700">{formatLongDate(a.issuanceDate)}</span>
-        </span>
+      {/* Dates row — issuance / effective / new deadline. Each prefixed
+          with a micro label so the date numerals don't read as a single
+          metadata blob. Renders only populated slots (effectiveDate +
+          newDeadline are both optional on the type). */}
+      <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+        <dt className="text-ink-500 uppercase text-2xs tracking-wider font-semibold pt-0.5">
+          Issued
+        </dt>
+        <dd className="text-ink-700">{formatLongDate(a.issuanceDate)}</dd>
         {a.effectiveDate && (
-          <span>
-            Effective <span className="text-ink-700">{formatLongDate(a.effectiveDate)}</span>
-          </span>
+          <>
+            <dt className="text-ink-500 uppercase text-2xs tracking-wider font-semibold pt-0.5">
+              Effective
+            </dt>
+            <dd className="text-ink-700">{formatLongDate(a.effectiveDate)}</dd>
+          </>
         )}
-        {a.newDeadline && (
-          <span className="inline-flex items-center gap-1">
-            <CalendarClock className="w-3 h-3 text-ink-500" aria-hidden />
+      </dl>
+
+      {/* Deadline shift — promoted into its own slot when present;
+          usually the single most-actionable fact on the pane. */}
+      {a.newDeadline && (
+        <div className="mt-3 inline-flex items-center gap-1.5 px-2 py-1 rounded border border-warn-border bg-warn-bg text-xs text-warn-ink">
+          <CalendarClock className="w-3 h-3 shrink-0" aria-hidden />
+          <span>
             Deadline shifts to{" "}
-            <span className="font-medium text-ink-900">
+            <span className="font-semibold">
               {formatLongDate(a.newDeadline)}
             </span>
             {a.oldDeadline && (
-              <span className="text-ink-400">
+              <span className="text-warn-ink/70">
+                {" "}
                 (was {formatLongDate(a.oldDeadline)})
               </span>
             )}
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Full summary — the verbatim text the parser captured. No
           truncation here; the feed card line-clamps to 2, this surface
@@ -669,7 +692,12 @@ function CopilotPane({
           card the user just clicked. Pane header: state badge +
           title + close X. Everything else (full client list, email
           draft, action card) lives in the pane body. */}
-      <div className="bg-surface border-b border-line px-region py-3 flex items-start gap-3">
+      {/* Header — Yuqi audit 2026-05-06: title + state badge now vertically
+          center together (was items-start, leaving the badge floating
+          above the title baseline). Title bumped to text-base/font-semibold
+          so the alert subject reads as the primary thing on the pane,
+          not a metadata strip. */}
+      <div className="bg-surface border-b border-line px-region py-3 flex items-center gap-3">
         {/* Mobile: explicit "Back to alerts" affordance — the pane fills the
             viewport at <md, so the user needs a clear way to return to the
             feed. md+ uses a discreet X (the feed is already visible to the
@@ -684,9 +712,9 @@ function CopilotPane({
           Back
         </button>
         <StateBadge code={a.stateCode} />
-        <div className="flex-1 min-w-0 text-sm font-semibold text-ink-900 leading-snug pt-0.5">
+        <h2 className="flex-1 min-w-0 text-base font-semibold text-ink-900 leading-snug">
           {a.title}
-        </div>
+        </h2>
         <button
           type="button"
           onClick={onClose}
@@ -1479,8 +1507,23 @@ export function Alerts() {
           onSuccess: (res: unknown) => {
             const r = res as { deadlinesUpdated?: number } | null;
             const n = r?.deadlinesUpdated ?? 0;
+            // Yuqi audit 2026-05-06: prior toast was just a count — no
+            // way back to the affected clients. Now carries an action
+            // button that filters Timeline to the affected subset so the
+            // user can verify which deadlines actually moved.
+            const dateLabel = a.newDeadline
+              ? formatLongDate(a.newDeadline)
+              : "the new date";
             toast.success(
-              `${n} ${n === 1 ? "deadline" : "deadlines"} moved to ${a.newDeadline ? formatLongDate(a.newDeadline) : "the new date"}`,
+              `${n} ${n === 1 ? "deadline" : "deadlines"} moved to ${dateLabel}`,
+              {
+                duration: 8000,
+                action: {
+                  label: "View affected",
+                  onClick: () =>
+                    navigate(`/timeline?announcement=${a.id}`),
+                },
+              },
             );
             handleComplete(a.id);
           },
