@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { StatusPill } from "@/components/ui/StatusPill";
-import { StateBadge } from "@/components/ui/StateBadge";
+import { StateBadgeArt } from "@/components/ui/StateBadgeArt";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/button";
 import { formatLongDate, hoursSince } from "@/data/dateHelpers";
@@ -157,7 +157,7 @@ export function StateAlertCard({
     >
       {/* ── Zone 1 — what just happened ───────────────────────── */}
       <div className="p-region flex items-start gap-3">
-        <StateBadge code={a.stateCode} />
+        <StateBadgeArt code={a.stateCode} size="md" />
         <div className="flex-1 min-w-0">
           <h3 className="text-lg font-semibold text-ink-900 leading-snug">
             {a.title}
