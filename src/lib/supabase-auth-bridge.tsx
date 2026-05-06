@@ -92,7 +92,16 @@ export function SupabaseAuthBridge() {
           if (demoBootstrapPending) {
             try {
               localStorage.removeItem("duedatehq.bootstrap_demo_pending");
-              await trpcUtils.client.auth.bootstrapDemo.mutate();
+              // Reseed flag is set by Login.tsx's tryDemo() when the
+              // user lands on /login?reseed=1 and clicks the demo
+              // button. Passes through here so bootstrapDemo wipes the
+              // demo firm before re-seeding. One-shot — clear the flag
+              // even on failure so a stuck flag doesn't keep nuking
+              // the firm on every subsequent login.
+              const reseed =
+                localStorage.getItem("duedatehq.bootstrap_demo_reseed") === "1";
+              localStorage.removeItem("duedatehq.bootstrap_demo_reseed");
+              await trpcUtils.client.auth.bootstrapDemo.mutate({ reseed });
               // Pull the now-seeded session so SessionProvider picks up
               // the firm name + tier we just created.
               const remote = await trpcUtils.auth.session.fetch();
@@ -176,6 +185,59 @@ export function SupabaseAuthBridge() {
     );
     return () => subscription.subscription.unsubscribe();
   }, [navigate, trpcUtils]);
+
+  // ───────────────────────────────────────────────────────────────────
+  // ?reseed=1 escape hatch for already-signed-in demo users
+  //
+  // The regular `?reseed=1` path runs through Login.tsx → magic-link →
+  // SIGNED_IN handler above. That doesn't help a user who's already
+  // signed in as demo and just wants to refresh their firm to current
+  // seed content — the SIGNED_IN handler early-returns when the local
+  // session matches the Supabase email, never re-firing bootstrapDemo.
+  //
+  // This effect runs once on mount, checks the URL, and if it sees
+  // `?reseed=1` while signed in as the demo user, calls
+  // bootstrapDemo({ reseed: true }) directly, strips the param, and
+  // hard-reloads so every cached query refetches against fresh data.
+  // ───────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (env.useMockAuth) return;
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("reseed") !== "1") return;
+
+    let cancelled = false;
+    void (async () => {
+      const sess = await supabase().auth.getSession();
+      const email = sess.data.session?.user?.email?.toLowerCase();
+      if (cancelled) return;
+      if (email !== "demo@duedatehq.com") {
+        // Not signed in as demo — let the SIGNED_IN path handle it via
+        // the localStorage flag set by Login.tsx. Drop the URL param so
+        // a refresh after auth doesn't double-fire.
+        url.searchParams.delete("reseed");
+        window.history.replaceState({}, "", url.toString());
+        return;
+      }
+      try {
+        await trpcUtils.client.auth.bootstrapDemo.mutate({ reseed: true });
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error("supabase-auth-bridge.reseed_failed", err);
+        return;
+      }
+      if (cancelled) return;
+      url.searchParams.delete("reseed");
+      // Hard reload — invalidating the tRPC cache + re-fetching every
+      // query manually would also work, but reload is one line and
+      // covers any non-tRPC state (zustand store, localStorage cache).
+      window.location.replace(url.toString());
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [trpcUtils]);
 
   return null;
 }

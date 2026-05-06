@@ -263,8 +263,10 @@ const DEMO_DEADLINES: DemoDeadline[] = [
 interface SeedResult {
   clientsInserted: number;
   clientsExisting: number;
+  clientsCleared: number;
   deadlinesInserted: number;
   deadlinesExisting: number;
+  deadlinesBackfilled: number;
   tasksInserted: number;
   tasksExisting: number;
   milestonesInserted: number;
@@ -418,10 +420,20 @@ const CHECKLIST_LABELS: Array<{ label: string; itemType: string }> = [
 ];
 
 /**
- * Idempotently seed the demo firm with 51 clients + ~70 deadlines.
- * Safe to call repeatedly — existing rows are detected by (firm_id, name)
- * for clients and (firm_id, client_id, form_type, official_due_date) for
- * deadlines and are skipped, not duplicated.
+ * Idempotently seed the demo firm with 51 clients + ~70 deadlines + the
+ * downstream task/milestone/checklist/draft chain. Safe to call repeatedly:
+ *
+ *   • New rows insert with the keys listed at the top of this file.
+ *   • Existing deadlines without internal_target_date get it backfilled
+ *     (one-shot UPDATE) so firms seeded before that field shipped pick
+ *     it up without a destructive reset.
+ *   • All other existing rows are left alone.
+ *
+ * Pass `reseed: true` to cascade-delete every client in the firm before
+ * re-seeding (caller is responsible for restricting that to a demo
+ * context — there is no firm-id check in here). Cascade chain: clients
+ * → deadlines → tasks → milestones / checklists / drafts / activity.
+ * The firm row + user rows stay so the auth session keeps working.
  *
  * Note: takes the db handle as a parameter so this can be invoked from
  * any tRPC ctx (which supplies db) or a CLI script.
@@ -429,14 +441,30 @@ const CHECKLIST_LABELS: Array<{ label: string; itemType: string }> = [
 export async function seedDemoFirm({
   db,
   firmId,
+  reseed = false,
 }: {
   db: typeof DbType;
   firmId: string;
+  reseed?: boolean;
 }): Promise<SeedResult> {
   let clientsInserted = 0;
   let clientsExisting = 0;
+  let clientsCleared = 0;
   let deadlinesInserted = 0;
   let deadlinesExisting = 0;
+  let deadlinesBackfilled = 0;
+
+  // Reset path — wipe firm-scoped content so the seed runs from clean
+  // state. onDelete: cascade on every dependent FK takes care of
+  // deadlines → tasks → milestones / checklists / drafts / activity in
+  // a single delete. Firm + user rows survive.
+  if (reseed) {
+    const cleared = await db
+      .delete(clients)
+      .where(eq(clients.firmId, firmId))
+      .returning({ id: clients.id });
+    clientsCleared = cleared.length;
+  }
 
   // Index existing clients by name so we can reuse their ids when seeding
   // deadlines without doing a per-row lookup.
@@ -477,11 +505,16 @@ export async function seedDemoFirm({
   }
 
   // Index existing deadlines so we don't re-create the same row on re-run.
+  // Also pull internal_target_date so we can backfill rows where it's
+  // null — firms seeded before that column was populated would otherwise
+  // never get the "Behind plan" tile to fire.
   const existingDeadlines = await db
     .select({
+      id: deadlines.id,
       clientId: deadlines.clientId,
       formType: deadlines.formType,
       officialDueDate: deadlines.officialDueDate,
+      internalTargetDate: deadlines.internalTargetDate,
     })
     .from(deadlines)
     .where(eq(deadlines.firmId, firmId));
@@ -492,6 +525,20 @@ export async function seedDemoFirm({
       deadlineKey(d.clientId, d.formType, d.officialDueDate),
     ),
   );
+
+  // One-shot backfill: any existing deadline missing internal_target_date
+  // gets it set to (official - 7d). Idempotent — once filled, the WHERE
+  // skips it. Done before the insert pass so the new-deadline insert
+  // path can rely on no-op-update semantics if we ever hit the same row.
+  for (const d of existingDeadlines) {
+    if (d.internalTargetDate) continue;
+    const internalTargetDate = isoDate(addDays(new Date(d.officialDueDate), -7));
+    await db
+      .update(deadlines)
+      .set({ internalTargetDate })
+      .where(eq(deadlines.id, d.id));
+    deadlinesBackfilled++;
+  }
 
   for (const d of DEMO_DEADLINES) {
     const clientId = idByKey.get(d.clientKey);
@@ -831,8 +878,10 @@ export async function seedDemoFirm({
   return {
     clientsInserted,
     clientsExisting,
+    clientsCleared,
     deadlinesInserted,
     deadlinesExisting,
+    deadlinesBackfilled,
     tasksInserted,
     tasksExisting,
     milestonesInserted,

@@ -164,6 +164,17 @@ export function Login() {
     setSubmitError(null);
     setPending(true);
     try {
+      // Forward `?reseed=1` through the magic-link round trip — the bridge
+      // reads this flag right before calling bootstrapDemo, passing
+      // reseed=true so the BE wipes the existing demo firm and re-seeds
+      // from clean state. Use case: a demo firm provisioned under an
+      // older seed version that's missing newer rows (tasks, milestones,
+      // etc.) — the additive seed pass alone won't reach it.
+      const wantReseed =
+        new URLSearchParams(window.location.search).get("reseed") === "1";
+      if (wantReseed) {
+        localStorage.setItem("duedatehq.bootstrap_demo_reseed", "1");
+      }
       localStorage.setItem("duedatehq.bootstrap_demo_pending", "1");
       const { actionLink } = await createDemoSession.mutateAsync();
       window.location.href = actionLink;

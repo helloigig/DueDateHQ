@@ -236,63 +236,87 @@ export const authRouter = router({
     return { actionLink: data.properties.action_link };
   }),
 
-  bootstrapDemo: publicProcedure.mutation(async ({ ctx }) => {
-    if (!ctx.user) {
-      throw new TRPCError({ code: "UNAUTHORIZED" });
-    }
-    if (ctx.user.email.toLowerCase() !== DEMO_EMAIL) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "demo_endpoint_requires_demo_email",
-      });
-    }
-
-    // Resolve-or-create the firm + user row in one transaction.
-    const firmId = await db.transaction(async (tx) => {
-      const existingUser = await tx.query.users.findFirst({
-        where: eq(users.id, ctx.user!.id),
-      });
-      if (existingUser) {
-        return existingUser.firmId;
-      }
-      const [firm] = await tx
-        .insert(firms)
-        .values({
-          name: DEMO_FIRM_NAME,
-          primaryStates: ["CA"],
-          tier: "pro",
-          subscriptionStatus: "trialing",
-          seatLimit: 5,
-          // Demo firm has no client cap — the seed inserts 51, well past
-          // the solo-tier 50 cap, and we don't want the next prospect's
-          // import to bounce off a hard limit.
-          clientLimit: null,
-          trialEndsAt: new Date(Date.now() + 30 * 86_400_000),
+  bootstrapDemo: publicProcedure
+    .input(
+      z
+        .object({
+          // When true, deletes every client in the demo firm (cascades
+          // through deadlines → tasks → milestones / checklists / drafts)
+          // before re-seeding. Use to force a stale demo firm to pick up
+          // new seed content without manual Supabase surgery. The seed
+          // itself is idempotent and re-runs on every login, but it only
+          // INSERTs — it never UPDATEs existing rows, so additive seed
+          // changes (new label, new status mix) won't reach a firm that
+          // was already populated under the old version.
+          reseed: z.boolean().optional().default(false),
         })
-        .returning();
-      if (!firm) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        .optional(),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
       }
-      await tx.insert(users).values({
-        id: ctx.user!.id,
-        firmId: firm.id,
-        email: ctx.user!.email,
-        displayName: "Sarah Mitchell",
-        role: "owner",
+      if (ctx.user.email.toLowerCase() !== DEMO_EMAIL) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "demo_endpoint_requires_demo_email",
+        });
+      }
+      const reseed = input?.reseed ?? false;
+
+      // Resolve-or-create the firm + user row in one transaction.
+      const firmId = await db.transaction(async (tx) => {
+        const existingUser = await tx.query.users.findFirst({
+          where: eq(users.id, ctx.user!.id),
+        });
+        if (existingUser) {
+          return existingUser.firmId;
+        }
+        const [firm] = await tx
+          .insert(firms)
+          .values({
+            name: DEMO_FIRM_NAME,
+            primaryStates: ["CA"],
+            tier: "pro",
+            subscriptionStatus: "trialing",
+            seatLimit: 5,
+            // Demo firm has no client cap — the seed inserts 51, well past
+            // the solo-tier 50 cap, and we don't want the next prospect's
+            // import to bounce off a hard limit.
+            clientLimit: null,
+            trialEndsAt: new Date(Date.now() + 30 * 86_400_000),
+          })
+          .returning();
+        if (!firm) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        }
+        await tx.insert(users).values({
+          id: ctx.user!.id,
+          firmId: firm.id,
+          email: ctx.user!.email,
+          displayName: "Sarah Mitchell",
+          role: "owner",
+        });
+        return firm.id;
       });
-      return firm.id;
-    });
 
-    // Seed (idempotent) — outside the transaction so a partial seed
-    // doesn't roll back the firm creation. The seed itself is safe
-    // to re-run, so on retry we just pick up where we left off.
-    const seedResult = await seedDemoFirm({ db, firmId });
+      // Seed (idempotent on insert; UPDATEs internal_target_date on
+      // existing deadlines as a one-shot backfill so a firm seeded
+      // before that field shipped picks it up). Outside the transaction
+      // so a partial seed doesn't roll back the firm creation.
+      //
+      // reseed=true: cascade-deletes every client in the firm (firms +
+      // user rows stay so the Supabase auth session keeps working
+      // through the reset), then runs the full seed from clean state.
+      // Restricted to the demo email at the top of this handler.
+      const seedResult = await seedDemoFirm({ db, firmId, reseed });
 
-    return {
-      firmId,
-      ...seedResult,
-    };
-  }),
+      return {
+        firmId,
+        reseed,
+        ...seedResult,
+      };
+    }),
 
   /**
    * Sibling of `team.acceptInvite` exposed under the `auth` namespace
