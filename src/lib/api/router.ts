@@ -217,6 +217,39 @@ export const appRouter = t.router({
         deadlinesExisting: number;
       }> => NOT_IMPL()
     ),
+    /** Demo workspace bootstrap. Called by SupabaseAuthBridge after
+     *  the user signs in as demo@duedatehq.com (via createDemoSession
+     *  → action link). Provisions the demo firm if missing AND
+     *  idempotently seeds the 51-client roster + downstream chain.
+     *  `reseed: true` cascade-deletes every client in the firm before
+     *  re-seeding — used by the `?reseed=1` URL escape hatch to force
+     *  a stale demo firm to pick up new seed content. Backend FORBIDS
+     *  calls from any other email. */
+    bootstrapDemo: t.procedure
+      .input(
+        z
+          .object({
+            reseed: z.boolean().optional().default(false),
+          })
+          .optional()
+      )
+      .mutation(
+        async (): Promise<{
+          firmId: string;
+          reseed: boolean;
+          clientsInserted: number;
+          clientsExisting: number;
+          clientsCleared: number;
+          deadlinesInserted: number;
+          deadlinesExisting: number;
+          deadlinesBackfilled: number;
+          tasksInserted: number;
+          tasksExisting: number;
+          milestonesInserted: number;
+          checklistsInserted: number;
+          draftsInserted: number;
+        }> => NOT_IMPL()
+      ),
   }),
 
   clients: t.router({
