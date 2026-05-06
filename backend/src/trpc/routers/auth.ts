@@ -179,24 +179,39 @@ export const authRouter = router({
    * email already exists, returning the existing user).
    */
   createDemoSession: publicProcedure.mutation(async () => {
-    // Step 1: ensure the demo Supabase user exists. Admin createUser
-    // is idempotent when the email already exists — it returns the
-    // existing user as a non-fatal error we treat as success.
-    const created = await supabaseAdmin.auth.admin.createUser({
-      email: DEMO_EMAIL,
-      email_confirm: true, // skip the confirm-your-email step entirely
-      user_metadata: { full_name: "Sarah Mitchell" },
-    });
-    if (
-      created.error &&
-      // "User already registered" is the expected outcome on every call
-      // after the first. Any other error is fatal.
-      !/already (registered|exists)/i.test(created.error.message)
-    ) {
+    // Step 1: check whether the demo user already exists. Earlier
+    // version called createUser unconditionally and tried to
+    // recognise the duplicate-error response by message regex —
+    // brittle (Supabase's exact wording varies between versions:
+    // "User already registered" vs "A user with this email address
+    // has already been registered" vs "email_exists"). Pre-checking
+    // existence sidesteps the entire error-classification problem.
+    const list = await supabaseAdmin.auth.admin.listUsers();
+    if (list.error) {
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
-        message: created.error.message,
+        message: `listUsers_failed: ${list.error.message}`,
       });
+    }
+    const existing = list.data.users.find(
+      (u) => (u.email ?? "").toLowerCase() === DEMO_EMAIL,
+    );
+
+    if (!existing) {
+      // First-ever call on this Supabase project — provision the
+      // demo user. email_confirm: true skips the confirmation flow
+      // so we can immediately mint a magic link below.
+      const created = await supabaseAdmin.auth.admin.createUser({
+        email: DEMO_EMAIL,
+        email_confirm: true,
+        user_metadata: { full_name: "Sarah Mitchell" },
+      });
+      if (created.error) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `createUser_failed: ${created.error.message}`,
+        });
+      }
     }
 
     // Step 2: generate a magic-link URL the FE can navigate to. The
@@ -215,7 +230,7 @@ export const authRouter = router({
     if (error || !data?.properties?.action_link) {
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
-        message: error?.message ?? "no_action_link",
+        message: `generateLink_failed: ${error?.message ?? "no_action_link"}`,
       });
     }
     return { actionLink: data.properties.action_link };
