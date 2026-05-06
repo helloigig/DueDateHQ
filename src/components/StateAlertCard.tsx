@@ -160,12 +160,10 @@ export function StateAlertCard({
           </div>
           {/* Body / summary — falls back to a generated one-liner when
               the announcement has no human-authored summary. Yuqi
-              2026-05-05: cards that arrived from the scraper without
-              a body looked half-loaded ("Press release from FDLE"
-              with no description rendered an empty paragraph).
-              `${authority} published a ${type}` is a thin description
-              but at least the row never renders blank. */}
-          <p className="mt-2 text-sm text-ink-700 leading-snug line-clamp-2">
+              2026-05-06: feed cards truncate to ONE line; the full
+              text lives in the right co-pilot pane (AlertContextSection).
+              The card is a scan-row, not a reader. */}
+          <p className="mt-2 text-sm text-ink-700 leading-snug line-clamp-1">
             {a.summary && a.summary.trim()
               ? a.summary
               : `${a.authority} published a ${TYPE_LABEL[a.type].toLowerCase()} for ${a.affectedClientIds.length} of your clients. Open the detail pane for the full text.`}

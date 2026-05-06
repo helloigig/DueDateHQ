@@ -167,6 +167,7 @@ function ActionRow({
   cta,
   onClick,
   primary,
+  affectedItems,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -179,31 +180,112 @@ function ActionRow({
    *  / Add filings); the rest stay outline. T2: one accent, one viewport,
    *  one action. */
   primary?: boolean;
+  /** Concrete tasks/deadlines this action will modify. When provided,
+   *  the row gets a "Show {N}" expand toggle that reveals each item with
+   *  client + form + due-date + (for deadline-shifts) old → new date.
+   *  Yuqi audit 2026-05-06: "what deadlines are they? you need to
+   *  click and open to see the details." */
+  affectedItems?: Array<{
+    clientName: string;
+    clientId?: string;
+    taskId?: string;
+    label: string;
+    meta?: string;
+  }>;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasItems = affectedItems && affectedItems.length > 0;
+
   return (
-    <article className="bg-surface border border-line rounded-md p-region flex items-start gap-3 hover:bg-sunken/40 transition-colors">
-      <span
-        aria-hidden
-        className="shrink-0 w-7 h-7 rounded-md bg-sunken text-ink-700 inline-flex items-center justify-center"
-      >
-        {icon}
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold text-ink-900 leading-snug">
-          {title}
+    <article className="bg-surface border border-line rounded-md transition-colors hover:bg-sunken/40 overflow-hidden">
+      <div className="p-region flex items-start gap-3">
+        <span
+          aria-hidden
+          className="shrink-0 w-9 h-9 rounded-md bg-sunken text-ink-700 inline-flex items-center justify-center"
+        >
+          {icon}
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold text-ink-900 leading-snug">
+            {title}
+          </div>
+          <div className="text-xs text-ink-700 mt-1 leading-snug">
+            {description}
+          </div>
+          {hasItems && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded((v) => !v);
+              }}
+              className="mt-2 inline-flex items-center gap-1 text-2xs font-medium text-ink-500 hover:text-ink-900 group/expand"
+              aria-expanded={expanded}
+            >
+              <ChevronRight
+                className={`w-3 h-3 transition-transform ${expanded ? "rotate-90" : ""}`}
+                aria-hidden
+              />
+              {expanded
+                ? `Hide affected ${affectedItems!.length === 1 ? "item" : "items"}`
+                : `Show ${affectedItems!.length} affected ${affectedItems!.length === 1 ? "item" : "items"}`}
+            </button>
+          )}
         </div>
-        <div className="text-xs text-ink-700 mt-1 leading-snug">
-          {description}
-        </div>
+        <Button
+          size="sm"
+          variant={primary ? "default" : "outline"}
+          onClick={onClick}
+          className="shrink-0"
+        >
+          {cta}
+        </Button>
       </div>
-      <Button
-        size="sm"
-        variant={primary ? "default" : "outline"}
-        onClick={onClick}
-        className="shrink-0"
-      >
-        {cta}
-      </Button>
+      {hasItems && expanded && (
+        <ul className="border-t border-line bg-canvas/40 divide-y divide-line">
+          {affectedItems!.map((item, idx) => {
+            const linkable = item.clientId && item.taskId;
+            const inner = (
+              <>
+                <span className="text-2xs font-medium text-ink-900 truncate">
+                  {item.clientName}
+                </span>
+                <span className="text-ink-300">·</span>
+                <span className="text-2xs text-ink-700 truncate flex-1 min-w-0">
+                  {item.label}
+                </span>
+                {item.meta && (
+                  <span className="text-2xs text-ink-500 tabular-nums shrink-0">
+                    {item.meta}
+                  </span>
+                )}
+                {linkable && (
+                  <ChevronRight
+                    className="w-3 h-3 text-ink-300 group-hover/item:text-ink-700 group-hover/item:translate-x-0.5 shrink-0 transition-all"
+                    aria-hidden
+                  />
+                )}
+              </>
+            );
+            return (
+              <li key={idx}>
+                {linkable ? (
+                  <Link
+                    to={`/clients/${item.clientId}?task=${item.taskId}`}
+                    className="group/item flex items-center gap-2 px-region py-2 hover:bg-sunken/60 transition-colors"
+                  >
+                    {inner}
+                  </Link>
+                ) : (
+                  <div className="flex items-center gap-2 px-region py-2">
+                    {inner}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </article>
   );
 }
@@ -451,6 +533,73 @@ function CopilotPane({
 }) {
   const [draftIndex, setDraftIndex] = useState(0);
   const navigate = useNavigate();
+  // Hooks at top-level — must be called before the early-return below
+  // to satisfy Rules of Hooks. Yuqi audit 2026-05-06: when the user
+  // expands an action row, we need to reach into the store for
+  // deadline/task lookups; that means useStore + useMemo here.
+  const storeDeadlines = useStore().deadlines;
+  const storeTasks = useStore().tasks;
+  const allAffectedClients = useMemo(
+    () => (announcement ? affectedClientsFor(announcement, clientSource) : []),
+    [announcement, clientSource],
+  );
+  const includedAffectedClients = useMemo(
+    () =>
+      allAffectedClients.filter((c) => !excludedClientIds.has(c.id)),
+    [allAffectedClients, excludedClientIds],
+  );
+  const affectedItemsForDeadlineShift = useMemo(() => {
+    if (!announcement) return [];
+    return includedAffectedClients.map((c) => {
+      const byOldDate =
+        announcement.oldDeadline &&
+        storeDeadlines.find(
+          (d) =>
+            d.clientId === c.id &&
+            d.officialDueDate === announcement.oldDeadline,
+        );
+      const byClient = byOldDate
+        ? byOldDate
+        : storeDeadlines
+            .filter(
+              (d) =>
+                d.clientId === c.id &&
+                d.status !== "completed" &&
+                d.status !== "filed_extension",
+            )
+            .sort((x, y) =>
+              x.officialDueDate.localeCompare(y.officialDueDate),
+            )[0];
+      const task = byClient
+        ? storeTasks.find((t) => t.deadlineId === byClient.id)
+        : undefined;
+      return {
+        clientName: c.name,
+        clientId: c.id,
+        taskId: task?.id,
+        label:
+          byClient?.form ?? announcement.taxTypes?.[0] ?? "Filing",
+        meta: byClient
+          ? `due ${formatLongDate(byClient.officialDueDate)}`
+          : undefined,
+      };
+    });
+  }, [
+    announcement,
+    includedAffectedClients,
+    storeDeadlines,
+    storeTasks,
+  ]);
+  const affectedItemsByClient = useMemo(() => {
+    if (!announcement) return [];
+    return includedAffectedClients.map((c) => ({
+      clientName: c.name,
+      clientId: c.id,
+      taskId: undefined as string | undefined,
+      label: c.tier ? `${c.tier} tier` : "Client",
+      meta: c.primaryState ? `${c.primaryState} filings` : undefined,
+    }));
+  }, [announcement, includedAffectedClients]);
 
   useEffect(() => {
     setDraftIndex(0);
@@ -487,6 +636,10 @@ function CopilotPane({
   const includedClients = allAffected.filter((c) => !excludedClientIds.has(c.id));
   const includedCount = includedClients.length;
   const excludedCount = allAffected.length - includedCount;
+
+  // affectedItemsForDeadlineShift + affectedItemsByClient are computed
+  // at top-level (above the early return) to honor Rules of Hooks.
+  // See the useMemo block at the top of CopilotPane.
   const safeIdx = Math.min(draftIndex, Math.max(0, includedCount - 1));
   const currentClient = includedClients[safeIdx];
   const overrideKey = (clientId: string) => `${a.id}:${clientId}`;
@@ -802,6 +955,7 @@ function CopilotPane({
                 onApplyDeadline(a);
               }}
               primary={a.type === "disaster_extension"}
+              affectedItems={affectedItemsForDeadlineShift}
             />
           )}
 
@@ -817,6 +971,7 @@ function CopilotPane({
               cta={`Add filings`}
               onClick={() => onRunNexusCheck(a)}
               primary
+              affectedItems={affectedItemsByClient}
             />
           )}
 
@@ -828,6 +983,7 @@ function CopilotPane({
               cta={`Tag ${includedCount}`}
               onClick={() => onOpenTag(a)}
               primary
+              affectedItems={affectedItemsByClient}
             />
           )}
 
@@ -839,6 +995,7 @@ function CopilotPane({
               cta="Schedule"
               onClick={() => onOpenPlanningCall(a)}
               primary
+              affectedItems={affectedItemsByClient}
             />
           )}
 
@@ -850,6 +1007,7 @@ function CopilotPane({
               cta="Recompute"
               onClick={() => onOpenRecompute(a)}
               primary
+              affectedItems={affectedItemsForDeadlineShift}
             />
           )}
 
