@@ -290,6 +290,22 @@ function ClientGroupRowView({
   // body, not the FK. Phase 2 introduces multi-task drafts so the
   // email_drafts row can fan out activity events across every linked
   // task. Mock-mode keeps the in-memory store shortcut.
+  // Cross-surface cache invalidation on send. Yuqi audit 2026-05-06:
+  // sending a chase email used to leave stale data on every surface
+  // EXCEPT ActionQueue itself —
+  //   • todoItems.list — the queue rebuilds from this; without
+  //     invalidation the just-sent row would re-appear on next mount
+  //   • checklistItems — `lastReminderAt` bumps on send; without
+  //     invalidation Inbox + ClientDetail show the old timestamp
+  //   • inboundReplies.list — Mail Inbox shows the same item still
+  //     "unreplied" because its read model is separate
+  const utils = trpc.useUtils();
+  const invalidateAfterSend = () => {
+    void utils.todoItems.list.invalidate();
+    void utils.checklistItems?.list?.invalidate?.();
+    void utils.inboundReplies?.list?.invalidate?.();
+    void utils.tasks.list.invalidate();
+  };
   const saveDraftMut = trpc.emails.saveDraft.useMutation();
   const sendEmailMut = trpc.emails.send.useMutation();
   const liveClientQuery = trpc.clients.get.useQuery(
@@ -327,6 +343,7 @@ function ClientGroupRowView({
         status: "draft",
       });
       actions.sendEmail(id);
+      invalidateAfterSend();
       toast.success(
         `Sent · ${payload.itemIds.length} ${payload.itemIds.length === 1 ? "item" : "items"} bundled into one email`,
       );
@@ -356,6 +373,7 @@ function ClientGroupRowView({
         },
       } as never)) as { id: string };
       await sendEmailMut.mutateAsync({ id: draft.id } as never);
+      invalidateAfterSend();
       toast.success(
         `Sent · ${payload.itemIds.length} ${payload.itemIds.length === 1 ? "item" : "items"} bundled into one email`,
       );
