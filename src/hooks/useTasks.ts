@@ -64,6 +64,13 @@ export function useTasksForClient(clientId: string | undefined): Task[] {
  * the task milestones (so the cascade-down from `updateTaskStatus →
  * "completed"` is reflected in the Mini Timeline without a manual
  * refetch).
+ *
+ * Yuqi audit 2026-05-06: also invalidates `todoItems.list` so the
+ * Action Queue on Today drops the row when a task moves to
+ * "completed". The queue derives its rows from todoItems (PRD §4.8
+ * nine sources), which is a separate query from `tasks.list` — without
+ * this invalidation, a task marked complete in the Task panel would
+ * stay in the queue until the next page refresh.
  */
 function useInvalidateTask() {
   const utils = trpc.useUtils();
@@ -73,6 +80,7 @@ function useInvalidateTask() {
     void utils.activity.listForTask.invalidate();
     void utils.taskMilestones.listForTask.invalidate();
     void utils.taskMilestones.fleetStack.invalidate();
+    void utils.todoItems.list.invalidate();
   };
 }
 
