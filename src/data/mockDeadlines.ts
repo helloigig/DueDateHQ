@@ -355,6 +355,40 @@ const raw: D[] = [
     assignedUser: "Maya Patel",
     notes: "Deferred pending updated revenue numbers from QBO export.",
   },
+
+  // ============================================================
+  // PRIOR-YEAR HISTORY (tax year 2024, filed in 2025) — backfilled
+  // 2026-05-06 so every active client added before 2025 has at least
+  // one completed annual return on record. Without this, ~38 of 49
+  // clients had no past-filings on their detail page, making the
+  // demo read like a brand-new firm rather than an established one
+  // that's been with these clients for years. One federal annual
+  // return per client, dated to the 2025 filing season window.
+  // ============================================================
+  { clientId: "c-ca-06", form: "1041 (federal)", jurisdiction: "federal", officialDueDate: "2025-04-15", status: "completed", completedAt: "2025-04-09", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-ca-09", form: "1065 (federal)", jurisdiction: "federal", officialDueDate: "2025-03-17", status: "completed", completedAt: "2025-03-13", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-ca-10", form: "1120-S (federal)", jurisdiction: "federal", officialDueDate: "2025-03-17", status: "completed", completedAt: "2025-03-13", assignedUser: "Maya Patel" },
+  { clientId: "c-ny-01", form: "1065 (federal)", jurisdiction: "federal", officialDueDate: "2025-03-17", status: "completed", completedAt: "2025-03-13", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-ny-03", form: "1065 (federal)", jurisdiction: "federal", officialDueDate: "2025-03-17", status: "completed", completedAt: "2025-03-13", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-ny-05", form: "1041 (federal)", jurisdiction: "federal", officialDueDate: "2025-04-15", status: "completed", completedAt: "2025-04-09", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-tx-01", form: "1065 (federal)", jurisdiction: "federal", officialDueDate: "2025-03-17", status: "completed", completedAt: "2025-03-13", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-tx-03", form: "1120-S (federal)", jurisdiction: "federal", officialDueDate: "2025-03-17", status: "completed", completedAt: "2025-03-13", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-tx-05", form: "1065 (federal)", jurisdiction: "federal", officialDueDate: "2025-03-17", status: "completed", completedAt: "2025-03-13", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-tx-08", form: "1065 (federal)", jurisdiction: "federal", officialDueDate: "2025-03-17", status: "completed", completedAt: "2025-03-13", assignedUser: "Maya Patel" },
+  { clientId: "c-la-02", form: "1120-S (federal)", jurisdiction: "federal", officialDueDate: "2025-03-17", status: "completed", completedAt: "2025-03-13", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-la-03", form: "1040 (federal)", jurisdiction: "federal", officialDueDate: "2025-04-15", status: "completed", completedAt: "2025-04-08", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-la-06", form: "1065 (federal)", jurisdiction: "federal", officialDueDate: "2025-03-17", status: "completed", completedAt: "2025-03-13", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-la-07", form: "1041 (federal)", jurisdiction: "federal", officialDueDate: "2025-04-15", status: "completed", completedAt: "2025-04-09", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-fl-01", form: "1065 (federal)", jurisdiction: "federal", officialDueDate: "2025-03-17", status: "completed", completedAt: "2025-03-13", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-fl-02", form: "1120-S (federal)", jurisdiction: "federal", officialDueDate: "2025-03-17", status: "completed", completedAt: "2025-03-13", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-fl-03", form: "1040 (federal)", jurisdiction: "federal", officialDueDate: "2025-04-15", status: "completed", completedAt: "2025-04-08", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-fl-05", form: "1065 (federal)", jurisdiction: "federal", officialDueDate: "2025-03-17", status: "completed", completedAt: "2025-03-13", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-ga-01", form: "1120-S (federal)", jurisdiction: "federal", officialDueDate: "2025-03-17", status: "completed", completedAt: "2025-03-13", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-il-01", form: "1065 (federal)", jurisdiction: "federal", officialDueDate: "2025-03-17", status: "completed", completedAt: "2025-03-13", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-pa-01", form: "1120 (federal)", jurisdiction: "federal", officialDueDate: "2025-04-15", status: "completed", completedAt: "2025-04-09", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-nj-01", form: "1065 (federal)", jurisdiction: "federal", officialDueDate: "2025-03-17", status: "completed", completedAt: "2025-03-13", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-ma-01", form: "1041 (federal)", jurisdiction: "federal", officialDueDate: "2025-04-15", status: "completed", completedAt: "2025-04-09", assignedUser: "Sarah Mitchell" },
+  { clientId: "c-or-01", form: "1120-S (federal)", jurisdiction: "federal", officialDueDate: "2025-03-17", status: "completed", completedAt: "2025-03-13", assignedUser: "Sarah Mitchell" },
 ];
 
 // We assign IDs deterministically so cross-references (the

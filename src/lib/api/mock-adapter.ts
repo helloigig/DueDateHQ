@@ -100,11 +100,17 @@ const mockInboundReplies: MockInboundReply[] = (() => {
       id: "reply-mock-2",
       firmId: "firm-mock",
       taskId: null,
-      clientId: "c-ca-03",
+      // Originally also c-ca-03 (Mark Sullivan), giving the impression
+      // of a single prospect peppering the firm with two replies four
+      // hours apart — narratively odd. Repointed to c-ca-08 Anne
+      // Dupont (active CA Individual) so the inbox shows three
+      // distinct clients and the demo reads as a cross-section of the
+      // roster, not one anxious prospect.
+      clientId: "c-ca-08",
       gmailMessageId: "gmail-mock-2",
-      fromAddress: "mark.sullivan@gmail.com",
+      fromAddress: "adupont@outlook.com",
       toAddress: "intake@duedatehq.space",
-      subject: "1040 (extension) — IRA limit",
+      subject: "1040 — IRA limit question",
       bodyText:
         "Quick question — what's the IRA contribution limit this year?",
       attachmentMetadata: [],

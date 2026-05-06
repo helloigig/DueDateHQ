@@ -93,7 +93,7 @@ export function OnboardingDone() {
             <Stat
               n={stats.forwardingAddresses}
               label="Per-task forwarding addresses"
-              detail="Method A — every task has a unique inbound address."
+              detail="Every task has a unique inbound address — forward client docs straight in."
             />
           </div>
           {stats.insights > 0 && (

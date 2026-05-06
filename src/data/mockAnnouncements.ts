@@ -98,12 +98,14 @@ export const announcements: Announcement[] = [
     relatedAnnouncementIds: ["irs-disaster-2026-la-delta"],
     parseConfidence: "high",
     matchConfidence: "high",
+    // c-la-05 lives in Jefferson but is `prospect` (not active), so
+    // computeAffectedClients() filters it out. Listing it here would
+    // make the seed disagree with detection (5 active matches, not 6).
     affectedClientIds: [
       "c-la-01",
       "c-la-02",
       "c-la-03",
       "c-la-04",
-      "c-la-05",
       "c-la-06",
     ],
     read: false,
@@ -132,7 +134,9 @@ export const announcements: Announcement[] = [
     relatedAnnouncementIds: [],
     parseConfidence: "high",
     matchConfidence: "high",
-    affectedClientIds: ["c-ca-01", "c-ca-02", "c-ca-04", "c-ca-07", "c-ca-10"],
+    // c-ca-04 is a Partnership but `prospect` — drop it so the seed
+    // count (4) matches what computeAffectedClients() would produce.
+    affectedClientIds: ["c-ca-01", "c-ca-02", "c-ca-07", "c-ca-10"],
     read: false,
     dismissed: false,
   },
@@ -471,7 +475,15 @@ export const announcements: Announcement[] = [
     relatedAnnouncementIds: [],
     parseConfidence: "high",
     matchConfidence: "high",
-    affectedClientIds: ["c-fl-02", "c-fl-07"],
+    // c-fl-07 (Johnson Family) lives in Hillsborough — also in the
+    // announced county list — but is `inactive`, so listing them here
+    // would conflict with computeAffectedClients() filtering by status
+    // and produce a "2 clients affected" header that resolves to a
+    // single chip on /alerts. c-fl-02 (Suncoast Advisors S-Corp,
+    // active, Pinellas) is the only honest match; surfacing just it
+    // also delivers the demo punchline: 23-county press release →
+    // ONE client of yours.
+    affectedClientIds: ["c-fl-02"],
     read: true,
     dismissed: false,
   },

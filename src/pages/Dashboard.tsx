@@ -21,7 +21,7 @@ import { useDashboardPreferences } from "../data/preferences";
 import { ChaseBanner } from "../components/ChaseBanner";
 import { BlockingAlertsDialog } from "../components/BlockingAlertsDialog";
 import { OnboardingLayer2Widget } from "../components/OnboardingLayer2Widget";
-// import { WelcomeTour } from "../components/WelcomeTour"; // hidden per user direction
+import { WelcomeTour } from "../components/WelcomeTour";
 import { CapacityStrip } from "../components/CapacityStrip";
 // ModeFHealth removed — the same monitoring signal ("50/50 states ·
 // last scrape 14m ago") is already on /alerts as the ambient line.
@@ -245,7 +245,7 @@ export function Dashboard() {
           now" affordances (Mercury Home: Send / Transfer / Deposit / Request).
           Per T2 — only the first action ("Send chase") wears the indigo
           accent; the rest are ghost pills. */}
-      <div className="mb-region flex items-end justify-between gap-region flex-wrap">
+      <div className="mb-card flex items-end justify-between gap-region flex-wrap">
         <PageHeader
           className="mb-0"
           title={
@@ -269,11 +269,19 @@ export function Dashboard() {
           confirm) live in the action queue's TodoItem feed below. */}
       <MorningTriage summary={summary} />
 
-      {/* State alerts — preview surface. Top 3 escalated rows with a
-          freshness chip ("N new since last visit") in the section meta
-          when applicable; this absorbs what the old WhatChangedBanner
-          did, eliminating the duplicate "5 new state alerts" amber
-          callout that used to sit above the same list. */}
+      {/* First-run orientation — banner + 3-slide modal tour (Hook /
+          Core / Moat). Gated by localStorage so it only fires once per
+          browser. Reintroduced 2026-05-06 per Yuqi: the 3-step intro
+          card was core to the first-time experience and shouldn't have
+          been removed. */}
+      <WelcomeTour />
+
+      {/* State alerts — preview surface with compact one-line rows
+          (CompactAlertRow). Top 3 action-today rows + a freshness chip
+          ("N new since last visit") in the section meta. The chip
+          absorbs what the old WhatChangedBanner did, eliminating the
+          duplicate "5 new state alerts" amber callout that used to sit
+          above the same list. */}
       <StateAlertsPreview announcements={activeBanners} />
 
       {/* §2: Action queue — AI-curated TodoItem feed (PRD §4.8 nine
@@ -304,10 +312,14 @@ export function Dashboard() {
       <OnboardingLayer2Widget />
 
       {/* Blocking-alerts overlay — fires only at >72h escalation. Stays as
-          a modal because the spec demands a forced ack at that tier. */}
+          a modal because the spec demands a forced ack at that tier. The
+          totalAffecting prop carries the full "Affecting you" count so
+          the modal can show "5 of {N} affecting you" — clarifying that
+          this popup is a strict subset of the /alerts "Affecting you" tab. */}
       {showBlockingDialog && !blockingDismissed && (
         <BlockingAlertsDialog
           alerts={alertsByTier.blocking}
+          totalAffecting={firmRelevantAlerts.length}
           onSnooze={(reason) => {
             update({ alerts_snoozed_until: toIso(TODAY) });
             if (reason) {
@@ -421,16 +433,25 @@ function StateAlertsPreview({
     (a) => !a.dismissed && a.affectedClientIds.length > 0,
   );
 
-  // Escalated subset — the only thing that earns Today's real estate.
-  const escalated = affecting.filter(
-    (a) => escTier(hoursSince(a.detectedAt)) === "escalated",
-  );
-  const routineCount = affecting.length - escalated.length;
+  // Action-today subset — escalated (48–72h) + blocking (>72h).
+  // Both tiers need action TODAY; the blocking modal is just the
+  // louder surface for >72h. Showing both here keeps the dashboard
+  // honest after the modal is dismissed/snoozed: the count and copy
+  // reflect everything past the 48h SLA, not just the in-between tier.
+  const actionToday = affecting.filter((a) => {
+    const t = escTier(hoursSince(a.detectedAt));
+    return t === "escalated" || t === "blocking";
+  });
+  // Routine = affecting that AREN'T action-today. Excluding blocking
+  // here is what fixes the prior double-count (modal shows blocking,
+  // and they were also counted as "routine" on this strip).
+  const routineCount = affecting.length - actionToday.length;
 
-  // No escalated — but if there are new-since-last-visit alerts, surface
-  // those instead of collapsing to the ambient line. The user shouldn't
-  // miss "5 new state alerts" just because none of them are past 72h SLA.
-  if (escalated.length === 0) {
+  // No action-today (no escalated, no blocking) — but if there are
+  // new-since-last-visit alerts, surface those instead of collapsing
+  // to the ambient line. The user shouldn't miss "5 new state alerts"
+  // just because none of them are past 48h SLA yet.
+  if (actionToday.length === 0) {
     if (newSinceLastVisit.length > 0) {
       const newIds = new Set(newSinceLastVisit.map((n) => n.id));
       const newAlerts = affecting.filter((a) => newIds.has(a.id));
@@ -448,13 +469,29 @@ function StateAlertsPreview({
         <section className="mb-section">
           <SectionHeader
             title="Alerts to act on today"
-            meta={`${newSinceLastVisit.length} new since last visit`}
+            meta={
+              <span className="inline-flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2 h-5 rounded-pill text-2xs font-semibold uppercase tracking-wider bg-info-bg/70 border border-info-border/60 text-info-ink">
+                  <span className="tabular-nums">
+                    {newSinceLastVisit.length}
+                  </span>
+                  new
+                </span>
+                <span className="text-2xs text-ink-500">
+                  since last visit
+                </span>
+              </span>
+            }
             action={
               <Link
                 to="/alerts"
-                className="text-xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-1"
+                className="text-xs font-medium text-ink-500 hover:text-ink-900 inline-flex items-center gap-1 px-2 h-7 rounded-md hover:bg-sunken/60 transition-colors group"
               >
-                All alerts <ChevronRight className="w-3 h-3" aria-hidden />
+                All alerts
+                <ChevronRight
+                  className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5"
+                  aria-hidden
+                />
               </Link>
             }
           />
@@ -506,9 +543,12 @@ function StateAlertsPreview({
     );
   }
 
-  // Escalated present — sort escalated by impact (deadline-shifting,
-  // then most clients) so the most urgent card is first.
-  const sortedEscalated = [...escalated].sort((a, b) => {
+  // Action-today present — sort by impact (blocking before escalated,
+  // then deadline-shifting, then most clients).
+  const sortedActionToday = [...actionToday].sort((a, b) => {
+    const aBlocking = escTier(hoursSince(a.detectedAt)) === "blocking" ? 1 : 0;
+    const bBlocking = escTier(hoursSince(b.detectedAt)) === "blocking" ? 1 : 0;
+    if (aBlocking !== bBlocking) return bBlocking - aBlocking;
     const aShift = a.newDeadline ? 1 : 0;
     const bShift = b.newDeadline ? 1 : 0;
     if (aShift !== bShift) return bShift - aShift;
@@ -521,33 +561,45 @@ function StateAlertsPreview({
   // Cap at 3 — Today's purpose is "act on the most urgent now," not browse
   // every escalation. Anything past 3 lives on /alerts.
   const PREVIEW_CAP = 3;
-  const previewed = sortedEscalated.slice(0, PREVIEW_CAP);
+  const previewed = sortedActionToday.slice(0, PREVIEW_CAP);
   const overflow =
-    escalated.length - previewed.length + Math.max(0, routineCount);
-
-  // Freshness chip — appended to the SLA meta when any alerts have
-  // arrived since the user's last visit. Replaces the old standalone
-  // <WhatChangedBanner> that used to sit above this section.
-  const slaLabel =
-    escalated.length === 1
-      ? "1 past 72h SLA"
-      : `${escalated.length} past 72h SLA`;
-  const meta =
-    newSinceLastVisit.length > 0
-      ? `${slaLabel} · ${newSinceLastVisit.length} new since last visit`
-      : slaLabel;
+    actionToday.length - previewed.length + Math.max(0, routineCount);
 
   return (
     <section className="mb-section">
       <SectionHeader
         title="Alerts to act on today"
-        meta={meta}
+        meta={
+          <span className="inline-flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-2 h-5 rounded-pill text-2xs font-semibold uppercase tracking-wider bg-warn-bg/70 border border-warn-border/60 text-warn-ink">
+              <span className="tabular-nums">{actionToday.length}</span>
+              past 48h
+            </span>
+            {newSinceLastVisit.length > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-2 h-5 rounded-pill text-2xs font-semibold uppercase tracking-wider bg-info-bg/70 border border-info-border/60 text-info-ink">
+                <span className="tabular-nums">
+                  {newSinceLastVisit.length}
+                </span>
+                new
+              </span>
+            )}
+            <span className="text-2xs text-ink-500">
+              {newSinceLastVisit.length > 0
+                ? "act today · since last visit"
+                : "act today"}
+            </span>
+          </span>
+        }
         action={
           <Link
             to="/alerts"
-            className="text-xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-1"
+            className="text-xs font-medium text-ink-500 hover:text-ink-900 inline-flex items-center gap-1 px-2 h-7 rounded-md hover:bg-sunken/60 transition-colors group"
           >
-            All alerts <ChevronRight className="w-3 h-3" aria-hidden />
+            All alerts
+            <ChevronRight
+              className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5"
+              aria-hidden
+            />
           </Link>
         }
       />

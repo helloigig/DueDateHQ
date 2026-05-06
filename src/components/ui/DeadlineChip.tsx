@@ -302,20 +302,21 @@ function renderChipText(
         </>
       );
     case "overdue":
-      // Compact mode used to show "OVERDUE · +39d" in solid red — the
-      // signal was loud but the *justification* (the actual IRS date
-      // that's past) was hidden until you hovered the tooltip. Now both
-      // variants show "Past IRS · Mar 15 · +39d" so the chip carries
-      // its own evidence — the eye sees the past date right there
-      // without inferring "OVERDUE" was magic.
+      // Compact mode shows "Past IRS · Mar 15" — the slip count is
+      // redundant in dense list contexts (Timeline) where the row's
+      // own "Xd behind" status pill on the right rail already carries
+      // the magnitude. Default mode keeps the explicit "+39d" so
+      // standalone surfaces (TaskHeader) stay self-evident.
       return (
         <>
           <span className="font-medium">Past IRS</span>
           <span className={tone.arrow}>·</span>
           <DateLabel value={officialDueDate} format="short" />
-          <span className={tone.delta}>
-            · {signedDeltaLabel(-result.daysBehind)}
-          </span>
+          {!isCompact && (
+            <span className={tone.delta}>
+              · {signedDeltaLabel(-result.daysBehind)}
+            </span>
+          )}
         </>
       );
     case "extension":
