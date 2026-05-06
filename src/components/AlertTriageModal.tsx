@@ -35,7 +35,8 @@ export function AlertTriageModal() {
   // Per-user opt-out: Settings → Notifications → "Show triage on
   // first land". Defaults to true (the dogfooding ask was for a strong
   // notification on first-land); users who find it noisy turn it off
-  // and keep the inline `<WhatChangedBanner>` as the alternative.
+  // and rely on the freshness chip in the "Alerts to act on today"
+  // section header ("N new since last visit") as the inline alternative.
   const triageSettingsQuery = trpc.announcements.getTriageSettings.useQuery(
     undefined,
     { staleTime: 60_000 },

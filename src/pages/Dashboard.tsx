@@ -30,7 +30,7 @@ import { CapacityStrip } from "../components/CapacityStrip";
 import { ActionQueue } from "../components/ActionQueue";
 import { MorningTriage } from "../components/MorningTriage";
 import { AlertTriageModal } from "../components/AlertTriageModal";
-import { WhatChangedBanner } from "../components/WhatChangedBanner";
+import { trpc } from "../lib/api/client";
 import { AiUsageInfo } from "../components/AiUsageInfo";
 import { PageHeader } from "../components/ui/PageHeader";
 import { DateLabel } from "../components/ui/DateLabel";
@@ -259,25 +259,21 @@ export function Dashboard() {
         />
       </div>
 
-      {/* §1: Morning triage — the directive layer.
-          Replaces the dual KPI tiles + JustHappened chip strip. When
-          anything actionable is non-zero (past official / filing today /
-          anomalies / behind plan / replies / inbound to confirm), render
-          banner-weight cards in blocking-first priority. When all zero,
-          collapse to a single one-liner so the page yields its space to
-          the queue immediately below. The point is to answer "what must
-          I touch NOW or TODAY?" before the eye reaches the queue. */}
+      {/* §1: Morning triage — calendar-truth status strip.
+          A single thin row summarizing past official / due today /
+          behind plan counts. The previous design (three banner-weight
+          tinted cards) competed visually with the white "Alerts to act
+          on today" container directly below — same shape, two voices.
+          Strip-shape sidesteps the collision and saves ~150px. The
+          per-item next-gestures (anomalies, replies, inbound to
+          confirm) live in the action queue's TodoItem feed below. */}
       <MorningTriage summary={summary} />
 
-      {/* §2: What changed since the user was last here. State-alert news
-          banner (since-last-visit) — vanishes when nothing's new. */}
-      <WhatChangedBanner />
-
-      {/* State alerts — preview surface. Top 3 most-urgent rendered as
-          the canonical <StateAlertCard variant="preview"> (same shape
-          as /alerts so the user doesn't see two layouts of the same
-          data). Click navigates to /alerts/:id where the action lives.
-          Empty state shows a calm "all clear" line. */}
+      {/* State alerts — preview surface. Top 3 escalated rows with a
+          freshness chip ("N new since last visit") in the section meta
+          when applicable; this absorbs what the old WhatChangedBanner
+          did, eliminating the duplicate "5 new state alerts" amber
+          callout that used to sit above the same list. */}
       <StateAlertsPreview announcements={activeBanners} />
 
       {/* §2: Action queue — AI-curated TodoItem feed (PRD §4.8 nine
@@ -368,16 +364,28 @@ export function Dashboard() {
 // /alerts to act on them anyway. Reserving Today for the truly
 // urgent makes the morning glance honest.
 //
-// Three states:
-//   • 0 alerts            → calm "all clear" line
-//   • 0 escalated, N affecting → ambient line ("N affecting · all under SLA")
-//   • M escalated, N total      → M cards inline + "{N-M} more routine →" link
+// Freshness signal — "N new since last visit" — is rendered as a chip
+// in the SectionHeader meta whenever `triageOnFirstLand` returns rows.
+// This used to be a separate `<WhatChangedBanner>` above this section,
+// but that was a duplicate amber callout for the same announcements
+// already listed below. One section, one signal.
+//
+// Four states:
+//   • 0 alerts                 → calm "all clear" line
+//   • 0 escalated, 0 new       → ambient line ("N affecting · all under SLA")
+//   • 0 escalated, M new       → list M new since-last-visit alerts
+//   • E escalated, M new       → list E + freshness chip in header meta
 function StateAlertsPreview({
   announcements,
 }: {
   announcements: Announcement[];
 }) {
   const navigate = useNavigate();
+  const triageQuery = trpc.announcements.triageOnFirstLand.useQuery(undefined, {
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+  const newSinceLastVisit = triageQuery.data ?? [];
 
   // Empty: monitoring assurance, calm.
   if (announcements.length === 0) {
@@ -419,9 +427,60 @@ function StateAlertsPreview({
   );
   const routineCount = affecting.length - escalated.length;
 
-  // No escalated — single ambient line. Same shape as the empty state
-  // (calm), different copy (you have stuff, but not on fire).
+  // No escalated — but if there are new-since-last-visit alerts, surface
+  // those instead of collapsing to the ambient line. The user shouldn't
+  // miss "5 new state alerts" just because none of them are past 72h SLA.
   if (escalated.length === 0) {
+    if (newSinceLastVisit.length > 0) {
+      const newIds = new Set(newSinceLastVisit.map((n) => n.id));
+      const newAlerts = affecting.filter((a) => newIds.has(a.id));
+      const sortedNew = [...newAlerts].sort((a, b) =>
+        b.detectedAt.localeCompare(a.detectedAt),
+      );
+      const PREVIEW_CAP = 3;
+      const previewed = sortedNew.slice(0, PREVIEW_CAP);
+      const overflow =
+        sortedNew.length -
+        previewed.length +
+        Math.max(0, affecting.length - sortedNew.length);
+
+      return (
+        <section className="mb-section">
+          <SectionHeader
+            title="Alerts to act on today"
+            meta={`${newSinceLastVisit.length} new since last visit`}
+            action={
+              <Link
+                to="/alerts"
+                className="text-xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-1"
+              >
+                All alerts <ChevronRight className="w-3 h-3" aria-hidden />
+              </Link>
+            }
+          />
+          <div className="bg-surface border border-line rounded-md overflow-hidden">
+            <ul className="divide-y divide-line" role="list">
+              {previewed.map((a) => (
+                <CompactAlertRow
+                  key={a.id}
+                  announcement={a}
+                  onClick={() => navigate(`/alerts/${a.id}`)}
+                />
+              ))}
+            </ul>
+            {overflow > 0 && (
+              <Link
+                to="/alerts"
+                className="block w-full px-region py-2 text-xs text-ink-500 hover:text-ink-900 hover:bg-sunken/40 border-t border-line text-center"
+              >
+                {overflow} more {overflow === 1 ? "alert" : "alerts"} on /alerts →
+              </Link>
+            )}
+          </div>
+        </section>
+      );
+    }
+
     return (
       <Link
         to="/alerts"
@@ -466,15 +525,23 @@ function StateAlertsPreview({
   const overflow =
     escalated.length - previewed.length + Math.max(0, routineCount);
 
+  // Freshness chip — appended to the SLA meta when any alerts have
+  // arrived since the user's last visit. Replaces the old standalone
+  // <WhatChangedBanner> that used to sit above this section.
+  const slaLabel =
+    escalated.length === 1
+      ? "1 past 72h SLA"
+      : `${escalated.length} past 72h SLA`;
+  const meta =
+    newSinceLastVisit.length > 0
+      ? `${slaLabel} · ${newSinceLastVisit.length} new since last visit`
+      : slaLabel;
+
   return (
     <section className="mb-section">
       <SectionHeader
         title="Alerts to act on today"
-        meta={
-          escalated.length === 1
-            ? "1 past 72h SLA"
-            : `${escalated.length} past 72h SLA`
-        }
+        meta={meta}
         action={
           <Link
             to="/alerts"
