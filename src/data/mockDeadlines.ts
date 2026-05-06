@@ -14,7 +14,9 @@ type D = Omit<Deadline, "id">;
 //   · "Maya Patel"     (member, junior preparer; carries ~25% of load)
 //
 // Statuses exercised: not_started, in_progress, overdue, completed,
-// filed_extension (submitted + approved), deferred, not_applicable.
+// filed_extension (submitted + approved), not_applicable.
+// `deferred` was killed 2026-05-06 — deferring is a reschedule (working
+// date moves), not a terminal state. See PRD §8.5.
 
 const raw: D[] = [
   // ============================================================
@@ -334,26 +336,32 @@ const raw: D[] = [
   },
 
   // ============================================================
-  // DEFERRED (2) — pushed by the firm on purpose. Distinct from
-  // not_applicable (kill); deferred = "we'll come back to this."
+  // RESCHEDULED (2) — working date pushed by the firm on purpose.
+  // The `deferred` status was killed 2026-05-06 — deferring is a
+  // reschedule (working date moves, official stays put per PRD §8.5),
+  // not a terminal state. These rows now carry an `internalDueDate`
+  // later than the official to surface the same "we'll come back to
+  // this" intent. Distinct from `not_applicable` (a kill).
   // ============================================================
   {
     clientId: "c-ca-04",
     form: "Sales tax Q1 (CA CDTFA)",
     jurisdiction: "CA",
     officialDueDate: "2026-04-30",
-    status: "deferred",
+    internalDueDate: "2026-05-15",
+    status: "in_progress",
     assignedUser: "Sarah Mitchell",
-    notes: "Deferred — client is restructuring entity; revisit after May 15.",
+    notes: "Rescheduled — client is restructuring entity; revisit after May 15.",
   },
   {
     clientId: "c-tx-02",
     form: "TX Franchise (Q1)",
     jurisdiction: "TX",
     officialDueDate: "2026-04-30",
-    status: "deferred",
+    internalDueDate: "2026-05-12",
+    status: "in_progress",
     assignedUser: "Maya Patel",
-    notes: "Deferred pending updated revenue numbers from QBO export.",
+    notes: "Rescheduled — pending updated revenue numbers from QBO export.",
   },
 
   // ============================================================

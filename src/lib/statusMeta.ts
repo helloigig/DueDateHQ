@@ -12,7 +12,6 @@ export const DEADLINE_STATUS_META: Record<
   in_progress:     { label: "In progress",     variant: "neutral", icon: "Pencil",         title: "Work in progress." },
   completed:       { label: "Filed",           variant: "ok",      icon: "FileCheck",      title: "Filing completed." },
   filed_extension: { label: "Extension filed", variant: "info",    icon: "CalendarClock",  title: "Extension filed — final return still owed." },
-  deferred:        { label: "Deferred",        variant: "neutral", icon: "PauseCircle",    title: "Intentionally deferred." },
   overdue:         { label: "Overdue",         variant: "danger",  icon: "AlertCircle",    title: "Past the official due date." },
 };
 

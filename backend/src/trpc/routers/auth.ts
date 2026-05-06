@@ -6,6 +6,7 @@ import { db } from "../../db/client.js";
 import { firms, teamInvites, users } from "../../db/schema.js";
 import { ALL_STATES } from "../../lib/states.js";
 import { seedDemoFirm } from "../../db/seed-demo-firm.js";
+import { seedAnnouncements } from "../../db/seed-announcements.js";
 import { supabaseAdmin } from "../../auth/supabase.js";
 
 const DEMO_EMAIL = "demo@duedatehq.com";
@@ -303,10 +304,22 @@ export const authRouter = router({
       // Restricted to the demo email at the top of this handler.
       const seedResult = await seedDemoFirm({ db, firmId, reseed });
 
+      // Re-anchor demo state-announcement detectedAt timestamps on
+      // every demo login. seedAnnouncements is system-wide and
+      // idempotent (UPDATE existing rows by sourceUrl, INSERT missing).
+      // Without this, a demo firm that was seeded weeks ago has every
+      // alert sitting in the "fresh" tier forever — the >72h blocking
+      // modal never fires and the AlertTriageModal first-land effect
+      // sees no news. Re-anchoring lets the deterministic
+      // DETECTED_AT_OFFSET_HOURS table do its job.
+      const annResult = await seedAnnouncements();
+
       return {
         firmId,
         reseed,
         ...seedResult,
+        announcementsInserted: annResult.inserted,
+        announcementsUpdated: annResult.updated,
       };
     }),
 

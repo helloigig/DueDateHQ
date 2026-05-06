@@ -19,7 +19,6 @@ export const deadlineStatusSchema = z.enum([
   "not_started",
   "in_progress",
   "completed",
-  "deferred",
   "filed_extension",
   "overdue",
 ]);

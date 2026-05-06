@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Sparkles, AlertTriangle, Check, ChevronRight } from "lucide-react";
-import type { Announcement, Client, Deadline } from "../types";
+import type { Announcement, Client, Deadline, Task } from "../types";
 import {
   TODAY,
   countdownLabel,
@@ -9,11 +9,10 @@ import {
   hoursSince,
   parseDate,
 } from "../data/dateHelpers";
-import { actions } from "../data/store";
+import { useStore } from "../data/store";
 import { StateBadge } from "./ui/StateBadge";
-import { useSetDeadlineStatus } from "../hooks/useDeadlines";
-import { env } from "../config";
 import { ClientChip } from "./ClientChip";
+import { MarkCompleteDialog } from "./MarkCompleteDialog";
 
 type PriorityItem =
   | {
@@ -75,13 +74,21 @@ export function PriorityCard({
   escalatedAlerts?: Announcement[];
   onDismiss: () => void;
 }) {
-  const setStatusMut = useSetDeadlineStatus();
-  const markComplete = (deadlineId: string) => {
-    if (env.useMockData) {
-      actions.setDeadlineStatus(deadlineId, "completed");
-    } else {
-      setStatusMut.mutate({ id: deadlineId, status: "completed" });
-    }
+  // Mark-complete now routes through the shared MarkCompleteDialog so
+  // the quick-mark from the dashboard uses the same confirmation rule
+  // as TaskActions and TaskMiniTimeline (one entrance, one rule).
+  // Resolves the matching Task for each deadline (1:1 per types.ts) so
+  // the dialog can read the checklist + drive the cascade-down.
+  const { tasks } = useStore();
+  const taskByDeadlineId = useMemo(
+    () => new Map(tasks.map((t) => [t.deadlineId, t] as const)),
+    [tasks],
+  );
+  const [pendingTask, setPendingTask] = useState<Task | null>(null);
+  const onMarkCompleteClick = (deadline: Deadline) => {
+    const t = taskByDeadlineId.get(deadline.id);
+    if (!t) return;
+    setPendingTask(t);
   };
   const items: PriorityItem[] = useMemo(() => {
     const active = deadlines.filter(
@@ -197,8 +204,9 @@ export function PriorityCard({
                 {countdownLabel(item.deadline.officialDueDate)}
               </span>
               <button
-                onClick={() => markComplete(item.deadline.id)}
-                className="text-xs p-1.5 rounded bg-ok-bg text-ok-ink hover:bg-ok-border/40"
+                onClick={() => onMarkCompleteClick(item.deadline)}
+                disabled={!taskByDeadlineId.has(item.deadline.id)}
+                className="text-xs p-1.5 rounded bg-ok-bg text-ok-ink hover:bg-ok-border/40 disabled:opacity-40 disabled:cursor-not-allowed"
                 aria-label="Mark complete"
                 title="Mark complete"
               >
@@ -208,6 +216,15 @@ export function PriorityCard({
           )
         )}
       </ul>
+      {pendingTask && (
+        <MarkCompleteDialog
+          open={!!pendingTask}
+          onOpenChange={(b) => {
+            if (!b) setPendingTask(null);
+          }}
+          task={pendingTask}
+        />
+      )}
     </section>
   );
 }

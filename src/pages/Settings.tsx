@@ -820,9 +820,10 @@ function NotificationsPanel() {
  * Settings card for the alert triage modal. The modal fires on first
  * /-page-land per browser session when there are state alerts that
  * arrived since the user's last_active_at and have at least one
- * matched client. Toggle off when it becomes noise — the inline
- * `<WhatChangedBanner>` on Dashboard continues to surface the same
- * urgency without the modal interruption.
+ * matched client. Toggle off when it becomes noise — the freshness
+ * chip in the Today page's "Alerts to act on today" section header
+ * ("N new since last visit") continues to surface the same urgency
+ * inline without the modal interruption.
  */
 function AlertTriageCard() {
   const utils = trpc.useUtils();

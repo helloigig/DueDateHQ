@@ -1,27 +1,45 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useShortcuts } from "../hooks/useKeyboard";
 import { useClients } from "../hooks/useClients";
 import { useTriageDeadlines } from "../hooks/useDeadlines";
 import { useDetectAnnouncements } from "../hooks/useAnnouncements";
 import { useRealtimeAnnouncements } from "../hooks/useRealtimeAnnouncements";
+import { useStore } from "../data/store";
 import { useSession } from "../data/session";
 import { ShortcutsModal } from "../components/ShortcutsModal";
 import { DashboardSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { ErrorState } from "../components/ErrorState";
-import { TODAY, toIso, hoursSince } from "../data/dateHelpers";
+import {
+  TODAY,
+  toIso,
+  daysBetween,
+  parseDate,
+  hoursSince,
+} from "../data/dateHelpers";
 import { ChaseBanner } from "../components/ChaseBanner";
 import { CapacityStrip } from "../components/CapacityStrip";
+// ModeFHealth removed — the same monitoring signal ("50/50 states ·
+// last scrape 14m ago") is already on /alerts as the ambient line.
+// Two surfaces showing the same health was redundant.
+// AlertTriageModal / WelcomeTour / BlockingAlertsDialog /
+// OnboardingLayer2Widget removed in the F1 slim-down: stacked modals
+// + first-run banners + bottom widget all fired on entry, burying
+// MorningTriage and Action Queue. MorningTriage now carries the
+// triage signal; the >72h subset is covered by the warn-tinted
+// "past 48h" badge + CompactAlertRow ordering inside StateAlertsPreview.
 import { ActionQueue } from "../components/ActionQueue";
-import { JustHappenedStrip } from "../components/JustHappenedStrip";
+import { MorningTriage } from "../components/MorningTriage";
+import { trpc } from "../lib/api/client";
 import { AiUsageInfo } from "../components/AiUsageInfo";
 import { PageHeader } from "../components/ui/PageHeader";
 import { DateLabel } from "../components/ui/DateLabel";
 import { SectionHeader } from "../components/ui/SectionHeader";
-import { StateAlertCard } from "../components/StateAlertCard";
 import { Megaphone, ChevronRight } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { Announcement } from "../types";
 import { escalationTier as escTier } from "../data/dateHelpers";
+
+const DONE_STATUSES = new Set(["completed", "filed_extension"]);
 
 /**
  * Dashboard — the morning glance.
@@ -49,6 +67,7 @@ export function Dashboard() {
   const triageQuery = useTriageDeadlines();
   const announcementsQuery = useRealtimeAnnouncements();
   const detectMutation = useDetectAnnouncements();
+  const { tasks } = useStore();
   const location = useLocation();
   // /legacy/dashboard renders the pre-v0.7-amendment view: deadline list only,
   // no ActionQueue, no state-monitor Health. Lets us A/B compare during transition.
@@ -95,7 +114,37 @@ export function Dashboard() {
   //   path.
   const activeBanners = announcements.filter((a) => !a.dismissed);
 
-  const todayIso = toIso(TODAY);
+  // Operational summary. Two distinct signals:
+  //   • pastInternalTarget — task is past its internal target date (1-week
+  //     buffer eaten). Daily-relevant. The signal Sarah actually feels.
+  //   • pastOfficial — task is past the government deadline. Rare. Means
+  //     extension territory. Almost always 0 in a healthy firm.
+  // Plus: dueThisWeek — calendar context. Always shown.
+  const summary = useMemo(() => {
+    const open = tasks.filter((t) => !DONE_STATUSES.has(t.status));
+    const todayIso = toIso(TODAY);
+    const pastInternalTarget = open.filter(
+      (t) => t.internalTargetDate < todayIso && t.officialDueDate >= todayIso,
+    ).length;
+    const pastOfficial = open.filter(
+      (t) => t.officialDueDate < todayIso,
+    ).length;
+    const dueToday = open.filter((t) => t.officialDueDate === todayIso).length;
+    const dueThisWeek = open.filter((t) => {
+      const days = daysBetween(TODAY, parseDate(t.officialDueDate));
+      return days >= 0 && days <= 7;
+    }).length;
+    const activeClients = clients.filter((c) => c.status === "active").length;
+    return {
+      pastInternalTarget,
+      pastOfficial,
+      dueToday,
+      dueThisWeek,
+      activeClients,
+    };
+  }, [tasks, clients]);
+
+  const todayIso = useMemo(() => toIso(TODAY), []);
 
   const hasNoClients = clients.length === 0;
 
@@ -154,24 +203,11 @@ export function Dashboard() {
 
   return (
     <div className="max-w-[1080px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
-      {/* Today slim-down 2026-05-06 (Yuqi UX walkthrough):
-          The page used to bury Action Queue at scroll position ~2400px
-          under five overlapping framings of the same alert data:
-            - AlertTriageModal (modal on entry)
-            - BlockingAlertsDialog (full-screen modal)
-            - WhatChangedBanner ("Since you were last here")
-            - WelcomeTour banner (showed even on populated workspaces)
-            - 3 KPI tiles (passive numbers — info redundant with queue)
-            - OnboardingLayer2Widget (Connect-QBO nudge below the queue)
-          All removed. Today now reads:
-            PageHeader → JustHappenedStrip (overnight diff, self-vanishes)
-            → StateAlertsPreview (top 3 alerts, single canonical framing)
-            → ActionQueue (the daily work, above the fold)
-            → ChaseBanner (14d+ silent clients, self-vanishes)
-            → CapacityStrip (≥3-staff firms only). */}
-
-      {/* PAGE HEADER — H1 + date. Action affordances live inside each
-          section (state-alert cards, action-queue rows). */}
+      {/* PAGE HEADER ROW — Mercury Home anatomy: H1 left + action button row
+          right. The action row carries the page's "what can I do here right
+          now" affordances (Mercury Home: Send / Transfer / Deposit / Request).
+          Per T2 — only the first action ("Send chase") wears the indigo
+          accent; the rest are ghost pills. */}
       <div className="mb-card flex items-end justify-between gap-region flex-wrap">
         <PageHeader
           className="mb-0"
@@ -186,19 +222,25 @@ export function Dashboard() {
         />
       </div>
 
-      {/* §1: Just happened — overnight diff strip. Self-vanishes when
-          confirms + issues + replies all zero, so on a quiet morning
-          the page goes straight to State alerts → Action Queue. */}
-      <JustHappenedStrip />
+      {/* §1: Morning triage — calendar-truth status strip.
+          A single thin row summarizing past official / due today /
+          behind plan counts. The previous design (three banner-weight
+          tinted cards) competed visually with the white "Alerts to act
+          on today" container directly below — same shape, two voices.
+          Strip-shape sidesteps the collision and saves ~150px. The
+          per-item next-gestures (anomalies, replies, inbound to
+          confirm) live in the action queue's TodoItem feed below. */}
+      <MorningTriage summary={summary} />
 
-      {/* §2: State alerts — preview surface. Top 3 most-urgent rendered as
-          the canonical <StateAlertCard variant="preview"> (same shape
-          as /alerts so the user doesn't see two layouts of the same
-          data). Click navigates to /alerts/:id where the action lives.
-          Empty state shows a calm "all clear" line. */}
+      {/* State alerts — preview surface with compact one-line rows
+          (CompactAlertRow). Top 3 action-today rows + a freshness chip
+          ("N new since last visit") in the section meta. The chip
+          absorbs what the old WhatChangedBanner did, eliminating the
+          duplicate "5 new state alerts" amber callout that used to sit
+          above the same list. */}
       <StateAlertsPreview announcements={activeBanners} />
 
-      {/* §3: Action queue — AI-curated TodoItem feed (PRD §4.8 nine
+      {/* §2: Action queue — AI-curated TodoItem feed (PRD §4.8 nine
           sources, urgency-sorted with waiting_multiplier). State alerts
           pinned at the top of the queue (state-monitor rows render with a
           distinct event-shape variant); per-client rows aggregate every
@@ -207,10 +249,15 @@ export function Dashboard() {
           scale (49 clients × 6 forms = 294 rows). */}
       {!isLegacy && <ActionQueue />}
 
-      {/* §4: Quiet clients — automation has run out. The phone-call
+      {/* §3: Quiet clients — automation has run out. The phone-call
           subset of in-flight chases (14d+ since last reminder, still
           waiting). Self-vanishes when zero. */}
       <ChaseBanner />
+
+      {/* §4: ModeFHealth removed — see import block above. The state-
+          monitoring health signal lives once, on the /alerts page
+          ambient line ("50/50 states monitored · last scrape 14m ago"),
+          which the Dashboard's StateAlertsPreview links into. */}
 
       {/* §5: Capacity — ≥3-staff firms only (gate inside the component).
           Solo Sarah never sees this; mid-firm Yan Jing always does. */}
@@ -258,17 +305,28 @@ export function Dashboard() {
 // /alerts to act on them anyway. Reserving Today for the truly
 // urgent makes the morning glance honest.
 //
-// Three states:
-//   • 0 alerts            → calm "all clear" line
-//   • 0 escalated, N affecting → ambient line ("N affecting · all under SLA")
-//   • M escalated, N total      → M cards inline + "{N-M} more routine →" link
+// Freshness signal — "N new since last visit" — is rendered as a chip
+// in the SectionHeader meta whenever `triageOnFirstLand` returns rows.
+// This used to be a separate `<WhatChangedBanner>` above this section,
+// but that was a duplicate amber callout for the same announcements
+// already listed below. One section, one signal.
+//
+// Four states:
+//   • 0 alerts                 → calm "all clear" line
+//   • 0 escalated, 0 new       → ambient line ("N affecting · all under SLA")
+//   • 0 escalated, M new       → list M new since-last-visit alerts
+//   • E escalated, M new       → list E + freshness chip in header meta
 function StateAlertsPreview({
   announcements,
 }: {
   announcements: Announcement[];
 }) {
   const navigate = useNavigate();
-  const clientsQuery = useClients();
+  const triageQuery = trpc.announcements.triageOnFirstLand.useQuery(undefined, {
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+  const newSinceLastVisit = triageQuery.data ?? [];
 
   // Empty: monitoring assurance, calm.
   if (announcements.length === 0) {
@@ -318,10 +376,77 @@ function StateAlertsPreview({
   // and they were also counted as "routine" on this strip).
   const routineCount = affecting.length - actionToday.length;
 
-  // No action-today (no escalated, no blocking) — single ambient line.
-  // Same shape as the empty state (calm), different copy (you have
-  // stuff, but not on fire).
+  // No action-today (no escalated, no blocking) — but if there are
+  // new-since-last-visit alerts, surface those instead of collapsing
+  // to the ambient line. The user shouldn't miss "5 new state alerts"
+  // just because none of them are past 48h SLA yet.
   if (actionToday.length === 0) {
+    if (newSinceLastVisit.length > 0) {
+      const newIds = new Set(newSinceLastVisit.map((n) => n.id));
+      const newAlerts = affecting.filter((a) => newIds.has(a.id));
+      const sortedNew = [...newAlerts].sort((a, b) =>
+        b.detectedAt.localeCompare(a.detectedAt),
+      );
+      const PREVIEW_CAP = 3;
+      const previewed = sortedNew.slice(0, PREVIEW_CAP);
+      const overflow =
+        sortedNew.length -
+        previewed.length +
+        Math.max(0, affecting.length - sortedNew.length);
+
+      return (
+        <section className="mb-section">
+          <SectionHeader
+            title="Alerts to act on today"
+            meta={
+              <span className="inline-flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2 h-5 rounded-pill text-2xs font-semibold uppercase tracking-wider bg-info-bg/70 border border-info-border/60 text-info-ink">
+                  <span className="tabular-nums">
+                    {newSinceLastVisit.length}
+                  </span>
+                  new
+                </span>
+                <span className="text-2xs text-ink-500">
+                  since last visit
+                </span>
+              </span>
+            }
+            action={
+              <Link
+                to="/alerts"
+                className="text-xs font-medium text-ink-500 hover:text-ink-900 inline-flex items-center gap-1 px-2 h-7 rounded-md hover:bg-sunken/60 transition-colors group"
+              >
+                All alerts
+                <ChevronRight
+                  className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5"
+                  aria-hidden
+                />
+              </Link>
+            }
+          />
+          <div className="bg-surface border border-line rounded-md overflow-hidden">
+            <ul className="divide-y divide-line" role="list">
+              {previewed.map((a) => (
+                <CompactAlertRow
+                  key={a.id}
+                  announcement={a}
+                  onClick={() => navigate(`/alerts/${a.id}`)}
+                />
+              ))}
+            </ul>
+            {overflow > 0 && (
+              <Link
+                to="/alerts"
+                className="block w-full px-region py-2 text-xs text-ink-500 hover:text-ink-900 hover:bg-sunken/40 border-t border-line text-center"
+              >
+                {overflow} more {overflow === 1 ? "alert" : "alerts"} on /alerts →
+              </Link>
+            )}
+          </div>
+        </section>
+      );
+    }
+
     return (
       <Link
         to="/alerts"
@@ -362,19 +487,12 @@ function StateAlertsPreview({
     return b.detectedAt.localeCompare(a.detectedAt);
   });
 
-  // Today shows only the top 3 most-impactful action-today alerts.
-  // The rest fold into the "+N more" footer that links to /alerts.
-  // Without this cap, busy mornings (10+ alerts past SLA) buried the
-  // Action Queue under a wall of full alert cards — exactly the
-  // "what's the actual next thing I do" friction this page is supposed
-  // to solve. /alerts remains the workshop for everything beyond top 3.
-  const ACTION_TODAY_PREVIEW_MAX = 3;
-  const visibleActionToday = sortedActionToday.slice(
-    0,
-    ACTION_TODAY_PREVIEW_MAX,
-  );
-  const hiddenActionToday = sortedActionToday.length - visibleActionToday.length;
-  const moreCount = hiddenActionToday + routineCount;
+  // Cap at 3 — Today's purpose is "act on the most urgent now," not browse
+  // every escalation. Anything past 3 lives on /alerts.
+  const PREVIEW_CAP = 3;
+  const previewed = sortedActionToday.slice(0, PREVIEW_CAP);
+  const overflow =
+    actionToday.length - previewed.length + Math.max(0, routineCount);
 
   return (
     <section className="mb-section">
@@ -386,7 +504,19 @@ function StateAlertsPreview({
               <span className="tabular-nums">{actionToday.length}</span>
               past 48h
             </span>
-            <span className="text-2xs text-ink-500">act today</span>
+            {newSinceLastVisit.length > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-2 h-5 rounded-pill text-2xs font-semibold uppercase tracking-wider bg-info-bg/70 border border-info-border/60 text-info-ink">
+                <span className="tabular-nums">
+                  {newSinceLastVisit.length}
+                </span>
+                new
+              </span>
+            )}
+            <span className="text-2xs text-ink-500">
+              {newSinceLastVisit.length > 0
+                ? "act today · since last visit"
+                : "act today"}
+            </span>
           </span>
         }
         action={
@@ -402,33 +532,82 @@ function StateAlertsPreview({
           </Link>
         }
       />
-      <div className="flex flex-col gap-card">
-        {visibleActionToday.map((a) => (
-          <StateAlertCard
-            key={a.id}
-            a={a}
-            variant="preview"
-            onSelect={() => navigate(`/alerts/${a.id}`)}
-            clientSource={clientsQuery.data?.items}
-          />
-        ))}
-      </div>
-      {moreCount > 0 && (
-        <div className="mt-card flex justify-center">
+      <div className="bg-surface border border-line rounded-md overflow-hidden">
+        <ul className="divide-y divide-line" role="list">
+          {previewed.map((a) => (
+            <CompactAlertRow
+              key={a.id}
+              announcement={a}
+              onClick={() => navigate(`/alerts/${a.id}`)}
+            />
+          ))}
+        </ul>
+        {overflow > 0 && (
           <Link
             to="/alerts"
-            className="group inline-flex items-center gap-1.5 text-xs font-medium text-ink-500 hover:text-ink-900 px-3 h-8 rounded-md border border-line bg-surface hover:bg-sunken transition-colors"
+            className="block w-full px-region py-2 text-xs text-ink-500 hover:text-ink-900 hover:bg-sunken/40 border-t border-line text-center"
           >
-            <span className="tabular-nums">{moreCount}</span>
-            more {moreCount === 1 ? "alert" : "alerts"} on /alerts
-            <ChevronRight
-              className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5"
-              aria-hidden
-            />
+            {overflow} more {overflow === 1 ? "alert" : "alerts"} on /alerts →
           </Link>
-        </div>
-      )}
+        )}
+      </div>
     </section>
+  );
+}
+
+// CompactAlertRow — one-line summary of a single state alert. Strips
+// down the StateAlertCard's full presentation (title + body + affected
+// client list + nexus pill + source URL) to just the essentials Sarah
+// needs to decide whether to act NOW: state, summary headline, affected
+// count, recency, and a deadline-shift pill if applicable. Click lands
+// on /alerts/:id where the full detail + actions live.
+function CompactAlertRow({
+  announcement,
+  onClick,
+}: {
+  announcement: Announcement;
+  onClick: () => void;
+}) {
+  const hours = hoursSince(announcement.detectedAt);
+  const recency =
+    hours < 1
+      ? "just now"
+      : hours < 24
+        ? `${hours}h ago`
+        : `${Math.floor(hours / 24)}d ago`;
+  const affectedCount = announcement.affectedClientIds.length;
+  // Use the title as the one-line headline (it's the distilled "Economic
+  // nexus threshold lowered to $300,000" form). Summary is a longer body
+  // paragraph — that lives on /alerts/:id, not here.
+  const headline = announcement.title;
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onClick}
+        className="w-full text-left px-region py-2.5 flex items-center gap-3 hover:bg-sunken/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo/40"
+      >
+        <span className="inline-flex items-center justify-center min-w-[28px] h-5 px-1.5 rounded text-2xs font-semibold bg-sunken text-ink-700 shrink-0 tabular-nums">
+          {announcement.stateCode}
+        </span>
+        <span className="flex-1 min-w-0 truncate text-sm text-ink-900">
+          {headline}
+        </span>
+        {announcement.newDeadline && (
+          <span className="text-2xs px-1.5 py-0.5 rounded bg-warn-bg text-warn-ink shrink-0 hidden sm:inline-block">
+            moves deadline
+          </span>
+        )}
+        <span className="text-xs text-ink-500 shrink-0 tabular-nums">
+          {affectedCount} {affectedCount === 1 ? "client" : "clients"} ·{" "}
+          {recency}
+        </span>
+        <ChevronRight
+          className="w-3.5 h-3.5 text-ink-400 shrink-0"
+          aria-hidden
+        />
+      </button>
+    </li>
   );
 }
 

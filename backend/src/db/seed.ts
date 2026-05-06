@@ -123,7 +123,7 @@ async function seed() {
 
   // eslint-disable-next-line no-console
   console.log(
-    `[ddhq-backend] seed complete — packages: +${createdPackages}, service templates: +${createdTemplates}, reminder templates: +${createdReminderTemplates}, federal forms: +${federalFormsResult.inserted} inserted, ${federalFormsResult.updated} updated, ${federalFormsResult.unchanged} unchanged, announcements: +${announcementsResult.inserted} (skipped ${announcementsResult.skipped}), announcement sources: +${sourcesResult.inserted} (skipped ${sourcesResult.skipped})`,
+    `[ddhq-backend] seed complete — packages: +${createdPackages}, service templates: +${createdTemplates}, reminder templates: +${createdReminderTemplates}, federal forms: +${federalFormsResult.inserted} inserted, ${federalFormsResult.updated} updated, ${federalFormsResult.unchanged} unchanged, announcements: +${announcementsResult.inserted} (updated ${announcementsResult.updated}), announcement sources: +${sourcesResult.inserted} (skipped ${sourcesResult.skipped})`,
   );
 }
 

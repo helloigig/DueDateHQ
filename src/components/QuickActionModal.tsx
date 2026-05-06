@@ -156,7 +156,7 @@ export function QuickActionModal({
             />
             <ActionRow
               label="Defer to a later date…"
-              hint="Pushes the due date; status becomes Deferred"
+              hint="Pushes the working date; official date stays put (PRD §8.5)"
               onClick={() => setMode("defer")}
             />
             <ActionRow
