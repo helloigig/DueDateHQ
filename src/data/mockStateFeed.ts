@@ -98,26 +98,32 @@ export const STATE_FEED: Announcement[] = [
     dismissed: false,
   },
   {
-    id: "ann-feed-ca-pte-2026",
+    // Reframed 2026-05-06: previously a CA pte_change "Form 3804
+    // deadline moved to May 15" that contradicted the seed's ann-ca-
+    // 2026-pte-election ("deadline extended to July 31"). A CPA seeing
+    // both at once would not be able to tell which is real, which
+    // violates "data must make sense". Repointed to a CA marketplace-
+    // facilitator nexus update — different topic, no conflict.
+    id: "ann-feed-ca-marketplace-nexus-2026",
     stateCode: "CA",
-    authority: "California Franchise Tax Board",
-    title: "PTE elective tax — Form 3804 election deadline moved to May 15",
+    authority: "California Department of Tax and Fee Administration",
+    title: "Marketplace facilitator threshold lowered to $400,000",
     summary:
-      "California Franchise Tax Board has moved the Pass-Through Entity elective tax election deadline from June 15 to May 15 effective the 2026 tax year. Affected entities should re-confirm election strategy before the new deadline.",
+      "CA CDTFA has lowered the marketplace facilitator economic nexus threshold from $500,000 to $400,000 in California sales for tax year 2026. LLCs and S-Corps selling through marketplaces with CA receipts above the new threshold must register and collect.",
     issuanceDate: "2026-04-21",
-    effectiveDate: "2026-05-15",
+    effectiveDate: "2026-07-01",
     detectedAt: new Date().toISOString(),
-    type: "pte_change",
-    taxType: "income",
+    type: "nexus_change",
+    taxType: "sales_use",
     retroactive: false,
     counties: [],
-    entityTypes: ["S-Corp", "Partnership", "LLC"],
-    taxTypes: ["income"],
-    sourceUrl: "https://www.ftb.ca.gov/file/business/credits/pte.html",
+    entityTypes: ["S-Corp", "LLC"],
+    taxTypes: ["sales_use"],
+    sourceUrl: "https://www.cdtfa.ca.gov/news/2026/marketplace-threshold.htm",
     sourceAuthority: "primary",
     relatedAnnouncementIds: [],
     parseConfidence: "high",
-    matchConfidence: "high",
+    matchConfidence: "medium",
     affectedClientIds: [],
     read: false,
     dismissed: false,

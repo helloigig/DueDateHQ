@@ -197,7 +197,12 @@ export function Clients() {
   }, [tasks]);
   const fleetCounts = useMemo(() => {
     const out = new Map<string, { waiting: number; review: number; oldestReminderDays: number | null }>();
-    const now = Date.now();
+    // Use demo TODAY anchor (not wall-clock Date.now()) so the
+    // "stuck >14d" cohort is computed against the same frame of
+    // reference the rest of the demo uses. Without this, every mock
+    // reminder is "14+ days old" the moment wall-clock time drifts past
+    // the anchor — and the Stuck tile reads as the entire roster.
+    const nowMs = TODAY.getTime();
     for (const ci of checklistItems) {
       const clientId = taskClient.get(ci.taskId);
       if (!clientId) continue;
@@ -206,7 +211,7 @@ export function Clients() {
       if (ci.state === "requested_waiting" || ci.state === "not_requested") {
         entry.waiting++;
         if (ci.lastReminderAt) {
-          const days = Math.floor((now - new Date(ci.lastReminderAt).getTime()) / (24 * 60 * 60 * 1000));
+          const days = Math.floor((nowMs - new Date(ci.lastReminderAt).getTime()) / (24 * 60 * 60 * 1000));
           if (entry.oldestReminderDays == null || days > entry.oldestReminderDays) {
             entry.oldestReminderDays = days;
           }
@@ -555,12 +560,12 @@ export function Clients() {
       >
         <MetricTile
           label="Active clients"
-          value={clients.length}
+          value={activeCount}
           tone="neutral"
           helper={
             allClients.length === clients.length
-              ? "Whole roster"
-              : `of ${allClients.length} matching filters`
+              ? `${allClients.length} on roster`
+              : `${clients.length} matching filters · ${allClients.length} on roster`
           }
         />
         {multiStateCount > 0 && (
