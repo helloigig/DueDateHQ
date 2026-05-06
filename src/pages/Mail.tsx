@@ -7,9 +7,7 @@ import {
   AlertTriangle,
   Mail as MailIcon,
   Check,
-  ChevronRight as ChevronRightIcon,
   Link2,
-  Siren,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -17,41 +15,21 @@ import { trpc } from "../lib/api/client";
 import { env } from "../config";
 import { PageHeader } from "../components/ui/PageHeader";
 
-// Mail surface — per IA v0.7 amendment §3.8.
+// Mail surface — thread context for inbound + outbound communication.
+// Tabs: Inbox / Outbox / Drafts / Issues.
 //
-// Cross-client communication pivot. Top section is "Reminders Out, Awaiting
-// Reply" (gap-over-fill principle: what client hasn't replied to is the
-// loudest element). Below is 4 tabs (Inbox / Outbox / Drafts / Issues).
+// The "Reminders Out / Awaiting client reply" header section was removed
+// 2026-05-06: it duplicated Today's Action Queue + ChaseBanner (the
+// daily-action chase surface). Mail's job is thread context, not a
+// second daily-action page. Per-thread "Open task" deep-links carry
+// the bridge to the task surface.
 //
-// Wired to live BE: Inbox tab → trpc.inboundReplies.list (Method A SES forward
-// + Method B Gmail/Outlook OAuth pull both write here). Issues tab →
-// trpc.deliveryEvents.issues (bounce/complaint/unsubscribe webhooks). Falls
-// back to static mocks when BE returns empty (fresh / un-seeded firms).
+// Wired to live BE: Inbox tab → trpc.inboundReplies.list (Method A SES
+// forward + Method B Gmail/Outlook OAuth pull both write here). Issues
+// tab → trpc.deliveryEvents.issues (bounce/complaint/unsubscribe).
+// Falls back to static mocks when BE returns empty (fresh firms).
 
 type Tab = "inbox" | "outbox" | "drafts" | "issues";
-
-// Static fallback rows shown when the live BE returns empty AND the user
-// is in mock mode. Names match real entries in src/data/mockClients.ts.
-const REMINDERS_OUT = [
-  {
-    daysSent: 11,
-    client: "Acme Bayou LLC",
-    task: "K-1 from Apex Fund (1065)",
-    address: "rob@acmebayou.com",
-  },
-  {
-    daysSent: 9,
-    client: "Pacific Ridge S-Corp",
-    task: "Shareholder distribution (CA 100S)",
-    address: "kyle@pacificridge.co",
-  },
-  {
-    daysSent: 8,
-    client: "Lakeshore Realty LLC",
-    task: "Rental property packet (1065)",
-    address: "ap@lakeshore-realty.com",
-  },
-];
 
 const INBOX_MOCK: InboxRow[] = [
   {
@@ -147,56 +125,12 @@ export function Mail() {
         : [];
   const inboxCount = inbox.length;
 
-  // Reminders Out — sent emailDrafts that haven't been replied to yet.
-  // Wired to trpc.emails.awaitingReply (joins through tasks → deadlines
-  // → clients so rows render real client + form names). Mock fallback
-  // only in mock mode — real mode + 0 sent shows the empty state.
-  // FE router types are stale until BE redeploys; cast the proxy access
-  // through `as any` so the Vercel build doesn't fail on a missing key.
-  type ReminderRow = {
-    id: string;
-    taskId?: string;
-    clientId?: string;
-    clientName: string;
-    taskLabel: string;
-    subject: string;
-    toAddress: string;
-    sentAt: string | null;
-    daysSent: number | null;
-  };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const remindersOutQuery = (trpc.emails as any).awaitingReply.useQuery({
-    limit: 20,
-  }) as {
-    data?: ReminderRow[];
-    isLoading: boolean;
-    error?: { message: string } | null;
-  };
-  const liveReminders: ReminderRow[] = remindersOutQuery.data ?? [];
-  const reminders: ReminderRow[] =
-    liveReminders.length > 0
-      ? liveReminders
-      : env.useMockData
-        ? REMINDERS_OUT.map((r) => ({
-            id: `mock-${r.client}-${r.task}`,
-            taskId: undefined,
-            clientId: undefined,
-            clientName: r.client,
-            taskLabel: r.task,
-            subject: r.task,
-            toAddress: r.address,
-            sentAt: null,
-            daysSent: r.daysSent,
-          }))
-        : [];
-  const remindersAggregate = useMemo(() => {
-    if (reminders.length === 0) return null;
-    const days = reminders.map((r) => r.daysSent ?? 0);
-    const oldest = days.length ? Math.max(...days) : 0;
-    const overSeven = days.filter((d) => d > 7).length;
-    const uniqueClients = new Set(reminders.map((r) => r.clientName)).size;
-    return { count: reminders.length, oldest, overSeven, uniqueClients };
-  }, [reminders]);
+  // Reminders Out / Awaiting client reply — section removed 2026-05-06.
+  // Today's Action Queue + ChaseBanner own the chase surface; surfacing
+  // the same data here as a "loud peach gradient" header just made Mail
+  // feel like a second daily-action page. Mail's job is thread context
+  // for inbound/outbound. The Inbox tab + per-thread "Open task" link
+  // carries everything the CPA needs from this surface.
 
   // Mail Issues — bounces/complaints/unsubscribes joined with email_drafts.
   const issuesCount = (issuesQuery.data ?? []).length;
@@ -221,128 +155,6 @@ export function Mail() {
         Cross-client communication — AI classifies inbound; bytes stay in your
         email account.
       </p>
-
-      {/* Reminders Out — gap-over-fill prominent top section per IA v0.7 §3.8.
-          Polished 2026-05-06 to match WhatChangedBanner / AlertTriageModal
-          anatomy: eyebrow + headline composition, soft gradient peach bg
-          (Q1 register), refined per-row hover with chevron translate. */}
-      <section
-        aria-labelledby="reminders-out-heading"
-        className="rounded-md border border-warn-border/70 bg-gradient-to-br from-warn-bg/70 via-warn-bg/55 to-warn-bg/40 p-region mb-card"
-      >
-        <header className="flex items-start gap-3 mb-region">
-          <span
-            aria-hidden
-            className="w-9 h-9 rounded-md bg-warn-bg border border-warn-border/60 flex items-center justify-center text-warn-ink shrink-0 shadow-[inset_0_-1px_0_rgba(154,59,18,0.06)]"
-          >
-            <Siren className="w-4 h-4" aria-hidden />
-          </span>
-          <div className="flex-1 min-w-0">
-            <p className="text-2xs font-semibold uppercase tracking-wider text-warn-ink/80">
-              Awaiting client reply
-            </p>
-            <h2
-              id="reminders-out-heading"
-              className="text-sm font-semibold text-ink-900 mt-0.5 leading-snug"
-            >
-              {remindersAggregate ? (
-                <>
-                  <span className="tabular-nums">
-                    {remindersAggregate.count}
-                  </span>{" "}
-                  reminder{remindersAggregate.count === 1 ? "" : "s"} out
-                </>
-              ) : (
-                "Reminders out"
-              )}
-            </h2>
-            <p className="text-2xs text-ink-500 mt-1">
-              {remindersOutQuery.isLoading
-                ? "loading…"
-                : remindersOutQuery.error
-                  ? "couldn't load reminders — try refresh"
-                  : remindersAggregate
-                    ? (
-                      <>
-                        Across{" "}
-                        <span className="tabular-nums text-ink-700 font-medium">
-                          {remindersAggregate.uniqueClients}
-                        </span>{" "}
-                        {remindersAggregate.uniqueClients === 1 ? "client" : "clients"}
-                        <span className="mx-1.5 text-ink-300">·</span>
-                        oldest{" "}
-                        <span className="tabular-nums text-ink-700 font-medium">
-                          {remindersAggregate.oldest}d
-                        </span>
-                        <span className="mx-1.5 text-ink-300">·</span>
-                        <span className="tabular-nums text-ink-700 font-medium">
-                          {remindersAggregate.overSeven}
-                        </span>{" "}
-                        sent &gt; 7d ago
-                      </>
-                    )
-                    : env.useMockData
-                      ? "showing example data (mock mode)"
-                      : "no reminders out yet"}
-            </p>
-          </div>
-        </header>
-
-        {reminders.length === 0 ? (
-          <p className="text-xs text-ink-500 pl-12">
-            {env.useMockData
-              ? "Mock mode would show example reminders here."
-              : "When you send a chase email and the client hasn't replied, it shows up here."}
-          </p>
-        ) : (
-          <ul className="pl-12 -ml-1.5 divide-y divide-warn-border/30">
-            {reminders.map((r) => {
-              const tone =
-                r.daysSent != null && r.daysSent > 7
-                  ? "text-danger-ink font-semibold"
-                  : "text-warn-ink font-medium";
-              const RowInner = (
-                <>
-                  <span
-                    className={`tabular-nums text-xs w-10 shrink-0 ${tone}`}
-                  >
-                    {r.daysSent != null ? `${r.daysSent}d` : "—"}
-                  </span>
-                  <span className="font-medium text-sm text-ink-900 truncate">
-                    {r.clientName}
-                  </span>
-                  <span className="text-ink-300 text-xs">·</span>
-                  <span className="text-ink-700 text-xs truncate">
-                    {r.taskLabel}
-                  </span>
-                  {r.clientId && r.taskId && (
-                    <ChevronRightIcon
-                      className="ml-auto w-3.5 h-3.5 text-ink-300 group-hover/reminder:text-ink-700 group-hover/reminder:translate-x-0.5 shrink-0 transition-all"
-                      aria-hidden
-                    />
-                  )}
-                </>
-              );
-              return (
-                <li key={r.id}>
-                  {r.clientId && r.taskId ? (
-                    <Link
-                      to={`/clients/${r.clientId}/tasks/${r.taskId}`}
-                      className="group/reminder flex items-center gap-3 px-2 py-2 rounded hover:bg-surface/70 transition-colors text-sm"
-                    >
-                      {RowInner}
-                    </Link>
-                  ) : (
-                    <div className="flex items-center gap-3 px-2 py-2 text-sm">
-                      {RowInner}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
 
       {/* Tabs — Inbox / Outbox / Drafts / Issues.
           Counts: Inbox + Issues are LIVE (BE returns the row set we

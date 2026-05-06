@@ -97,29 +97,17 @@ export function Sidebar() {
   const STALLED_HOURS = 14 * 24;
   const hoursSinceIso = (iso: string) =>
     (Date.now() - new Date(iso).getTime()) / (60 * 60 * 1000);
-  // Sidebar badge must match what /to-review actually shows. The cut:
-  //   - Confirms: AI high/medium, not flagged
-  //   - Chases:  due today, NOT stalled >14d (those are Quiet-Clients
-  //              dashboard concerns — surfacing them here too would
-  //              double-count and inflate the badge into a wall)
-  const inboxCount = checklistItems.filter((c) => {
-    if (
-      c.state === "received_unreviewed" &&
-      !c.flagReason &&
-      (c.aiConfidence === "high" || c.aiConfidence === "medium")
-    ) {
-      return true;
-    }
-    if (
-      c.state === "requested_waiting" &&
-      c.nextReminderAt &&
-      c.nextReminderAt <= todayIso &&
-      (!c.lastReminderAt || hoursSinceIso(c.lastReminderAt) < STALLED_HOURS)
-    ) {
-      return true;
-    }
-    return false;
-  }).length;
+  // Mail badge — narrowed 2026-05-06 from "all chase + review items" to
+  // ONLY unreplied inbound (received_unreviewed, regardless of AI tier).
+  // Old filter mixed chase-due reminders with received-from-client items
+  // and inflated the count to "99+" on demo data. Chase-due items belong
+  // on Today's Action Queue (the daily action surface) — surfacing them
+  // again as a Mail badge double-counts and panics the eye. The Mail
+  // surface itself is for inbound thread context; the badge should
+  // reflect "what arrived and needs your attention" only.
+  const inboxCount = checklistItems.filter(
+    (c) => c.state === "received_unreviewed" && !c.flagReason,
+  ).length;
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem(COLLAPSED_KEY) === "1";
@@ -226,7 +214,7 @@ export function Sidebar() {
                     className="ml-auto"
                     title={`${inboxCount} ${
                       inboxCount === 1 ? "item" : "items"
-                    } needing review (confirms + chase reminders due)`}
+                    } the client sent that you haven't reviewed yet`}
                   />
                 )}
                 {collapsed && to === "/mail" && inboxCount > 0 && (
