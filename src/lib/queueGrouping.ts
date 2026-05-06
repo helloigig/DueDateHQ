@@ -19,26 +19,23 @@ export type ClientGroupRow = {
   verbCounts: Partial<Record<MockTodoItem["verb"], number>>;
 };
 
-export type StateAlertRow = {
-  kind: "state_alert";
-  key: string;
-  item: QueueTodoItem;
-};
-
 export type BulkBatchRow = {
   kind: "bulk_batch";
   key: string;
   item: QueueTodoItem;
 };
 
-export type QueueRow = ClientGroupRow | StateAlertRow | BulkBatchRow;
+export type QueueRow = ClientGroupRow | BulkBatchRow;
 
-// state-monitor state alerts (verb=Apply) fan out to N clients — they're event-shaped,
-// not client-shaped, so they render as their own row. email-drafter bulk drafts have
-// "N clients" as the client field — also not a single-client row.
+// state-monitor state alerts (verb=Apply / source=mode_f_alert) live in the
+// dedicated state-alert surface (StateAlertsPreview on Dashboard, the State
+// alerts section on Today). They DON'T appear here — duplicating them as
+// pinned queue rows violated "one thing, one entrance, one name" (see
+// feedback_one_entrance_one_name). They're filtered out below.
 //
-// Heuristic: if `client` looks like "12 clients" / "8 clients", treat as
-// non-grouping. Otherwise group by client name (mock) or clientId (live).
+// email-drafter bulk drafts have "N clients" as the client field — that's
+// the only multi-client row that still belongs in the queue (no other
+// canonical surface owns those drafts yet).
 const MULTI_CLIENT_RE = /^\d+\s+clients?$/i;
 
 function isMultiClient(item: QueueTodoItem): boolean {
@@ -100,15 +97,13 @@ export function pickPrimaryItem(
 }
 
 export function buildQueueRows(items: QueueTodoItem[]): QueueRow[] {
-  const stateAlerts: StateAlertRow[] = [];
   const bulks: BulkBatchRow[] = [];
   const groups = new Map<string, QueueTodoItem[]>();
 
   for (const item of items) {
-    if (item.source === "mode_f_alert" || item.verb === "Apply") {
-      stateAlerts.push({ kind: "state_alert", key: `alert:${item.id}`, item });
-      continue;
-    }
+    // Mode F state alerts live in the dedicated state-alert surface, not
+    // here — skip them so the queue stays focused on per-client chase work.
+    if (item.source === "mode_f_alert" || item.verb === "Apply") continue;
     if (isMultiClient(item)) {
       bulks.push({ kind: "bulk_batch", key: `bulk:${item.id}`, item });
       continue;
@@ -141,17 +136,13 @@ export function buildQueueRows(items: QueueTodoItem[]): QueueRow[] {
     });
   }
 
-  // Final order: state alerts pinned to top (sorted by urgencyScore among
-  // themselves), then a merged stream of client groups + bulk rows by score.
-  stateAlerts.sort((a, b) => b.item.urgencyScore - a.item.urgencyScore);
-  const tail: QueueRow[] = [...clientGroups, ...bulks].sort((a, b) => {
+  return [...clientGroups, ...bulks].sort((a, b) => {
     const aScore =
       a.kind === "client_group" ? a.maxUrgencyScore : a.item.urgencyScore;
     const bScore =
       b.kind === "client_group" ? b.maxUrgencyScore : b.item.urgencyScore;
     return bScore - aScore;
   });
-  return [...stateAlerts, ...tail];
 }
 
 // Summarize the items for a client group as a single sentence, e.g.
