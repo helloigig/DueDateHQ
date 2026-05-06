@@ -206,20 +206,6 @@ export const appRouter = t.router({
     /** Demo workspace bootstrap. Called by SupabaseAuthBridge after
      *  the user signs in as demo@duedatehq.com (via createDemoSession
      *  → action link). Provisions the demo firm if missing AND
-     *  idempotently seeds the 51-client roster + deadlines. Backend
-     *  FORBIDS calls from any other email. */
-    bootstrapDemo: t.procedure.mutation(
-      async (): Promise<{
-        firmId: string;
-        clientsInserted: number;
-        clientsExisting: number;
-        deadlinesInserted: number;
-        deadlinesExisting: number;
-      }> => NOT_IMPL()
-    ),
-    /** Demo workspace bootstrap. Called by SupabaseAuthBridge after
-     *  the user signs in as demo@duedatehq.com (via createDemoSession
-     *  → action link). Provisions the demo firm if missing AND
      *  idempotently seeds the 51-client roster + downstream chain.
      *  `reseed: true` cascade-deletes every client in the firm before
      *  re-seeding — used by the `?reseed=1` URL escape hatch to force
