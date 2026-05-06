@@ -179,6 +179,60 @@ export const authRouter = router({
    * email already exists, returning the existing user).
    */
   createDemoSession: publicProcedure.mutation(async () => {
+    // Step 1: ensure the demo Supabase user exists. Admin createUser
+    // is idempotent in spirit — every call after the first returns
+    // the "already exists" error which we treat as success. Earlier
+    // version regex'd for `/already (registered|exists)/i` which
+    // missed Supabase's actual message "A user with this email
+    // address has already been registered" (note the "been"). Match
+    // on HTTP status (422) + a broader keyword set so the check is
+    // robust to Supabase's exact wording.
+    const created = await supabaseAdmin.auth.admin.createUser({
+      email: DEMO_EMAIL,
+      email_confirm: true, // skip the confirm-your-email step entirely
+      user_metadata: { full_name: "Sarah Mitchell" },
+    });
+    if (created.error) {
+      const msg = created.error.message ?? "";
+      const status = (created.error as { status?: number }).status;
+      const isAlreadyExists =
+        status === 422 ||
+        /already|exists|registered|duplicate/i.test(msg);
+      if (!isAlreadyExists) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `createUser_failed: ${msg}`,
+        });
+      }
+    }
+
+    // Step 2: generate a magic-link URL the FE can navigate to. The
+    // `redirectTo` lands the user back on the dashboard root after
+    // Supabase processes the token; our SupabaseAuthBridge will pick
+    // up SIGNED_IN and call bootstrapDemo from there.
+    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+      type: "magiclink",
+      email: DEMO_EMAIL,
+      options: {
+        redirectTo: process.env.PUBLIC_APP_URL
+          ? `${process.env.PUBLIC_APP_URL}/`
+          : undefined,
+      },
+    });
+    if (error || !data?.properties?.action_link) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: `generateLink_failed: ${error?.message ?? "no_action_link"}`,
+      });
+    }
+    return { actionLink: data.properties.action_link };
+  }),
+
+  bootstrapDemo: publicProcedure.mutation(async ({ ctx }) => {
+    if (!ctx.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+    if (ctx.user.email.toLowerCase() !== DEMO_EMAIL) {
     // Step 1: check whether the demo user already exists. Earlier
     // version called createUser unconditionally and tried to
     // recognise the duplicate-error response by message regex —
