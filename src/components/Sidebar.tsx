@@ -74,7 +74,6 @@ export function Sidebar() {
           : storeClients,
     [liveClientsRaw, storeClients],
   );
-  const todayIso = new Date().toISOString().slice(0, 10);
   // Alerts caption: count of unique CLIENTS affected by active (non-dismissed)
   // alerts — the actionable number ("how many of MY clients does this touch")
   // not the raw alert count. Matches the way Sarah scans the bell.
@@ -94,9 +93,6 @@ export function Sidebar() {
       ).length,
     [sidebarClients],
   );
-  const STALLED_HOURS = 14 * 24;
-  const hoursSinceIso = (iso: string) =>
-    (Date.now() - new Date(iso).getTime()) / (60 * 60 * 1000);
   // Mail badge — narrowed 2026-05-06 from "all chase + review items" to
   // ONLY unreplied inbound (received_unreviewed, regardless of AI tier).
   // Old filter mixed chase-due reminders with received-from-client items

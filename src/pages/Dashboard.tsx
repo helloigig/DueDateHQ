@@ -4,7 +4,6 @@ import { useClients } from "../hooks/useClients";
 import { useTriageDeadlines } from "../hooks/useDeadlines";
 import { useDetectAnnouncements } from "../hooks/useAnnouncements";
 import { useRealtimeAnnouncements } from "../hooks/useRealtimeAnnouncements";
-import { useStore } from "../data/store";
 import { useSession } from "../data/session";
 import { ShortcutsModal } from "../components/ShortcutsModal";
 import { DashboardSkeleton } from "../components/skeletons/DashboardSkeleton";
@@ -23,8 +22,6 @@ import { Megaphone, ChevronRight } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { Announcement } from "../types";
 import { escalationTier as escTier } from "../data/dateHelpers";
-
-const DONE_STATUSES = new Set(["completed", "filed_extension"]);
 
 /**
  * Dashboard — the morning glance.
@@ -52,7 +49,6 @@ export function Dashboard() {
   const triageQuery = useTriageDeadlines();
   const announcementsQuery = useRealtimeAnnouncements();
   const detectMutation = useDetectAnnouncements();
-  const { tasks } = useStore();
   const location = useLocation();
   // /legacy/dashboard renders the pre-v0.7-amendment view: deadline list only,
   // no ActionQueue, no state-monitor Health. Lets us A/B compare during transition.
