@@ -21,7 +21,7 @@ import { useDashboardPreferences } from "../data/preferences";
 import { ChaseBanner } from "../components/ChaseBanner";
 import { BlockingAlertsDialog } from "../components/BlockingAlertsDialog";
 import { OnboardingLayer2Widget } from "../components/OnboardingLayer2Widget";
-// import { WelcomeTour } from "../components/WelcomeTour"; // hidden per user direction
+import { WelcomeTour } from "../components/WelcomeTour";
 import { CapacityStrip } from "../components/CapacityStrip";
 // ModeFHealth removed — the same monitoring signal ("50/50 states ·
 // last scrape 14m ago") is already on /alerts as the ambient line.
@@ -304,10 +304,14 @@ export function Dashboard() {
         )}
       </div>
 
-      {/* WelcomeTour hidden per user direction — adds noise on the daily
-          surface; reintroduce as an onboarding-only banner gated on
-          firstSession if we want a tour later. */}
-      {/* <WelcomeTour /> */}
+      {/* First-run orientation — banner + 3-slide modal tour (Hook /
+          Core / Moat). Gated by localStorage so it only fires once per
+          browser. Reintroduced 2026-05-06 per Yuqi: the 3-step intro
+          card was core to the first-time experience and shouldn't have
+          been removed. The banner stage is calm (one line, dismissible);
+          users who want orientation click "60-second tour" to open the
+          slide-deck modal. */}
+      <WelcomeTour />
 
       {/* ─────────────────────────────────────────────────────────────────
           Today narrative (5 sections, read top → bottom):
