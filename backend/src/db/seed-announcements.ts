@@ -501,21 +501,80 @@ const DEMO_ANNOUNCEMENTS: DemoAnnouncement[] = [
   },
 ];
 
+// Per-index `detectedAt` offset (hours ago, relative to seed-time now).
+// Spread deterministically across the four escalation tiers so the demo
+// always exercises every alert surface — fresh badge, reminder colour,
+// escalated tier, AND the >72h blocking modal that previously never
+// fired because every row defaulted to detectedAt=now() (all "fresh").
+//
+//   <  24h → fresh        (idx 0, 7, 14, 21)
+//   24–48h → reminder     (idx 1, 8, 15)
+//   48–72h → escalated    (idx 2, 9, 16)
+//   >  72h → blocking     (idx 3+, plus a few very-old to prove backlog)
+//
+// 22 demo announcements → ~3-4 in each non-blocking tier and ~10 in
+// blocking tier. The blocking tier is intentionally heaviest because
+// "you've been away" is the demo's load-bearing narrative.
+const DETECTED_AT_OFFSET_HOURS = [
+  2, // 0 fresh
+  30, // 1 reminder
+  56, // 2 escalated
+  90, // 3 blocking (~3.7d)
+  120, // 4 blocking (5d)
+  168, // 5 blocking (7d)
+  240, // 6 blocking (10d)
+  10, // 7 fresh
+  36, // 8 reminder
+  60, // 9 escalated
+  96, // 10 blocking (4d)
+  144, // 11 blocking (6d)
+  192, // 12 blocking (8d)
+  336, // 13 blocking (14d)
+  18, // 14 fresh
+  44, // 15 reminder
+  68, // 16 escalated
+  108, // 17 blocking
+  156, // 18 blocking
+  264, // 19 blocking (11d)
+  408, // 20 blocking (17d)
+  6, // 21 fresh
+];
+
 export async function seedAnnouncements(): Promise<{
   inserted: number;
-  skipped: number;
+  updated: number;
 }> {
   let inserted = 0;
-  let skipped = 0;
+  let updated = 0;
 
-  for (const a of DEMO_ANNOUNCEMENTS) {
+  // Anchor "now" once per call so every announcement's detectedAt
+  // comes off the same wall-clock — keeps the spread tight regardless
+  // of how slow the loop is.
+  const now = Date.now();
+
+  for (let i = 0; i < DEMO_ANNOUNCEMENTS.length; i++) {
+    const a = DEMO_ANNOUNCEMENTS[i]!;
+    const offsetHours =
+      DETECTED_AT_OFFSET_HOURS[i] ??
+      DETECTED_AT_OFFSET_HOURS[i % DETECTED_AT_OFFSET_HOURS.length]!;
+    const detectedAt = new Date(now - offsetHours * 60 * 60 * 1000);
+
     const existing = await db
       .select({ id: announcements.id })
       .from(announcements)
       .where(eq(announcements.sourceUrl, a.sourceUrl))
       .limit(1);
+
     if (existing.length > 0) {
-      skipped++;
+      // Re-anchor detectedAt on every run. The demo data needs to feel
+      // "fresh as of right now" — leaving an old detectedAt would
+      // collapse the tier spread back to all-blocking the longer the
+      // seeded firm sits idle.
+      await db
+        .update(announcements)
+        .set({ detectedAt })
+        .where(eq(announcements.id, existing[0]!.id));
+      updated++;
       continue;
     }
     await db.insert(announcements).values({
@@ -536,9 +595,10 @@ export async function seedAnnouncements(): Promise<{
       sourceAuthority: a.sourceAuthority,
       parseConfidence: a.parseConfidence,
       publishedAt: a.publishedAt,
+      detectedAt,
     });
     inserted++;
   }
 
-  return { inserted, skipped };
+  return { inserted, updated };
 }
