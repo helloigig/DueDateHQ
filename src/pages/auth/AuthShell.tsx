@@ -109,10 +109,10 @@ export function BrandMark({ size = 22 }: { size?: number }) {
       className="shrink-0"
       aria-hidden
     >
-      <rect width="32" height="32" rx="6" fill="#0F172A" />
+      <rect width="32" height="32" rx="6" fill="#1A1B19" />
       <g
         fill="none"
-        stroke="#FAFAF7"
+        stroke="#FFFFFF"
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -121,7 +121,7 @@ export function BrandMark({ size = 22 }: { size?: number }) {
         <path d="M8 16h16" />
         <path d="M8 20h10" />
       </g>
-      <circle cx="24" cy="20" r="2.5" fill="#EF4444" />
+      <circle cx="24" cy="20" r="2.5" fill="#E8F1A8" />
     </svg>
   );
 }
