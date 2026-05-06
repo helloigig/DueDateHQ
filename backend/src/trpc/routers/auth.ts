@@ -228,68 +228,6 @@ export const authRouter = router({
     return { actionLink: data.properties.action_link };
   }),
 
-  bootstrapDemo: publicProcedure.mutation(async ({ ctx }) => {
-    if (!ctx.user) {
-      throw new TRPCError({ code: "UNAUTHORIZED" });
-    }
-    if (ctx.user.email.toLowerCase() !== DEMO_EMAIL) {
-    // Step 1: check whether the demo user already exists. Earlier
-    // version called createUser unconditionally and tried to
-    // recognise the duplicate-error response by message regex —
-    // brittle (Supabase's exact wording varies between versions:
-    // "User already registered" vs "A user with this email address
-    // has already been registered" vs "email_exists"). Pre-checking
-    // existence sidesteps the entire error-classification problem.
-    const list = await supabaseAdmin.auth.admin.listUsers();
-    if (list.error) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: `listUsers_failed: ${list.error.message}`,
-      });
-    }
-    const existing = list.data.users.find(
-      (u) => (u.email ?? "").toLowerCase() === DEMO_EMAIL,
-    );
-
-    if (!existing) {
-      // First-ever call on this Supabase project — provision the
-      // demo user. email_confirm: true skips the confirmation flow
-      // so we can immediately mint a magic link below.
-      const created = await supabaseAdmin.auth.admin.createUser({
-        email: DEMO_EMAIL,
-        email_confirm: true,
-        user_metadata: { full_name: "Sarah Mitchell" },
-      });
-      if (created.error) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: `createUser_failed: ${created.error.message}`,
-        });
-      }
-    }
-
-    // Step 2: generate a magic-link URL the FE can navigate to. The
-    // `redirectTo` lands the user back on the dashboard root after
-    // Supabase processes the token; our SupabaseAuthBridge will pick
-    // up SIGNED_IN and call bootstrapDemo from there.
-    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-      type: "magiclink",
-      email: DEMO_EMAIL,
-      options: {
-        redirectTo: process.env.PUBLIC_APP_URL
-          ? `${process.env.PUBLIC_APP_URL}/`
-          : undefined,
-      },
-    });
-    if (error || !data?.properties?.action_link) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: `generateLink_failed: ${error?.message ?? "no_action_link"}`,
-      });
-    }
-    return { actionLink: data.properties.action_link };
-  }),
-
   bootstrapDemo: publicProcedure
     .input(
       z
