@@ -295,15 +295,15 @@ function ClientGroupRowView({
   // EXCEPT ActionQueue itself —
   //   • todoItems.list — the queue rebuilds from this; without
   //     invalidation the just-sent row would re-appear on next mount
-  //   • checklistItems — `lastReminderAt` bumps on send; without
+  //   • checklists.listForTask — `lastReminderAt` bumps on send; without
   //     invalidation Inbox + ClientDetail show the old timestamp
   //   • inboundReplies.list — Mail Inbox shows the same item still
   //     "unreplied" because its read model is separate
   const utils = trpc.useUtils();
   const invalidateAfterSend = () => {
     void utils.todoItems.list.invalidate();
-    void utils.checklistItems?.list?.invalidate?.();
-    void utils.inboundReplies?.list?.invalidate?.();
+    void utils.checklists.listForTask.invalidate();
+    void utils.inboundReplies.list.invalidate();
     void utils.tasks.list.invalidate();
   };
   const saveDraftMut = trpc.emails.saveDraft.useMutation();
