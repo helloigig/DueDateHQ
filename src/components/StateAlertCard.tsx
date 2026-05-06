@@ -132,7 +132,10 @@ export function StateAlertCard({
       }}
       className={cn(
         "group block w-full shrink-0 text-left bg-surface border border-line rounded-md transition-all cursor-pointer overflow-hidden",
-        "hover:border-line-strong",
+        // Q3: hover communicates via subtle elevation instead of darker
+        // border. Soft pop shadow + faint sunken tint feels lifted
+        // without raising the chrome's loudness.
+        "hover:shadow-pop hover:border-line",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-900",
         isFeed && selected && !handled && "border-indigo ring-2 ring-indigo-soft",
         handled && "opacity-60 hover:opacity-95",

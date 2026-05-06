@@ -28,6 +28,7 @@ import { CapacityStrip } from "../components/CapacityStrip";
 // Two surfaces showing the same health was redundant.
 // import { ModeFHealth } from "../components/ModeFHealth";
 import { ActionQueue } from "../components/ActionQueue";
+import { AlertTriageModal } from "../components/AlertTriageModal";
 import { JustHappenedStrip } from "../components/JustHappenedStrip";
 import { WhatChangedBanner } from "../components/WhatChangedBanner";
 import { AiUsageInfo } from "../components/AiUsageInfo";
@@ -236,13 +237,10 @@ export function Dashboard() {
 
   return (
     <div className="max-w-[1080px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
-      {/* AlertTriageModal removed 2026-05-06 — it fired in addition to
-          BlockingAlertsDialog, putting two back-to-back modals on every
-          first land (especially the demo workspace). The inline
-          <WhatChangedBanner> covers the ambient "what's new since you
-          were last here" cue without interruption; <BlockingAlertsDialog>
-          stays for the >72h SLA forced ack. Per Q5 confidence: pick one
-          surface per concept. */}
+      {/* Triage modal — fires once per browser session on first land
+          when the user has alerts that arrived while they were away.
+          Honors the per-user toggle in Settings → Notifications. */}
+      <AlertTriageModal />
 
       {/* PAGE HEADER ROW — Mercury Home anatomy: H1 left + action button row
           right. The action row carries the page's "what can I do here right
@@ -527,16 +525,24 @@ function StateAlertsPreview({
       <SectionHeader
         title="Escalated alerts"
         meta={
-          escalated.length === 1
-            ? "1 past 72h SLA — act today"
-            : `${escalated.length} past 72h SLA — act today`
+          <span className="inline-flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-2 h-5 rounded-pill text-2xs font-semibold uppercase tracking-wider bg-warn-bg/70 border border-warn-border/60 text-warn-ink">
+              <span className="tabular-nums">{escalated.length}</span>
+              past 72h SLA
+            </span>
+            <span className="text-2xs text-ink-500">act today</span>
+          </span>
         }
         action={
           <Link
             to="/alerts"
-            className="text-xs text-ink-500 hover:text-ink-900 inline-flex items-center gap-1"
+            className="text-xs font-medium text-ink-500 hover:text-ink-900 inline-flex items-center gap-1 px-2 h-7 rounded-md hover:bg-sunken/60 transition-colors group"
           >
-            All alerts <ChevronRight className="w-3 h-3" aria-hidden />
+            All alerts
+            <ChevronRight
+              className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5"
+              aria-hidden
+            />
           </Link>
         }
       />
@@ -552,14 +558,18 @@ function StateAlertsPreview({
         ))}
       </div>
       {routineCount > 0 && (
-        <div className="mt-3 flex justify-center">
+        <div className="mt-card flex justify-center">
           <Link
             to="/alerts"
-            className="inline-flex items-center gap-1 text-xs text-ink-500 hover:text-ink-900 hover:underline underline-offset-[3px] decoration-[1.5px]"
+            className="group inline-flex items-center gap-1.5 text-xs font-medium text-ink-500 hover:text-ink-900 px-3 h-8 rounded-md border border-line bg-surface hover:bg-sunken transition-colors"
           >
-            {routineCount} more routine{" "}
-            {routineCount === 1 ? "alert" : "alerts"} on /alerts
-            <ChevronRight className="w-3.5 h-3.5" aria-hidden />
+            <span className="tabular-nums">{routineCount}</span>
+            more routine{" "}
+            {routineCount === 1 ? "alert" : "alerts"}
+            <ChevronRight
+              className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5"
+              aria-hidden
+            />
           </Link>
         </div>
       )}

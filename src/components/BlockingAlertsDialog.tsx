@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ChevronRight } from "lucide-react";
 import type { Announcement } from "../types";
 import { hoursSince } from "../data/dateHelpers";
 import { Button } from "./ui/button";
@@ -32,20 +32,23 @@ export function BlockingAlertsDialog({
     <AlertDialog open={alerts.length > 0}>
       <AlertDialogContent size="lg">
         <AlertDialogHeader tone="danger">
-          <div className="flex items-start gap-2">
-            <AlertTriangle
-              className="w-5 h-5 text-danger-ink shrink-0 mt-0.5"
+          <div className="flex items-start gap-3">
+            <span
               aria-hidden
-            />
-            <div>
-              <AlertDialogTitle tone="danger">
-                {alerts.length === 1
-                  ? "1 alert still needs review"
-                  : `${alerts.length} alerts still need review`}
+              className="w-10 h-10 rounded-md bg-danger-bg border border-danger-border/60 flex items-center justify-center text-danger-ink shrink-0 shadow-[inset_0_-1px_0_rgba(185,28,28,0.06)]"
+            >
+              <AlertTriangle className="w-4 h-4" aria-hidden />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-2xs font-semibold uppercase tracking-wider text-danger-ink/80">
+                Past 72-hour SLA
+              </p>
+              <AlertDialogTitle tone="danger" className="mt-0.5">
+                <span className="tabular-nums">{alerts.length}</span>{" "}
+                {alerts.length === 1 ? "alert still needs review" : "alerts still need review"}
               </AlertDialogTitle>
-              <AlertDialogDescription tone="danger">
-                These have been unactioned for more than 72 hours. Each could be
-                affecting live client deadlines.
+              <AlertDialogDescription tone="danger" className="mt-1.5 text-ink-500">
+                Unactioned for more than 72 hours. Each could be affecting live client deadlines.
               </AlertDialogDescription>
             </div>
           </div>
@@ -55,24 +58,29 @@ export function BlockingAlertsDialog({
           {alerts.map((a) => {
             const h = Math.round(hoursSince(a.detectedAt));
             return (
-              <li key={a.id} className="px-5 py-3 flex items-center gap-3">
+              <li
+                key={a.id}
+                className="group px-region py-3 flex items-center gap-3 hover:bg-sunken/60 transition-colors"
+              >
                 <StateBadge code={a.stateCode} size="sm" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-ink-900 truncate">
                     {a.title}
                   </div>
-                  <div className="text-xs text-ink-500 mt-0.5">
-                    {a.affectedClientIds.length} client
-                    {a.affectedClientIds.length === 1 ? "" : "s"} · {h}h
-                    unactioned
+                  <div className="text-2xs text-ink-500 mt-1">
+                    <span className="tabular-nums">{a.affectedClientIds.length}</span>{" "}
+                    {a.affectedClientIds.length === 1 ? "client" : "clients"}
+                    <span className="mx-1.5 text-ink-300">·</span>
+                    <span className="tabular-nums">{h}h</span> unactioned
                   </div>
                 </div>
                 <Link
                   to={`/alerts/${a.id}`}
                   onClick={onClose}
-                  className="text-sm px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover shrink-0"
+                  className="text-sm h-9 px-3 rounded-md bg-indigo text-white hover:bg-indigo-hover shrink-0 inline-flex items-center gap-1 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2"
                 >
-                  Review →
+                  Review
+                  <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
                 </Link>
               </li>
             );

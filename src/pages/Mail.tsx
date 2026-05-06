@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   Mail as MailIcon,
   Check,
+  ChevronRight as ChevronRightIcon,
   Link2,
   Siren,
   X,
@@ -222,67 +223,123 @@ export function Mail() {
       </p>
 
       {/* Reminders Out — gap-over-fill prominent top section per IA v0.7 §3.8.
-          Border 1px (DESIGN.md max), warn-bg (token, not -bg/40 mix). */}
+          Polished 2026-05-06 to match WhatChangedBanner / AlertTriageModal
+          anatomy: eyebrow + headline composition, soft gradient peach bg
+          (Q1 register), refined per-row hover with chevron translate. */}
       <section
         aria-labelledby="reminders-out-heading"
-        className="rounded-md border border-warn-border bg-warn-bg p-region mb-card"
+        className="rounded-md border border-warn-border/70 bg-gradient-to-br from-warn-bg/70 via-warn-bg/55 to-warn-bg/40 p-region mb-card"
       >
-        <header className="flex items-center justify-between gap-2 mb-3">
-          <h2
-            id="reminders-out-heading"
-            className="text-sm font-semibold text-ink-900 flex items-center gap-2"
+        <header className="flex items-start gap-3 mb-region">
+          <span
+            aria-hidden
+            className="w-9 h-9 rounded-md bg-warn-bg border border-warn-border/60 flex items-center justify-center text-warn-ink shrink-0 shadow-[inset_0_-1px_0_rgba(154,59,18,0.06)]"
           >
-            <Siren className="w-4 h-4 text-warn-ink" aria-hidden />
-            Reminders out, awaiting reply
-          </h2>
-          <span className="text-2xs text-ink-500 tabular-nums">
-            {remindersOutQuery.isLoading
-              ? "loading…"
-              : remindersOutQuery.error
-                ? "couldn't load reminders — try refresh"
-                : remindersAggregate
-                  ? `${remindersAggregate.count} across ${remindersAggregate.uniqueClients} client${remindersAggregate.uniqueClients === 1 ? "" : "s"} · oldest ${remindersAggregate.oldest}d · ${remindersAggregate.overSeven} sent > 7d ago`
-                  : env.useMockData
-                    ? "showing example data (mock mode)"
-                    : "no reminders out yet"}
+            <Siren className="w-4 h-4" aria-hidden />
           </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-2xs font-semibold uppercase tracking-wider text-warn-ink/80">
+              Awaiting client reply
+            </p>
+            <h2
+              id="reminders-out-heading"
+              className="text-sm font-semibold text-ink-900 mt-0.5 leading-snug"
+            >
+              {remindersAggregate ? (
+                <>
+                  <span className="tabular-nums">
+                    {remindersAggregate.count}
+                  </span>{" "}
+                  reminder{remindersAggregate.count === 1 ? "" : "s"} out
+                </>
+              ) : (
+                "Reminders out"
+              )}
+            </h2>
+            <p className="text-2xs text-ink-500 mt-1">
+              {remindersOutQuery.isLoading
+                ? "loading…"
+                : remindersOutQuery.error
+                  ? "couldn't load reminders — try refresh"
+                  : remindersAggregate
+                    ? (
+                      <>
+                        Across{" "}
+                        <span className="tabular-nums text-ink-700 font-medium">
+                          {remindersAggregate.uniqueClients}
+                        </span>{" "}
+                        {remindersAggregate.uniqueClients === 1 ? "client" : "clients"}
+                        <span className="mx-1.5 text-ink-300">·</span>
+                        oldest{" "}
+                        <span className="tabular-nums text-ink-700 font-medium">
+                          {remindersAggregate.oldest}d
+                        </span>
+                        <span className="mx-1.5 text-ink-300">·</span>
+                        <span className="tabular-nums text-ink-700 font-medium">
+                          {remindersAggregate.overSeven}
+                        </span>{" "}
+                        sent &gt; 7d ago
+                      </>
+                    )
+                    : env.useMockData
+                      ? "showing example data (mock mode)"
+                      : "no reminders out yet"}
+            </p>
+          </div>
         </header>
 
         {reminders.length === 0 ? (
-          <p className="text-xs text-ink-500 px-2 py-3">
+          <p className="text-xs text-ink-500 pl-12">
             {env.useMockData
               ? "Mock mode would show example reminders here."
               : "When you send a chase email and the client hasn't replied, it shows up here."}
           </p>
         ) : (
-          <ul className="space-y-1.5">
-            {reminders.map((r) => (
-              <li
-                key={r.id}
-                className="flex items-center gap-3 px-2 py-1.5 rounded hover:bg-surface text-sm"
-              >
-                <span className="tabular-nums text-2xs w-10 text-danger-solid font-semibold">
-                  {r.daysSent != null ? `${r.daysSent}d` : "—"}
-                </span>
-                <span className="font-medium text-ink-900 truncate">
-                  {r.clientName}
-                </span>
-                <span className="text-ink-500 text-xs">·</span>
-                <span className="text-ink-700 text-xs truncate">
-                  {r.taskLabel}
-                </span>
-                <span className="ml-auto flex items-center gap-2 shrink-0">
+          <ul className="pl-12 -ml-1.5 divide-y divide-warn-border/30">
+            {reminders.map((r) => {
+              const tone =
+                r.daysSent != null && r.daysSent > 7
+                  ? "text-danger-ink font-semibold"
+                  : "text-warn-ink font-medium";
+              const RowInner = (
+                <>
+                  <span
+                    className={`tabular-nums text-xs w-10 shrink-0 ${tone}`}
+                  >
+                    {r.daysSent != null ? `${r.daysSent}d` : "—"}
+                  </span>
+                  <span className="font-medium text-sm text-ink-900 truncate">
+                    {r.clientName}
+                  </span>
+                  <span className="text-ink-300 text-xs">·</span>
+                  <span className="text-ink-700 text-xs truncate">
+                    {r.taskLabel}
+                  </span>
+                  {r.clientId && r.taskId && (
+                    <ChevronRightIcon
+                      className="ml-auto w-3.5 h-3.5 text-ink-300 group-hover/reminder:text-ink-700 group-hover/reminder:translate-x-0.5 shrink-0 transition-all"
+                      aria-hidden
+                    />
+                  )}
+                </>
+              );
+              return (
+                <li key={r.id}>
                   {r.clientId && r.taskId ? (
                     <Link
                       to={`/clients/${r.clientId}?task=${r.taskId}`}
-                      className="px-2 py-1 text-xs text-ink-500 hover:text-ink-900"
+                      className="group/reminder flex items-center gap-3 px-2 py-2 rounded hover:bg-surface/70 transition-colors text-sm"
                     >
-                      Open task →
+                      {RowInner}
                     </Link>
-                  ) : null}
-                </span>
-              </li>
-            ))}
+                  ) : (
+                    <div className="flex items-center gap-3 px-2 py-2 text-sm">
+                      {RowInner}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
