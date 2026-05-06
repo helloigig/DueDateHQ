@@ -148,16 +148,12 @@
     color: var(--ink-400); letter-spacing: 0.12em;
   }
 
-  /* === SLIDE 2: 场景 (slim) === */
-  .scene-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5vmin; align-items: center; }
-  .scene-time-row { display: flex; align-items: baseline; gap: 1.5vmin; margin-bottom: 1.4vmin; }
-  .scene-time { font-family: var(--font-mono); font-size: 2.6vmin; font-weight: 600; color: var(--ink-900); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; min-width: 9vmin; }
-  .scene-event { font-size: 1.5vmin; color: var(--ink-500); line-height: 1.5; }
-  .scene-event .em { color: var(--ink-900); font-weight: 600; }
-  .scene-punch {
-    margin-top: 3vmin; padding-top: 2vmin; border-top: 1px solid var(--line);
-    font-size: 2.2vmin; line-height: 1.4; color: var(--ink-900); font-weight: 600;
-  }
+  /* === SLIDE 2: 场景 · 真实访谈 quote === */
+  .scene-quote-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; max-width: 80%; margin: 0 auto; gap: 4vmin; text-align: center; }
+  .scene-quote { font-size: 5.5vmin; line-height: 1.25; font-weight: 600; color: var(--ink-900); letter-spacing: -0.02em; }
+  .scene-quote .accent { color: var(--indigo); }
+  .scene-attrib { font-family: var(--font-mono); font-size: 1.4vmin; color: var(--ink-500); letter-spacing: 0.08em; text-transform: uppercase; }
+  .scene-context { font-size: 2vmin; color: var(--ink-500); padding-top: 3vmin; border-top: 1px solid var(--line); width: 100%; }
   .alert-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.5vmin; box-shadow: var(--pop); }
   .alert-card .top { display: flex; gap: 1vmin; align-items: center; margin-bottom: 1.5vmin; }
   .alert-card .title { font-size: 1.7vmin; font-weight: 600; color: var(--ink-900); flex: 1; line-height: 1.4; }
@@ -233,8 +229,7 @@
 
   /* === SLIDE 7: Yan Jing 深度 === */
   .yj-grid { display: grid; grid-template-columns: 1fr 1.3fr; gap: 3.5vmin; margin-top: 1.5vmin; align-items: stretch; }
-  .yj-card-left { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.8vmin; display: flex; flex-direction: column; gap: 1.8vmin; position: relative; }
-  .yj-card-left::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 8px 8px 0 0; background: var(--indigo); }
+  .yj-card-left { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.8vmin; display: flex; flex-direction: column; gap: 1.8vmin; }
   .yj-id { display: flex; flex-direction: column; gap: 0.5vmin; }
   .yj-badge { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--indigo-ink); text-transform: uppercase; }
   .yj-name { font-size: 3.2vmin; font-weight: 600; color: var(--ink-900); letter-spacing: -0.02em; line-height: 1; }
@@ -394,20 +389,13 @@
 
   /* === SLIDE 13: Integrations === */
   .int-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.8vmin; margin-top: 2.5vmin; }
-  .int-tier { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.4vmin; display: flex; flex-direction: column; gap: 1.3vmin; position: relative; }
-  .int-tier::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 8px 8px 0 0; background: var(--ink-300); }
-  .int-tier.tier0::before { background: var(--ok-ink); }
-  .int-tier.tier1::before { background: var(--indigo); }
-  .int-tier.tier3::before { background: var(--danger-border); }
+  .int-tier { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.4vmin; display: flex; flex-direction: column; gap: 1.3vmin; }
   .int-tier .label { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); text-transform: uppercase; }
-  .int-tier.tier0 .label { color: var(--ok-ink); }
-  .int-tier.tier1 .label { color: var(--indigo); }
-  .int-tier.tier3 .label { color: var(--danger-ink); }
   .int-tier .when { font-size: 1.5vmin; font-weight: 600; color: var(--ink-900); line-height: 1.3; }
   .int-list { display: flex; flex-direction: column; gap: 0.4vmin; flex: 1; }
   .int-list .item { font-size: 1.3vmin; color: var(--ink-700); padding: 0.5vmin 0; border-bottom: 1px dashed var(--line); }
   .int-list .item:last-child { border-bottom: none; }
-  .int-tier .why { font-size: 1.2vmin; color: var(--ink-500); font-style: italic; line-height: 1.5; padding-top: 0.8vmin; border-top: 1px solid var(--line); }
+  .int-tier .why { display: none; }
 
   /* === SLIDE 15: 现状 === */
   .stat-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2vmin; margin-bottom: 2.5vmin; padding-bottom: 2.5vmin; border-bottom: 1px solid var(--line); }
@@ -422,19 +410,14 @@
 
   /* === SLIDE 16: Roadmap (phase-based) === */
   .phase-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5vmin; margin-top: 2.5vmin; }
-  .phase-card { padding: 2.2vmin; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 1.2vmin; position: relative; }
-  .phase-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 8px 8px 0 0; background: var(--ink-300); }
-  .phase-card.now::before { background: var(--ok-ink); }
-  .phase-card.q3::before { background: var(--indigo); }
+  .phase-card { padding: 2.2vmin; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 1.2vmin; }
   .phase-card .when { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); text-transform: uppercase; }
-  .phase-card.now .when { color: var(--ok-ink); }
-  .phase-card.q3 .when { color: var(--indigo); }
   .phase-card .theme { font-size: 1.6vmin; font-weight: 600; color: var(--ink-900); line-height: 1.3; padding-bottom: 0.6vmin; border-bottom: 1px solid var(--line); }
   .phase-card .feats { display: flex; flex-direction: column; gap: 0.6vmin; flex: 1; }
   .phase-card .feat { font-size: 1.3vmin; color: var(--ink-700); line-height: 1.5; }
   .phase-card .feat b { color: var(--ink-900); font-weight: 600; }
   .phase-card .feat::before { content: "·"; margin-right: 0.5vmin; color: var(--ink-400); font-weight: 700; }
-  .phase-card .hook { font-size: 1.2vmin; color: var(--ink-500); font-style: italic; padding-top: 0.8vmin; border-top: 1px dashed var(--line); line-height: 1.5; margin-top: auto; }
+  .phase-card .hook { display: none; }
 
   /* === SLIDE 17: Forever-no + Memorable closing === */
   .closing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3vmin; margin-top: 2vmin; }
@@ -442,7 +425,7 @@
   .forever-list { display: flex; flex-direction: column; gap: 0.6vmin; }
   .forever-item { padding: 0.9vmin 1.2vmin; background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--danger-border); border-radius: 6px; display: grid; grid-template-columns: 1fr auto; gap: 1.3vmin; align-items: baseline; }
   .forever-item .what { font-size: 1.35vmin; color: var(--ink-900); font-weight: 500; }
-  .forever-item .why { font-size: 1.2vmin; color: var(--ink-500); font-style: italic; text-align: right; max-width: 16vmin; line-height: 1.4; }
+  .forever-item .why { display: none; }
 
   .memorable-col h3 { font-size: 1.35vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--indigo-ink); margin-bottom: 1.3vmin; font-family: var(--font-mono); text-transform: uppercase; }
   .memorable-list { display: flex; flex-direction: column; gap: 1vmin; }
@@ -499,63 +482,38 @@
   <div class="cover-foot">Gigi Wu &nbsp;·&nbsp; May 2026 &nbsp;·&nbsp; <a class="link" href="https://duedatehq.space" target="_blank" rel="noopener">duedatehq.space</a></div>
 </section>
 
-<!-- 2. 场景 (slim — no narrative paragraphs) -->
-<section class="slide center" data-num="02" data-title="场景" data-notes="一个具体的周二下午。三个时间戳，一张 alert card。不要叙事化讲，让 timestamps 和右边的 alert card 自己讲。停在最后一句「她从客户那儿得知。每一次都是。」— 让它落下，然后翻页进痛点。">
-  <div class="micro eyebrow">场景 · 一个普通的周二</div>
-  <div class="scene-grid">
-    <div class="col">
-      <div class="scene-time-row"><span class="scene-time">3:14 PM</span><span class="scene-event">路易斯安那州税务局发布飓风延期公告</span></div>
-      <div class="scene-time-row"><span class="scene-time">5:08 PM</span><span class="scene-event">第一个客户邮件：<span class="em">「这对我有什么影响？」</span></span></div>
-      <div class="scene-time-row"><span class="scene-time">8:30 PM</span><span class="scene-event">Sarah 在 Excel 里手动比对 49 个客户的州</span></div>
-      <div class="scene-punch">
-        她从客户那儿得知政策变化。<br>
-        每一次都是。
-      </div>
-    </div>
-    <div class="alert-card">
-      <div class="top">
-        <span class="chip">LA · DOR</span>
-        <span class="title">飓风 Delta 延期公告</span>
-        <span class="when">2 小时前</span>
-      </div>
-      <div class="summary">受影响郡的申报截止日延至 11/15。AI 已解析 12 个字段。</div>
-      <div class="row-pills">
-        <span class="pill silent"><strong style="margin-right: 0.4vmin;">6 个客户</strong> · 8 个 deadline</span>
-        <span class="pill success">解析 · 高</span>
-      </div>
-      <div class="actions">
-        <button class="btn-primary">起草客户邮件</button>
-        <button class="btn-secondary">批量延期</button>
-      </div>
-    </div>
+<!-- 2. 场景 · 真实访谈 quote -->
+<section class="slide center" data-num="02" data-title="场景 · 真实访谈" data-notes="不是合成的故事 — 这是真实访谈里的一句话，来自 strategy-02-problem-statement.md。读得慢。停在「6 个客户已经过了原 deadline」让它落下。然后再读底部那一行 context — 让观众明白这不是孤立事件。">
+  <div class="micro eyebrow">访谈记录 · 一位匿名 solo CPA</div>
+  <div class="scene-quote-wrap">
+    <div class="scene-quote">「从客户的群消息里，<br>我才知道 IRS 给 LA County 延了期。<br><span class="accent">6 个客户已经过了原 deadline。</span>」</div>
+    <div class="scene-attrib">strategy-02-problem-statement.md · 真实访谈记录</div>
+    <div class="scene-context">这不是孤立事件。50 个州、几百个公告/年、CPA 没工具盯。</div>
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">02</span>场景</span>
+    <span class="center"><span class="num">02</span>场景 · 真实访谈</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
 <!-- 3. 痛点 (强力版 · 后果导向) -->
 <section class="slide center" data-num="03" data-title="痛点 · 真实后果" data-notes="痛点强力版：每一个痛都用「真实代价」标出来。不是抽象的「不方便」，是真实的钱、真实的时间、真实的关系。讲的时候按红框（真实代价）顺序读，不读 body 段。让钱和后果说话。最下面那行长期痛点是收尾 — partner 退休、知识全丢，事务所价值掉一半。这是为什么资深合伙人愿意付钱。">
-  <div class="micro eyebrow">痛点 · Sarah Mitchell（primary persona） · 三个 failure mode</div>
+  <div class="micro eyebrow">Sarah Mitchell · 三个 failure mode</div>
   <h2 class="h1">三件事每周压在她身上。</h2>
   <div class="pain-grid">
     <div class="pain-card">
-      <div class="pain-num">Failure mode 01</div>
-      <div class="pain-title">Monday-morning anxiety</div>
+      <div class="pain-title">周一早上靠记忆拼凑上周</div>
       <div class="pain-body">她重新打开 Excel，试着想起周末前哪些事是急的。每周一都是从短期记忆里重建工作。没有系统视图。</div>
       <div class="pain-quote">「我现在花在搞清楚这周要做什么的时间，比实际做事的时间还多。」<span class="src">— Sarah Mitchell · 01-product-brief.md</span></div>
     </div>
     <div class="pain-card">
-      <div class="pain-num">Failure mode 02</div>
-      <div class="pain-title">The chase loop</div>
+      <div class="pain-title">三周前开始追，最后一周还在补</div>
       <div class="pain-body">每个 deadline 前 3 周开始发邮件追客户要材料。有的回了，很多没回，有的她忘了 follow up。最后总有一个客户拿出她没要过的 1099。</div>
       <div class="pain-quote">「Solve this one pain — confirming the client gave 100% of what's needed — and I'm definitely your first customer.」<span class="src">— Yan Jing · 660 行访谈综合</span></div>
     </div>
     <div class="pain-card">
-      <div class="pain-num">Failure mode 03</div>
-      <div class="pain-title">The state-change miss</div>
+      <div class="pain-title">从客户嘴里才知道州改了规则</div>
       <div class="pain-body">当州改了 estimated payment 规则，她从客户的投诉里得知，不是从工具。「IRS 给 LA County 延期到 10 月，一位 CPA 从客户的 group chat 看到，发现自己 6 个客户已经过了原 deadline。」</div>
       <div class="pain-quote"><span class="src" style="font-style: italic; color: var(--ink-500);">来自匿名 CPA 访谈 · strategy-02-problem-statement.md · personas.md</span></div>
     </div>
@@ -596,9 +554,6 @@
       <tr><td class="cap">客户 portal · 文件 vault · 计费</td><td class="us-col partial">永不做</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
     </tbody>
   </table>
-  <div class="caption" style="margin-top: 1.8vmin; font-style: italic; line-height: 1.6;">
-    最后一行是最关键的：他们做"全套"，我们只做一层。<strong style="color: var(--ink-900); font-style: normal;">不抢 portal、vault、计费 — 让我们和 QuickBooks / Lacerte / Gmail 共生，不替代。</strong>
-  </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
     <span class="center"><span class="num">04</span>竞争</span>
@@ -613,15 +568,15 @@
   <div class="opp-grid" style="margin-top: 2.2vmin;">
     <div class="opp-stack">
       <div class="opp-row">
-        <div class="label">Why now · 01 · 经济性</div>
+        <div class="label">经济</div>
         <div class="text"><span class="strong">5 年前这是 Bloomberg / CCH 的数千美元/年订阅生意。</span><br><span class="sub">LLM 让独立工具能做 50 州监控 + 解析 + 客户匹配。</span></div>
       </div>
       <div class="opp-row">
-        <div class="label">Why now · 02 · 老牌在崩</div>
+        <div class="label">老牌在崩</div>
         <div class="text"><span class="strong">File In Time 2026 还是 Windows 安装包。</span><br><span class="sub">桌面架构无法做云端 24h SLA。结构跟不上。</span></div>
       </div>
       <div class="opp-row">
-        <div class="label">Why now · 03 · Suite 疲劳</div>
+        <div class="label">Suite 疲劳</div>
         <div class="text"><span class="strong">TaxDome 年付绑定 + 10–15 小时安装。</span><br><span class="sub">Capterra 上每个差评都在喊"我要一个层，不要又一个套件"。</span></div>
       </div>
     </div>
@@ -709,14 +664,8 @@
         "600 个客户如果每个人都去问一下的话，<br>那好多时间花在."
         <span class="attrib">— Yan Jing · 间接承认了他记不住所有客户</span>
       </div>
-      <div class="caption" style="line-height: 1.6; color: var(--ink-700); font-size: 1.35vmin;">
-        他清楚记得 ~50 客户、模糊记得 ~100、剩 450 只能查记录。
-        <strong style="color: var(--ink-900);">这是供给侧天花板。</strong>
-        AI 的职责不是替他做事 — 是让 600 个客户都得到他给前 50 的关注。
-      </div>
       <div class="yj-bottom-quote">
-        "AI 不替 CPA 做决定 — AI 让 CPA 看到他原本看不到的信息。"<br>
-        <span style="color: var(--ink-500); font-style: normal; font-size: 1.2vmin; font-family: var(--font-mono); letter-spacing: 0.04em;">— 整段访谈的产品框架</span>
+        「AI 不替 CPA 做决定 — AI 让 CPA 看到他原本看不到的信息。」
       </div>
     </div>
     <div class="yj-conclusions">
@@ -726,7 +675,6 @@
         <div class="body">
           <div class="ti">多年历史不是"慢慢变好"，是壁垒。</div>
           <div class="desc">Day 1 by import — 不是 Year 2 才有。"客户读完'AI 第一年还没数据'就走了。"</div>
-          <div class="ref">→ §1, §4 · Mode A/E · Import Tier 1-4</div>
         </div>
       </div>
       <div class="yj-concl-item">
@@ -734,7 +682,6 @@
         <div class="body">
           <div class="ti">Onboarding 必须分 3 层，每层都见价值。</div>
           <div class="desc">5 分钟（CSV）/ 30 分钟（一个集成）/ 持续（多年导入 + 邮件 OAuth）。每一层独立交付。</div>
-          <div class="ref">→ §2 · Onboarding Layer 1/2/3</div>
         </div>
       </div>
       <div class="yj-concl-item">
@@ -742,7 +689,6 @@
         <div class="body">
           <div class="ti">AI 优势不是单户精度，是规模。</div>
           <div class="desc">单户 CPA 比 AI 强。AI 的边在：让 600 个客户得到他给前 50 的关注。</div>
-          <div class="ref">→ §4 · "Would Lacerte's organizer give this same answer?"</div>
         </div>
       </div>
       <div class="yj-concl-item">
@@ -750,7 +696,6 @@
         <div class="body">
           <div class="ti">邮件 + 审计轨迹是信任脊梁。</div>
           <div class="desc">Stage 1（AI 起草、CPA 审）→ Stage 2 opt-in（满足 3 条件后自动）。Timeline 是 IRS 合规要求。</div>
-          <div class="ref">→ §5, §11 · Phase 1/2 · activity timeline</div>
         </div>
       </div>
       <div class="yj-concl-item">
@@ -758,7 +703,6 @@
         <div class="body">
           <div class="ti">最值钱的买家：preparer→advisor 的资深合伙人。</div>
           <div class="desc">顾问触发 + 流失预警 + 定价情报 + firm brain — 这一层付费意愿最高。</div>
-          <div class="ref">→ §7-8 · Layer B/C · Year 3 / Year 5</div>
         </div>
       </div>
     </div>
@@ -779,25 +723,21 @@
       <div class="badge">Thread Q1 · 多年历史</div>
       <div class="quote">"为什么我要先付一年费用，然后等 AI 慢慢学？"<span class="attrib">— 对"AI 越用越懂你"营销话术的直接拒绝</span></div>
       <div class="arrow-row"><span class="arrow">→</span><span class="text"><b>Onboarding 重写为 3 层（5 分钟 / 30 分钟 / 持续）。</b>Day 1 import = 引擎。产品文案明令禁止"AI is learning"句式。</span></div>
-      <div class="ref">PRD §1.6, §2 · Mode A/E · Import Tier 1-4</div>
     </div>
     <div class="qthread-card">
       <div class="badge">Thread Q2 · 邮件 + 审计轨迹</div>
       <div class="quote">"IRS 来查 client X 的 2023 年报税，事务所必须能调出'我们在 T 时刻问了 Y'。"<span class="attrib">— 审计轨迹是合规要求，不是 nice-to-have</span></div>
       <div class="arrow-row"><span class="arrow">→</span><span class="text"><b>Stage 1（AI 起草、CPA 审）→ Stage 2 opt-in（满足 3 条件后自动）。</b>activity timeline append-only · IRS 审计可导出 PDF + JSON。</span></div>
-      <div class="ref">PRD §5, §11 · Phase 1/2 · §15.4 audit-trail export</div>
     </div>
     <div class="qthread-card">
       <div class="badge">Thread Q4 · 双向集成</div>
       <div class="quote">"我有 40 个软件工具，最怕新东西不和它们说话。CCH 内核可能 50 年了。"<span class="attrib">— 反对 suite-replace 路线</span></div>
       <div class="arrow-row"><span class="arrow">→</span><span class="text"><b>Karbon route（layer-not-suite）。</b>Tier 0/1/2/3 框架 · per-integration 单一 source-of-truth · CCH Axcess 进 forever-no list。</span></div>
-      <div class="ref">PRD §6.4 · §6.5 · forever_no.md</div>
     </div>
     <div class="qthread-card">
       <div class="badge">综合 · 决策边界</div>
       <div class="quote">"AI 不替 CPA 做决定 — AI 让 CPA 看到他原本看不到的信息。"<span class="attrib">— 整段访谈的产品框架</span></div>
       <div class="arrow-row"><span class="arrow">→</span><span class="text"><b>绿 / 黄 / 红 区。</b>§5.3 不变量「AI 永不自动确认材料齐」直写在 DB CHECK 约束里。客户可以查代码。</span></div>
-      <div class="ref">PRD §4.5 · §5.3 · arch v0.7 §5</div>
     </div>
   </div>
   <div class="caption" style="margin-top: 1.8vmin; padding: 1.2vmin 1.5vmin; background: var(--indigo-soft); border-radius: 6px; color: var(--indigo-ink); font-size: 1.3vmin; line-height: 1.6;">
@@ -822,7 +762,6 @@
         <div class="q-item"><span class="qn">5×</span><span><b>州公告</b> · 怎么知道 · 识别受影响客户多久 · 同行工具表现 · 怎么通知客户 · 自动 parse 的价值</span></div>
         <div class="q-item"><span class="qn">3×</span><span><b>转化</b> · 试用前 30 分钟决定去留 · 自动 alert 是否解决真痛点 · 是否需要 govt 原文链接验证</span></div>
       </div>
-      <div class="caption" style="margin-top: 0.6vmin; font-size: 1.15vmin; color: var(--ink-500); font-style: italic;">独立 web app · 自动保存（localStorage）· 4 个版本迭代到最终 · 不是 Google form</div>
     </div>
     <div class="meth-block">
       <div class="lbl">招募 funnel · 真实数字</div>
