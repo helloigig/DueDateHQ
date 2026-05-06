@@ -365,7 +365,29 @@
   .ai-callout { margin-top: 2vmin; padding: 1.3vmin 1.6vmin; background: var(--indigo-soft); border-radius: 6px; font-size: 1.4vmin; color: var(--indigo-ink); line-height: 1.5; border: 1px solid rgba(91, 91, 214, 0.2); }
   .ai-callout .strong { font-weight: 600; }
 
-  /* === SLIDE 12: Features === */
+  /* === SLIDE 13 (NEW): Tech implementation 卖点 === */
+  .tech-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 3.5vmin; margin-top: 2vmin; align-items: stretch; }
+  .pipeline-block { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.5vmin; display: flex; flex-direction: column; gap: 0.8vmin; }
+  .pipeline-block .lbl { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); margin-bottom: 0.5vmin; text-transform: uppercase; }
+  .pipe-step { display: grid; grid-template-columns: 3vmin 1fr; gap: 1vmin; align-items: start; padding: 0.6vmin 0; }
+  .pipe-step .glyph { font-family: var(--font-mono); font-size: 1.2vmin; color: var(--indigo); font-weight: 700; line-height: 1.6; }
+  .pipe-step .body { font-size: 1.4vmin; line-height: 1.55; color: var(--ink-700); }
+  .pipe-step .body b { color: var(--ink-900); font-weight: 600; }
+  .pipe-step .body .note { font-size: 1.2vmin; color: var(--ink-500); display: block; margin-top: 0.2vmin; font-style: italic; }
+  .pipe-step.branch { padding-left: 3vmin; }
+  .pipe-step.branch .body { font-size: 1.25vmin; color: var(--ink-500); font-style: italic; }
+  .pipe-arrow { font-family: var(--font-mono); color: var(--ink-300); font-size: 1.4vmin; padding-left: 1vmin; line-height: 0.5; }
+
+  .tech-points { display: flex; flex-direction: column; gap: 1.3vmin; }
+  .tech-points .lbl { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); margin-bottom: 0.3vmin; text-transform: uppercase; }
+  .tech-point { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 1.4vmin 1.7vmin; display: grid; grid-template-columns: 3.5vmin 1fr; gap: 1vmin; align-items: start; }
+  .tech-point .glyph { font-family: var(--font-mono); font-size: 1.6vmin; color: var(--indigo); font-weight: 700; line-height: 1.2; }
+  .tech-point .body { display: flex; flex-direction: column; gap: 0.3vmin; }
+  .tech-point .ti { font-size: 1.5vmin; font-weight: 600; color: var(--ink-900); line-height: 1.3; letter-spacing: -0.005em; }
+  .tech-point .desc { font-size: 1.25vmin; color: var(--ink-700); line-height: 1.55; }
+  .tech-point .desc code { font-family: var(--font-mono); font-size: 1.15vmin; background: var(--sunken); padding: 0.1vmin 0.5vmin; border-radius: 3px; color: var(--ink-900); }
+
+  /* === SLIDE 14 (was 12): Features === */
   .feat-table { width: 100%; margin-top: 2.5vmin; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); border-collapse: separate; border-spacing: 0; }
   .feat-table th, .feat-table td { padding: 1.2vmin 1.4vmin; text-align: left; font-size: 1.35vmin; border-bottom: 1px solid var(--line); vertical-align: middle; }
   .feat-table th { background: var(--sunken); font-weight: 600; color: var(--ink-700); font-size: 1.2vmin; letter-spacing: 0.08em; font-family: var(--font-mono); text-transform: uppercase; }
@@ -1021,8 +1043,71 @@
   </div>
 </section>
 
-<!-- 12. Features -->
-<section class="slide center" data-num="13" data-title="产品特性 · 5 件 AI 接管的事" data-notes="5 件机器接管的事 × Mode × Day 1 / P1 节奏 × 痛点 × 关键功能。这一页是产品全景。按行读。Mode A/C/D/F 是 Day 1，Mode B/E 是 P1（需多年历史） — 这个 sequencing 直接来自 Yan Jing 访谈结论 01。">
+<!-- 13. Tech implementation 卖点 (NEW) -->
+<section class="slide center" data-num="13" data-title="技术实施 · 工程深度卖点" data-notes="同 brief 同 demo day 上，对手大概率给的是「我们用 AI」这种营销话术。我们能给的是真实的工程实施细节——50 州监控管线、DB 强制约束、Row-Level Security 多租户、双层 AI 置信度、Anthropic+OpenAI 双 LLM 兜底。讲的时候按管线图先讲一遍 wedge 怎么实现，然后右边 5 个 tech point 一条一条过——每一条都是「这个工程决策不是装饰」。">
+  <div class="micro eyebrow">技术实施 · 不是营销话术，是工程</div>
+  <h2 class="h1">工程深度本身就是卖点。</h2>
+  <div class="tech-grid">
+    <div class="pipeline-block">
+      <div class="lbl">State Alert 管线 · 端到端</div>
+      <div class="pipe-step"><span class="glyph">①</span><span class="body"><b>50 州 DOR + DC + SoS 网站</b><span class="note">每 15 分钟轮询 · 内容 hash 去重</span></span></div>
+      <div class="pipe-arrow">↓</div>
+      <div class="pipe-step"><span class="glyph">②</span><span class="body"><b>LLM 解析器</b> → 结构化 JSON + 置信分<span class="note">提取 deadline shift / 郡 / 实体类型 / 税种 / 生效日期</span></span></div>
+      <div class="pipe-arrow">↓</div>
+      <div class="pipe-step branch"><span class="glyph">↳</span><span class="body">置信 &lt; 0.85 → 人工审核队列（reviewer 发布/拒绝）</span></div>
+      <div class="pipe-step"><span class="glyph">③</span><span class="body"><b>Matcher</b> → 每 firm 客户簿交叉<span class="note">entity type × state × county × tax type 联合查询</span></span></div>
+      <div class="pipe-arrow">↓</div>
+      <div class="pipe-step"><span class="glyph">④</span><span class="body"><b>4 个 alert surface</b> → bell · banner · 阻塞 modal · /alerts<span class="note">Email via Resend · 升级 tier 由 hoursSinceDetected 计算</span></span></div>
+      <div class="caption" style="margin-top: 0.8vmin; padding-top: 0.8vmin; border-top: 1px dashed var(--line); font-size: 1.2vmin; color: var(--ink-500); font-style: italic;">完整 spec 在 STATE-NOTIFICATION-IMPLEMENTATION.md</div>
+    </div>
+    <div class="tech-points">
+      <div class="lbl">5 个工程决策 · 每个都不装饰</div>
+      <div class="tech-point">
+        <span class="glyph">01</span>
+        <div class="body">
+          <div class="ti">DB CHECK 约束强制人工确认</div>
+          <div class="desc">§5.3 不变量「AI 永不自动确认」写进 <code>checklist_item</code> 表 CHECK。即使应用层 bug，DB 拒绝。</div>
+        </div>
+      </div>
+      <div class="tech-point">
+        <span class="glyph">02</span>
+        <div class="body">
+          <div class="ti">Row-Level Security 多租户</div>
+          <div class="desc">每条 query 在 Postgres 层强制 <code>firm_id = current_firm()</code>。应用层 + DB 层双重隔离。</div>
+        </div>
+      </div>
+      <div class="tech-point">
+        <span class="glyph">03</span>
+        <div class="body">
+          <div class="ti">双层 AI 置信度</div>
+          <div class="desc"><code>parse_confidence</code>（解析对不对）+ <code>match_confidence</code>（客户对不对）— 两个独立的信号，不是一个数字。CPA 看到的是 chip 级的透明。</div>
+        </div>
+      </div>
+      <div class="tech-point">
+        <span class="glyph">04</span>
+        <div class="body">
+          <div class="ti">Anthropic + OpenAI 双 LLM 兜底</div>
+          <div class="desc">Claude Sonnet 4.5 主，GPT-4 Turbo 备。5xx 或 rate limit 自动 failover。每 firm 月度成本上限 $50，软警告 80%、自动暂停 100%。</div>
+        </div>
+      </div>
+      <div class="tech-point">
+        <span class="glyph">05</span>
+        <div class="body">
+          <div class="ti">Activity timeline append-only</div>
+          <div class="desc">IRS audit-grade 合规。每个邮件、附件、状态变化、CPA 决定都不可改。可导出 PDF + JSON。客户被 audit 时 5 分钟出包。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="chrome">
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">13</span>技术实施 · 工程深度</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
+  </div>
+</section>
+
+<!-- 14. Features -->
+<section class="slide center" data-num="14" data-title="产品特性 · 5 件 AI 接管的事" data-notes="5 件机器接管的事 × Mode × Day 1 / P1 节奏 × 痛点 × 关键功能。这一页是产品全景。按行读。Mode A/C/D/F 是 Day 1，Mode B/E 是 P1（需多年历史） — 这个 sequencing 直接来自 Yan Jing 访谈结论 01。">
   <div class="micro eyebrow">产品特性 · 5 件 AI 接管的事</div>
   <h2 class="h1">每一件都有 Mode · 痛点 · 节奏。</h2>
   <table class="feat-table">
@@ -1075,13 +1160,13 @@
   </table>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">13</span>产品特性</span>
+    <span class="center"><span class="num">14</span>产品特性</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
 <!-- 13. Integrations -->
-<section class="slide center" data-num="14" data-title="集成 · Tier 0/1/2/3" data-notes="集成态度即定位。Tier 0 是 Day 1 必装 — 否则产品掉成「楔子 + 手动」。Tier 1 是 P1。Tier 2 是 Phase 2。Tier 3 永不做 — CCH Axcess 在这里因为内核 50 年了没 API（Yan Jing 原话）。强调最后一格：「永不做」也是定位。">
+<section class="slide center" data-num="15" data-title="集成 · Tier 0/1/2/3" data-notes="集成态度即定位。Tier 0 是 Day 1 必装 — 否则产品掉成「楔子 + 手动」。Tier 1 是 P1。Tier 2 是 Phase 2。Tier 3 永不做 — CCH Axcess 在这里因为内核 50 年了没 API（Yan Jing 原话）。强调最后一格：「永不做」也是定位。">
   <div class="micro eyebrow">集成 · 我们和谁说话</div>
   <h2 class="h1">4 层集成 · 决定了"层"路线的边界。</h2>
   <div class="int-grid">
@@ -1129,13 +1214,13 @@
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">14</span>集成</span>
+    <span class="center"><span class="num">15</span>集成</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
 <!-- 15. 现状 - 已 ship 的具体能力 -->
-<section class="slide center" data-num="15" data-title="现状 · 已经在线" data-notes="不是抽象的「我们在 build」 — 是具体的「这些功能已经在 duedatehq.space 上跑」。讲的时候按列读，强调每一项都 demo 可见。22 页这个数字在最右，要求把视线收尾。">
+<section class="slide center" data-num="16" data-title="现状 · 已经在线" data-notes="不是抽象的「我们在 build」 — 是具体的「这些功能已经在 duedatehq.space 上跑」。讲的时候按列读，强调每一项都 demo 可见。22 页这个数字在最右，要求把视线收尾。">
   <div class="micro eyebrow">现状 · 已经在生产 · 现在就能打开看</div>
   <h2 class="h1">不是 mockup。这些都在 duedatehq.space 上跑。</h2>
   <div class="stat-strip">
@@ -1158,13 +1243,13 @@
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">15</span>现状 · 已经在线</span>
+    <span class="center"><span class="num">16</span>现状 · 已经在线</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
 <!-- 16. Roadmap - 12 个月 4 阶段 (具体功能名 · 无 Mode 抽象) -->
-<section class="slide center" data-num="16" data-title="Roadmap · 12 个月" data-notes="Roadmap 不再用 Mode A/B/C 这种内部抽象。用具体功能名 + 用户能感受到的好处 + 阶段时间。Q3 是商业化（登录 + 集成 + 计费）；Q4 是日常 AI 接入；明年 Q1 是引擎激活；明年 Q2+ 是平台 + 合规。讲的时候按 phase 顺序读，每张卡片读 phase 名 + 1-2 个最强 feature，不要全念。">
+<section class="slide center" data-num="17" data-title="Roadmap · 12 个月" data-notes="Roadmap 不再用 Mode A/B/C 这种内部抽象。用具体功能名 + 用户能感受到的好处 + 阶段时间。Q3 是商业化（登录 + 集成 + 计费）；Q4 是日常 AI 接入；明年 Q1 是引擎激活；明年 Q2+ 是平台 + 合规。讲的时候按 phase 顺序读，每张卡片读 phase 名 + 1-2 个最强 feature，不要全念。">
   <div class="micro eyebrow">Roadmap · 接下来 12 个月 · 真的具体</div>
   <h2 class="h1">从「楔子在线」到「平台开张」的 4 步。</h2>
   <div class="phase-grid">
@@ -1218,13 +1303,13 @@
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">16</span>Roadmap · 12 个月 · 4 阶段</span>
+    <span class="center"><span class="num">17</span>Roadmap · 12 个月 · 4 阶段</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
 <!-- 17. Forever-no + 让人记住的 4 件 (closing) -->
-<section class="slide center" data-num="17" data-title="永不做 + 评委带走的 4 件" data-notes="结尾。左边 forever-no list 展示纪律 — 我们用「不做什么」证明思考深度。右边 4 件深色卡片 — 评委带走的核心记忆点：研究深度（660 行）、客户承诺（Yan Jing first customer）、工程证明（DB CHECK 约束）、产品现实（在线可点）。这 4 个不是营销话术 — 是同 brief 同 demo day 上对手大概率没有的差异化证据。讲完左边，右边一条一条慢读，最后一句「现在就可以打开」是落点。">
+<section class="slide center" data-num="18" data-title="永不做 + 评委带走的 4 件" data-notes="结尾。左边 forever-no list 展示纪律 — 我们用「不做什么」证明思考深度。右边 4 件深色卡片 — 评委带走的核心记忆点：研究深度（660 行）、客户承诺（Yan Jing first customer）、工程证明（DB CHECK 约束）、产品现实（在线可点）。这 4 个不是营销话术 — 是同 brief 同 demo day 上对手大概率没有的差异化证据。讲完左边，右边一条一条慢读，最后一句「现在就可以打开」是落点。">
   <div class="micro eyebrow">收尾 · 纪律 + 评委带走的 4 件</div>
   <h2 class="h1">不做的事，定义了我们做的事。</h2>
   <div class="closing-grid">
@@ -1276,7 +1361,7 @@
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">17</span>永不做 + 评委带走的 4 件</span>
+    <span class="center"><span class="num">18</span>永不做 + 评委带走的 4 件</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
