@@ -158,15 +158,33 @@ export function ClientDetail() {
   const client = clientQuery.data ?? null;
   const deadlines = deadlinesQuery.data ?? [];
   const archiveClientMut = useArchiveClient();
-  const [tab, setTab] = useState<Tab>("work");
-  // Tracks whether the user explicitly clicked a tab. Once true, the
-  // default-tab effect below stops auto-switching — Sarah's manual
-  // selection wins. Yuqi audit 2026-05-05: "if To Do is empty, default
-  // to Filings tab."
+  // Tab state — single source of truth is the URL `?tab=` query param so
+  // the active tab survives copy-link / browser-back / refresh. Old
+  // `?tab=todo` / `?tab=filings` / `?tab=engagement` deep links alias
+  // to "work" via the route map below. Yuqi audit 2026-05-06: prior
+  // setup kept tab in local useState only; the URL was a one-way
+  // door (deep link could land you on a tab, but switching tabs
+  // wouldn't write back).
+  const TAB_ALIAS: Record<string, Tab> = {
+    work: "work",
+    todo: "work",
+    filings: "work",
+    engagement: "work",
+    mailbox: "mailbox",
+    notes: "notes",
+    documents: "documents",
+    contacts: "contacts",
+    audit: "audit",
+  };
+  const tabFromUrl = TAB_ALIAS[searchParams.get("tab") ?? "work"] ?? "work";
+  const tab: Tab = tabFromUrl;
   const tabExplicitRef = useRef(false);
   const onTabChange = (next: Tab) => {
     tabExplicitRef.current = true;
-    setTab(next);
+    const params = new URLSearchParams(searchParams);
+    if (next === "work") params.delete("tab");
+    else params.set("tab", next);
+    setSearchParams(params, { replace: false });
   };
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
@@ -613,6 +631,25 @@ export function ClientDetail() {
                 setAddDeadlineOpen(true);
               }}
             />
+            {/* Visual transition between Filings (calendar-truth) and
+                ToDo (action-truth on the same task set). Yuqi audit
+                2026-05-06: post-merge the two sections rendered as
+                visual peers, but they describe the same data sliced
+                differently. The micro-label below frames ToDo as the
+                doc-axis breakdown of the filings above so the user
+                doesn't read them as unrelated lists. */}
+            <div
+              className="border-t border-line pt-4 -mt-1"
+              aria-hidden="true"
+            >
+              <p className="text-2xs uppercase tracking-wider font-semibold text-ink-500">
+                Doc-level chase &amp; review
+              </p>
+              <p className="text-xs text-ink-500 mt-0.5">
+                Items grouped from the filings above, split by what's
+                pending on the client vs. waiting on you.
+              </p>
+            </div>
             <ToDoTab
               client={client}
               allDeadlines={filteredDeadlines}
@@ -1539,27 +1576,40 @@ function ToDoTab({
 
       {/* ⚠ NEEDS YOUR REVIEW — secondary, expanded by default.
           Same deadline-grouped layout as "Still waiting" so the two
-          panels read as a coherent surface. Header carries an item
-          count + a task count so Sarah can see "5 items across 3
-          tasks" at a glance. */}
-      {needsReview.length > 0 && (
-        <section className="bg-surface border border-line rounded-md overflow-hidden">
+          panels read as a coherent surface. Yuqi audit 2026-05-06
+          (post-merge): renders even when empty so the surface stays
+          symmetric with "Still waiting" — the prior conditional
+          render made the section vanish entirely, which read as a
+          UI bug rather than an empty state. */}
+      <section className="bg-surface border border-line rounded-md overflow-hidden">
           <header className="flex items-baseline gap-2 px-4 py-3 border-b border-line">
             <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-900">
               <AlertTriangle className="w-4 h-4 text-warn-ink" aria-hidden />
               Needs your review
             </h3>
             <span className="text-2xs text-ink-500 tabular-nums">
-              {needsReview.length} item{needsReview.length === 1 ? "" : "s"}
-              {reviewGroups.length > 0 && (
+              {needsReview.length === 0 ? (
+                "Nothing pending review"
+              ) : (
                 <>
-                  {" · "}
-                  {reviewGroups.length} task
-                  {reviewGroups.length === 1 ? "" : "s"}
+                  {needsReview.length} item{needsReview.length === 1 ? "" : "s"}
+                  {reviewGroups.length > 0 && (
+                    <>
+                      {" · "}
+                      {reviewGroups.length} task
+                      {reviewGroups.length === 1 ? "" : "s"}
+                    </>
+                  )}
                 </>
               )}
             </span>
           </header>
+          {needsReview.length === 0 && (
+            <div className="px-4 py-6 text-sm text-ink-500 text-center">
+              All inbound docs are confirmed. Anything new from this
+              client will surface here.
+            </div>
+          )}
           <div className="divide-y divide-line">
             {reviewGroups.map((g) => {
               const itemCount = g.items.length;
@@ -1619,7 +1669,6 @@ function ToDoTab({
             })}
           </div>
         </section>
-      )}
 
       {/* "Open deadlines for this client" section dropped 2026-05-06 —
           Yuqi audit: this list duplicated the Filings tab's "Filing
