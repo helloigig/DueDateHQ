@@ -5,6 +5,10 @@ import { firmProcedure, publicProcedure, router } from "../init.js";
 import { db } from "../../db/client.js";
 import { firms, teamInvites, users } from "../../db/schema.js";
 import { ALL_STATES } from "../../lib/states.js";
+import { seedDemoFirm } from "../../db/seed-demo-firm.js";
+
+const DEMO_EMAIL = "demo@duedatehq.com";
+const DEMO_FIRM_NAME = "Mitchell CPA (demo)";
 
 export const authRouter = router({
   /**
@@ -132,6 +136,85 @@ export const authRouter = router({
       });
       return { firmId: result.firmId, alreadyProvisioned: false as const };
     }),
+
+  /**
+   * Demo workspace bootstrap. Called by Login.tsx's "Try the demo
+   * workspace" button after the user signs in via Supabase magic link
+   * to demo@duedatehq.com.
+   *
+   * Behaviour:
+   *   1. The caller MUST be authenticated as demo@duedatehq.com — any
+   *      other email gets FORBIDDEN. This guards the demo seed against
+   *      being accidentally written into a real customer firm.
+   *   2. If the user has no firm row yet, create a fresh "Mitchell CPA
+   *      (demo)" firm and link the user as owner (mirrors the standard
+   *      `bootstrap` path).
+   *   3. Idempotently seed the firm with the 51-client roster +
+   *      deadlines (see `seedDemoFirm`).
+   *   4. Returns the firm id and seed counts so the FE can show a
+   *      one-line "demo populated" toast.
+   *
+   * Idempotent end-to-end: re-running this on an already-seeded firm
+   * inserts 0 new rows. Safe to call from a post-signin auth bridge
+   * that doesn't know whether it's the user's first or 50th login.
+   */
+  bootstrapDemo: publicProcedure.mutation(async ({ ctx }) => {
+    if (!ctx.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+    if (ctx.user.email.toLowerCase() !== DEMO_EMAIL) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "demo_endpoint_requires_demo_email",
+      });
+    }
+
+    // Resolve-or-create the firm + user row in one transaction.
+    const firmId = await db.transaction(async (tx) => {
+      const existingUser = await tx.query.users.findFirst({
+        where: eq(users.id, ctx.user!.id),
+      });
+      if (existingUser) {
+        return existingUser.firmId;
+      }
+      const [firm] = await tx
+        .insert(firms)
+        .values({
+          name: DEMO_FIRM_NAME,
+          primaryStates: ["CA"],
+          tier: "pro",
+          subscriptionStatus: "trialing",
+          seatLimit: 5,
+          // Demo firm has no client cap — the seed inserts 51, well past
+          // the solo-tier 50 cap, and we don't want the next prospect's
+          // import to bounce off a hard limit.
+          clientLimit: null,
+          trialEndsAt: new Date(Date.now() + 30 * 86_400_000),
+        })
+        .returning();
+      if (!firm) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      }
+      await tx.insert(users).values({
+        id: ctx.user!.id,
+        firmId: firm.id,
+        email: ctx.user!.email,
+        displayName: "Sarah Mitchell",
+        role: "owner",
+      });
+      return firm.id;
+    });
+
+    // Seed (idempotent) — outside the transaction so a partial seed
+    // doesn't roll back the firm creation. The seed itself is safe
+    // to re-run, so on retry we just pick up where we left off.
+    const seedResult = await seedDemoFirm({ db, firmId });
+
+    return {
+      firmId,
+      ...seedResult,
+    };
+  }),
 
   /**
    * Sibling of `team.acceptInvite` exposed under the `auth` namespace

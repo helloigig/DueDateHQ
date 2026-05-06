@@ -78,6 +78,42 @@ export function SupabaseAuthBridge() {
             userEmail.split("@")[0] ??
             "";
 
+          // Demo-workspace short-circuit: when the user just signed in
+          // as demo@duedatehq.com AND `tryDemo()` set the pending flag
+          // before sending them off to email, we skip onboarding entirely
+          // and instead provision-or-seed the demo firm via
+          // `auth.bootstrapDemo`. The mutation is idempotent so a re-fired
+          // INITIAL_SESSION (browser refresh after landing) won't re-seed.
+          const demoBootstrapPending =
+            userEmail.toLowerCase() === "demo@duedatehq.com" &&
+            typeof localStorage !== "undefined" &&
+            localStorage.getItem("duedatehq.bootstrap_demo_pending") === "1";
+
+          if (demoBootstrapPending) {
+            try {
+              localStorage.removeItem("duedatehq.bootstrap_demo_pending");
+              await trpcUtils.client.auth.bootstrapDemo.mutate();
+              // Pull the now-seeded session so SessionProvider picks up
+              // the firm name + tier we just created.
+              const remote = await trpcUtils.auth.session.fetch();
+              signIn({
+                firmName: remote?.firm.name ?? "Mitchell CPA (demo)",
+                userName: remote?.user.displayName ?? "Sarah Mitchell",
+                userEmail,
+                tier: remote?.firm.tier ?? "pro",
+              });
+              navigate("/", { replace: true });
+              return;
+            } catch (err) {
+              // bootstrapDemo can fail if the BE is down or the FORBIDDEN
+              // guard rejects (someone hand-set the flag with a different
+              // email). Fall through to the normal sign-in path below so
+              // the user at least lands somewhere coherent.
+              // eslint-disable-next-line no-console
+              console.error("supabase-auth-bridge.bootstrap_demo_failed", err);
+            }
+          }
+
           try {
             const remote = await trpcUtils.auth.session.fetch();
             if (remote) {
