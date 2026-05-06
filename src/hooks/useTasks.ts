@@ -60,8 +60,10 @@ export function useTasksForClient(clientId: string | undefined): Task[] {
 
 /**
  * Common invalidator for any task mutation — refreshes the task row,
- * the per-client list, the cross-client list, and the activity feed.
- * Hooks below all share this so the UI feels coherent post-mutation.
+ * the per-client list, the cross-client list, the activity feed, and
+ * the task milestones (so the cascade-down from `updateTaskStatus →
+ * "completed"` is reflected in the Mini Timeline without a manual
+ * refetch).
  */
 function useInvalidateTask() {
   const utils = trpc.useUtils();
@@ -69,6 +71,8 @@ function useInvalidateTask() {
     void utils.tasks.list.invalidate();
     void utils.tasks.get.invalidate();
     void utils.activity.listForTask.invalidate();
+    void utils.taskMilestones.listForTask.invalidate();
+    void utils.taskMilestones.fleetStack.invalidate();
   };
 }
 

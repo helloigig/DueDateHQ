@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Sparkles, AlertOctagon, Pencil, X } from "lucide-react";
 import type { Task, ChecklistItem } from "../types";
 import { trpc } from "../lib/api/client";
+import { MarkCompleteDialog } from "./MarkCompleteDialog";
 // MILESTONE_STATUS_META + StatusPill (from main #151) intentionally NOT
 // imported here — the redesigned Waypoint + ActiveStagePanel use their
 // own coloring tied to the connector/progress story (filled green line
@@ -96,6 +97,11 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
     null,
   );
   const [editing, setEditing] = useState<Waypoint | null>(null);
+  // Mark-complete dialog (cascade-up entry point) — fires when the user
+  // clicks the File pillar's "Mark done" action. Routes through the
+  // same shared dialog as TaskActions/PriorityCard so the <80% guard
+  // rail and audit trail are identical regardless of entry point.
+  const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   // Selected waypoint type — drives which stage's actions appear in the
   // panel below the timeline. Starts unset; resolves to the active stage
   // (in_progress / overdue / blocked) once waypoints load.
@@ -299,24 +305,38 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
                   wp={selectedWaypoint}
                   slideDirection={slideDirection}
                   isMarkingDone={updateMilestone.isPending}
+                  isFileStage={selectedWaypoint.type === "file"}
+                  isCollectStage={selectedWaypoint.type === "collect"}
                   onMarkDone={
-                    selectedWaypoint.ids &&
-                    selectedWaypoint.ids.length > 0
-                      ? async () => {
-                          try {
-                            await Promise.all(
-                              selectedWaypoint.ids!.map((id) =>
-                                updateMilestone.mutateAsync({
-                                  id,
-                                  status: "done",
-                                }),
-                              ),
-                            );
-                          } catch {
-                            // Error toast surfaces via the hook's onError.
-                          }
-                        }
-                      : undefined
+                    // File pillar → cascade-up via the shared
+                    // MarkCompleteDialog. Marking File done IS marking
+                    // the task complete (locked 2026-05-06); same
+                    // confirmation rule applies.
+                    selectedWaypoint.type === "file"
+                      ? () => setCompleteDialogOpen(true)
+                      : // Collect pillar → not user-clickable. Status
+                        // is derived from the checklist below; marking
+                        // it done in isolation would lie about which
+                        // docs are actually in.
+                        selectedWaypoint.type === "collect"
+                        ? undefined
+                        : selectedWaypoint.ids &&
+                            selectedWaypoint.ids.length > 0
+                          ? async () => {
+                              try {
+                                await Promise.all(
+                                  selectedWaypoint.ids!.map((id) =>
+                                    updateMilestone.mutateAsync({
+                                      id,
+                                      status: "done",
+                                    }),
+                                  ),
+                                );
+                              } catch {
+                                // Error toast surfaces via hook onError.
+                              }
+                            }
+                          : undefined
                   }
                   onOverride={
                     selectedWaypoint.ids &&
@@ -354,6 +374,11 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
           isSaving={updateMilestone.isPending}
         />
       )}
+      <MarkCompleteDialog
+        open={completeDialogOpen}
+        onOpenChange={setCompleteDialogOpen}
+        task={task}
+      />
     </section>
   );
 }
@@ -617,6 +642,8 @@ function ActiveStagePanel({
   onOverride,
   isMarkingDone,
   slideDirection,
+  isFileStage,
+  isCollectStage,
 }: {
   wp: Waypoint;
   onMarkDone?: () => void;
@@ -627,6 +654,13 @@ function ActiveStagePanel({
    *  enters from the right edge); "left" when picking a stage to the
    *  left. null on first mount = no animation. */
   slideDirection?: "left" | "right" | null;
+  /** File pillar — its CTA reads "Mark complete" (cascade-up to task)
+   *  rather than "Mark File done", since marking File done IS marking
+   *  the task complete (locked 2026-05-06). */
+  isFileStage?: boolean;
+  /** Collect pillar — derived from checklist, no user CTA. The panel
+   *  shows a hint pointing to the checklist below instead. */
+  isCollectStage?: boolean;
 }) {
   const isFinished = wp.status === "done";
   const headline = (() => {
@@ -671,6 +705,11 @@ function ActiveStagePanel({
       {wp.blockerReason && (
         <p className="mt-1 text-2xs text-danger-ink">{wp.blockerReason}</p>
       )}
+      {isCollectStage && !isFinished && (
+        <p className="mt-1 text-2xs text-ink-500">
+          Status follows the checklist below — confirm items there.
+        </p>
+      )}
       {(onMarkDone || onOverride) && (
         <div className="mt-2 flex items-center gap-3 flex-wrap justify-center">
           {onMarkDone && !isFinished && (
@@ -680,7 +719,11 @@ function ActiveStagePanel({
               disabled={isMarkingDone}
               className="text-xs font-medium px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover disabled:opacity-50 inline-flex items-center gap-1"
             >
-              {isMarkingDone ? "Marking…" : `Mark ${wp.label} done`}
+              {isMarkingDone
+                ? "Marking…"
+                : isFileStage
+                  ? "Mark task complete"
+                  : `Mark ${wp.label} done`}
               <span aria-hidden>→</span>
             </button>
           )}

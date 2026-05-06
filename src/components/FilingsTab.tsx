@@ -255,12 +255,10 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
                         </span>
                       )}
                       {(statusCounts.not_started ||
-                        statusCounts.in_progress ||
-                        statusCounts.deferred) && (
+                        statusCounts.in_progress) && (
                         <span>
                           {(statusCounts.not_started ?? 0) +
-                            (statusCounts.in_progress ?? 0) +
-                            (statusCounts.deferred ?? 0)}{" "}
+                            (statusCounts.in_progress ?? 0)}{" "}
                           open
                         </span>
                       )}

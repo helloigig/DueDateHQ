@@ -30,23 +30,12 @@ import type {
 const delay = (ms = 150) =>
   new Promise((r) => setTimeout(r, ms + Math.random() * 100));
 
-// In-memory mock store for taskMilestones — survives across calls within a
-// page session, cleared on reload. Supports `proposeForTask` round-trips so
-// TaskMiniTimeline can demo the arrival-timing propose flow without a backend.
-type MockMilestoneRow = {
-  id: string;
-  firmId: string;
-  taskId: string;
-  milestoneType: string;
-  customLabel: string | null;
-  targetDate: string | null;
-  completedDate: string | null;
-  status: "not_started" | "in_progress" | "blocked" | "done" | "overdue";
-  blockerReason: string | null;
-  displayOrder: number;
-  proposedBy: "user" | "ai" | "system";
-};
-const mockMilestoneStore = new Map<string, MockMilestoneRow[]>();
+// taskMilestones now live on the main store (`state.milestones`) so the
+// task-complete cascade can mutate them transactionally. The previous
+// module-private Map was hoisted 2026-05-06; the row shape is the
+// canonical tRPC `TaskMilestoneRow` (router.ts:43) so mock and real
+// modes agree on schema.
+import type { TaskMilestoneRow } from "./router";
 
 // Mutable mock inbound-replies store. Lets the mock-mode UI exercise the
 // real linkToTask + markActioned flows: actioned rows are removed from
@@ -738,13 +727,14 @@ export const mockAdapter = {
   // taskMilestones — mock simulates arrival-timing target_date proposals so the FE
   // round-trip works in mock mode. proposeForTask synthesizes 5 substrate-
   // default milestones (per PRD §4.2 cold-start: -90/-60/-21/-7/0 days from
-  // due_date) and stashes them in mockMilestoneStore so subsequent listForTask
-  // calls return them. Real wiring happens against the backend when
+  // due_date) and stashes them in store.milestones (hoisted 2026-05-06 from
+  // a module-private Map so the task→milestones cascade can mutate them
+  // transactionally). Real wiring happens against the backend when
   // VITE_USE_MOCK_API=false — the BE calls predictMilestoneTargetDates.
   taskMilestones: {
     listForTask: async (input: { taskId: string }) => {
       await delay();
-      return mockMilestoneStore.get(input.taskId) ?? [];
+      return getState().milestones[input.taskId] ?? [];
     },
     fleetStack: async (_input?: { waitingOnly?: boolean; limit?: number }) => {
       await delay();
@@ -753,9 +743,9 @@ export const mockAdapter = {
       // Timeline assignee column has data in mock mode. Mock store keeps
       // a display name on the task; we map it to the session userId since
       // the mock firm has exactly one user.
-      const flat = Array.from(mockMilestoneStore.values()).flat();
+      const { milestones, tasks } = getState();
+      const flat = Object.values(milestones).flat();
       const session = sessionOrDefault();
-      const { tasks } = getState();
       return flat.map((m) => {
         const task = tasks.find((t) => t.id === m.taskId);
         const isMine =
@@ -779,7 +769,7 @@ export const mockAdapter = {
     },
     detectBlockers: async (input: { taskId: string }) => {
       await delay(400);
-      const existing = mockMilestoneStore.get(input.taskId) ?? [];
+      const existing = getState().milestones[input.taskId] ?? [];
       if (existing.length === 0) {
         return { decisions: [], appliedCount: 0 };
       }
@@ -787,7 +777,11 @@ export const mockAdapter = {
       // is in the past. Mirrors the backend heuristic fallback so dev
       // demos see meaningful cross-year-insighter behavior without an API key.
       const todayMs = Date.now();
-      let appliedCount = 0;
+      const patches: Array<{
+        id: string;
+        status?: TaskMilestoneRow["status"];
+        blockerReason?: string | null;
+      }> = [];
       const decisions = existing.map((m) => {
         if (m.status === "done") {
           return {
@@ -802,11 +796,12 @@ export const mockAdapter = {
             (todayMs - new Date(m.targetDate).getTime()) /
               (24 * 60 * 60 * 1000),
           );
-          // Apply the block to the in-memory store so listForTask reflects it
           if (m.status !== "blocked") {
-            m.status = "blocked";
-            m.blockerReason = `target was ${daysLate}d ago; status still ${m.status}`;
-            appliedCount++;
+            patches.push({
+              id: m.id,
+              status: "blocked",
+              blockerReason: `target was ${daysLate}d ago; status still ${m.status}`,
+            });
           }
           return {
             milestoneId: m.id,
@@ -822,19 +817,24 @@ export const mockAdapter = {
           confidence: "low" as const,
         };
       });
-      return { decisions, appliedCount };
+      if (patches.length > 0) {
+        actions.patchMilestonesBulk(input.taskId, patches);
+      }
+      return { decisions, appliedCount: patches.length };
     },
     proposeForTask: async (input: { taskId: string }) => {
       await delay();
-      const existing = mockMilestoneStore.get(input.taskId);
+      const existing = getState().milestones[input.taskId];
       if (existing && existing.length > 0) {
         return { proposed: false, milestones: existing };
       }
       // Synthesize 5 substrate milestones from the task's due date if known.
-      // The mock store doesn't have task data; default to ~April 15 of next
-      // year as a reasonable filing-due anchor for demo purposes. Real BE
-      // looks up officialDueDate from the deadline row.
-      const due = nextApril15();
+      // Pull the matched task's officialDueDate so the rendered "Path to
+      // filing" reflects the actual filing date (the prior nextApril15
+      // fallback was a debug shim). Falls through to nextApril15 if the
+      // task can't be located (defensive).
+      const task = getState().tasks.find((t) => t.id === input.taskId);
+      const due = task?.officialDueDate ?? nextApril15();
       const offsetDays = (days: number) => {
         const d = new Date(due);
         d.setDate(d.getDate() - days);
@@ -847,7 +847,7 @@ export const mockAdapter = {
         { type: "internal_review", offset: 7 },
         { type: "file", offset: 0 },
       ] as const;
-      const synthesized = stages.map((s, idx) => ({
+      const synthesized: TaskMilestoneRow[] = stages.map((s, idx) => ({
         id: `mock-mil-${input.taskId}-${idx}`,
         firmId: "mock-firm",
         taskId: input.taskId,
@@ -860,7 +860,7 @@ export const mockAdapter = {
         displayOrder: idx,
         proposedBy: "ai" as const,
       }));
-      mockMilestoneStore.set(input.taskId, synthesized);
+      actions.setMilestonesForTask(input.taskId, synthesized);
       return {
         proposed: true,
         milestones: synthesized,
@@ -869,9 +869,52 @@ export const mockAdapter = {
           "mock substrate (PRD §4.2 cold-start defaults — no firm history)",
       };
     },
-    update: async (_input: unknown) => {
+    update: async (input: {
+      id: string;
+      status?: TaskMilestoneRow["status"];
+      targetDate?: string;
+      blockerReason?: string | null;
+    }) => {
       await delay();
-      return {} as unknown;
+      // Locate the parent taskId by scanning the milestones map. Cheap
+      // for mock (max ~50 tasks × 5 milestones).
+      const { milestones } = getState();
+      let foundTaskId: string | null = null;
+      let foundRow: TaskMilestoneRow | null = null;
+      for (const [taskId, rows] of Object.entries(milestones)) {
+        const m = rows.find((r) => r.id === input.id);
+        if (m) {
+          foundTaskId = taskId;
+          foundRow = m;
+          break;
+        }
+      }
+      if (!foundTaskId || !foundRow) {
+        throw new Error("milestone not found");
+      }
+      const patch: Partial<
+        Pick<TaskMilestoneRow, "status" | "targetDate" | "blockerReason">
+      > = {};
+      if (input.status !== undefined) patch.status = input.status;
+      if (input.targetDate !== undefined) patch.targetDate = input.targetDate;
+      if (input.blockerReason !== undefined)
+        patch.blockerReason = input.blockerReason;
+      actions.updateMilestone(foundTaskId, input.id, patch);
+
+      // Cascade-up: marking the File milestone done completes the task.
+      // PRD §9.4.1 — the BE writes a TaskMilestoneEvent regardless; the
+      // task-level cascade is what makes "click File done" equivalent
+      // to "click Mark complete." Other milestones don't cascade.
+      if (
+        input.status === "done" &&
+        (foundRow.milestoneType === "file" || foundRow.milestoneType === "filing")
+      ) {
+        const task = getState().tasks.find((t) => t.id === foundTaskId);
+        if (task && task.status !== "completed") {
+          actions.updateTaskStatus(task.id, "completed");
+        }
+      }
+      return getState().milestones[foundTaskId]?.find((r) => r.id === input.id) as unknown;
     },
     add: async (_input: unknown) => {
       await delay();
