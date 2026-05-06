@@ -126,26 +126,71 @@ export function Login() {
   };
 
   const tryDemo = async () => {
-    const actions = await loadActions();
-    actions.resetToSeeds();
-    signIn({
-      firmName: "Mitchell CPA (demo)",
-      userName: "Sarah Mitchell",
-      userEmail: "demo@duedatehq.com",
-      tier: "pro",
-    });
-    const raw = localStorage.getItem("duedatehq.session.v1");
-    if (raw) {
-      try {
-        const s = JSON.parse(raw);
-        s.onboardingComplete = true;
-        s.primaryStates = ["CA"];
-        localStorage.setItem("duedatehq.session.v1", JSON.stringify(s));
-      } catch {
-        /* ignore */
+    // Mock-mode: the local store carries the seeded 51-client roster
+    // already, so we just sign in locally and land on Today. No
+    // network hop, no email round-trip — instant demo.
+    if (env.useMockAuth) {
+      const actions = await loadActions();
+      actions.resetToSeeds();
+      signIn({
+        firmName: "Mitchell CPA (demo)",
+        userName: "Sarah Mitchell",
+        userEmail: "demo@duedatehq.com",
+        tier: "pro",
+      });
+      const raw = localStorage.getItem("duedatehq.session.v1");
+      if (raw) {
+        try {
+          const s = JSON.parse(raw);
+          s.onboardingComplete = true;
+          s.primaryStates = ["CA"];
+          localStorage.setItem("duedatehq.session.v1", JSON.stringify(s));
+        } catch {
+          /* ignore */
+        }
       }
+      navigate("/", { replace: true });
+      return;
     }
-    navigate("/", { replace: true });
+
+    // Real-mode: send a Supabase magic link to demo@duedatehq.com. The
+    // user clicks the link in email → SupabaseAuthBridge picks up the
+    // SIGNED_IN event → sees the `bootstrap_demo_pending` flag we set
+    // here and calls `auth.bootstrapDemo` to provision the firm + seed
+    // the 51 clients. We use `shouldCreateUser: true` so the very first
+    // demo click on a fresh deploy works (no preexisting Supabase user).
+    setSubmitError(null);
+    setPending(true);
+    try {
+      localStorage.setItem("duedatehq.bootstrap_demo_pending", "1");
+      const { error } = await supabase().auth.signInWithOtp({
+        email: "demo@duedatehq.com",
+        options: {
+          shouldCreateUser: true,
+          emailRedirectTo: `${window.location.origin}/`,
+        },
+      });
+      if (error) {
+        // Wipe the flag — the magic link never went out so there's
+        // nothing to bootstrap on return.
+        localStorage.removeItem("duedatehq.bootstrap_demo_pending");
+        const msg = error.message.toLowerCase();
+        if (msg.includes("rate") || msg.includes("too many")) {
+          setSubmitError(
+            "Too many demo signins in the last hour. Wait ~60 minutes.",
+          );
+        } else {
+          setSubmitError(error.message);
+        }
+        return;
+      }
+      // The "sent" view explains the magic link to the user; the real
+      // bootstrap happens inside SupabaseAuthBridge after they click.
+      setEmail("demo@duedatehq.com");
+      setStep("sent");
+    } finally {
+      setPending(false);
+    }
   };
 
   // Link-sent confirmation view

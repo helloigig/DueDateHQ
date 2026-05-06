@@ -196,6 +196,21 @@ export const appRouter = t.router({
           alreadyProvisioned: boolean;
         }> => NOT_IMPL()
       ),
+    /** Demo workspace bootstrap. Called by Login.tsx tryDemo() after
+     *  the user signs in via Supabase magic link to demo@duedatehq.com.
+     *  Provisions the demo firm if missing AND idempotently seeds the
+     *  51-client roster + deadlines. Returns counts so the FE can show
+     *  a one-line "demo populated" toast. Backend FORBIDS calls from
+     *  any other email. */
+    bootstrapDemo: t.procedure.mutation(
+      async (): Promise<{
+        firmId: string;
+        clientsInserted: number;
+        clientsExisting: number;
+        deadlinesInserted: number;
+        deadlinesExisting: number;
+      }> => NOT_IMPL()
+    ),
   }),
 
   clients: t.router({

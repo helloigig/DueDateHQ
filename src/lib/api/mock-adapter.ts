@@ -245,6 +245,20 @@ export const mockAdapter = {
       await delay(400);
       return { ok: true as const };
     },
+    // Mock-mode no-op: the local store already carries the 51-client
+    // demo roster via mockClients/mockDeadlines, so the FE doesn't
+    // need to do anything to populate the workspace. Returning the
+    // same counts shape as the real BE keeps callers branch-free.
+    bootstrapDemo: async () => {
+      await delay(200);
+      return {
+        firmId: "firm-mock",
+        clientsInserted: 0,
+        clientsExisting: 51,
+        deadlinesInserted: 0,
+        deadlinesExisting: 70,
+      };
+    },
   },
 
   clients: {
