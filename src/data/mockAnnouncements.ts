@@ -30,12 +30,14 @@ export const announcements: Announcement[] = [
     relatedAnnouncementIds: ["irs-disaster-2026-la-delta"],
     parseConfidence: "high",
     matchConfidence: "high",
+    // c-la-05 lives in Jefferson but is `prospect` (not active), so
+    // computeAffectedClients() filters it out. Listing it here would
+    // make the seed disagree with detection (5 active matches, not 6).
     affectedClientIds: [
       "c-la-01",
       "c-la-02",
       "c-la-03",
       "c-la-04",
-      "c-la-05",
       "c-la-06",
     ],
     read: false,
@@ -64,7 +66,9 @@ export const announcements: Announcement[] = [
     relatedAnnouncementIds: [],
     parseConfidence: "high",
     matchConfidence: "high",
-    affectedClientIds: ["c-ca-01", "c-ca-02", "c-ca-04", "c-ca-07", "c-ca-10"],
+    // c-ca-04 is a Partnership but `prospect` — drop it so the seed
+    // count (4) matches what computeAffectedClients() would produce.
+    affectedClientIds: ["c-ca-01", "c-ca-02", "c-ca-07", "c-ca-10"],
     read: false,
     dismissed: false,
   },
@@ -124,12 +128,14 @@ export const announcements: Announcement[] = [
     dismissed: false,
   },
 
-  // ── Non-affecting news items ──────────────────────────────────────────
-  // State announcements scraped from monitored authorities that do NOT
-  // touch this firm's roster. They live on /alerts under "All
+  // ── Mostly long-tail / monitoring items ───────────────────────────────
+  // State announcements scraped from monitored authorities that ALMOST
+  // never touch this firm's roster. They live on /alerts under "All
   // announcements" so the CPA can verify "we're watching" without them
   // bubbling into Today's queue. The "Affecting you" tab counts only the
   // intersection — which is the differentiator's whole point (gap > fill).
+  // FL is the deliberate exception: 23-county press release narrows to
+  // ONE client (c-fl-02 in Pinellas) — that's the demo punchline.
   {
     id: "ann-or-2026-passthrough",
     stateCode: "OR",
@@ -260,8 +266,12 @@ export const announcements: Announcement[] = [
     relatedAnnouncementIds: [],
     parseConfidence: "high",
     matchConfidence: "high",
-    affectedClientIds: [],
-    read: true,
+    // Pinellas is one of the announced counties and c-fl-02 (Suncoast
+    // Advisors S-Corp, active) lives there + matches the entityType
+    // filter. Surfacing this honestly demonstrates the differentiator:
+    // a 23-county press release narrows down to ONE client of yours.
+    affectedClientIds: ["c-fl-02"],
+    read: false,
     dismissed: false,
   },
   {

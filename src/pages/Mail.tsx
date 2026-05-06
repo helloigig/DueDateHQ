@@ -29,46 +29,52 @@ import { PageHeader } from "../components/ui/PageHeader";
 
 type Tab = "inbox" | "outbox" | "drafts" | "issues";
 
+// Yuqi audit 2026-05-06: previously these mocks referenced invented
+// client names ("Emily Hartfield", "Marcus Chen", "Apex Fund",
+// "Sarah Mitchell", "Jordan Lee") that don't exist in mockClients —
+// "Sarah Mitchell" collides with the CPA persona, and clicking the
+// rows lands on a 404. Repointed to real clients so Mail surfaces
+// link consistently with Clients / Alerts / Timeline.
 const REMINDERS_OUT = [
   {
     daysSent: 11,
-    client: "Emily Hartfield",
-    task: "K-1 Apex Fund (1040 NY)",
-    address: "emily@hartfield.com",
+    client: "Sofia Alvarez",
+    task: "K-1 from outside fund (1040 NY)",
+    address: "sofia.alvarez@gmail.com",
   },
   {
     daysSent: 9,
-    client: "Marcus Chen",
-    task: "S-Corp books (S-Corp CA)",
-    address: "marcus@chen-llc.com",
+    client: "Pacific Ridge S-Corp",
+    task: "S-Corp books (1120-S CA)",
+    address: "kyle@pacificridge.co",
   },
   {
     daysSent: 8,
-    client: "Apex Fund",
+    client: "Bayou Engineering Partnership",
     task: "1065 Partner Forms",
-    address: "ops@apexfund.com",
+    address: "accounting@bayoueng.com",
   },
 ];
 
 const INBOX_MOCK: InboxRow[] = [
   {
     intent: "timeline_pushback",
-    client: "Sarah Mitchell",
+    client: "Sofia Alvarez",
     task: "1040 NY",
     preview: "Hi! K-1 from my fund won't be ready until late July...",
     receivedHoursAgo: 3,
   },
   {
     intent: "question_asked",
-    client: "Jordan Lee",
-    task: "S-Corp CA",
+    client: "Granite Ventures S-Corp",
+    task: "1120-S CA",
     preview: "Quick question — what's the IRA contribution limit this year?",
     receivedHoursAgo: 7,
   },
   {
     intent: "document_provided",
-    client: "Emily Hartfield",
-    task: "1040 NY",
+    client: "Anne Dupont",
+    task: "1040 Federal",
     preview: "Attached: W-2 for 2025 (ADP via Acme Corp)",
     receivedHoursAgo: 14,
   },

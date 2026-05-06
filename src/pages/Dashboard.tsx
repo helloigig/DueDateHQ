@@ -469,15 +469,24 @@ function StateAlertsPreview({
     (a) => !a.dismissed && a.affectedClientIds.length > 0,
   );
 
-  // Escalated subset — the only thing that earns Today's real estate.
-  const escalated = affecting.filter(
-    (a) => escTier(hoursSince(a.detectedAt)) === "escalated",
-  );
-  const routineCount = affecting.length - escalated.length;
+  // Action-today subset — escalated (48–72h) + blocking (>72h).
+  // Both tiers need action TODAY; the blocking modal is just the
+  // louder surface for >72h. Showing both here keeps the dashboard
+  // honest after the modal is dismissed/snoozed: the count and copy
+  // reflect everything past the 48h SLA, not just the in-between tier.
+  const actionToday = affecting.filter((a) => {
+    const t = escTier(hoursSince(a.detectedAt));
+    return t === "escalated" || t === "blocking";
+  });
+  // Routine = affecting that AREN'T action-today. Excluding blocking
+  // here is what fixes the prior double-count (modal shows blocking,
+  // and they were also counted as "routine" on this strip).
+  const routineCount = affecting.length - actionToday.length;
 
-  // No escalated — single ambient line. Same shape as the empty state
-  // (calm), different copy (you have stuff, but not on fire).
-  if (escalated.length === 0) {
+  // No action-today (no escalated, no blocking) — single ambient line.
+  // Same shape as the empty state (calm), different copy (you have
+  // stuff, but not on fire).
+  if (actionToday.length === 0) {
     return (
       <Link
         to="/alerts"
@@ -503,9 +512,12 @@ function StateAlertsPreview({
     );
   }
 
-  // Escalated present — sort escalated by impact (deadline-shifting,
-  // then most clients) so the most urgent card is first.
-  const sortedEscalated = [...escalated].sort((a, b) => {
+  // Action-today present — sort by impact (blocking before escalated,
+  // then deadline-shifting, then most clients).
+  const sortedActionToday = [...actionToday].sort((a, b) => {
+    const aBlocking = escTier(hoursSince(a.detectedAt)) === "blocking" ? 1 : 0;
+    const bBlocking = escTier(hoursSince(b.detectedAt)) === "blocking" ? 1 : 0;
+    if (aBlocking !== bBlocking) return bBlocking - aBlocking;
     const aShift = a.newDeadline ? 1 : 0;
     const bShift = b.newDeadline ? 1 : 0;
     if (aShift !== bShift) return bShift - aShift;
@@ -518,11 +530,11 @@ function StateAlertsPreview({
   return (
     <section className="mb-section">
       <SectionHeader
-        title="Escalated alerts"
+        title="Alerts to act on today"
         meta={
-          escalated.length === 1
-            ? "1 past 72h SLA — act today"
-            : `${escalated.length} past 72h SLA — act today`
+          actionToday.length === 1
+            ? "1 past 48h — act today"
+            : `${actionToday.length} past 48h — act today`
         }
         action={
           <Link
@@ -534,7 +546,7 @@ function StateAlertsPreview({
         }
       />
       <div className="flex flex-col gap-card">
-        {sortedEscalated.map((a) => (
+        {sortedActionToday.map((a) => (
           <StateAlertCard
             key={a.id}
             a={a}

@@ -80,9 +80,13 @@ const mockInboundReplies: MockInboundReply[] = (() => {
       id: "reply-mock-1",
       firmId: "firm-mock",
       taskId: null,
-      clientId: null,
+      // c-ny-02 — Sofia Alvarez, NY Individual. Real seed client so the
+      // "Open client" button on this row navigates somewhere real.
+      // (Previously fromAddress was sarah.mitchell@example.com, which
+      // collided with the CPA persona name shown in the avatar.)
+      clientId: "c-ny-02",
       gmailMessageId: "gmail-mock-1",
-      fromAddress: "sarah.mitchell@example.com",
+      fromAddress: "sofia.alvarez@gmail.com",
       toAddress: "intake@duedatehq.space",
       subject: "1040 NY — K-1 timing",
       bodyText:
@@ -100,11 +104,12 @@ const mockInboundReplies: MockInboundReply[] = (() => {
       id: "reply-mock-2",
       firmId: "firm-mock",
       taskId: null,
-      clientId: null,
+      // c-ca-10 — Granite Ventures S-Corp, CA. Real seed client.
+      clientId: "c-ca-10",
       gmailMessageId: "gmail-mock-2",
-      fromAddress: "jordan.lee@example.com",
+      fromAddress: "ken@graniteventures.com",
       toAddress: "intake@duedatehq.space",
-      subject: "S-Corp CA — IRA limit",
+      subject: "1120-S CA — IRA limit",
       bodyText:
         "Quick question — what's the IRA contribution limit this year?",
       attachmentMetadata: [],
@@ -120,11 +125,12 @@ const mockInboundReplies: MockInboundReply[] = (() => {
       id: "reply-mock-3",
       firmId: "firm-mock",
       taskId: null,
-      clientId: null,
+      // c-ca-08 — Anne Dupont, CA Individual. Real seed client.
+      clientId: "c-ca-08",
       gmailMessageId: "gmail-mock-3",
-      fromAddress: "emily.hartfield@example.com",
+      fromAddress: "adupont@outlook.com",
       toAddress: "intake@duedatehq.space",
-      subject: "1040 NY — W-2",
+      subject: "1040 Federal — W-2",
       bodyText: "Attached: W-2 for 2025 (ADP via Acme Corp)",
       attachmentMetadata: [{ filename: "W2-2025.pdf", size: 12834 }],
       topLevelClass: "client_doc",

@@ -55,24 +55,34 @@ export function BlockingAlertsDialog({
           {alerts.map((a) => {
             const h = Math.round(hoursSince(a.detectedAt));
             return (
-              <li key={a.id} className="px-5 py-3 flex items-center gap-3">
-                <StateBadge code={a.stateCode} size="sm" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-ink-900 truncate">
-                    {a.title}
-                  </div>
-                  <div className="text-xs text-ink-500 mt-0.5">
-                    {a.affectedClientIds.length} client
-                    {a.affectedClientIds.length === 1 ? "" : "s"} · {h}h
-                    unactioned
-                  </div>
-                </div>
+              <li key={a.id}>
+                {/* Whole row is the deep link — the Review button is the
+                    visual affordance, but clicking anywhere on the row
+                    (state badge, title, count) lands on the same alert.
+                    Without this the row felt clickable but only the
+                    button worked, which is a slip-error trap. */}
                 <Link
                   to={`/alerts/${a.id}`}
                   onClick={onClose}
-                  className="text-sm px-3 py-1.5 rounded bg-indigo text-white hover:bg-indigo-hover shrink-0"
+                  className="group px-5 py-3 flex items-center gap-3 hover:bg-sunken/60 focus-visible:outline-none focus-visible:bg-sunken/60 transition-colors"
                 >
-                  Review →
+                  <StateBadge code={a.stateCode} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-ink-900 truncate">
+                      {a.title}
+                    </div>
+                    <div className="text-xs text-ink-500 mt-0.5">
+                      {a.affectedClientIds.length} client
+                      {a.affectedClientIds.length === 1 ? "" : "s"} · {h}h
+                      unactioned
+                    </div>
+                  </div>
+                  <span
+                    aria-hidden
+                    className="text-sm px-3 py-1.5 rounded bg-indigo text-white group-hover:bg-indigo-hover shrink-0"
+                  >
+                    Review →
+                  </span>
                 </Link>
               </li>
             );

@@ -21,20 +21,31 @@
 import { Bell, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { trpc } from "../lib/api/client";
+import { useAnnouncements } from "../hooks/useAnnouncements";
 
 export function WhatChangedBanner() {
   const triageQuery = trpc.announcements.triageOnFirstLand.useQuery(undefined, {
     staleTime: 30_000,
     refetchOnWindowFocus: false,
   });
+  // Pull the full announcement list to resolve UNIQUE affected clients
+  // across the triage items. Summing per-alert counts double-counts a
+  // client when two alerts touch them (e.g. a NY LLC affected by both
+  // the nexus rule and the penalty waiver). The /alerts header uses
+  // unique clients too — keeping the same metric here avoids the demo
+  // confusion of "24 clients" on Today vs "21 clients" on /alerts.
+  const announcementsQuery = useAnnouncements({ activeOnly: true });
 
   const items = triageQuery.data ?? [];
   if (items.length === 0) return null;
 
-  const totalClients = items.reduce(
-    (acc, i) => acc + i.affectedClientCount,
-    0,
-  );
+  const triageIds = new Set(items.map((i) => i.id));
+  const uniqueClientIds = new Set<string>();
+  for (const a of announcementsQuery.data ?? []) {
+    if (!triageIds.has(a.id)) continue;
+    for (const cid of a.affectedClientIds) uniqueClientIds.add(cid);
+  }
+  const uniqueClientCount = uniqueClientIds.size;
 
   return (
     <div className="mb-card bg-warn-bg/40 border border-warn-border/60 rounded-md px-4 py-3">
@@ -47,12 +58,12 @@ export function WhatChangedBanner() {
             {items.length === 1
               ? "1 new state alert since you were last here"
               : `${items.length} new state alerts since you were last here`}
-            {totalClients > 0 && (
+            {uniqueClientCount > 0 && (
               <span className="text-ink-500 font-normal ml-1">
                 ·{" "}
-                {totalClients === 1
+                {uniqueClientCount === 1
                   ? "1 client affected"
-                  : `${totalClients} clients affected`}
+                  : `${uniqueClientCount} clients affected`}
               </span>
             )}
           </p>

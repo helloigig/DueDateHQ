@@ -134,10 +134,19 @@ const STAGE_LABELS: Record<Stage, string> = {
   file: "File",
 };
 
+// Yuqi audit 2026-05-06: previously these rows used invented client
+// names ("Apex Fund", "Emily Hartfield", "Marcus Chen", "Sarah Mitchell",
+// "Jordan Lee") that didn't exist in mockClients.ts — clicking a row
+// navigated to a 404 client detail and the "Sarah Mitchell" row
+// collided with the CPA persona name in the bottom-left avatar. Each
+// row now references a real client id + name from the mock roster so
+// the Timeline links into the same client surface the rest of the demo
+// uses (Clients table, Alerts recipient chips, Mail threads).
 const MOCK_TIMELINES: TaskRow[] = [
   {
-    taskId: "mock-task-apex",
-    client: "Apex Fund",
+    taskId: "mock-task-bayou-1065",
+    clientId: "c-la-06",
+    client: "Bayou Engineering Partnership",
     task: "1065 Partner Forms",
     dueDate: "Mar 15",
     officialDueIso: "2026-03-15",
@@ -149,13 +158,14 @@ const MOCK_TIMELINES: TaskRow[] = [
     milestoneStatus: ["done", "done", "in_progress", "not_started", "not_started"],
     jurisdiction: "federal",
     entityType: "Partnership",
-    tier: "premium",
+    tier: "standard",
     assignedUserId: "user-mock",
     assigneeName: "Sarah Mitchell",
   },
   {
-    taskId: "mock-task-hartfield",
-    client: "Emily Hartfield",
+    taskId: "mock-task-alvarez-1040",
+    clientId: "c-ny-02",
+    client: "Sofia Alvarez",
     task: "1040 NY",
     dueDate: "Apr 15",
     officialDueIso: "2026-04-15",
@@ -172,9 +182,10 @@ const MOCK_TIMELINES: TaskRow[] = [
     assigneeName: null,
   },
   {
-    taskId: "mock-task-chen",
-    client: "Marcus Chen",
-    task: "S-Corp CA",
+    taskId: "mock-task-pacific-ridge-1120s",
+    clientId: "c-ca-02",
+    client: "Pacific Ridge S-Corp",
+    task: "1120-S CA",
     dueDate: "Mar 31",
     officialDueIso: "2026-03-31",
     internalDueIso: "2026-03-24",
@@ -185,31 +196,33 @@ const MOCK_TIMELINES: TaskRow[] = [
     milestoneStatus: ["done", "done", "done", "in_progress", "not_started"],
     jurisdiction: "CA",
     entityType: "S-Corp",
-    tier: "premium",
+    tier: "standard",
     assignedUserId: "user-mock",
     assigneeName: "Sarah Mitchell",
   },
   {
-    taskId: "mock-task-mitchell",
-    client: "Sarah Mitchell",
-    task: "1040 TX",
-    dueDate: "Apr 15",
-    officialDueIso: "2026-04-15",
-    internalDueIso: "2026-04-08",
+    taskId: "mock-task-juniper-franchise",
+    clientId: "c-tx-08",
+    client: "Juniper Oil & Gas LLC",
+    task: "TX Franchise Tax",
+    dueDate: "May 15",
+    officialDueIso: "2026-05-15",
+    internalDueIso: "2026-05-08",
     formClass: "annual_return",
     currentStage: "review",
     daysBehind: 0,
     missingCount: 1,
     milestoneStatus: ["done", "done", "done", "in_progress", "not_started"],
     jurisdiction: "TX",
-    entityType: "Individual",
-    tier: "standard",
+    entityType: "LLC",
+    tier: "premium",
     assignedUserId: null,
     assigneeName: null,
   },
   {
-    taskId: "mock-task-lee",
-    client: "Jordan Lee",
+    taskId: "mock-task-dupont-1040",
+    clientId: "c-ca-08",
+    client: "Anne Dupont",
     task: "1040 Federal",
     dueDate: "Apr 15",
     officialDueIso: "2026-04-15",
