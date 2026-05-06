@@ -316,11 +316,17 @@ export function Login() {
           </p>
         </div>
 
-        {/* Demo workspace — only in mock mode + not for invited users */}
-        {env.useMockData && !inviteToken && (
+        {/* Demo workspace — visible in both mock + real mode now that
+            tryDemo() supports both. In real mode it sends a Supabase
+            magic link to demo@duedatehq.com and bootstraps the demo
+            firm via auth.bootstrapDemo on return. Hidden only when
+            the user is following an invite — they're joining a
+            specific firm and shouldn't be detoured into the demo. */}
+        {!inviteToken && (
           <button
             onClick={() => void tryDemo()}
-            className="w-full mt-3 bg-surface border border-line hover:border-accent rounded-md p-4 text-left transition-colors group"
+            disabled={pending}
+            className="w-full mt-3 bg-surface border border-line hover:border-accent rounded-md p-4 text-left transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div className="flex items-start gap-3">
               <span className="w-8 h-8 rounded-full bg-info-bg border border-info-border text-info-ink flex items-center justify-center shrink-0">
@@ -331,8 +337,9 @@ export function Login() {
                   Try the demo workspace
                 </p>
                 <p className="text-xs text-ink-500 mt-0.5">
-                  49 fake clients, live state alert, 3 years of prior history.
-                  No email, no waiting — just see how it works.
+                  {env.useMockAuth
+                    ? "51 fake clients, live state alerts, 3 years of prior history. No email, no waiting — just see how it works."
+                    : "51 fake clients, live state alerts, 3 years of prior history. We'll email a one-time sign-in link to demo@duedatehq.com."}
                 </p>
               </div>
               <ArrowRight
