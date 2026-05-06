@@ -408,6 +408,18 @@
   .shipped-row .text { font-size: 1.4vmin; color: var(--ink-700); line-height: 1.55; }
   .shipped-row .text b { color: var(--ink-900); font-weight: 600; }
 
+  /* === SLIDE 16: Roadmap timeline === */
+  .timeline-wrap { margin-top: 2.5vmin; margin-bottom: 2vmin; padding: 0 1vmin; }
+  .timeline-track { position: relative; height: 4vmin; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0; }
+  .timeline-bar { position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: var(--line); transform: translateY(-50%); }
+  .timeline-fill { position: absolute; top: 50%; left: 0; height: 2px; background: var(--ink-900); transform: translateY(-50%); width: 12.5%; }
+  .timeline-marker { position: relative; display: flex; flex-direction: column; align-items: flex-start; }
+  .timeline-marker .dot { position: absolute; top: calc(50% - 0.6vmin); left: 0; width: 1.2vmin; height: 1.2vmin; border-radius: 50%; background: var(--surface); border: 2px solid var(--ink-300); }
+  .timeline-marker.shipped .dot { background: var(--ink-900); border-color: var(--ink-900); }
+  .timeline-marker .label-when { position: absolute; top: -2.5vmin; left: 0; font-family: var(--font-mono); font-size: 1.2vmin; color: var(--ink-700); font-weight: 700; letter-spacing: 0.06em; }
+  .timeline-marker .label-theme { position: absolute; top: 2.5vmin; left: 0; font-size: 1.3vmin; color: var(--ink-500); }
+  .timeline-marker.shipped .label-when { color: var(--ink-900); }
+
   /* === SLIDE 16: Roadmap (phase-based) === */
   .phase-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5vmin; margin-top: 2.5vmin; }
   .phase-card { padding: 2.2vmin; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 1.2vmin; }
@@ -723,7 +735,7 @@
     </div>
     <div class="qthread-card">
       <div class="badge">Thread Q2 · 邮件 + 审计轨迹</div>
-      <div class="quote">"IRS 来查 client X 的 2023 年报税，事务所必须能调出'我们在 T 时刻问了 Y'。"<span class="attrib">— 审计轨迹是合规要求，不是 nice-to-have</span></div>
+      <div class="quote">「CPA 行业活在 audit-trail 期待里。IRS 任何时候都可能来查任何客户的记录。事务所拿不出完整 trail = 专业责任风险。」<span class="attrib">— 访谈综合 §11.1 audit-trail（非 verbatim）</span></div>
       <div class="arrow-row"><span class="arrow">→</span><span class="text"><b>Stage 1（AI 起草、CPA 审）→ Stage 2 opt-in（满足 3 条件后自动）。</b>activity timeline append-only · IRS 审计可导出 PDF + JSON。</span></div>
     </div>
     <div class="qthread-card">
@@ -779,7 +791,7 @@
       </div>
       <div class="other-section">
         <div class="lbl">新增 · 转化失败现场</div>
-        <div class="text">Q4：试过 TaxDome 但第 3 个客户导入就放弃。「不愿为不需要的 80% 功能绑一年。」</div>
+        <div class="text">Q4 答 TaxDome 试用经历：第 3 个客户导入就放弃 — 觉得 80% 功能她用不上，不值得绑一年。</div>
       </div>
       <div class="other-section">
         <div class="lbl">决定 · 落进产品</div>
@@ -792,11 +804,11 @@
       <div class="meta">5 人事务所 · 2 年经验 · 分到 80 客户 · 仍在 ramp</div>
       <div class="other-section">
         <div class="lbl">确认 · 知识转移痛</div>
-        <div class="text">partner 把客户「丢」给 junior，没人系统化记每个客户去年怎么处理的。Q5：「替我记住 partner 没告诉我的事。」</div>
+        <div class="text">partner 把客户分配给 junior，没人系统化记下每个客户去年怎么处理。她希望系统替她记下 partner 头脑里的隐式知识。</div>
       </div>
       <div class="other-section">
         <div class="lbl">新增 · 焦虑的真实形状</div>
-        <div class="text">Q2：「不知道自己不知道什么」。差点漏的不是技术 deadline — 是 partner 没交代过的客户习惯。</div>
+        <div class="text">Q2 答案核心是「未知的未知」— 差点漏的不是技术 deadline，是 partner 没交代过的客户习惯（哪家基金 K-1 总是 8 月才到等等）。</div>
       </div>
       <div class="other-section">
         <div class="lbl">决定 · 落进产品</div>
@@ -804,6 +816,7 @@
       </div>
     </div>
   </div>
+  <div class="caption" style="margin-top: 2vmin; padding-top: 1.5vmin; border-top: 1px solid var(--line); font-size: 1.2vmin; color: var(--ink-500); font-style: italic;">L. / M. 卡片里的描述是访谈综合（synthesis），不是逐字 verbatim。Yan Jing 全程录像可对照；L./M. 因隐私不便录像。</div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
     <span class="center"><span class="num">09</span>另两次访谈 · 招募 funnel</span>
@@ -862,7 +875,7 @@
     <div class="mockup-bar">
       <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
       <div class="url">duedatehq.space/today</div>
-      <div class="live-stamp">● 已在生产</div>
+      <div class="live-stamp" style="background: var(--sunken); color: var(--ink-500); border-color: var(--line);">● 演示数据 · 真实部署</div>
     </div>
     <div class="mockup-content">
       <div class="mockup-alert">
@@ -1117,8 +1130,18 @@
 
 <!-- 16. Roadmap - 12 个月 4 阶段 (具体功能名 · 无 Mode 抽象) -->
 <section class="slide center" data-num="16" data-title="Roadmap · 12 个月" data-notes="Roadmap 不再用 Mode A/B/C 这种内部抽象。用具体功能名 + 用户能感受到的好处 + 阶段时间。Q3 是商业化（登录 + 集成 + 计费）；Q4 是日常 AI 接入；明年 Q1 是引擎激活；明年 Q2+ 是平台 + 合规。讲的时候按 phase 顺序读，每张卡片读 phase 名 + 1-2 个最强 feature，不要全念。">
-  <div class="micro eyebrow">Roadmap · 接下来 12 个月 · 真的具体</div>
+  <div class="micro eyebrow">接下来 12 个月</div>
   <h2 class="h1">四步 — 从楔子到平台。</h2>
+  <div class="timeline-wrap">
+    <div class="timeline-track">
+      <div class="timeline-bar"></div>
+      <div class="timeline-fill"></div>
+      <div class="timeline-marker shipped"><span class="dot"></span><span class="label-when">May 2026</span><span class="label-theme">楔子上线</span></div>
+      <div class="timeline-marker"><span class="dot"></span><span class="label-when">Q3 2026</span><span class="label-theme">商业化</span></div>
+      <div class="timeline-marker"><span class="dot"></span><span class="label-when">Q4 2026</span><span class="label-theme">日常 AI</span></div>
+      <div class="timeline-marker"><span class="dot"></span><span class="label-when">2027 H1</span><span class="label-theme">引擎 + 平台</span></div>
+    </div>
+  </div>
   <div class="phase-grid">
     <div class="phase-card now">
       <div class="when">✓ 现在 · May 2026</div>
