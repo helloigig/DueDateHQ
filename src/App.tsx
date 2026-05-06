@@ -1,6 +1,17 @@
 import { Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { lazyWithChunkRetry } from "./lib/lazy-with-retry";
+
+/**
+ * TaskRouteRedirect — bounces the legacy `/clients/:id/tasks/:taskId`
+ * deep link to the canonical `/clients/:id?task=:taskId` panel. Kept
+ * inline (not lazy) because it's 6 lines and never blocks first paint.
+ */
+function TaskRouteRedirect() {
+  const { id, taskId } = useParams<{ id: string; taskId: string }>();
+  if (!id || !taskId) return <Navigate to="/clients" replace />;
+  return <Navigate to={`/clients/${id}?task=${taskId}`} replace />;
+}
 // Auth pages stay eagerly imported — they're the entry points (post-signout
 // redirect target + magic-link landing) and are individually tiny. Loading
 // them lazily would just add a Suspense flash on the most-hit page.
@@ -25,9 +36,6 @@ const Clients = lazyWithChunkRetry(() =>
 );
 const ClientDetail = lazyWithChunkRetry(() =>
   import("./pages/ClientDetail").then((m) => ({ default: m.ClientDetail })),
-);
-const TaskDetail = lazyWithChunkRetry(() =>
-  import("./pages/TaskDetail").then((m) => ({ default: m.TaskDetail })),
 );
 const Inbox = lazyWithChunkRetry(() =>
   import("./pages/Inbox").then((m) => ({ default: m.Inbox })),
@@ -228,7 +236,18 @@ export default function App() {
           <Route path="activity" element={<Navigate to="/" replace />} />
           <Route path="clients" element={<Clients />} />
           <Route path="clients/:id" element={<ClientDetail />} />
-          <Route path="clients/:id/tasks/:taskId" element={<TaskDetail />} />
+          {/* Legacy task route. Yuqi audit 2026-05-06: every task entry
+              point (Today, ActionQueue, Timeline, Mail, Calendar, Alerts)
+              now opens the task in the right-rail TaskPanel via the
+              `?task=:taskId` query param. The standalone full-page
+              TaskDetail layout was producing two divergent UIs for the
+              same object and losing panel state on transition. Path is
+              kept as a redirect so deep links land on the canonical
+              destination. */}
+          <Route
+            path="clients/:id/tasks/:taskId"
+            element={<TaskRouteRedirect />}
+          />
           {/* /alerts is the v0u feed + co-pilot pane workshop. Mounted
               INSIDE AppShell so it shares the same sidebar/topbar/banner
               chrome as Today/Timeline/Clients (consistency). The page

@@ -31,6 +31,8 @@ import {
   AlertTriangle,
   Bot,
   Pause,
+  Megaphone,
+  ChevronRight,
   type LucideIcon,
 } from "lucide-react";
 import { actions, useStore } from "../data/store";
@@ -42,6 +44,7 @@ import {
   useClient,
   useUpdateClient,
 } from "../hooks/useClients";
+import { useAnnouncements } from "../hooks/useAnnouncements";
 import { useDeadlinesForClient } from "../hooks/useDeadlines";
 import { useTasksForClient } from "../hooks/useTasks";
 import {
@@ -69,6 +72,7 @@ import { ExportClientsButton } from "../components/ExportClientsButton";
 import { PinClientButton } from "../components/Sidebar";
 import { BackLink } from "../components/ui/BackLink";
 import { PageContainer } from "../components/ui/PageContainer";
+import { StateBadge } from "../components/ui/StateBadge";
 import { StateChipGroup } from "../components/StateChipGroup";
 import { ClientChip } from "../components/ClientChip";
 import { STATE_NAMES, type StateCode } from "../types";
@@ -91,13 +95,24 @@ import type {
 // Tier + since + deadline counts now live as a meta line under the
 // client name; the gauge is gone (it was measuring nothing real).
 //
-// Tab strip: To Do | Filings | Mailbox | Notes
+// Tab strip: Work | Mailbox | Notes
 // Held over for deep-link compatibility but routed via overflow menu:
 // documents / contacts / audit.
 //
-// Engagement tab key still mapped for `?tab=engagement` URLs that
-// existed in the wild — it silently aliases to "todo".
+// Yuqi audit 2026-05-06: To Do + Filings merged into a single "Work"
+// tab. The two former tabs were two views of the same task set —
+// To Do filtered to "still waiting / needs review" docs, Filings
+// listed deadlines + status pills — and forced the user to swap tabs
+// to reconcile "what's the plan" vs "what's blocking it." Work
+// renders the filing list (calendar-truth structure) AND the doc
+// checklist (action-truth) on one surface so the relationship is
+// visible without tab-swapping.
+//
+// `todo`, `filings`, and `engagement` are kept as URL aliases so old
+// deep links (?tab=todo, ?tab=filings, ?tab=engagement) silently
+// route to `work` instead of 404'ing.
 type Tab =
+  | "work"
   | "todo"
   | "filings"
   | "mailbox"
@@ -143,15 +158,33 @@ export function ClientDetail() {
   const client = clientQuery.data ?? null;
   const deadlines = deadlinesQuery.data ?? [];
   const archiveClientMut = useArchiveClient();
-  const [tab, setTab] = useState<Tab>("todo");
-  // Tracks whether the user explicitly clicked a tab. Once true, the
-  // default-tab effect below stops auto-switching — Sarah's manual
-  // selection wins. Yuqi audit 2026-05-05: "if To Do is empty, default
-  // to Filings tab."
+  // Tab state — single source of truth is the URL `?tab=` query param so
+  // the active tab survives copy-link / browser-back / refresh. Old
+  // `?tab=todo` / `?tab=filings` / `?tab=engagement` deep links alias
+  // to "work" via the route map below. Yuqi audit 2026-05-06: prior
+  // setup kept tab in local useState only; the URL was a one-way
+  // door (deep link could land you on a tab, but switching tabs
+  // wouldn't write back).
+  const TAB_ALIAS: Record<string, Tab> = {
+    work: "work",
+    todo: "work",
+    filings: "work",
+    engagement: "work",
+    mailbox: "mailbox",
+    notes: "notes",
+    documents: "documents",
+    contacts: "contacts",
+    audit: "audit",
+  };
+  const tabFromUrl = TAB_ALIAS[searchParams.get("tab") ?? "work"] ?? "work";
+  const tab: Tab = tabFromUrl;
   const tabExplicitRef = useRef(false);
   const onTabChange = (next: Tab) => {
     tabExplicitRef.current = true;
-    setTab(next);
+    const params = new URLSearchParams(searchParams);
+    if (next === "work") params.delete("tab");
+    else params.set("tab", next);
+    setSearchParams(params, { replace: false });
   };
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
@@ -167,21 +200,9 @@ export function ClientDetail() {
   // its name as a pass-through alias so the To Do / Filings / Mailbox
   // tabs that consume it don't change their prop contracts.
 
-  // Default tab — landing on To Do is the right answer when the client
-  // has active work to chase / confirm. When To Do would be empty (no
-  // active deadlines), Filings is what Sarah opens to answer "where is
-  // this client at." We auto-switch on first data load, but only if
-  // the user hasn't already clicked a tab — manual selection wins.
-  useEffect(() => {
-    if (tabExplicitRef.current) return;
-    if (!deadlinesQuery.data) return;
-    const hasActive = deadlinesQuery.data.some(
-      (d) => d.status !== "completed" && d.status !== "filed_extension",
-    );
-    if (!hasActive) {
-      setTab("filings");
-    }
-  }, [deadlinesQuery.data]);
+  // Default tab is always Work post-merge (To Do + Filings collapsed
+  // into one surface, so there's no longer a "swap to Filings when
+  // To Do is empty" branch to implement).
 
   useEffect(() => {
     if (searchParams.get("addDeadline") === "1") {
@@ -244,16 +265,18 @@ export function ClientDetail() {
   const activeDeadlineCount = clientDeadlines.filter(
     (d) => d.status !== "completed" && d.status !== "filed_extension"
   ).length;
-  // "Working on" — the distinct formTypes among active deadlines. Used
-  // to badge the client header so the CPA can read at-a-glance which
-  // filings the firm is in the middle of for this client.
-  const workingOnFormTypes = Array.from(
-    new Set(
-      clientDeadlines
-        .filter((d) => d.status !== "completed" && d.status !== "filed_extension")
-        .map((d) => d.form),
-    ),
+  // Header summary — Yuqi audit 2026-05-06: previous version listed every
+  // active form by name ("PA RCT-101 (corporate), PA RCT-101 (final),
+  // 1120 (extension)") which duplicated the Filings tab line-for-line.
+  // The header should be a glance-level summary; the per-form detail
+  // belongs in the Work tab. Compute the soonest official due date so
+  // the header carries the "next thing on the calendar" instead.
+  const activeDeadlines = clientDeadlines.filter(
+    (d) => d.status !== "completed" && d.status !== "filed_extension",
   );
+  const nextDueDate = activeDeadlines
+    .map((d) => d.officialDueDate)
+    .sort()[0];
 
   // Pass-through alias — header filters retired; tabs still consume
   // `filteredDeadlines` by name.
@@ -303,9 +326,19 @@ export function ClientDetail() {
     navigate("/clients");
   };
 
+  // Back-link target — preserves the originating surface when the user
+  // arrived from a non-/clients context. Yuqi audit 2026-05-06: clicking
+  // a client chip on /alerts/:id used to land here with no return path
+  // beyond the browser back button; the back link said "Back to
+  // Clients" regardless of how the user got here. Now: if the URL
+  // carries `?fromAlert=:id`, the link points back at that alert.
+  const fromAlertId = searchParams.get("fromAlert");
+  const backFallback = fromAlertId ? `/alerts/${fromAlertId}` : "/clients";
+  const backLabel = fromAlertId ? "alert" : "Clients";
+
   return (
     <PageContainer variant="wide">
-      <BackLink fallback="/clients" fallbackLabel="Clients" />
+      <BackLink fallback={backFallback} fallbackLabel={backLabel} />
 
 
       {/* Header redesign 2026-05-06.
@@ -376,12 +409,14 @@ export function ClientDetail() {
         </div>
       </div>
 
-      {/* Two-column header body — left: meta + working-on rows;
-          right: auto-generated AI summary card. Stacks on mobile.
-          Year/Form filter chips dropped from the header (filteredDeadlines
-          falls through when state is empty); they can return inside the
-          relevant tab if needed. */}
-      <div className="mt-3 mb-region grid grid-cols-1 md:grid-cols-[1fr,auto] gap-4">
+      {/* Header body — meta line + working-on row. The right-rail
+          ClientAiSummaryCard ("AI generated based on history" + "X prior-
+          year facts on file") was dropped 2026-05-06: the copy was meta-
+          narration about AI rather than a concrete signal, mirrored
+          forever-no-list "AI is learning" pattern, and ate header
+          real estate. Concrete advisory signals already surface as
+          Opportunities and inside Activity tab. */}
+      <div className="mt-3 mb-region">
         <div className="min-w-0 space-y-2">
           {/* Meta row: primary service package + email-icon-button +
               phone-icon-button + "Since {date}". Email and phone collapse
@@ -430,18 +465,24 @@ export function ClientDetail() {
             )}
           </div>
 
-          {/* Working-on row: N filings + status chip (All on track / N
-              behind / N on extension) + colon + form list. Replaces the
-              former 3-metric stat strip — one short sentence reads
-              faster than three numbers when most clients are on track. */}
+          {/* Header status line: filing count + status chip + next due
+              date. Yuqi audit 2026-05-06: previous version listed every
+              active form by name, duplicating the Filings tab. The
+              header now reads as a glance summary ("3 filings · 1
+              behind · next due May 8") so a CPA scanning the page top
+              can answer "is anything wrong, what's next" without their
+              eye getting pulled into a comma-separated form list. The
+              per-form detail belongs in the Work tab below. */}
           {kpis.active > 0 && (
             <div className="text-sm text-ink-700 flex items-baseline flex-wrap gap-x-2 gap-y-1">
               <span className="text-ink-500">
-                Working on{" "}
                 <span className="font-semibold text-ink-900 tabular-nums">
                   {kpis.active}
                 </span>{" "}
                 filing{kpis.active === 1 ? "" : "s"}
+              </span>
+              <span className="text-ink-300" aria-hidden>
+                ·
               </span>
               {kpis.behind > 0 ? (
                 <span className="inline-flex items-center gap-1 text-2xs px-1.5 py-0.5 rounded border border-warn-border bg-warn-bg/60 text-warn-ink font-medium">
@@ -459,32 +500,35 @@ export function ClientDetail() {
                   All on track
                 </span>
               )}
-              {workingOnFormTypes.length > 0 && (
-                <span className="text-ink-500 inline-flex items-baseline gap-1 min-w-0">
-                  <span>:</span>
-                  <span className="text-ink-700 truncate">
-                    {workingOnFormTypes.slice(0, 4).join(", ")}
-                    {workingOnFormTypes.length > 4 &&
-                      ` +${workingOnFormTypes.length - 4}`}
+              {nextDueDate && (
+                <>
+                  <span className="text-ink-300" aria-hidden>
+                    ·
                   </span>
-                </span>
+                  <span className="text-ink-500">
+                    next due{" "}
+                    <span className="text-ink-900 font-medium">
+                      {formatLongDate(nextDueDate)}
+                    </span>
+                  </span>
+                </>
               )}
             </div>
           )}
 
           {/* Override surface — only renders when the user has authored
-              a manual AI summary. Right-rail card carries the
-              auto-summary; the override is its editorial twin. */}
+              a manual AI summary. */}
           <ClientAiSummary client={client} />
         </div>
-
-        {/* Right rail — auto-generated AI summary card. Compact,
-            single-paragraph; the deeper Advisory + churn-risk surfaces
-            still render below via ClientAiInsightsCard. */}
-        <div className="md:max-w-sm md:w-[22rem]">
-          <ClientAiSummaryCard clientId={client.id} />
-        </div>
       </div>
+
+      {/* Active state alerts touching this client. Without this section,
+          /clients/:id was the one place in the demo where an affected
+          client showed no signal of the alert affecting them — you could
+          land on Suncoast Advisors with no hint that the FL hurricane
+          prep extension applies. Renders null when there are no active
+          alerts for this client. */}
+      <ClientStateAlertsCard clientId={client.id} />
 
       {/* Cross-year-insighter advisory triggers + churn-risk deep callout.
           Kept below the header so they don't crowd identity, but above
@@ -493,18 +537,14 @@ export function ClientDetail() {
       <ClientAiInsightsCard clientId={client.id} />
 
       <div className="mt-5 border-b border-line flex items-center gap-1 flex-wrap relative">
-        {/* Tab order — IA v0.7 §3.3 amendment 2026-05-04: To Do leads
-            because it's the only tab the CPA actually opens during the
-            day (chase / confirm / send). Engagement = contract/scope
-            (what we're paid to do); Filings = past + current + projected
-            timeline; Habits + Predictions fold into Filings as the
-            "Multi-year patterns" section since they describe the same
-            history axis. Notes promoted from sub-section to a real tab
-            so firm-internal memory has its own destination. */}
+        {/* Tab order — Yuqi audit 2026-05-06: Work leads (Filings + To Do
+            merged). Mailbox = inbound thread / chase replies. Notes = firm-
+            internal memory. Documents / Contacts / Audit log live in the
+            overflow ("…") menu — referenced often enough to deep-link, not
+            often enough to earn primary tab real estate. */}
         {(
           [
-            ["todo", "To Do", CircleCheck],
-            ["filings", "Filings", ClipboardList],
+            ["work", "Work", ClipboardList],
             ["mailbox", "Mailbox", Mail],
             ["notes", "Notes", Brain],
           ] as const
@@ -570,37 +610,53 @@ export function ClientDetail() {
       </div>
 
       <div className="mt-5 space-y-5">
-        {/* Both To Do and Filings receive `filteredDeadlines` (year +
-            form filter projection). When no filter is active this is
-            === clientDeadlines, so unfiltered render is identical to
-            before. */}
-        {tab === "todo" && (
-          <ToDoTab
-            client={client}
-            allDeadlines={filteredDeadlines}
-            onAddDeadline={() => setAddDeadlineOpen(true)}
-            onOpenDocuments={() => onTabChange("documents")}
-          />
-        )}
-        {/* Engagement tab retired 2026-05-05 — see type Tab comment.
-            Existing ?tab=engagement deep links silently route to todo. */}
-        {tab === "engagement" && (
-          <ToDoTab
-            client={client}
-            allDeadlines={filteredDeadlines}
-            onAddDeadline={() => setAddDeadlineOpen(true)}
-            onOpenDocuments={() => onTabChange("documents")}
-          />
-        )}
-        {tab === "filings" && (
-          <FilingsTab
-            client={client}
-            deadlines={filteredDeadlines}
-            onAddDeadline={(prefill) => {
-              setAddDeadlinePrefill(prefill);
-              setAddDeadlineOpen(true);
-            }}
-          />
+        {/* Work tab — merged To Do + Filings. Filings (calendar-truth
+            structure) renders first to give the "where is this client
+            at across all filings" overview; ToDo (action-truth) renders
+            below as the per-doc chase work for whichever filings are
+            currently active. They consume the same `filteredDeadlines`
+            so counts always reconcile.
+            Old `?tab=todo`, `?tab=filings`, and `?tab=engagement` deep
+            links silently land here. */}
+        {(tab === "work" ||
+          tab === "todo" ||
+          tab === "filings" ||
+          tab === "engagement") && (
+          <>
+            <FilingsTab
+              client={client}
+              deadlines={filteredDeadlines}
+              onAddDeadline={(prefill) => {
+                setAddDeadlinePrefill(prefill);
+                setAddDeadlineOpen(true);
+              }}
+            />
+            {/* Visual transition between Filings (calendar-truth) and
+                ToDo (action-truth on the same task set). Yuqi audit
+                2026-05-06: post-merge the two sections rendered as
+                visual peers, but they describe the same data sliced
+                differently. The micro-label below frames ToDo as the
+                doc-axis breakdown of the filings above so the user
+                doesn't read them as unrelated lists. */}
+            <div
+              className="border-t border-line pt-4 -mt-1"
+              aria-hidden="true"
+            >
+              <p className="text-2xs uppercase tracking-wider font-semibold text-ink-500">
+                Doc-level chase &amp; review
+              </p>
+              <p className="text-xs text-ink-500 mt-0.5">
+                Items grouped from the filings above, split by what's
+                pending on the client vs. waiting on you.
+              </p>
+            </div>
+            <ToDoTab
+              client={client}
+              allDeadlines={filteredDeadlines}
+              onAddDeadline={() => setAddDeadlineOpen(true)}
+              onOpenDocuments={() => onTabChange("documents")}
+            />
+          </>
         )}
         {tab === "mailbox" && <MailboxTab client={client} />}
         {tab === "notes" && <NotesTab client={client} />}
@@ -1406,139 +1462,14 @@ function ToDoTab({
   const daysAgo = (iso: string): number =>
     Math.floor((Date.now() - new Date(iso).getTime()) / (24 * 60 * 60 * 1000));
 
-  // Derive the unique tasks from BOTH:
-  //   (a) the full per-client task list (useTasksForClient / store tasks
-  //       in mock mode) — so every task shows, even ones without open
-  //       todoItems right now (Yuqi audit 2026-05-06: previously a
-  //       client with all-confirmed items had an empty Tasks strip
-  //       even though its tasks still existed).
-  //   (b) any items that DO have open todoItems — surfaces the
-  //       open-count badge on the matching chip.
-  // Each task is a first-class navigable unit on this surface;
-  // clicking → TaskDetail.
-  const remoteTasksList = useTasksForClient(
-    !env.useMockData ? client.id : undefined,
-  );
-  const tasksOnPage = useMemo(() => {
-    const seen = new Map<
-      string,
-      { id: string; name: string; chaseCount: number; reviewCount: number }
-    >();
-    // (a) Seed from the canonical per-client task list. Real mode
-    // pulls from BE via useTasksForClient; mock mode reads the store.
-    const sourceTasks = env.useMockData
-      ? storeTasks.filter((t) => t.clientId === client.id)
-      : remoteTasksList;
-    for (const t of sourceTasks) {
-      const taskName =
-        // Live BE shape carries formType + jurisdiction; mock store has
-        // the same fields. Compose a readable label either way.
-        [t.formType, t.jurisdiction].filter(Boolean).join(" · ") ||
-        "Task";
-      seen.set(t.id, {
-        id: t.id,
-        name: taskName,
-        chaseCount: 0,
-        reviewCount: 0,
-      });
-    }
-    // (b) Bucket open items into "chase" (client owes us) vs "review"
-    // (client sent, we owe a confirm/reject). Yuqi audit 2026-05-05:
-    // a single "X waiting" count conflated both buckets, which clashed
-    // with the "Still waiting on client" section name (that section
-    // shows ONLY the chase subset). Split into "X chase · Y review"
-    // so the chip matches the section vocabulary AND surfaces the
-    // review queue at a glance.
-    //   not_requested + requested_waiting → chase  (we're chasing the client)
-    //   received_unreviewed + received_issue → review  (waiting on CPA action)
-    for (const ci of items) {
-      if (!ci.taskId) continue;
-      const isChase =
-        ci.state === "not_requested" || ci.state === "requested_waiting";
-      const isReview =
-        ci.state === "received_unreviewed" || ci.state === "received_issue";
-      if (!isChase && !isReview) continue;
-      const entry = seen.get(ci.taskId);
-      if (entry) {
-        if (isChase) entry.chaseCount += 1;
-        else entry.reviewCount += 1;
-      } else {
-        // Item references a task we didn't see in (a) — fall back to
-        // the item's taskName so the chip still shows.
-        seen.set(ci.taskId, {
-          id: ci.taskId,
-          name: ci.taskName ?? "Task",
-          chaseCount: isChase ? 1 : 0,
-          reviewCount: isReview ? 1 : 0,
-        });
-      }
-    }
-    return Array.from(seen.values()).sort(
-      (a, b) =>
-        b.chaseCount +
-        b.reviewCount -
-        (a.chaseCount + a.reviewCount),
-    );
-  }, [items, remoteTasksList, storeTasks, client.id]);
+  // Tasks chip strip dropped 2026-05-06 — it duplicated the Filings tab
+  // (same per-task navigable units, same chase/review signals). To Do is
+  // the doc-bucket surface (Still waiting / Needs review); Filings is
+  // the per-task surface. The chase/review counts are still readable as
+  // group headers inside the two sections below.
 
   return (
     <div className="space-y-4">
-      {/* Tasks strip — every task on this client as a navigable chip.
-          Open count badge surfaces which task has the most pending
-          work; click → TaskDetail. The To Do view below stays as the
-          per-item gap surface. */}
-      {tasksOnPage.length > 0 && (
-        <section className="bg-surface border border-line rounded-md px-4 py-3">
-          <header className="flex items-baseline gap-2 mb-2">
-            <h3 className="text-2xs uppercase tracking-wider text-ink-500 font-semibold">
-              Tasks
-            </h3>
-            <span className="text-2xs text-ink-400">
-              {tasksOnPage.length}{" "}
-              {tasksOnPage.length === 1 ? "active" : "active"}
-            </span>
-          </header>
-          <div className="flex flex-wrap gap-1.5">
-            {tasksOnPage.map((t) => (
-              <Link
-                key={t.id}
-                to={taskHref(t.id)}
-                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded border border-line bg-canvas text-ink-700 hover:bg-sunken hover:text-ink-900 hover:border-line-strong transition-colors"
-                title={
-                  t.chaseCount > 0 || t.reviewCount > 0
-                    ? `${t.name} — ${t.chaseCount} chasing client, ${t.reviewCount} awaiting your review`
-                    : `Open ${t.name}`
-                }
-              >
-                <span className="font-medium">{t.name}</span>
-                {/* Split badge — "chase" subset (warn yellow, matches the
-                    Still-waiting-on-client section's palette) + "review"
-                    subset (info blue, matches the AI-confidence review
-                    palette). Each appears only when its count > 0; both
-                    hide when the task has no open work. The middle dot
-                    separates the two only when both are non-zero. */}
-                {t.chaseCount > 0 && (
-                  <span
-                    className="text-2xs tabular-nums text-warn-ink bg-warn-bg/60 border border-warn-border px-1 py-0.5 rounded"
-                    title={`${t.chaseCount} item${t.chaseCount === 1 ? "" : "s"} the client still owes you`}
-                  >
-                    {t.chaseCount} chase
-                  </span>
-                )}
-                {t.reviewCount > 0 && (
-                  <span
-                    className="text-2xs tabular-nums text-info-ink bg-info-bg/60 border border-info-border px-1 py-0.5 rounded"
-                    title={`${t.reviewCount} item${t.reviewCount === 1 ? "" : "s"} received from the client, awaiting your confirm/reject`}
-                  >
-                    {t.reviewCount} review
-                  </span>
-                )}
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* 🚨 STILL WAITING ON CLIENT — primary surface. Yuqi note
           2026-05-05: panel chrome stays neutral even when populated;
           the warning signal is carried by the small siren icon + the
@@ -1645,27 +1576,40 @@ function ToDoTab({
 
       {/* ⚠ NEEDS YOUR REVIEW — secondary, expanded by default.
           Same deadline-grouped layout as "Still waiting" so the two
-          panels read as a coherent surface. Header carries an item
-          count + a task count so Sarah can see "5 items across 3
-          tasks" at a glance. */}
-      {needsReview.length > 0 && (
-        <section className="bg-surface border border-line rounded-md overflow-hidden">
+          panels read as a coherent surface. Yuqi audit 2026-05-06
+          (post-merge): renders even when empty so the surface stays
+          symmetric with "Still waiting" — the prior conditional
+          render made the section vanish entirely, which read as a
+          UI bug rather than an empty state. */}
+      <section className="bg-surface border border-line rounded-md overflow-hidden">
           <header className="flex items-baseline gap-2 px-4 py-3 border-b border-line">
             <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-900">
               <AlertTriangle className="w-4 h-4 text-warn-ink" aria-hidden />
               Needs your review
             </h3>
             <span className="text-2xs text-ink-500 tabular-nums">
-              {needsReview.length} item{needsReview.length === 1 ? "" : "s"}
-              {reviewGroups.length > 0 && (
+              {needsReview.length === 0 ? (
+                "Nothing pending review"
+              ) : (
                 <>
-                  {" · "}
-                  {reviewGroups.length} task
-                  {reviewGroups.length === 1 ? "" : "s"}
+                  {needsReview.length} item{needsReview.length === 1 ? "" : "s"}
+                  {reviewGroups.length > 0 && (
+                    <>
+                      {" · "}
+                      {reviewGroups.length} task
+                      {reviewGroups.length === 1 ? "" : "s"}
+                    </>
+                  )}
                 </>
               )}
             </span>
           </header>
+          {needsReview.length === 0 && (
+            <div className="px-4 py-6 text-sm text-ink-500 text-center">
+              All inbound docs are confirmed. Anything new from this
+              client will surface here.
+            </div>
+          )}
           <div className="divide-y divide-line">
             {reviewGroups.map((g) => {
               const itemCount = g.items.length;
@@ -1725,7 +1669,6 @@ function ToDoTab({
             })}
           </div>
         </section>
-      )}
 
       {/* "Open deadlines for this client" section dropped 2026-05-06 —
           Yuqi audit: this list duplicated the Filings tab's "Filing
@@ -1859,6 +1802,100 @@ function MailboxTab({ client }: { client: Client }) {
 }
 
 /**
+ * Active state alerts touching this client. Surfaces the back-edge of the
+ * alert ↔ client relationship — /alerts shows "Affects N clients" with
+ * names, but until now /clients/:id had no reciprocal signal. Renders
+ * null when no active alerts include this client in `affectedClientIds`.
+ */
+function ClientStateAlertsCard({ clientId }: { clientId: string }) {
+  const announcementsQuery = useAnnouncements({ activeOnly: true });
+  const alerts = (announcementsQuery.data ?? []).filter(
+    (a) => !a.dismissed && a.affectedClientIds.includes(clientId),
+  );
+  const [expanded, setExpanded] = useState(false);
+
+  if (alerts.length === 0) return null;
+
+  // Collapsed by default 2026-05-06: a 7-alert block at the top of
+  // every client page swallowed first-screen real estate before the
+  // CPA could see Tasks / To Do. The summary line carries the
+  // count + per-alert action lives one click away inside this section
+  // (or directly on /alerts). Auto-expanded only when there's a single
+  // alert (no signal vs noise concern with N=1).
+  const showList = expanded || alerts.length === 1;
+  const headerLabel = `Active state ${alerts.length === 1 ? "alert" : "alerts"} for this client`;
+
+  return (
+    <section
+      className="mt-5 bg-warn-bg/40 border border-warn-border/60 rounded-md px-region py-region"
+      aria-label="Active state alerts affecting this client"
+    >
+      <button
+        type="button"
+        onClick={() => setExpanded((x) => !x)}
+        disabled={alerts.length === 1}
+        aria-expanded={showList}
+        aria-controls={`client-alerts-${clientId}`}
+        className="w-full flex items-center gap-2 text-left disabled:cursor-default"
+      >
+        <Megaphone className="w-3.5 h-3.5 text-warn-ink shrink-0" aria-hidden />
+        <span className="text-2xs uppercase tracking-wider font-semibold text-warn-ink">
+          {headerLabel}
+        </span>
+        <span className="text-2xs text-ink-500 tabular-nums">
+          · {alerts.length}
+        </span>
+        {alerts.length > 1 && (
+          <span className="ml-auto text-2xs text-warn-ink inline-flex items-center gap-0.5">
+            {expanded ? "Hide" : "Show"}
+            <ChevronRight
+              className={`w-3 h-3 transition-transform ${expanded ? "rotate-90" : ""}`}
+              aria-hidden
+            />
+          </span>
+        )}
+      </button>
+      {showList && (
+        <ul
+          id={`client-alerts-${clientId}`}
+          className="flex flex-col gap-1.5 mt-2.5"
+        >
+          {alerts.map((a) => (
+            <li key={a.id}>
+              <Link
+                to={`/alerts/${a.id}`}
+                className="group flex items-center gap-3 px-2.5 py-2 rounded-md bg-surface/70 border border-warn-border/40 hover:bg-surface hover:border-warn-border/80 transition-colors"
+              >
+                <StateBadge code={a.stateCode} size="sm" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-ink-900 truncate">{a.title}</div>
+                  <div className="text-2xs text-ink-500 mt-0.5 truncate">
+                    {a.authority}
+                    {a.newDeadline && (
+                      <>
+                        <span className="mx-1.5 text-ink-300">·</span>
+                        <span>Deadline shifts to {formatLongDate(a.newDeadline)}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <span className="text-2xs text-ink-500 group-hover:text-ink-900 inline-flex items-center gap-0.5 shrink-0">
+                  Review
+                  <ChevronRight
+                    className="w-3 h-3 transition-transform group-hover:translate-x-0.5"
+                    aria-hidden
+                  />
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/**
  * Compact arrival-timing / cross-year summary card on the client header. Click to expand
  * for the full insights panel. Cold-start fallback per PRD §4.2.
  */
@@ -1916,75 +1953,11 @@ function ClientAiInsightsCard({ clientId }: { clientId: string }) {
   );
 }
 
-/**
- * Compact AI summary card for the right rail of the ClientDetail header.
- * Composes a one-paragraph narrative from prior-year facts + churn-risk
- * heuristics — the same signals ClientAiInsightsCard surfaces via
- * structured callouts, but distilled into a single readable sentence so
- * the CPA's eye reads it at a glance and moves on.
- *
- * Returns null when there's nothing meaningful to say (no facts, not at
- * churn risk) — better silence than a stub.
- */
-function ClientAiSummaryCard({ clientId }: { clientId: string }) {
-  const facts = useImportedFactsForClient(clientId);
-  const insights = useAiInsightsForClient(clientId);
-  const clientQuery = useClient(clientId);
-  const client = clientQuery.data;
-  const open = insights.filter((i) => i.status === "open");
-  const churnRiskScore = computeChurnRiskScore(clientId, open.length);
-  const isNewClient = (() => {
-    if (!client?.addedAt) return true;
-    const added = parseDate(client.addedAt);
-    if (Number.isNaN(added.getTime())) return true;
-    const daysSinceAdded =
-      (TODAY.getTime() - added.getTime()) / (24 * 60 * 60 * 1000);
-    return daysSinceAdded < 30;
-  })();
-  const showChurnRisk = churnRiskScore >= 2 && !isNewClient;
-
-  if (!client) return null;
-  if (facts.length === 0 && !showChurnRisk) return null;
-
-  const factsLine =
-    facts.length > 0
-      ? `${client.name} has ${facts.length} prior-year fact${facts.length === 1 ? "" : "s"} on file — drafts run on personalised history.`
-      : `${client.name} has no prior-year facts imported yet — drafts run on template defaults.`;
-  const driftLine = showChurnRisk
-    ? churnRiskScore >= 4
-      ? "Strong engagement drift — reach out this week."
-      : churnRiskScore >= 3
-        ? "Engagement drift — worth a quick check-in."
-        : "Minor engagement drift, worth a glance."
-    : null;
-
-  return (
-    <div className="bg-info-bg/30 border border-info-border rounded-md p-4">
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <Sparkles className="w-3.5 h-3.5 text-info-ink" aria-hidden />
-        <span className="text-2xs uppercase tracking-wider font-semibold text-info-ink">
-          AI generated based on history
-        </span>
-      </div>
-      <p className="text-sm text-ink-700 leading-relaxed">
-        {factsLine}
-        {driftLine && <> {driftLine}</>}
-      </p>
-    </div>
-  );
-}
-
-/** Wireframe heuristic for churn risk. Real implementation per PRD §4.4
- *  Layer B uses response-time trends + declined-advisory count + reduced
- *  service-package count. Here we stub it deterministically off clientId. */
-function computeChurnRiskScore(clientId: string, openInsightCount: number): number {
-  // Use a deterministic per-client seed so demo is stable.
-  const seed = clientId
-    .split("")
-    .reduce((a, c) => a + c.charCodeAt(0), 0);
-  const base = seed % 5; // 0..4
-  return base + (openInsightCount > 1 ? 1 : 0);
-}
+// ClientAiSummaryCard + computeChurnRiskScore removed 2026-05-06 —
+// see header-body comment above. The right-rail "AI generated based on
+// history" narrative was meta-narration without a concrete call to
+// action; concrete advisory signals already surface as Opportunities
+// cards and inside the Activity feed.
 
 /**
  * Documents tab — IA §3.3. Longitudinal table: rows = document types,

@@ -17,27 +17,10 @@ import { formatLongDate } from "../data/dateHelpers";
 import { StatusPill } from "./ui/StatusPill";
 import { DEADLINE_STATUS_META } from "../lib/statusMeta";
 
-/**
- * Disambiguate quarterly/monthly federal forms (941 / 720 / 1099-NEC
- * etc.) — the BE has the same `form` value on each deadline so a
- * client with three 941s appears as "941 / 941 / 941" with only the
- * due date to tell them apart. Compute a period suffix from the due
- * date for known quarterly forms. Yuqi audit 2026-05-06 — "why are
- * there three 941? you need to differentiate that".
- */
-function periodSuffix(form: string, dueDate: string): string | null {
-  const formNumber = form.replace(/\s*\(.*\)\s*$/, "").trim().toUpperCase();
-  const month = parseInt(dueDate.slice(5, 7), 10);
-  // Form 941 (quarterly): due Apr / Jul / Oct / Jan-of-next-year
-  // covering Q1 / Q2 / Q3 / Q4 respectively. Same schedule for 720.
-  if (formNumber === "941" || formNumber === "720") {
-    if (month === 4) return "Q1";
-    if (month === 7) return "Q2";
-    if (month === 10) return "Q3";
-    if (month === 1) return "Q4";
-  }
-  return null;
-}
+// `periodSuffix` extracted to `lib/formPeriod.ts` so the Task panel
+// header can share the same Q1/Q2/Q3/Q4 disambiguation. Re-exported
+// here so existing callers don't change their import path.
+import { periodSuffix } from "../lib/formPeriod";
 
 /**
  * FilingsTab — surfaces the federal forms that apply to this client,
@@ -255,12 +238,10 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
                         </span>
                       )}
                       {(statusCounts.not_started ||
-                        statusCounts.in_progress ||
-                        statusCounts.deferred) && (
+                        statusCounts.in_progress) && (
                         <span>
                           {(statusCounts.not_started ?? 0) +
-                            (statusCounts.in_progress ?? 0) +
-                            (statusCounts.deferred ?? 0)}{" "}
+                            (statusCounts.in_progress ?? 0)}{" "}
                           open
                         </span>
                       )}
@@ -368,99 +349,24 @@ export function FilingsTab({ client, deadlines, onAddDeadline }: Props) {
         </section>
       )}
 
-      <header className="flex items-baseline justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-ink-900">
-            Federal forms catalog
-          </h3>
-          <p className="text-xs text-ink-500 mt-0.5">
-            Applicability for {client.name}{" "}
-            <span className="text-ink-400">· Entity: {client.entityType}</span>
-          </p>
-        </div>
-        <Link
-          to="/settings/federal-forms"
-          className="text-2xs text-ink-500 hover:text-ink-700 hover:underline"
-        >
-          Catalog admin →
-        </Link>
-      </header>
+      {/* Federal forms catalog — collapsed under a single expander
+          2026-05-06. Was rendering Suggested + Covered + Reference all
+          flat below the Filing plan, eating ~400px of every visit even
+          for clients whose plan was already complete. Filing plan
+          (above) is the per-task list the CPA actually navigates;
+          the catalog is "what other forms might apply" — answer-on-
+          demand, not first-class real estate.
 
-      {/* GAP SURFACE — applicable forms with no deadline yet. Loud by
-          design per `feedback_gap_over_fill`. */}
-      {suggested.length > 0 && (
-        <section className="border border-warn-border bg-warn-bg/30 rounded-md">
-          <header className="px-4 py-2 border-b border-warn-border/50 flex items-baseline gap-2">
-            <Sparkles className="w-3.5 h-3.5 text-warn-ink" aria-hidden />
-            <h4 className="text-xs uppercase tracking-wider text-warn-ink font-semibold">
-              Suggested — applicable but no deadline yet
-            </h4>
-            <span className="ml-auto text-2xs text-warn-ink">
-              {suggested.length} form
-              {suggested.length === 1 ? "" : "s"}
-            </span>
-          </header>
-          <ul className="divide-y divide-warn-border/40">
-            {suggested.map((item) => (
-              <FormRow
-                key={item.form.id}
-                form={item.form}
-                confidence={item.confidence}
-                reason={item.reason}
-                covered={false}
-                onAdd={() =>
-                  onAddDeadline({
-                    form: item.form.formNumber,
-                    jurisdiction: "federal",
-                    sourceNote: `Suggested from federal forms catalog · ${item.reason}`,
-                  })
-                }
-              />
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {/* COVERED — applicable forms with at least one deadline row. */}
-      {covered.length > 0 && (
-        <section className="bg-surface border border-line rounded-md">
-          <header className="px-4 py-2 border-b border-line flex items-baseline gap-2">
-            <FileText className="w-3.5 h-3.5 text-ok-ink" aria-hidden />
-            <h4 className="text-xs uppercase tracking-wider text-ink-700 font-semibold">
-              Covered — already on the calendar
-            </h4>
-            <span className="ml-auto text-2xs text-ink-500">
-              {covered.length} form
-              {covered.length === 1 ? "" : "s"}
-            </span>
-          </header>
-          <ul className="divide-y divide-line">
-            {covered.map((item) => (
-              <FormRow
-                key={item.form.id}
-                form={item.form}
-                confidence={item.confidence}
-                reason={item.reason}
-                covered={true}
-              />
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {/* REFERENCE — additional federal forms in the catalog filtered
-          by entity type but not auto-suggested (broader entity_types,
-          per_event triggers, etc.). Collapsed by default per the
-          gap-over-fill rule. */}
-      <ReferenceSection
-        forms={reference}
-        onAdd={(formNumber) =>
-          onAddDeadline({
-            form: formNumber,
-            jurisdiction: "federal",
-            sourceNote: "Picked from federal forms catalog",
-          })
-        }
+          Suggested still surfaces a loud yellow nudge when there are
+          gap forms (`suggested.length > 0`), but folded behind the
+          single expander rather than expanded inline. */}
+      <FederalFormsCatalogPanel
+        clientName={client.name}
+        entityType={client.entityType}
+        suggested={suggested}
+        covered={covered}
+        reference={reference}
+        onAddDeadline={onAddDeadline}
       />
 
       {/* Footer note dropped 2026-05-05 — was "Catalog source: backend
@@ -773,6 +679,166 @@ function ReferenceSection({
             />
           ))}
         </ul>
+      )}
+    </section>
+  );
+}
+
+type CatalogItem = {
+  form: FederalFormDTO;
+  confidence: "high" | "medium";
+  reason: string;
+};
+
+/**
+ * FederalFormsCatalogPanel — collapse-by-default container around the
+ * Suggested + Covered + Reference catalog sections. The catalog is
+ * "what other federal forms might apply to this client" — useful but
+ * not first-class real estate on the Filings tab. The Filing-plan
+ * section above remains the per-task list the CPA navigates daily.
+ *
+ * Auto-expands when there are gap forms (`suggested.length > 0`) so
+ * the loud yellow nudge still surfaces — gap-over-fill stays intact.
+ */
+function FederalFormsCatalogPanel({
+  clientName,
+  entityType,
+  suggested,
+  covered,
+  reference,
+  onAddDeadline,
+}: {
+  clientName: string;
+  entityType: string;
+  suggested: CatalogItem[];
+  covered: CatalogItem[];
+  reference: FederalFormDTO[];
+  onAddDeadline: (prefill: AddDeadlinePrefill) => void;
+}) {
+  const total = suggested.length + covered.length + reference.length;
+  const hasSuggested = suggested.length > 0;
+  // Auto-expand when there's a gap (suggested forms exist) so the
+  // yellow nudge stays loud; otherwise default collapsed.
+  const [open, setOpen] = useState(hasSuggested);
+
+  if (total === 0) return null;
+
+  return (
+    <section className="space-y-3">
+      <button
+        type="button"
+        onClick={() => setOpen((x) => !x)}
+        aria-expanded={open}
+        className="w-full flex items-baseline gap-2 px-3 py-2 rounded-md border border-line bg-surface text-left hover:bg-sunken transition-colors"
+      >
+        <FileText className="w-3.5 h-3.5 text-ink-500 shrink-0" aria-hidden />
+        <span className="text-sm font-medium text-ink-900">
+          Federal forms catalog
+        </span>
+        <span className="text-2xs text-ink-500">
+          · {total} applicable to {clientName}
+          <span className="text-ink-400"> · {entityType}</span>
+        </span>
+        {hasSuggested && (
+          <span className="text-2xs text-warn-ink bg-warn-bg/70 border border-warn-border/60 rounded px-1.5 py-0.5 ml-1">
+            {suggested.length} gap
+          </span>
+        )}
+        <span className="ml-auto text-2xs text-ink-500">
+          {open ? "Hide" : "Show"}
+        </span>
+      </button>
+
+      {open && (
+        <>
+          <div className="flex items-baseline justify-end -mt-1">
+            <Link
+              to="/settings/federal-forms"
+              className="text-2xs text-ink-500 hover:text-ink-700 hover:underline"
+            >
+              Catalog admin →
+            </Link>
+          </div>
+
+          {/* GAP SURFACE — applicable forms with no deadline yet. Loud
+              by design per `feedback_gap_over_fill`. */}
+          {suggested.length > 0 && (
+            <section className="border border-warn-border bg-warn-bg/30 rounded-md">
+              <header className="px-4 py-2 border-b border-warn-border/50 flex items-baseline gap-2">
+                <Sparkles
+                  className="w-3.5 h-3.5 text-warn-ink"
+                  aria-hidden
+                />
+                <h4 className="text-xs uppercase tracking-wider text-warn-ink font-semibold">
+                  Suggested — applicable but no deadline yet
+                </h4>
+                <span className="ml-auto text-2xs text-warn-ink">
+                  {suggested.length} form
+                  {suggested.length === 1 ? "" : "s"}
+                </span>
+              </header>
+              <ul className="divide-y divide-warn-border/40">
+                {suggested.map((item) => (
+                  <FormRow
+                    key={item.form.id}
+                    form={item.form}
+                    confidence={item.confidence}
+                    reason={item.reason}
+                    covered={false}
+                    onAdd={() =>
+                      onAddDeadline({
+                        form: item.form.formNumber,
+                        jurisdiction: "federal",
+                        sourceNote: `Suggested from federal forms catalog · ${item.reason}`,
+                      })
+                    }
+                  />
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {/* COVERED — applicable forms with at least one deadline row. */}
+          {covered.length > 0 && (
+            <section className="bg-surface border border-line rounded-md">
+              <header className="px-4 py-2 border-b border-line flex items-baseline gap-2">
+                <FileText className="w-3.5 h-3.5 text-ok-ink" aria-hidden />
+                <h4 className="text-xs uppercase tracking-wider text-ink-700 font-semibold">
+                  Covered — already on the calendar
+                </h4>
+                <span className="ml-auto text-2xs text-ink-500">
+                  {covered.length} form
+                  {covered.length === 1 ? "" : "s"}
+                </span>
+              </header>
+              <ul className="divide-y divide-line">
+                {covered.map((item) => (
+                  <FormRow
+                    key={item.form.id}
+                    form={item.form}
+                    confidence={item.confidence}
+                    reason={item.reason}
+                    covered={true}
+                  />
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {/* REFERENCE — additional federal forms in the catalog
+              filtered by entity type but not auto-suggested. Stays
+              collapsed inside its own ReferenceSection. */}
+          <ReferenceSection
+            forms={reference}
+            onAdd={(formNumber) =>
+              onAddDeadline({
+                form: formNumber,
+                jurisdiction: "federal",
+                sourceNote: "Picked from federal forms catalog",
+              })
+            }
+          />
+        </>
       )}
     </section>
   );

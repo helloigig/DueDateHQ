@@ -27,6 +27,11 @@ export interface FirmSession {
    *  every Phase-2-enabled template is paused regardless of per-template
    *  state. The CPA can flip it instantly from Settings → Reminders. */
   phase2AutoSendPaused?: boolean;
+  /** Internal-deadline buffer in calendar days before the official due
+   *  date. Drives Today's "behind plan" tier and the chase cadence start
+   *  point. Collected in Onboarding step "firm setup"; default 14d.
+   *  Editable in Settings → Firm. */
+  internalDeadlineBufferDays?: number;
   /** Onboarding → first-action arc (Yuqi audit 2026-05-05). After import
    *  the CPA lands on Today with a fresh queue but no muscle memory; we
    *  surface a one-time "Try it: send your first chase" banner pointing
@@ -111,6 +116,9 @@ export function signIn(input: {
     calendarProvider: sameAccount ? existing?.calendarProvider : undefined,
     phase2AutoSendPaused: sameAccount
       ? existing?.phase2AutoSendPaused
+      : undefined,
+    internalDeadlineBufferDays: sameAccount
+      ? existing?.internalDeadlineBufferDays
       : undefined,
   };
   write(s);

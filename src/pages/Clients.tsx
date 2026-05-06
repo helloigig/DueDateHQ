@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
@@ -34,7 +34,7 @@ import { trpc } from "../lib/api/client";
 import { env } from "../config";
 import { UpgradePrompt } from "../components/UpgradePrompt";
 import { toast } from "sonner";
-import { countdownLabel, parseDate, TODAY, daysBetween } from "../data/dateHelpers";
+import { countdownLabel, parseDate, TODAY, daysBetween, toIso } from "../data/dateHelpers";
 import {
   STATE_NAMES,
   type ClientTier,
@@ -98,15 +98,38 @@ type SmartFilter = "hasWaiting" | "stuck" | "multiState";
 const STUCK_THRESHOLD_DAYS = 14;
 
 export function Clients() {
+  // Two-layer search: `queryInput` is the controlled input (re-renders
+  // on every keystroke); `query` is the debounced value the table
+  // filter actually reads. 200ms feels instant but keeps the table
+  // from re-sorting + re-rendering on every keypress when the
+  // roster grows past a few hundred clients. Yuqi audit 2026-05-06.
+  const [queryInput, setQueryInput] = useState("");
   const [query, setQuery] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(queryInput), 200);
+    return () => clearTimeout(t);
+  }, [queryInput]);
   const [searchOpen, setSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-  // Show-archived toggle replaces the Status pills row 2026-05-06.
-  // Default = active only; toggle ON = active + archived. The API
-  // filter handles the projection, so the table never sees archived
-  // rows unless the toggle is on.
-  const [showArchived, setShowArchived] = useState(false);
+  // Show-archived toggle — persists to localStorage so the user's
+  // preference survives reload. Yuqi audit 2026-05-06: prior version
+  // reset to false on every page load, ignoring an explicit user
+  // choice.
+  const [showArchived, setShowArchived] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("clients.showArchived") === "1";
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "clients.showArchived",
+        showArchived ? "1" : "0",
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [showArchived]);
   // Page-level dismiss of the State alert banner — sticks for the
   // session, doesn't persist across reloads (the alert can be re-
   // raised from /alerts → toggle dismissed there too).
@@ -197,7 +220,12 @@ export function Clients() {
   }, [tasks]);
   const fleetCounts = useMemo(() => {
     const out = new Map<string, { waiting: number; review: number; oldestReminderDays: number | null }>();
-    const now = Date.now();
+    // Use demo TODAY anchor (not wall-clock Date.now()) so the
+    // "stuck >14d" cohort is computed against the same frame of
+    // reference the rest of the demo uses. Without this, every mock
+    // reminder is "14+ days old" the moment wall-clock time drifts past
+    // the anchor — and the Stuck tile reads as the entire roster.
+    const nowMs = TODAY.getTime();
     for (const ci of checklistItems) {
       const clientId = taskClient.get(ci.taskId);
       if (!clientId) continue;
@@ -206,7 +234,7 @@ export function Clients() {
       if (ci.state === "requested_waiting" || ci.state === "not_requested") {
         entry.waiting++;
         if (ci.lastReminderAt) {
-          const days = Math.floor((now - new Date(ci.lastReminderAt).getTime()) / (24 * 60 * 60 * 1000));
+          const days = Math.floor((nowMs - new Date(ci.lastReminderAt).getTime()) / (24 * 60 * 60 * 1000));
           if (entry.oldestReminderDays == null || days > entry.oldestReminderDays) {
             entry.oldestReminderDays = days;
           }
@@ -299,6 +327,23 @@ export function Clients() {
         d.status !== "filed_extension"
     ).length;
 
+  // "Behind" = active deadlines past internal target but official due date
+  // still in future. Surfaces the same signal ClientDetail header carries
+  // ("3 filings · 1 behind · next due ..."), so a CPA scanning the roster
+  // can tell from the row alone which clients are slipping the firm's
+  // self-imposed buffer. Yuqi audit 2026-05-06 (post-merge follow-up).
+  const todayIsoForBehind = toIso(TODAY);
+  const countBehindDeadlines = (clientId: string) =>
+    deadlines.filter(
+      (d) =>
+        d.clientId === clientId &&
+        d.status !== "completed" &&
+        d.status !== "filed_extension" &&
+        !!d.internalDueDate &&
+        d.internalDueDate < todayIsoForBehind &&
+        d.officialDueDate >= todayIsoForBehind,
+    ).length;
+
   const nextDeadlineFor = (clientId: string) => {
     const open = deadlines
       .filter(
@@ -368,6 +413,7 @@ export function Clients() {
 
   const clearAll = () => {
     setFilters(EMPTY_FILTERS);
+    setQueryInput("");
     setQuery("");
   };
 
@@ -479,8 +525,8 @@ export function Clients() {
                   ref={searchInputRef}
                   type="text"
                   placeholder="Search clients…"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  value={queryInput}
+                  onChange={(e) => setQueryInput(e.target.value)}
                   className="flex-1 min-w-0 text-sm bg-transparent text-ink-900 placeholder:text-ink-400 focus:outline-none"
                   autoFocus
                 />
@@ -488,6 +534,7 @@ export function Clients() {
                   label="Close search"
                   size="sm"
                   onClick={() => {
+                    setQueryInput("");
                     setQuery("");
                     setSearchOpen(false);
                   }}
@@ -555,12 +602,12 @@ export function Clients() {
       >
         <MetricTile
           label="Active clients"
-          value={clients.length}
+          value={activeCount}
           tone="neutral"
           helper={
             allClients.length === clients.length
-              ? "Whole roster"
-              : `of ${allClients.length} matching filters`
+              ? `${allClients.length} on roster`
+              : `${clients.length} matching filters · ${allClients.length} on roster`
           }
         />
         {multiStateCount > 0 && (
@@ -777,6 +824,7 @@ export function Clients() {
                 review: 0,
                 oldestReminderDays: null,
               };
+              const behindCount = countBehindDeadlines(c.id);
               const hasAlert = alertedClientIds.has(c.id);
               const waitingTone =
                 fc.oldestReminderDays != null && fc.oldestReminderDays > 14
@@ -832,30 +880,65 @@ export function Clients() {
                         Replaces the prior row-tint approach (T4: status
                         colors are pills, never row paint). One click →
                         alert with this client pre-included in the bundle. */}
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Link
-                        to={href}
-                        className="text-ink-900 font-medium hover:underline truncate"
-                      >
-                        {c.name}
-                      </Link>
-                      {(() => {
-                        const alert = alertByClientId.get(c.id);
-                        if (!alert) return null;
-                        return (
-                          <Link
-                            to={`/alerts/${alert.id}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full bg-warn-bg text-warn-ink hover:bg-warn-bg/80 shrink-0 align-middle"
-                            title={`${alert.stateCode} alert · ${alert.title} — open to email all affected clients`}
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Link
+                          to={href}
+                          className="text-ink-900 font-medium hover:underline truncate"
+                        >
+                          {c.name}
+                        </Link>
+                        {/* Behind chip — gap signal mirroring the
+                            ClientDetail header summary ("1 behind").
+                            Only renders when behind > 0; on-track is
+                            silent so the eye picks up trouble first. */}
+                        {behindCount > 0 && (
+                          <span
+                            className="inline-flex items-center text-2xs font-semibold px-1.5 py-0.5 rounded-full border border-warn-border bg-warn-bg/60 text-warn-ink shrink-0"
+                            title={`${behindCount} ${behindCount === 1 ? "filing" : "filings"} past internal target`}
                           >
-                            <span className="font-semibold tabular-nums">
-                              {alert.stateCode}
+                            {behindCount} behind
+                          </span>
+                        )}
+                        {(() => {
+                          const alert = alertByClientId.get(c.id);
+                          if (!alert) return null;
+                          return (
+                            <Link
+                              to={`/alerts/${alert.id}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded-full bg-warn-bg text-warn-ink hover:bg-warn-bg/80 shrink-0 align-middle"
+                              title={`${alert.stateCode} alert · ${alert.title} — open to email all affected clients`}
+                            >
+                              <span className="font-semibold tabular-nums">
+                                {alert.stateCode}
+                              </span>
+                              <span className="hidden md:inline">alert ↗</span>
+                            </Link>
+                          );
+                        })()}
+                      </div>
+                      {/* Service package subtitle — surfaces what plan
+                          this client is on without forcing a click into
+                          detail. Hidden on mobile for row-density. */}
+                      {c.servicePackages.length > 0 && (
+                        <span
+                          className="hidden md:inline text-2xs text-ink-500 truncate"
+                          title={
+                            c.servicePackages.length > 1
+                              ? `Packages: ${c.servicePackages.join(", ")}`
+                              : c.servicePackages[0]
+                          }
+                        >
+                          {c.servicePackages[0]}
+                          {c.servicePackages.length > 1 && (
+                            <span className="text-ink-400">
+                              {" "}
+                              +{c.servicePackages.length - 1}
                             </span>
-                            <span className="hidden md:inline">alert ↗</span>
-                          </Link>
-                        );
-                      })()}
+                          )}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-2.5">

@@ -48,11 +48,14 @@ export const STATE_NAMES: Record<StateCode, string> = {
 
 export type ClientStatus = "active" | "inactive" | "prospect" | "archived";
 
+// `deferred` was killed 2026-05-06 — semantically a reschedule (push working
+// date), not a terminal status. Deferring now mutates `internalDueDate`
+// while the task/deadline stays `in_progress`. PRD §8.5 — official date
+// remains immutable.
 export type DeadlineStatus =
   | "not_started"
   | "in_progress"
   | "completed"
-  | "deferred"
   | "filed_extension"
   | "overdue";
 
@@ -388,16 +391,16 @@ export interface DeadlineExtensionMeta {
 
 // -------- v0.7 Layer 2-4 model (Task / ChecklistItem / Activity / Email / AI) --------
 
+// `deferred` was killed 2026-05-06 — see DeadlineStatus comment.
+// `not_applicable` is the kill terminal — used when the filing becomes
+// irrelevant mid-season (client fired, entity dissolved, switched filing
+// status). Always carries a reason (audit).
 export type TaskStatus =
   | "not_started"
   | "in_progress"
   | "completed"
-  | "deferred"
   | "filed_extension"
   | "overdue"
-  // Distinct from `deferred` — this is a kill, not a push. Used when the
-  // deadline becomes irrelevant mid-season (client fired, entity dissolved,
-  // switched filing status). Always carries a reason (audit).
   | "not_applicable";
 
 /**

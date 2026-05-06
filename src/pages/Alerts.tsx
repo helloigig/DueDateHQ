@@ -31,7 +31,9 @@ import {
   SOURCE_AUTHORITY_TOOLTIP,
   TAX_TYPE_LABEL,
   TOPIC_LABEL,
+  TOPIC_TONE,
 } from "@/data/announcementLabels";
+import { StatusPill } from "@/components/ui/StatusPill";
 import {
   useAnnouncements,
   useDismissAnnouncement,
@@ -167,6 +169,7 @@ function ActionRow({
   cta,
   onClick,
   primary,
+  affectedItems,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -179,31 +182,112 @@ function ActionRow({
    *  / Add filings); the rest stay outline. T2: one accent, one viewport,
    *  one action. */
   primary?: boolean;
+  /** Concrete tasks/deadlines this action will modify. When provided,
+   *  the row gets a "Show {N}" expand toggle that reveals each item with
+   *  client + form + due-date + (for deadline-shifts) old → new date.
+   *  Yuqi audit 2026-05-06: "what deadlines are they? you need to
+   *  click and open to see the details." */
+  affectedItems?: Array<{
+    clientName: string;
+    clientId?: string;
+    taskId?: string;
+    label: string;
+    meta?: string;
+  }>;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasItems = affectedItems && affectedItems.length > 0;
+
   return (
-    <article className="bg-surface border border-line rounded-md p-region flex items-start gap-3 hover:bg-sunken/40 transition-colors">
-      <span
-        aria-hidden
-        className="shrink-0 w-7 h-7 rounded-md bg-sunken text-ink-700 inline-flex items-center justify-center"
-      >
-        {icon}
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold text-ink-900 leading-snug">
-          {title}
+    <article className="bg-surface border border-line rounded-md transition-colors hover:bg-sunken/40 overflow-hidden">
+      <div className="p-region flex items-start gap-3">
+        <span
+          aria-hidden
+          className="shrink-0 w-9 h-9 rounded-md bg-sunken text-ink-700 inline-flex items-center justify-center"
+        >
+          {icon}
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold text-ink-900 leading-snug">
+            {title}
+          </div>
+          <div className="text-xs text-ink-700 mt-1 leading-snug">
+            {description}
+          </div>
+          {hasItems && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded((v) => !v);
+              }}
+              className="mt-2 inline-flex items-center gap-1 text-2xs font-medium text-ink-500 hover:text-ink-900 group/expand"
+              aria-expanded={expanded}
+            >
+              <ChevronRight
+                className={`w-3 h-3 transition-transform ${expanded ? "rotate-90" : ""}`}
+                aria-hidden
+              />
+              {expanded
+                ? `Hide affected ${affectedItems!.length === 1 ? "item" : "items"}`
+                : `Show ${affectedItems!.length} affected ${affectedItems!.length === 1 ? "item" : "items"}`}
+            </button>
+          )}
         </div>
-        <div className="text-xs text-ink-700 mt-1 leading-snug">
-          {description}
-        </div>
+        <Button
+          size="sm"
+          variant={primary ? "default" : "outline"}
+          onClick={onClick}
+          className="shrink-0"
+        >
+          {cta}
+        </Button>
       </div>
-      <Button
-        size="sm"
-        variant={primary ? "default" : "outline"}
-        onClick={onClick}
-        className="shrink-0"
-      >
-        {cta}
-      </Button>
+      {hasItems && expanded && (
+        <ul className="border-t border-line bg-canvas/40 divide-y divide-line">
+          {affectedItems!.map((item, idx) => {
+            const linkable = item.clientId && item.taskId;
+            const inner = (
+              <>
+                <span className="text-2xs font-medium text-ink-900 truncate">
+                  {item.clientName}
+                </span>
+                <span className="text-ink-300">·</span>
+                <span className="text-2xs text-ink-700 truncate flex-1 min-w-0">
+                  {item.label}
+                </span>
+                {item.meta && (
+                  <span className="text-2xs text-ink-500 tabular-nums shrink-0">
+                    {item.meta}
+                  </span>
+                )}
+                {linkable && (
+                  <ChevronRight
+                    className="w-3 h-3 text-ink-300 group-hover/item:text-ink-700 group-hover/item:translate-x-0.5 shrink-0 transition-all"
+                    aria-hidden
+                  />
+                )}
+              </>
+            );
+            return (
+              <li key={idx}>
+                {linkable ? (
+                  <Link
+                    to={`/clients/${item.clientId}?task=${item.taskId}`}
+                    className="group/item flex items-center gap-2 px-region py-2 hover:bg-sunken/60 transition-colors"
+                  >
+                    {inner}
+                  </Link>
+                ) : (
+                  <div className="flex items-center gap-2 px-region py-2">
+                    {inner}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </article>
   );
 }
@@ -229,60 +313,81 @@ function AlertContextSection({ announcement: a }: { announcement: Announcement }
   };
   const isLowConfidence =
     a.parseConfidence === "low" || a.matchConfidence === "low";
+  const topicTone = TOPIC_TONE[a.type];
 
   return (
     <section className="px-region pt-region pb-region">
-      {/* Authority line + type pill */}
-      <div className="flex items-center gap-2 flex-wrap text-xs">
-        <span className="font-medium text-ink-900">{a.authority}</span>
-        <span className="text-ink-300" aria-hidden>·</span>
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line">
+      {/* Authority — given its own line so the issuing body reads as the
+          primary attribution, not a chip in a soup of other chips.
+          Yuqi audit 2026-05-06: prior version mashed authority + type +
+          tax + retroactive + source-class onto one line at text-xs and
+          all read like equally-weighted neutral pills. */}
+      <p className="text-xs text-ink-500">
+        <span className="font-medium text-ink-700">{a.authority}</span>
+      </p>
+
+      {/* Classification chips — type + tax type + retroactive + source.
+          Type pill now uses StatusPill with the shared TOPIC_TONE so it
+          matches the Today card and the feed card exactly. */}
+      <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+        <StatusPill variant={topicTone} size="xs">
           {TOPIC_LABEL[a.type]}
-        </span>
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line">
+        </StatusPill>
+        <StatusPill variant="neutral" size="xs">
           {TAX_TYPE_LABEL[a.taxType]}
-        </span>
+        </StatusPill>
         {a.retroactive && (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-warn-bg text-warn-ink border border-warn-border">
+          <StatusPill variant="warn" size="xs">
             <History className="w-3 h-3" aria-hidden />
             Retroactive
-          </span>
+          </StatusPill>
         )}
         <span
-          className="inline-flex items-center px-1.5 py-0.5 rounded bg-sunken text-ink-500 border border-line"
+          className="inline-flex items-center px-1.5 py-0.5 rounded bg-sunken text-ink-500 border border-line text-[11px] font-medium"
           title={SOURCE_AUTHORITY_TOOLTIP[a.sourceAuthority]}
         >
           {SOURCE_AUTHORITY_LABEL[a.sourceAuthority]}
         </span>
       </div>
 
-      {/* Dates row — issuance / effective / new deadline. Renders only the
-          slots that are populated (effectiveDate + newDeadline are both
-          optional on the type). */}
-      <div className="mt-2 flex items-center gap-x-3 gap-y-1 flex-wrap text-xs text-ink-500">
-        <span>
-          Issued <span className="text-ink-700">{formatLongDate(a.issuanceDate)}</span>
-        </span>
+      {/* Dates row — issuance / effective / new deadline. Each prefixed
+          with a micro label so the date numerals don't read as a single
+          metadata blob. Renders only populated slots (effectiveDate +
+          newDeadline are both optional on the type). */}
+      <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+        <dt className="text-ink-500 uppercase text-2xs tracking-wider font-semibold pt-0.5">
+          Issued
+        </dt>
+        <dd className="text-ink-700">{formatLongDate(a.issuanceDate)}</dd>
         {a.effectiveDate && (
-          <span>
-            Effective <span className="text-ink-700">{formatLongDate(a.effectiveDate)}</span>
-          </span>
+          <>
+            <dt className="text-ink-500 uppercase text-2xs tracking-wider font-semibold pt-0.5">
+              Effective
+            </dt>
+            <dd className="text-ink-700">{formatLongDate(a.effectiveDate)}</dd>
+          </>
         )}
-        {a.newDeadline && (
-          <span className="inline-flex items-center gap-1">
-            <CalendarClock className="w-3 h-3 text-ink-500" aria-hidden />
+      </dl>
+
+      {/* Deadline shift — promoted into its own slot when present;
+          usually the single most-actionable fact on the pane. */}
+      {a.newDeadline && (
+        <div className="mt-3 inline-flex items-center gap-1.5 px-2 py-1 rounded border border-warn-border bg-warn-bg text-xs text-warn-ink">
+          <CalendarClock className="w-3 h-3 shrink-0" aria-hidden />
+          <span>
             Deadline shifts to{" "}
-            <span className="font-medium text-ink-900">
+            <span className="font-semibold">
               {formatLongDate(a.newDeadline)}
             </span>
             {a.oldDeadline && (
-              <span className="text-ink-400">
+              <span className="text-warn-ink/70">
+                {" "}
                 (was {formatLongDate(a.oldDeadline)})
               </span>
             )}
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Full summary — the verbatim text the parser captured. No
           truncation here; the feed card line-clamps to 2, this surface
@@ -451,6 +556,73 @@ function CopilotPane({
 }) {
   const [draftIndex, setDraftIndex] = useState(0);
   const navigate = useNavigate();
+  // Hooks at top-level — must be called before the early-return below
+  // to satisfy Rules of Hooks. Yuqi audit 2026-05-06: when the user
+  // expands an action row, we need to reach into the store for
+  // deadline/task lookups; that means useStore + useMemo here.
+  const storeDeadlines = useStore().deadlines;
+  const storeTasks = useStore().tasks;
+  const allAffectedClients = useMemo(
+    () => (announcement ? affectedClientsFor(announcement, clientSource) : []),
+    [announcement, clientSource],
+  );
+  const includedAffectedClients = useMemo(
+    () =>
+      allAffectedClients.filter((c) => !excludedClientIds.has(c.id)),
+    [allAffectedClients, excludedClientIds],
+  );
+  const affectedItemsForDeadlineShift = useMemo(() => {
+    if (!announcement) return [];
+    return includedAffectedClients.map((c) => {
+      const byOldDate =
+        announcement.oldDeadline &&
+        storeDeadlines.find(
+          (d) =>
+            d.clientId === c.id &&
+            d.officialDueDate === announcement.oldDeadline,
+        );
+      const byClient = byOldDate
+        ? byOldDate
+        : storeDeadlines
+            .filter(
+              (d) =>
+                d.clientId === c.id &&
+                d.status !== "completed" &&
+                d.status !== "filed_extension",
+            )
+            .sort((x, y) =>
+              x.officialDueDate.localeCompare(y.officialDueDate),
+            )[0];
+      const task = byClient
+        ? storeTasks.find((t) => t.deadlineId === byClient.id)
+        : undefined;
+      return {
+        clientName: c.name,
+        clientId: c.id,
+        taskId: task?.id,
+        label:
+          byClient?.form ?? announcement.taxTypes?.[0] ?? "Filing",
+        meta: byClient
+          ? `due ${formatLongDate(byClient.officialDueDate)}`
+          : undefined,
+      };
+    });
+  }, [
+    announcement,
+    includedAffectedClients,
+    storeDeadlines,
+    storeTasks,
+  ]);
+  const affectedItemsByClient = useMemo(() => {
+    if (!announcement) return [];
+    return includedAffectedClients.map((c) => ({
+      clientName: c.name,
+      clientId: c.id,
+      taskId: undefined as string | undefined,
+      label: c.tier ? `${c.tier} tier` : "Client",
+      meta: c.primaryState ? `${c.primaryState} filings` : undefined,
+    }));
+  }, [announcement, includedAffectedClients]);
 
   useEffect(() => {
     setDraftIndex(0);
@@ -487,6 +659,10 @@ function CopilotPane({
   const includedClients = allAffected.filter((c) => !excludedClientIds.has(c.id));
   const includedCount = includedClients.length;
   const excludedCount = allAffected.length - includedCount;
+
+  // affectedItemsForDeadlineShift + affectedItemsByClient are computed
+  // at top-level (above the early return) to honor Rules of Hooks.
+  // See the useMemo block at the top of CopilotPane.
   const safeIdx = Math.min(draftIndex, Math.max(0, includedCount - 1));
   const currentClient = includedClients[safeIdx];
   const overrideKey = (clientId: string) => `${a.id}:${clientId}`;
@@ -516,7 +692,12 @@ function CopilotPane({
           card the user just clicked. Pane header: state badge +
           title + close X. Everything else (full client list, email
           draft, action card) lives in the pane body. */}
-      <div className="bg-surface border-b border-line px-region py-3 flex items-start gap-3">
+      {/* Header — Yuqi audit 2026-05-06: title + state badge now vertically
+          center together (was items-start, leaving the badge floating
+          above the title baseline). Title bumped to text-base/font-semibold
+          so the alert subject reads as the primary thing on the pane,
+          not a metadata strip. */}
+      <div className="bg-surface border-b border-line px-region py-3 flex items-center gap-3">
         {/* Mobile: explicit "Back to alerts" affordance — the pane fills the
             viewport at <md, so the user needs a clear way to return to the
             feed. md+ uses a discreet X (the feed is already visible to the
@@ -531,9 +712,9 @@ function CopilotPane({
           Back
         </button>
         <StateBadge code={a.stateCode} />
-        <div className="flex-1 min-w-0 text-sm font-semibold text-ink-900 leading-snug pt-0.5">
+        <h2 className="flex-1 min-w-0 text-base font-semibold text-ink-900 leading-snug">
           {a.title}
-        </div>
+        </h2>
         <button
           type="button"
           onClick={onClose}
@@ -802,6 +983,7 @@ function CopilotPane({
                 onApplyDeadline(a);
               }}
               primary={a.type === "disaster_extension"}
+              affectedItems={affectedItemsForDeadlineShift}
             />
           )}
 
@@ -817,6 +999,7 @@ function CopilotPane({
               cta={`Add filings`}
               onClick={() => onRunNexusCheck(a)}
               primary
+              affectedItems={affectedItemsByClient}
             />
           )}
 
@@ -828,6 +1011,7 @@ function CopilotPane({
               cta={`Tag ${includedCount}`}
               onClick={() => onOpenTag(a)}
               primary
+              affectedItems={affectedItemsByClient}
             />
           )}
 
@@ -839,6 +1023,7 @@ function CopilotPane({
               cta="Schedule"
               onClick={() => onOpenPlanningCall(a)}
               primary
+              affectedItems={affectedItemsByClient}
             />
           )}
 
@@ -850,6 +1035,7 @@ function CopilotPane({
               cta="Recompute"
               onClick={() => onOpenRecompute(a)}
               primary
+              affectedItems={affectedItemsForDeadlineShift}
             />
           )}
 
@@ -1097,6 +1283,92 @@ export function Alerts() {
     }
   }, [params.id, selected, announcementsQuery.isLoading, navigate]);
 
+  // If the selected alert lives in a tab other than the current one (e.g.
+  // arriving via deep link from the BlockingAlertsDialog when the alert is
+  // already dismissed), switch to the tab that contains it so the card
+  // shows up in the feed instead of leaving the user staring at an empty
+  // list with a populated pane.
+  useEffect(() => {
+    if (!params.id || !selected) return;
+    const inAffecting =
+      !selected.dismissed && selected.affectedClientIds.length > 0;
+    const inAll = !selected.dismissed;
+    if (tab === "affecting" && !inAffecting) {
+      setTab(inAll ? "all" : "resolved");
+    } else if (tab === "all" && !inAll) {
+      setTab("resolved");
+    } else if (tab === "resolved" && !selected.dismissed) {
+      setTab(inAffecting ? "affecting" : "all");
+    }
+  }, [params.id, selected, tab]);
+
+  // Scroll the selected card into view when arriving via deep link (e.g.
+  // BlockingAlertsDialog → /alerts/:id). Without this, the alert ID
+  // selects the right pane on the right but the card on the left could be
+  // off-screen — users land confused about whether the click "worked".
+  // We walk up to the nearest scrollable ancestor and set its scrollTop
+  // directly. `Element.scrollIntoView({ block: "nearest" })` proved
+  // unreliable inside this nested overflow-y-auto layout (it tries to
+  // scroll outer ancestors that aren't the actual feed container).
+  // Defer to the next frame so refs are populated after the cards mount —
+  // without this, the effect fires before the wrapper ref is registered
+  // when the user lands on /alerts/:id with the announcements query
+  // already cached.
+  // Scroll the selected card into view when arriving via deep link (e.g.
+  // BlockingAlertsDialog → /alerts/:id). The card wrapper carries a
+  // `data-alert-card` attribute so we can query the DOM directly inside
+  // an effect — using a ref callback Map proved unreliable across the
+  // rapid render sequence that fires when the announcements query
+  // resolves mid-mount. We retry every 150ms (up to 2s) using instant
+  // scroll because smooth animation gets cancelled by re-renders during
+  // hydration, leaving the scroller at a partial position.
+  useEffect(() => {
+    if (!params.id) return;
+    const id = params.id;
+    let cancelled = false;
+    let attempts = 0;
+    const tryScroll = () => {
+      if (cancelled) return;
+      attempts += 1;
+      const node = document.querySelector<HTMLElement>(
+        `[data-alert-card="${CSS.escape(id)}"]`,
+      );
+      if (!node) {
+        if (attempts < 14) window.setTimeout(tryScroll, 150);
+        return;
+      }
+      let scroller: HTMLElement | null = node.parentElement;
+      while (scroller) {
+        const overflow = getComputedStyle(scroller).overflowY;
+        if (overflow === "auto" || overflow === "scroll") break;
+        scroller = scroller.parentElement;
+      }
+      if (!scroller) {
+        if (attempts < 14) window.setTimeout(tryScroll, 150);
+        return;
+      }
+      const offsetWithinScroller =
+        node.getBoundingClientRect().top -
+        scroller.getBoundingClientRect().top +
+        scroller.scrollTop;
+      const target = Math.max(0, offsetWithinScroller - 24);
+      if (Math.abs(scroller.scrollTop - target) < 4) {
+        // Already (close to) there. Keep polling for a couple more
+        // ticks in case the list is still hydrating and the card's
+        // final position will shift.
+        if (attempts < 6) window.setTimeout(tryScroll, 150);
+        return;
+      }
+      scroller.scrollTop = target;
+      if (attempts < 14) window.setTimeout(tryScroll, 150);
+    };
+    const initial = window.setTimeout(tryScroll, 80);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(initial);
+    };
+  }, [params.id]);
+
   const handleSelect = (id: string) => {
     navigate(`/alerts/${id}`, { replace: true });
   };
@@ -1235,8 +1507,23 @@ export function Alerts() {
           onSuccess: (res: unknown) => {
             const r = res as { deadlinesUpdated?: number } | null;
             const n = r?.deadlinesUpdated ?? 0;
+            // Yuqi audit 2026-05-06: prior toast was just a count — no
+            // way back to the affected clients. Now carries an action
+            // button that filters Timeline to the affected subset so the
+            // user can verify which deadlines actually moved.
+            const dateLabel = a.newDeadline
+              ? formatLongDate(a.newDeadline)
+              : "the new date";
             toast.success(
-              `${n} ${n === 1 ? "deadline" : "deadlines"} moved to ${a.newDeadline ? formatLongDate(a.newDeadline) : "the new date"}`,
+              `${n} ${n === 1 ? "deadline" : "deadlines"} moved to ${dateLabel}`,
+              {
+                duration: 8000,
+                action: {
+                  label: "View affected",
+                  onClick: () =>
+                    navigate(`/timeline?announcement=${a.id}`),
+                },
+              },
             );
             handleComplete(a.id);
           },
@@ -1613,7 +1900,7 @@ export function Alerts() {
             </div>
           ) : (
             filtered.map((a) => (
-              <div key={a.id}>
+              <div key={a.id} data-alert-card={a.id}>
                 <StateAlertCard
                   a={a}
                   variant="feed"

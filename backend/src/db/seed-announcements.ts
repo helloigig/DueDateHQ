@@ -241,23 +241,340 @@ const DEMO_ANNOUNCEMENTS: DemoAnnouncement[] = [
     parseConfidence: "high",
     publishedAt: new Date("2026-04-30T16:00:00Z"),
   },
+
+  // ─────────────────────────────────────────────────────────────────────
+  // 2026-05 refresh — mirrors src/data/mockAnnouncements.ts so real-mode
+  // alert feed matches the demo-mode richness. Detection times spread
+  // around 2026-05-04/05 so the escalation tier (fresh / reminder /
+  // escalated / blocking) renders a varied list, and the blockbuster
+  // CA storm relief is the freshest item at the top of the feed.
+  // ─────────────────────────────────────────────────────────────────────
+
+  // BLOCKBUSTER — sweeps every CA + nexus-CA client.
+  {
+    stateCode: "CA",
+    authority: "California Franchise Tax Board",
+    title: "Statewide storm relief — 18 NorCal counties extended to Aug 17",
+    summary:
+      "California has extended filing and payment deadlines for individuals and businesses in 18 Northern California counties affected by the April-May storm system. Affected returns and payments due May 5 - July 15 are postponed to August 17, 2026. IRS has issued matching federal relief.",
+    type: "disaster_extension",
+    taxType: "multiple",
+    retroactive: false,
+    counties: [
+      "Alameda", "Contra Costa", "Marin", "Mendocino", "Monterey",
+      "Napa", "Sacramento", "San Benito", "San Francisco", "San Joaquin",
+      "San Mateo", "Santa Clara", "Santa Cruz", "Solano", "Sonoma",
+      "Stanislaus", "Sutter", "Yolo",
+    ],
+    entityTypes: ["LLC", "S-Corp", "C-Corp", "Individual", "Partnership", "Trust"],
+    taxTypes: ["State income", "PTE election", "Quarterly estimates", "Sales tax"],
+    oldDeadline: "2026-05-05",
+    newDeadline: "2026-08-17",
+    effectiveDate: "2026-05-05",
+    sourceUrl: "https://demo.duedatehq.space/announcements/ca-storm-relief-may-2026",
+    sourceAuthority: "primary",
+    parseConfidence: "high",
+    publishedAt: new Date("2026-05-05T08:00:00Z"),
+  },
+  {
+    stateCode: "LA",
+    authority: "Louisiana Department of Revenue",
+    title: "Hurricane Delta disaster extension",
+    summary:
+      "Louisiana has granted an automatic filing and payment extension for taxpayers in federally declared disaster areas. Orleans, Jefferson, and St. Bernard parishes qualify. Affected filings due Oct 15, 2026 are postponed to Feb 15, 2027.",
+    type: "disaster_extension",
+    taxType: "multiple",
+    retroactive: false,
+    counties: ["Orleans", "Jefferson", "St. Bernard"],
+    entityTypes: ["LLC", "S-Corp", "Individual", "Partnership"],
+    taxTypes: ["State income", "PTE election", "Quarterly estimates"],
+    oldDeadline: "2026-10-15",
+    newDeadline: "2027-02-15",
+    effectiveDate: "2026-05-04",
+    sourceUrl: "https://demo.duedatehq.space/announcements/la-hurricane-delta-2026",
+    sourceAuthority: "primary",
+    parseConfidence: "high",
+    publishedAt: new Date("2026-05-04T13:00:00Z"),
+  },
+  {
+    stateCode: "CA",
+    authority: "California Franchise Tax Board",
+    title: "PTE election deadline extended to July 31",
+    summary:
+      "California FTB has extended the 2026 Pass-Through Entity (PTE) election deadline from June 15 to July 31 for qualifying S-Corps, LLCs taxed as partnerships, and partnerships. No separate application required; payment postmark controls.",
+    type: "pte_change",
+    taxType: "income",
+    retroactive: false,
+    counties: [],
+    entityTypes: ["S-Corp", "LLC", "Partnership"],
+    taxTypes: ["PTE election"],
+    oldDeadline: "2026-06-15",
+    newDeadline: "2026-07-31",
+    effectiveDate: "2026-05-04",
+    sourceUrl: "https://demo.duedatehq.space/announcements/ca-pte-election-2026",
+    sourceAuthority: "primary",
+    parseConfidence: "high",
+    publishedAt: new Date("2026-05-04T05:00:00Z"),
+  },
+  {
+    stateCode: "NY",
+    authority: "New York Department of Taxation and Finance",
+    title: "Economic nexus threshold lowered to $300,000",
+    summary:
+      "New York has lowered its economic nexus threshold from $500,000 to $300,000 in receipts for sales tax purposes, effective Q3 2026. LLCs and partnerships with receipts over the new threshold must register for NY sales tax.",
+    type: "nexus_change",
+    taxType: "sales",
+    retroactive: false,
+    counties: [],
+    entityTypes: ["LLC", "Partnership", "S-Corp"],
+    taxTypes: ["Sales tax nexus"],
+    oldDeadline: null,
+    newDeadline: null,
+    effectiveDate: "2026-07-01",
+    sourceUrl: "https://demo.duedatehq.space/announcements/ny-nexus-threshold-2026",
+    sourceAuthority: "primary",
+    parseConfidence: "high",
+    publishedAt: new Date("2026-05-03T04:00:00Z"),
+  },
+  {
+    stateCode: "TX",
+    authority: "Texas Comptroller of Public Accounts",
+    title: "Late-filing penalty waiver for May 15 Franchise filings",
+    summary:
+      "Texas Comptroller is offering a one-time penalty waiver for Franchise Tax filings due May 15, 2026. Penalties automatically waived on returns filed by May 31. No separate application required.",
+    type: "penalty_relief",
+    taxType: "franchise",
+    retroactive: false,
+    counties: [],
+    entityTypes: ["LLC", "S-Corp", "C-Corp", "Partnership"],
+    taxTypes: ["Franchise Tax"],
+    oldDeadline: "2026-05-15",
+    newDeadline: "2026-05-31",
+    effectiveDate: "2026-05-15",
+    sourceUrl: "https://demo.duedatehq.space/announcements/tx-penalty-waiver-may-2026",
+    sourceAuthority: "primary",
+    parseConfidence: "high",
+    publishedAt: new Date("2026-05-01T17:00:00Z"),
+  },
+  // Low-confidence match — Sarah needs to verify before action.
+  {
+    stateCode: "GA",
+    authority: "Georgia Department of Revenue",
+    title: "Job tax credit program — 2026 designated census tracts revised",
+    summary:
+      "Georgia DOR has updated the 2026 list of census tracts eligible for the enhanced Job Tax Credit. Eligibility depends on industry NAICS code and physical employment location — review affected clients individually.",
+    type: "rate_change",
+    taxType: "income",
+    retroactive: true,
+    counties: [],
+    entityTypes: ["S-Corp", "C-Corp", "LLC"],
+    taxTypes: ["Job Tax Credit"],
+    oldDeadline: null,
+    newDeadline: null,
+    effectiveDate: "2026-01-01",
+    sourceUrl: "https://demo.duedatehq.space/announcements/ga-job-tax-credit-2026",
+    sourceAuthority: "primary",
+    parseConfidence: "high",
+    publishedAt: new Date("2026-05-02T11:30:00Z"),
+  },
+  // Supersede pair — IL form revision then a correction. The FE collapses
+  // the older one when relatedSourceUrls links them.
+  {
+    stateCode: "IL",
+    authority: "Illinois Department of Revenue",
+    title: "IL-1040 instructions revised — Schedule M",
+    summary:
+      "Illinois DOR has updated the IL-1040 Schedule M instructions to clarify retirement-income subtraction for 2026 filings. Form unchanged.",
+    type: "form_change",
+    taxType: "income",
+    retroactive: false,
+    counties: [],
+    entityTypes: ["Individual"],
+    taxTypes: ["Personal income"],
+    oldDeadline: null,
+    newDeadline: null,
+    effectiveDate: "2026-04-30",
+    sourceUrl: "https://demo.duedatehq.space/announcements/il-1040-schedule-m-2026",
+    sourceAuthority: "primary",
+    parseConfidence: "high",
+    publishedAt: new Date("2026-04-30T19:00:00Z"),
+  },
+  {
+    stateCode: "IL",
+    authority: "Illinois Department of Revenue",
+    title: "IL-1040 Schedule M correction — supersedes Apr 30 update",
+    summary:
+      "Illinois DOR has issued a correction to the Schedule M update from April 30. Pension subtraction language reverted; the prior bulletin can be disregarded for filings already in progress.",
+    type: "form_change",
+    taxType: "income",
+    retroactive: false,
+    counties: [],
+    entityTypes: ["Individual"],
+    taxTypes: ["Personal income"],
+    oldDeadline: null,
+    newDeadline: null,
+    effectiveDate: "2026-05-02",
+    sourceUrl: "https://demo.duedatehq.space/announcements/il-1040-schedule-m-correction-2026",
+    sourceAuthority: "primary",
+    parseConfidence: "high",
+    publishedAt: new Date("2026-05-02T15:30:00Z"),
+  },
+  {
+    stateCode: "PA",
+    authority: "Pennsylvania Department of Revenue",
+    title: "myPATH portal outage May 6-7 — filings paused",
+    summary:
+      "PA DOR has scheduled a 36-hour myPATH portal outage from May 6 18:00 ET through May 7 23:59 ET for system upgrades. Returns and payments due May 7 will be honored if filed by May 8 with no penalty.",
+    type: "penalty_relief",
+    taxType: "income",
+    retroactive: false,
+    counties: [],
+    entityTypes: ["LLC", "S-Corp", "C-Corp", "Partnership", "Individual"],
+    taxTypes: ["Corporate income", "Personal income"],
+    oldDeadline: "2026-05-07",
+    newDeadline: "2026-05-08",
+    effectiveDate: "2026-05-06",
+    sourceUrl: "https://demo.duedatehq.space/announcements/pa-mypath-outage-may-2026",
+    sourceAuthority: "primary",
+    parseConfidence: "high",
+    publishedAt: new Date("2026-05-04T16:45:00Z"),
+  },
+  {
+    stateCode: "NJ",
+    authority: "New Jersey Division of Taxation",
+    title: "NJ BAIT (PTE) graduated rate brackets confirmed for 2026",
+    summary:
+      "NJ has confirmed the 2026 BAIT (Business Alternative Income Tax / PTE election) bracket structure. Rates unchanged at 5.675% / 6.52% / 9.12% / 10.9%. Filers can plan Q3 estimates accordingly.",
+    type: "rate_change",
+    taxType: "income",
+    retroactive: false,
+    counties: [],
+    entityTypes: ["LLC", "Partnership", "S-Corp"],
+    taxTypes: ["BAIT / PTE"],
+    oldDeadline: null,
+    newDeadline: null,
+    effectiveDate: "2026-01-01",
+    sourceUrl: "https://demo.duedatehq.space/announcements/nj-bait-confirmed-2026",
+    sourceAuthority: "primary",
+    parseConfidence: "high",
+    publishedAt: new Date("2026-04-29T10:00:00Z"),
+  },
+  {
+    stateCode: "MA",
+    authority: "Massachusetts Department of Revenue",
+    title: "MA Form 2 (fiduciary) — Schedule B updated for trust DNI",
+    summary:
+      "Mass DOR has revised Schedule B of Form 2 to capture distributable net income (DNI) more precisely for complex trusts. New required line. No deadline change.",
+    type: "form_change",
+    taxType: "income",
+    retroactive: false,
+    counties: [],
+    entityTypes: ["Trust"],
+    taxTypes: ["Fiduciary"],
+    oldDeadline: null,
+    newDeadline: null,
+    effectiveDate: "2026-01-01",
+    sourceUrl: "https://demo.duedatehq.space/announcements/ma-form-2-trust-dni-2026",
+    sourceAuthority: "primary",
+    parseConfidence: "high",
+    publishedAt: new Date("2026-04-28T09:00:00Z"),
+  },
+  {
+    stateCode: "OR",
+    authority: "Oregon Department of Revenue",
+    title: "OR-PTE election form revised for 2026",
+    summary:
+      "Oregon DOR has updated the Form OR-19 (pass-through entity tax election) instructions. Election deadline unchanged at April 15. No action required for filings already submitted.",
+    type: "form_change",
+    taxType: "income",
+    retroactive: false,
+    counties: [],
+    entityTypes: ["S-Corp", "Partnership"],
+    taxTypes: ["PTE election"],
+    oldDeadline: null,
+    newDeadline: null,
+    effectiveDate: "2026-05-01",
+    sourceUrl: "https://demo.duedatehq.space/announcements/or-pte-form-2026",
+    sourceAuthority: "primary",
+    parseConfidence: "high",
+    publishedAt: new Date("2026-05-01T18:00:00Z"),
+  },
+];
+
+// Per-index `detectedAt` offset (hours ago, relative to seed-time now).
+// Spread deterministically across the four escalation tiers so the demo
+// always exercises every alert surface — fresh badge, reminder colour,
+// escalated tier, AND the >72h blocking modal that previously never
+// fired because every row defaulted to detectedAt=now() (all "fresh").
+//
+//   <  24h → fresh        (idx 0, 7, 14, 21)
+//   24–48h → reminder     (idx 1, 8, 15)
+//   48–72h → escalated    (idx 2, 9, 16)
+//   >  72h → blocking     (idx 3+, plus a few very-old to prove backlog)
+//
+// 22 demo announcements → ~3-4 in each non-blocking tier and ~10 in
+// blocking tier. The blocking tier is intentionally heaviest because
+// "you've been away" is the demo's load-bearing narrative.
+const DETECTED_AT_OFFSET_HOURS = [
+  2, // 0 fresh
+  30, // 1 reminder
+  56, // 2 escalated
+  90, // 3 blocking (~3.7d)
+  120, // 4 blocking (5d)
+  168, // 5 blocking (7d)
+  240, // 6 blocking (10d)
+  10, // 7 fresh
+  36, // 8 reminder
+  60, // 9 escalated
+  96, // 10 blocking (4d)
+  144, // 11 blocking (6d)
+  192, // 12 blocking (8d)
+  336, // 13 blocking (14d)
+  18, // 14 fresh
+  44, // 15 reminder
+  68, // 16 escalated
+  108, // 17 blocking
+  156, // 18 blocking
+  264, // 19 blocking (11d)
+  408, // 20 blocking (17d)
+  6, // 21 fresh
 ];
 
 export async function seedAnnouncements(): Promise<{
   inserted: number;
-  skipped: number;
+  updated: number;
 }> {
   let inserted = 0;
-  let skipped = 0;
+  let updated = 0;
 
-  for (const a of DEMO_ANNOUNCEMENTS) {
+  // Anchor "now" once per call so every announcement's detectedAt
+  // comes off the same wall-clock — keeps the spread tight regardless
+  // of how slow the loop is.
+  const now = Date.now();
+
+  for (let i = 0; i < DEMO_ANNOUNCEMENTS.length; i++) {
+    const a = DEMO_ANNOUNCEMENTS[i]!;
+    const offsetHours =
+      DETECTED_AT_OFFSET_HOURS[i] ??
+      DETECTED_AT_OFFSET_HOURS[i % DETECTED_AT_OFFSET_HOURS.length]!;
+    const detectedAt = new Date(now - offsetHours * 60 * 60 * 1000);
+
     const existing = await db
       .select({ id: announcements.id })
       .from(announcements)
       .where(eq(announcements.sourceUrl, a.sourceUrl))
       .limit(1);
+
     if (existing.length > 0) {
-      skipped++;
+      // Re-anchor detectedAt on every run. The demo data needs to feel
+      // "fresh as of right now" — leaving an old detectedAt would
+      // collapse the tier spread back to all-blocking the longer the
+      // seeded firm sits idle.
+      await db
+        .update(announcements)
+        .set({ detectedAt })
+        .where(eq(announcements.id, existing[0]!.id));
+      updated++;
       continue;
     }
     await db.insert(announcements).values({
@@ -278,9 +595,10 @@ export async function seedAnnouncements(): Promise<{
       sourceAuthority: a.sourceAuthority,
       parseConfidence: a.parseConfidence,
       publishedAt: a.publishedAt,
+      detectedAt,
     });
     inserted++;
   }
 
-  return { inserted, skipped };
+  return { inserted, updated };
 }

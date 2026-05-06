@@ -28,8 +28,8 @@ import { cn } from "../lib/utils";
 import {
   buildQueueRows,
   summarizeClientGroup,
+  summarizeClientGroupTasks,
   type ClientGroupRow,
-  type StateAlertRow,
   type BulkBatchRow,
   type QueueTodoItem,
 } from "../lib/queueGrouping";
@@ -113,17 +113,16 @@ export function ActionQueue() {
     <section className="mb-section" aria-labelledby="action-queue-heading">
       <SectionHeader
         title={<span id="action-queue-heading">Action queue</span>}
-        meta={
-          rows.length === 1
-            ? `${rows.length} client · ${items.length} ${items.length === 1 ? "item" : "items"}`
-            : `${rows.length} clients · ${items.length} items`
-        }
+        // Yuqi audit 2026-05-06: section header meta normalized to
+        // "{count} {entity-noun}" across Today / ActionQueue / Timeline so
+        // the strip reads consistently. Items lead because they're the
+        // unit the user acts on; the client count is implied by the row
+        // grouping below.
+        meta={`${items.length} ${items.length === 1 ? "item" : "items"} across ${rows.length} ${rows.length === 1 ? "client" : "clients"}`}
       />
       <div className="bg-surface border border-line rounded-md overflow-hidden">
         <ul className="divide-y divide-line" role="list">
           {visible.map((row) => {
-            if (row.kind === "state_alert")
-              return <StateAlertRowView key={row.key} row={row} />;
             if (row.kind === "bulk_batch")
               return <BulkBatchRowView key={row.key} row={row} />;
             return (
@@ -230,13 +229,8 @@ function ClientGroupRowView({
   const [open, setOpen] = useState(false);
   const [bundleOpen, setBundleOpen] = useState(false);
   const summary = summarizeClientGroup(row);
+  const taskScope = summarizeClientGroupTasks(row);
   const checklistStates = aggregateChecklistStates(row.items);
-  // Pending = anything not confirmed / not_applicable (the chase loop
-  // is still open). The mockup's "{N} items pending · last sent {Y}d
-  // ago" footer reads this number.
-  const pendingCount = checklistStates.filter(
-    (c) => c.state !== "received_confirmed" && c.state !== "not_applicable",
-  ).length;
   // "last sent Yd ago" — derive from the max `daysBehind` across Send
   // items in this group. daysBehind is the chase-loop's stuck duration
   // (days since the most recent reminder), so the max across this
@@ -296,6 +290,22 @@ function ClientGroupRowView({
   // body, not the FK. Phase 2 introduces multi-task drafts so the
   // email_drafts row can fan out activity events across every linked
   // task. Mock-mode keeps the in-memory store shortcut.
+  // Cross-surface cache invalidation on send. Yuqi audit 2026-05-06:
+  // sending a chase email used to leave stale data on every surface
+  // EXCEPT ActionQueue itself —
+  //   • todoItems.list — the queue rebuilds from this; without
+  //     invalidation the just-sent row would re-appear on next mount
+  //   • checklists.listForTask — `lastReminderAt` bumps on send; without
+  //     invalidation Inbox + ClientDetail show the old timestamp
+  //   • inboundReplies.list — Mail Inbox shows the same item still
+  //     "unreplied" because its read model is separate
+  const utils = trpc.useUtils();
+  const invalidateAfterSend = () => {
+    void utils.todoItems.list.invalidate();
+    void utils.checklists.listForTask.invalidate();
+    void utils.inboundReplies.list.invalidate();
+    void utils.tasks.list.invalidate();
+  };
   const saveDraftMut = trpc.emails.saveDraft.useMutation();
   const sendEmailMut = trpc.emails.send.useMutation();
   const liveClientQuery = trpc.clients.get.useQuery(
@@ -333,6 +343,7 @@ function ClientGroupRowView({
         status: "draft",
       });
       actions.sendEmail(id);
+      invalidateAfterSend();
       toast.success(
         `Sent · ${payload.itemIds.length} ${payload.itemIds.length === 1 ? "item" : "items"} bundled into one email`,
       );
@@ -362,6 +373,7 @@ function ClientGroupRowView({
         },
       } as never)) as { id: string };
       await sendEmailMut.mutateAsync({ id: draft.id } as never);
+      invalidateAfterSend();
       toast.success(
         `Sent · ${payload.itemIds.length} ${payload.itemIds.length === 1 ? "item" : "items"} bundled into one email`,
       );
@@ -434,30 +446,31 @@ function ClientGroupRowView({
                 />
               )}
             </div>
-            {/* Title — verb summary, big and bold per the mockup
-                ("Send 7 reminders · across TX Franchise + 941"). */}
+            {/* Title — verb breakdown, big and bold. The expanded child
+                list below shows exactly the same N items that this
+                summary describes; the row's footer count agrees. */}
             <h3 className="text-base font-semibold text-ink-900 leading-snug">
               {summary}
             </h3>
-            {/* Dot row + status line — dots above, "{N} items pending ·
-                last sent {Y}d ago" below. The dots tell the chase-loop
-                story; the line gives the count + recency at a glance. */}
+            {/* Meta row: dot stack (chase-loop status across the items)
+                + task scope ("across F-1120") + last-sent recency.
+                The action count is implicit in the verb breakdown above
+                — we don't print "{N} items pending" again because that
+                drifted from `summary` whenever the two used different
+                denominators. */}
             <div className="mt-2 flex items-center gap-2 flex-wrap">
               <DotStack
                 states={checklistStates.map((c) => c.state)}
                 maxVisible={12}
               />
-              <span className="text-xs text-ink-500">
-                {pendingCount} {pendingCount === 1 ? "item" : "items"} pending
-                {lastSentDays != null && (
-                  <>
-                    {" · "}
-                    <span className="text-ink-400">
-                      last sent {lastSentDays}d ago
-                    </span>
-                  </>
-                )}
-              </span>
+              {taskScope && (
+                <span className="text-xs text-ink-500">{taskScope}</span>
+              )}
+              {lastSentDays != null && (
+                <span className="text-xs text-ink-400">
+                  · last sent {lastSentDays}d ago
+                </span>
+              )}
             </div>
           </div>
         </button>
@@ -492,10 +505,10 @@ function ClientGroupRowView({
       {open && (
         <div className="bg-sunken/40 border-t border-line">
           <ul className="divide-y divide-line/60">
-            {row.items.map((it) => (
-              <SubItemRow
-                key={it.id}
-                item={it}
+            {groupItemsByTask(row.items).map((tg) => (
+              <TaskGroupRow
+                key={tg.key}
+                group={tg}
                 checked={checked}
                 onToggle={(id) =>
                   setChecked((p) => ({ ...p, [id]: !p[id] }))
@@ -524,64 +537,105 @@ function ClientGroupRowView({
 // told by the parent row's DotStack, which already reads the same
 // state palette via DotStack's internal map.
 
-// Sub-item inside an expanded client group. For arrival-timing rows (with a
-// checklistItems snapshot), each checklist item renders as a per-row
-// checkbox + state dot. Selection state is OWNED by the parent
-// ClientGroupRowView so a single Send bar at the bottom of the
-// expanded panel can bundle items across multiple tasks. The Send
-// button on this sub-row is gone — it would have promised a per-task
-// email, which contradicts the one-chase-loop-per-email invariant.
+// Group items by (taskId | task+dueDate) so multiple TodoItems for the
+// same task share a single header. Two items can land on the same task
+// when, e.g., Mode B emits a "Collect" chase row and Mode C emits a
+// "Review" anomaly flag against the same form — both belong under one
+// "F-1120 (FL corporate) · due May 1" header rather than repeating it.
+type TaskGroup = {
+  key: string;
+  task?: string;
+  dueDate?: string;
+  // Items grouped by render type. Mode-B chase rows carry a checklist
+  // snapshot; Mode-A/C/etc. rows render as inline action items below.
+  modeBItems: QueueTodoItem[];
+  actionItems: QueueTodoItem[];
+};
+
+function groupItemsByTask(items: QueueTodoItem[]): TaskGroup[] {
+  const groups = new Map<string, TaskGroup>();
+  const order: string[] = [];
+  for (const it of items) {
+    const key =
+      it.taskId ??
+      (it.task && it.dueDate ? `${it.task}|${it.dueDate}` : `id:${it.id}`);
+    let g = groups.get(key);
+    if (!g) {
+      g = {
+        key,
+        task: it.task,
+        dueDate: it.dueDate,
+        modeBItems: [],
+        actionItems: [],
+      };
+      groups.set(key, g);
+      order.push(key);
+    }
+    if (it.checklistItems && it.checklistItems.length > 0) {
+      g.modeBItems.push(it);
+    } else {
+      g.actionItems.push(it);
+    }
+  }
+  return order.map((k) => groups.get(k)!);
+}
+
+// One render block per task within an expanded client group. Renders the
+// task header (form + due date) ONCE, then all action items beneath:
+// Mode-B chase checkboxes, then Mode-A/C/etc. inline action rows. The
+// per-task header dedup is the load-bearing fix — without it, a task
+// with both a chase and an anomaly flag repeats its header twice.
 //
-// Non-Mode-B verbs fall back to the legacy single-row treatment with
-// click-to-act behaviour.
-function SubItemRow({
-  item,
+// Selection state for the checkboxes is OWNED by the parent
+// ClientGroupRowView so a single Send bar at the bottom of the expanded
+// panel can bundle items across multiple tasks (PRD §7.3 — one chase
+// loop per email).
+function TaskGroupRow({
+  group,
   checked,
   onToggle,
 }: {
-  item: QueueTodoItem;
+  group: TaskGroup;
   checked: Record<string, boolean>;
   onToggle: (id: string) => void;
 }) {
-  const Icon = VERB_ICON[item.verb];
   const navigate = useNavigate();
+  const hasContent =
+    group.modeBItems.length > 0 || group.actionItems.length > 0;
+  if (!hasContent) return null;
 
-  if (item.checklistItems && item.checklistItems.length > 0) {
-    const taskScopedKey = (ciId: string) =>
-      `${item.taskId ?? item.id}:${ciId}`;
-    return (
-      <li className="px-region py-3 pl-10 bg-surface/60">
-        {/* Task header — bold form name + due date. Matches the
-            mockup's "TX Franchise · due May 15" pattern. The full
-            state-label strip is gone (it lived per-item on the row
-            below before; the state is now communicated by checkbox
-            disabled-state + the optional "Follow-up" tag). */}
+  return (
+    <li className="px-region py-3 pl-10 bg-surface/60">
+      {/* Task header — bold form name + due date, rendered ONCE per
+          task. Matches the mockup's "TX Franchise · due May 15"
+          pattern. Multiple TodoItems on the same task (e.g. a Mode B
+          chase + a Mode C anomaly flag) all share this single header. */}
+      {(group.task || group.dueDate) && (
         <div className="flex items-baseline gap-2 mb-1.5 flex-wrap">
-          {item.task && (
+          {group.task && (
             <span className="text-sm text-ink-900 font-semibold">
-              {item.task}
+              {group.task}
             </span>
           )}
-          {item.dueDate && (
+          {group.dueDate && (
             <span className="inline-flex items-baseline gap-1 text-xs text-ink-500">
-              due <DateLabel value={item.dueDate} format="auto" />
-            </span>
-          )}
-          {item.stageLabel && (
-            <span className="text-2xs text-ink-400">
-              · {item.stageLabel}
+              due <DateLabel value={group.dueDate} format="auto" />
             </span>
           )}
         </div>
-        {/* Per-checklist-item rows — checkbox + label + optional
-            "Follow-up" tag. Items in `requested_waiting` have already
-            been chased once → tag them as a follow-up so the CPA can
-            see at a glance which are first-asks vs. re-asks. State
-            dots and full state labels are dropped; the chase-loop
-            story is told by the parent row's DotStack instead. */}
-        <ul className="space-y-1">
-          {item.checklistItems.map((ci) => {
-            const k = taskScopedKey(ci.id);
+      )}
+
+      <ul className="space-y-1">
+        {/* Mode-B checklist rows — flatten checklistItems across all
+            Mode-B TodoItems on this task into a single checkbox list.
+            Items in `requested_waiting` have already been chased once →
+            tag them as "Follow-up" so first-asks vs. re-asks read at a
+            glance. State dots / full state labels are intentionally
+            dropped; the chase-loop story is told by the parent row's
+            DotStack. */}
+        {group.modeBItems.map((item) =>
+          (item.checklistItems ?? []).map((ci) => {
+            const k = `${item.taskId ?? item.id}:${ci.id}`;
             const disabled =
               ci.state === "received_confirmed" ||
               ci.state === "not_applicable";
@@ -589,7 +643,7 @@ function SubItemRow({
             const isFollowUp = ci.state === "requested_waiting";
             return (
               <li
-                key={ci.id}
+                key={k}
                 className={cn(
                   "flex items-center gap-2 text-sm rounded px-1.5 py-1 transition-colors",
                   disabled
@@ -621,108 +675,61 @@ function SubItemRow({
                 )}
               </li>
             );
-          })}
-        </ul>
-      </li>
-    );
-  }
-  // Non-Mode-B fallback — legacy single-row treatment.
-  return (
-    <li>
-      <button
-        type="button"
-        onClick={() => navigateForItem(item, navigate)}
-        className={cn(
-          "w-full text-left px-region py-2 pl-10 flex items-start gap-2 transition-colors",
-          "hover:bg-surface focus-visible:bg-surface focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-indigo/40",
+          }),
         )}
-      >
-        <UrgencyDot urgency={item.urgency} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 text-xs text-ink-500 mb-0.5 flex-wrap">
-            {item.task && (
-              <span className="text-ink-700 font-medium">{item.task}</span>
-            )}
-            {item.dueDate && (
-              <>
-                {item.task && <span className="text-ink-300" aria-hidden>·</span>}
-                <span className="inline-flex items-center gap-1">
-                  due <DateLabel value={item.dueDate} format="auto" />
-                </span>
-              </>
-            )}
-            {item.stageLabel && (
-              <>
-                <span className="text-ink-300" aria-hidden>·</span>
-                <span
-                  className={
-                    item.daysBehind && item.daysBehind > 7
-                      ? "text-danger-ink font-medium"
-                      : item.daysBehind && item.daysBehind > 0
-                        ? "text-warn-ink"
-                        : "text-ink-500"
-                  }
-                >
-                  {item.stageLabel}
-                  {item.daysBehind != null && item.daysBehind > 0 && (
-                    <span className="ml-1">· {item.daysBehind}d behind</span>
-                  )}
-                </span>
-              </>
-            )}
-            <span className="ml-auto inline-flex items-center gap-1 text-xs text-ink-700">
-              <Icon className="w-3 h-3" aria-hidden />
-              <span className="font-medium">{item.verb}</span>
-            </span>
-          </div>
-          <div className="text-sm text-ink-900">{item.action}</div>
-          <div className="text-xs text-ink-500 mt-0.5">{item.context}</div>
-        </div>
-        <ChevronRight
-          className="w-3.5 h-3.5 text-ink-400 shrink-0 mt-1"
-          aria-hidden
-        />
-      </button>
-    </li>
-  );
-}
 
-// ── State alert row ───────────────────────────────────────────────────────
-// state-monitor state-event row. Different shape: event headline + affected count.
-// Pinned to the top of the queue. The cascade (alert → mutates Task →
-// mutates outstanding TodoItems → re-ranks queue) happens upstream; this
-// row is the "go act on it" entry point.
-function StateAlertRowView({ row }: { row: StateAlertRow }) {
-  const item = row.item;
-  const navigate = useNavigate();
-  return (
-    <li className="group bg-surface" data-deadline-row>
-      <button
-        type="button"
-        onClick={() => navigateForItem(item, navigate)}
-        className="w-full text-left px-region py-3 flex items-start gap-2 hover:bg-sunken/40 transition-colors"
-      >
-        <UrgencyDot urgency={item.urgency} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 text-xs text-ink-500 mb-0.5 flex-wrap">
-            <span className="text-2xs uppercase tracking-wider font-semibold text-ink-500">
-              State alert
-            </span>
-            <span className="text-ink-300" aria-hidden>·</span>
-            <span className="text-ink-900 font-medium">{item.client}</span>
-            <span className="ml-auto inline-flex items-center gap-1 text-xs text-ink-700">
-              <Megaphone className="w-3 h-3" aria-hidden />
-              <span className="font-medium">Notify all</span>
-            </span>
-          </div>
-          <div className="text-sm text-ink-900 font-medium">{item.action}</div>
-          <div className="text-xs text-ink-500 mt-0.5">{item.context}</div>
-        </div>
-        <ChevronRight
-          className="w-4 h-4 text-ink-400 group-hover:text-ink-700 shrink-0 mt-1"
-          aria-hidden
-        />
-      </button>
+        {/* Non-Mode-B rows (Mode A inbound to confirm, Mode C anomaly
+            flag, replies, etc.) — inline action rows that match the
+            checkbox-row rhythm above. Click navigates to the action
+            surface; right-side pill names the verb. */}
+        {group.actionItems.map((item) => {
+          const Icon = VERB_ICON[item.verb];
+          const verbLabel =
+            item.verb === "Confirm"
+              ? "Confirm"
+              : item.verb === "Discuss"
+                ? "Reply"
+                : item.verb;
+          return (
+            <li
+              key={item.id}
+              className="rounded transition-colors hover:bg-canvas cursor-pointer"
+              onClick={() => navigateForItem(item, navigate)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  navigateForItem(item, navigate);
+                }
+              }}
+            >
+              <div className="flex items-start gap-2 px-1.5 py-1.5">
+                <span
+                  className={cn(
+                    "inline-block w-1.5 h-1.5 rounded-pill shrink-0 mt-1.5",
+                    URGENCY_DOT_CLASS[item.urgency],
+                  )}
+                  aria-hidden
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-ink-900">{item.action}</div>
+                  {item.context && (
+                    <div className="text-xs text-ink-500 mt-0.5 line-clamp-2">
+                      {item.context}
+                    </div>
+                  )}
+                </div>
+                <span className="inline-flex items-center gap-1 text-xs text-ink-700 shrink-0 mt-0.5">
+                  <Icon className="w-3 h-3" aria-hidden />
+                  <span className="font-medium">{verbLabel}</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-ink-400" aria-hidden />
+                </span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </li>
   );
 }

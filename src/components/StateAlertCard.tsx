@@ -1,10 +1,20 @@
-import { CalendarClock, Check } from "lucide-react";
+import {
+  CalendarClock,
+  Check,
+  ChevronRight,
+  Forward,
+  Mail,
+  MoonStar,
+  Sparkles,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { StatusPill } from "@/components/ui/StatusPill";
-import { StateBadge } from "@/components/ui/StateBadge";
+import { StateBadgeArt } from "@/components/ui/StateBadgeArt";
 import { Avatar } from "@/components/ui/Avatar";
+import { Button } from "@/components/ui/button";
 import { formatLongDate, hoursSince } from "@/data/dateHelpers";
 import { clients as MOCK_CLIENTS } from "@/data/mockClients";
+import { TOPIC_LABEL, TOPIC_TONE } from "@/data/announcementLabels";
 import type { Announcement } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -16,38 +26,30 @@ type ClientLike = {
 
 /**
  * StateAlertCard — the canonical alert presentation. Single source of
- * truth for /alerts (variant="feed") and Dashboard's preview section
- * (variant="preview"). One pattern, two readings — closes the
- * "Dashboard renders alerts differently from /alerts" duplication.
+ * truth across /alerts (variant="feed") and Today's state-alert section
+ * (variant="today"). One pattern, two readings.
  *
  * Variants:
- *   - "feed"    — full workshop card. Click selects (left pane). Hover
- *                 reveals a `Send N` chip. Used by /alerts.
- *   - "preview" — Dashboard preview. Click navigates to /alerts/:id.
- *                 No hover action chip — the indigo CTA on every card
- *                 was a T2 violation when 10 of them stacked. Action
- *                 surface lives on /alerts.
+ *   - "feed"    — full workshop card. Click selects (left pane). Used by
+ *                 /alerts; the right co-pilot pane carries the actions.
+ *   - "today"   — Today's state-alert band. Same body as feed, plus an
+ *                 inline action footer (Review draft / Apply new
+ *                 deadline / Forward / Snooze) because Today has no
+ *                 co-pilot pane to host actions.
+ *
+ * Yuqi audit 2026-05-06: the third "preview" variant (used by an early
+ * Dashboard mock that no longer exists) was retired. It was a footerless
+ * version of "today" that meant the user couldn't tell at a glance what
+ * actions were available without clicking through. Dashboard now uses a
+ * separate `StateAlertsPreview` component for its compact surface.
  */
 
-type Tone = "danger" | "warn" | "info";
-
-const TYPE_LABEL: Record<Announcement["type"], string> = {
-  disaster_extension: "Disaster ext.",
-  penalty_relief: "Penalty relief",
-  pte_change: "PTE change",
-  form_change: "Form change",
-  rate_change: "Rate change",
-  nexus_change: "Nexus change",
-};
-
-const TYPE_TONE: Record<Announcement["type"], Tone> = {
-  disaster_extension: "warn",
-  penalty_relief: "info",
-  pte_change: "info",
-  form_change: "info",
-  rate_change: "info",
-  nexus_change: "warn",
-};
+// TOPIC_LABEL + TYPE_TONE moved to `data/announcementLabels.ts` as
+// TOPIC_LABEL / TOPIC_TONE so the Today card, /alerts feed card, and
+// /alerts detail pane share one source. The prior local copy here
+// drifted out of sync — the detail pane used a neutral pill, the card
+// used info blue, and the same "Penalty relief" label looked like two
+// different concepts to the user.
 
 function timeAgoShort(iso: string): string {
   const h = hoursSince(iso);
@@ -87,18 +89,25 @@ export function affectedClientsFor(
 
 export interface StateAlertCardProps {
   a: Announcement;
-  variant?: "feed" | "preview";
+  variant?: "feed" | "today";
   /** Selected ring (feed variant only). */
   selected?: boolean;
   /** Faded "handled this session" treatment (feed variant only). */
   handled?: boolean;
-  /** Click handler — feed: select the card; preview: navigate to /alerts/:id. */
+  /** Click handler — feed: select the card; preview/today: navigate to /alerts/:id. */
   onSelect: () => void;
+  /** Snooze handler — only rendered when variant="today" (Today owns the
+   *  action footer; /alerts variants delegate to the co-pilot pane). */
+  onSnooze?: () => void;
   /** Live client roster used to resolve recipient chips. When omitted,
    *  falls back to MOCK_CLIENTS (legacy callers / design previews).
    *  Real-mode callers pass tRPC `clients.list().items` so chips reflect
-   *  the firm's actual roster. */
+   *  the firm's actual roster. Ignored when `affectedClients` is set. */
   clientSource?: ReadonlyArray<ClientLike>;
+  /** Pre-resolved affected client list — overrides internal resolution.
+   *  Today passes this directly so it can join with its already-fetched
+   *  client roster without re-resolving. */
+  affectedClients?: ReadonlyArray<AffectedClient>;
   /** Optional — kept for callers that still pass it; the feed-card hover
    *  Send chip was retired in favor of the co-pilot pane's wired Send. */
   onComplete?: (id: string) => void;
@@ -110,14 +119,18 @@ export function StateAlertCard({
   selected = false,
   handled = false,
   onSelect,
+  onSnooze,
   clientSource,
+  affectedClients,
   onComplete: _onComplete,
 }: StateAlertCardProps) {
-  const tone = TYPE_TONE[a.type];
-  const affected = affectedClientsFor(a, clientSource);
+  const tone = TOPIC_TONE[a.type];
+  const affected = affectedClients ?? affectedClientsFor(a, clientSource);
   const visibleChips = affected.slice(0, 5);
   const overflow = Math.max(0, affected.length - visibleChips.length);
   const isFeed = variant === "feed";
+  const isToday = variant === "today";
+  const affectedCount = a.affectedClientIds.length;
 
   return (
     <div
@@ -132,7 +145,10 @@ export function StateAlertCard({
       }}
       className={cn(
         "group block w-full shrink-0 text-left bg-surface border border-line rounded-md transition-all cursor-pointer overflow-hidden",
-        "hover:border-line-strong",
+        // Q3: hover communicates via subtle elevation instead of darker
+        // border. Soft pop shadow + faint sunken tint feels lifted
+        // without raising the chrome's loudness.
+        "hover:shadow-pop hover:border-line",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-900",
         isFeed && selected && !handled && "border-indigo ring-2 ring-indigo-soft",
         handled && "opacity-60 hover:opacity-95",
@@ -141,7 +157,7 @@ export function StateAlertCard({
     >
       {/* ── Zone 1 — what just happened ───────────────────────── */}
       <div className="p-region flex items-start gap-3">
-        <StateBadge code={a.stateCode} />
+        <StateBadgeArt code={a.stateCode} size="md" />
         <div className="flex-1 min-w-0">
           <h3 className="text-lg font-semibold text-ink-900 leading-snug">
             {a.title}
@@ -149,7 +165,7 @@ export function StateAlertCard({
           <div className="mt-1 flex items-center gap-2 text-xs text-ink-500">
             <span className="truncate flex-1 min-w-0">{a.authority}</span>
             <StatusPill variant={tone} size="xs" className="shrink-0">
-              {TYPE_LABEL[a.type]}
+              {TOPIC_LABEL[a.type]}
             </StatusPill>
             <span className="tabular-nums shrink-0 text-ink-400">
               {timeAgoShort(a.detectedAt)}
@@ -157,15 +173,13 @@ export function StateAlertCard({
           </div>
           {/* Body / summary — falls back to a generated one-liner when
               the announcement has no human-authored summary. Yuqi
-              2026-05-05: cards that arrived from the scraper without
-              a body looked half-loaded ("Press release from FDLE"
-              with no description rendered an empty paragraph).
-              `${authority} published a ${type}` is a thin description
-              but at least the row never renders blank. */}
-          <p className="mt-2 text-sm text-ink-700 leading-snug line-clamp-2">
+              2026-05-06: feed cards truncate to ONE line; the full
+              text lives in the right co-pilot pane (AlertContextSection).
+              The card is a scan-row, not a reader. */}
+          <p className="mt-2 text-sm text-ink-700 leading-snug line-clamp-1">
             {a.summary && a.summary.trim()
               ? a.summary
-              : `${a.authority} published a ${TYPE_LABEL[a.type].toLowerCase()} for ${a.affectedClientIds.length} of your clients. Open the detail pane for the full text.`}
+              : `${a.authority} published a ${TOPIC_LABEL[a.type].toLowerCase()} for ${a.affectedClientIds.length} of your clients. Open the detail pane for the full text.`}
           </p>
           {handled && (
             <div className="mt-2 inline-flex items-center gap-1 text-2xs font-medium text-ok-ink bg-ok-bg border border-ok-border rounded px-1.5 py-0.5">
@@ -190,7 +204,11 @@ export function StateAlertCard({
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
                 {visibleChips.map((c) => (
-                  <AffectedClientChip key={c.id} client={c} />
+                  <AffectedClientChip
+                    key={c.id}
+                    client={c}
+                    fromAlertId={a.id}
+                  />
                 ))}
                 {overflow > 0 && (
                   <span className="text-xs text-ink-500 px-1.5 tabular-nums">
@@ -220,12 +238,55 @@ export function StateAlertCard({
         </div>
       )}
 
-      {/* Zone 3 — primary action moved into the co-pilot pane on the
-          right where the per-client draft preview, recipient toggles,
-          and Edit/Refine controls live. The card itself is the entry
-          point: click to select, then act in the pane. Removing the
-          inline Send avoids two parallel send paths that were drifting
-          out of sync (the inline one was toast-only). */}
+      {/* ── Zone 3 — actions ──────────────────────────────────────
+          feed/preview: action footer hidden — /alerts owns the action
+          surface in the right co-pilot pane; preview lets the user
+          click through to it. today: rendered inline because Today has
+          no co-pilot pane and the action would otherwise be an extra
+          click away through /alerts. */}
+      {isToday && (
+        <div
+          className="border-t border-dashed border-line px-region pt-3 pb-3 flex items-center gap-2 flex-wrap"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span className="text-micro uppercase tracking-wider font-semibold text-indigo-ink inline-flex items-center gap-1">
+            <Sparkles aria-hidden />
+            AI suggested
+          </span>
+          <Button
+            size="sm"
+            onClick={onSelect}
+            className="bg-indigo hover:bg-indigo-hover text-surface"
+          >
+            <Mail aria-hidden />
+            Review draft for {affectedCount}{" "}
+            {affectedCount === 1 ? "client" : "clients"}
+            <ChevronRight aria-hidden />
+          </Button>
+          {a.newDeadline && (
+            <Button size="sm" variant="outline" onClick={onSelect}>
+              <CalendarClock aria-hidden />
+              Apply new deadline
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={onSelect}>
+            <Forward aria-hidden />
+            Forward bulletin
+          </Button>
+          {onSnooze && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onSnooze}
+              aria-label="Snooze until tomorrow"
+              className="ml-auto"
+            >
+              <MoonStar aria-hidden />
+              Snooze
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -240,11 +301,24 @@ export function StateAlertCard({
  * through" affordance. Keeping the primitive split preserves the
  * ClientChip contract while giving this surface its own framed shape.
  */
-function AffectedClientChip({ client }: { client: AffectedClient }) {
+function AffectedClientChip({
+  client,
+  fromAlertId,
+}: {
+  client: AffectedClient;
+  fromAlertId?: string;
+}) {
   const firstLetter = (client.name.trim()[0] ?? "?").toUpperCase();
+  // Carry the alert id along so ClientDetail can render a "Back to
+  // alert" reverse link in its header. Avoids the dead-end where the
+  // user clicks a chip from /alerts/:id, lands on /clients/:id, and
+  // has no way back without browser back.
+  const to = fromAlertId
+    ? `/clients/${client.id}?fromAlert=${fromAlertId}`
+    : `/clients/${client.id}`;
   return (
     <Link
-      to={`/clients/${client.id}`}
+      to={to}
       className="inline-flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-pill border border-line bg-surface hover:bg-sunken hover:border-line-strong transition-colors min-w-0 max-w-full"
       onClick={(e) => e.stopPropagation()}
       title={client.name}

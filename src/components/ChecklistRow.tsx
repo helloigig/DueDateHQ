@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import {
   Check,
   Clock,
-  Circle,
+  Plus,
   AlertTriangle,
   RotateCcw,
   Mail,
@@ -36,10 +36,18 @@ interface Props {
   ) => void;
 }
 
+// Yuqi audit 2026-05-06: state labels rewritten to verb-first action
+// language so the row reads like a TODO instead of a passive status:
+//   not_requested  → "Need to ask"            (CPA action: open the chase)
+//   requested_waiting → "Waiting on client"   (CPA action: send a reminder)
+//   received_unreviewed → "Needs your review" (CPA action: review + confirm)
+//   received_confirmed → "Confirmed"          (resting state)
+//   received_issue → "Has issue"              (CPA action: resolve + reconfirm)
+//   not_applicable → "Not applicable"         (resting state)
 const STATE_LABEL: Record<DocumentState, string> = {
-  not_requested: "Not requested",
-  requested_waiting: "Requested · waiting",
-  received_unreviewed: "Received · awaiting review",
+  not_requested: "Need to ask",
+  requested_waiting: "Waiting on client",
+  received_unreviewed: "Needs your review",
   received_confirmed: "Confirmed",
   received_issue: "Has issue",
   not_applicable: "Not applicable",
@@ -66,8 +74,12 @@ function StateIcon({ state }: { state: DocumentState }) {
         </span>
       );
     case "requested_waiting":
+      // Filled hourglass on a tinted background — the CPA's eye should
+      // read this as "in motion, waiting on the other side." Stronger
+      // visual weight than the prior outline-only clock so it doesn't
+      // collide with `not_requested` (which is now a `+` action prompt).
       return (
-        <span className="w-5 h-5 rounded-full border border-ink-300 flex items-center justify-center text-ink-500">
+        <span className="w-5 h-5 rounded-full bg-warn-bg/60 border border-warn-border flex items-center justify-center text-warn-ink">
           <Clock className="w-3 h-3" aria-hidden />
         </span>
       );
@@ -79,9 +91,13 @@ function StateIcon({ state }: { state: DocumentState }) {
       );
     case "not_requested":
     default:
+      // Plus icon (vs. plain circle) reads as "action available — open
+      // the chase." The empty circle was indistinguishable from
+      // `requested_waiting` at a glance and the user repeatedly
+      // misidentified the two states. Yuqi audit 2026-05-06.
       return (
-        <span className="w-5 h-5 rounded-full border border-ink-300 flex items-center justify-center">
-          <Circle className="w-3 h-3 text-ink-300" aria-hidden />
+        <span className="w-5 h-5 rounded-full border border-dashed border-ink-400 flex items-center justify-center text-ink-500">
+          <Plus className="w-3 h-3" aria-hidden />
         </span>
       );
   }

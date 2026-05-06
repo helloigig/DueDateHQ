@@ -3,6 +3,7 @@ import { ChevronDown, Megaphone, Sparkles, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useSession, updateSession } from "@/data/session";
+import { useStore } from "@/data/store";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { DateLabel } from "@/components/ui/DateLabel";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -10,7 +11,8 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { ActionQueue } from "@/components/ActionQueue";
 import { TimelineDayRow } from "@/components/today/TimelineDayRow";
-import { StateAlertCard, type AffectedClient } from "@/components/today/StateAlertCard";
+import { MorningTriage } from "@/components/MorningTriage";
+import { StateAlertCard, type AffectedClient } from "@/components/StateAlertCard";
 import { type DotStackUrgency } from "@/components/ui/DotStack";
 import { clients as MOCK_CLIENTS } from "@/data/mockClients";
 import { deadlines as MOCK_DEADLINES } from "@/data/mockDeadlines";
@@ -84,28 +86,50 @@ function buildTimeline(deadlines: ReadonlyArray<Deadline>): TimelineDay[] {
   return out;
 }
 
-function buildConfirmedToday(): ConfirmedItem[] {
-  // Demo: synthesize 3 items confirmed earlier this morning
-  return [
-    {
-      id: "cf-1",
-      clientName: "Riverside Holdings LLC",
-      meta: "Form 568 · CA · LLC",
-      confirmedAt: "9:42a",
-    },
-    {
-      id: "cf-2",
-      clientName: "Pacific Ridge S-Corp",
-      meta: "1120-S · Federal · S-Corp",
-      confirmedAt: "10:15a",
-    },
-    {
-      id: "cf-3",
-      clientName: "Bayview Dental C-Corp",
-      meta: "Q1 estimate · Federal · C-Corp",
-      confirmedAt: "11:03a",
-    },
-  ];
+/**
+ * Derive today's confirmed items from live checklist state.
+ *
+ * Yuqi audit 2026-05-06: prior version returned a hardcoded array of
+ * three demo rows that never moved no matter what the user actually
+ * confirmed in-session. Now reads from `useStore` (mock) /
+ * `trpc.todoItems.list` (real) and shows checklist items that flipped
+ * to `received_confirmed` today.
+ */
+function buildConfirmedTodayFromChecklist(
+  checklistItems: Array<{
+    id: string;
+    state: string;
+    label?: string;
+    taskId?: string;
+    confirmedAt?: string;
+  }>,
+  taskById: Map<string, { clientName?: string; formType?: string; jurisdiction?: string }>,
+): ConfirmedItem[] {
+  const todayIso = toIso(TODAY);
+  const out: ConfirmedItem[] = [];
+  for (const ci of checklistItems) {
+    if (ci.state !== "received_confirmed" || !ci.confirmedAt) continue;
+    if (!ci.confirmedAt.startsWith(todayIso)) continue;
+    const task = ci.taskId ? taskById.get(ci.taskId) : undefined;
+    out.push({
+      id: ci.id,
+      clientName: task?.clientName ?? ci.label ?? "Unknown client",
+      meta: task
+        ? `${task.formType ?? "—"} · ${task.jurisdiction ?? "—"}`
+        : ci.label ?? "Confirmed item",
+      confirmedAt: formatTimeShort(ci.confirmedAt),
+    });
+  }
+  return out;
+}
+
+function formatTimeShort(iso: string): string {
+  const d = new Date(iso);
+  const h = d.getHours();
+  const m = d.getMinutes().toString().padStart(2, "0");
+  const ampm = h >= 12 ? "p" : "a";
+  const hh = h % 12 === 0 ? 12 : h % 12;
+  return `${hh}:${m}${ampm}`;
 }
 
 export function Today() {
@@ -137,7 +161,73 @@ export function Today() {
     () => buildTimeline(deadlinesForBuild),
     [deadlinesForBuild],
   );
-  const confirmed = useMemo(buildConfirmedToday, []);
+
+  // Morning triage — calendar-truth pulse.
+  //
+  // The strip just below the page header answers ONE question: "before
+  // I touch the action queue, what does the calendar say is hot today?"
+  // It is NOT a list of action items (that's the queue immediately
+  // below) and it is NOT a list of inbound replies (that's the bell).
+  //
+  // Three signals only, derived from deadline dates:
+  //   1. pastOfficial     — official due date passed, not yet filed.
+  //                         Highest urgency. Red. Should be ~0 in a
+  //                         healthy firm; nonzero = extension territory.
+  //   2. dueToday         — official due date = today. Medium urgency.
+  //                         Neutral.
+  //   3. pastInternalTarget — past the firm's internal target but
+  //                         official deadline still in future. Low
+  //                         urgency. Neutral. The "buffer eaten" signal
+  //                         Sarah feels every morning.
+  // All three zero → calm "All caught up" line that yields the page to
+  // the queue immediately. The component itself owns the chip-vs-strip
+  // collapsing logic.
+  const triageSummary = useMemo(() => {
+    const todayIso = toIso(TODAY);
+    const open = deadlinesForBuild.filter(
+      (d) => d.status !== "completed" && d.status !== "filed_extension",
+    );
+    return {
+      pastOfficial: open.filter((d) => d.officialDueDate < todayIso).length,
+      dueToday: open.filter((d) => d.officialDueDate === todayIso).length,
+      pastInternalTarget: open.filter(
+        (d) =>
+          !!d.internalDueDate &&
+          d.internalDueDate < todayIso &&
+          d.officialDueDate >= todayIso,
+      ).length,
+    };
+  }, [deadlinesForBuild]);
+  // Confirmed today — derived from live checklist state (mock store
+  // mutations + real-mode BE), not a hardcoded demo array. Joins each
+  // item with its task to surface "client · form · jurisdiction".
+  const storeSnapshot = useStore();
+  const checklistItems = storeSnapshot.checklistItems ?? [];
+  const tasksAll = storeSnapshot.tasks ?? [];
+  const clientById = useMemo(
+    () => new Map(clientsForBuild.map((c) => [c.id, c])),
+    [clientsForBuild],
+  );
+  const taskById = useMemo(() => {
+    const m = new Map<
+      string,
+      { clientName?: string; formType?: string; jurisdiction?: string }
+    >();
+    if (!Array.isArray(tasksAll)) return m;
+    for (const t of tasksAll) {
+      const c = clientById.get(t.clientId);
+      m.set(t.id, {
+        clientName: c?.name,
+        formType: t.formType,
+        jurisdiction: t.jurisdiction,
+      });
+    }
+    return m;
+  }, [tasksAll, clientById]);
+  const confirmed = useMemo(
+    () => buildConfirmedTodayFromChecklist(checklistItems, taskById),
+    [checklistItems, taskById],
+  );
   const [confirmedExpanded, setConfirmedExpanded] = useState(false);
 
   // State alerts — driven by real announcement data (mock-mode tRPC).
@@ -147,7 +237,12 @@ export function Today() {
   // all surfaces, per the chrome-consistency pass.)
   const navigate = useNavigate();
   const announcementsQuery = useAnnouncements({ activeOnly: true });
-  const announcements = announcementsQuery.data ?? [];
+  // Today shows the top 3 most-recent active alerts only — the upstream
+  // mock-adapter list handler sorts by detectedAt desc, so slice(0, 3)
+  // here is the canonical "newest 3." Anything beyond goes to /alerts.
+  const allAnnouncements = announcementsQuery.data ?? [];
+  const announcements = allAnnouncements.slice(0, 3);
+  const totalActiveAnnouncements = allAnnouncements.length;
   const dismissMutation = useDismissAnnouncement();
   const affectedFor = useMemo(() => {
     return (a: Announcement): AffectedClient[] => {
@@ -247,6 +342,11 @@ export function Today() {
         </div>
       )}
 
+      {/* Morning triage — single-line calendar-truth pulse. See the
+          comment on `triageSummary` above for what each signal means
+          and what NOT to put here. */}
+      <MorningTriage summary={triageSummary} />
+
       {/* State alerts — the v0.7 differentiator surface (v0u synthesis).
           One section per concept — replaces the prior hardcoded info banner.
           Empty state mimics the existing AnnouncementBanner "All clear" so
@@ -257,17 +357,26 @@ export function Today() {
           meta={
             announcementsQuery.isLoading
               ? "Loading…"
-              : announcements.length > 0
-                ? `${announcements.length} active`
+              : totalActiveAnnouncements > 0
+                ? `${totalActiveAnnouncements} active ${totalActiveAnnouncements === 1 ? "alert" : "alerts"}`
                 : "All clear"
           }
           action={
-            <Link
-              to="/alerts"
-              className="text-xs text-ink-500 hover:text-ink-900 underline underline-offset-[3px] decoration-[1.5px]"
-            >
-              All alerts
-            </Link>
+            totalActiveAnnouncements > announcements.length ? (
+              <Link
+                to="/alerts"
+                className="text-xs text-ink-500 hover:text-ink-900 underline underline-offset-[3px] decoration-[1.5px]"
+              >
+                All {totalActiveAnnouncements} alerts
+              </Link>
+            ) : (
+              <Link
+                to="/alerts"
+                className="text-xs text-ink-500 hover:text-ink-900 underline underline-offset-[3px] decoration-[1.5px]"
+              >
+                All alerts
+              </Link>
+            )
           }
         />
         {announcementsQuery.isLoading ? (
@@ -292,9 +401,10 @@ export function Today() {
             {announcements.map((a) => (
               <StateAlertCard
                 key={a.id}
-                announcement={a}
+                a={a}
+                variant="today"
                 affectedClients={affectedFor(a)}
-                onOpen={() => navigate(`/alerts/${a.id}`)}
+                onSelect={() => navigate(`/alerts/${a.id}`)}
                 onSnooze={() => {
                   dismissMutation.mutate({ id: a.id });
                   toast.success("Snoozed until tomorrow");
@@ -320,7 +430,14 @@ export function Today() {
 
       {/* Timeline — glance-view of next 14 days */}
       <section className="mb-section">
-        <SectionHeader title="Timeline" meta="Next 14 days" />
+        <SectionHeader
+          title="Timeline"
+          meta={`${timeline.reduce((s, d) => s + d.count, 0)} ${
+            timeline.reduce((s, d) => s + d.count, 0) === 1
+              ? "deadline"
+              : "deadlines"
+          } in next 14 days`}
+        />
         {timeline.length === 0 ? (
           <div className="text-sm text-ink-500 py-6 text-center border-t border-line">
             No deadlines in the next 14 days.

@@ -145,25 +145,27 @@ function makeChecklistForTask(taskId: string, formType: string): ChecklistItem[]
     };
     switch (state) {
       case "received_confirmed":
-        base.receivedAt = "2026-04-08";
-        base.confirmedAt = "2026-04-09";
-        base.confirmedBy = "Sarah Mitchell";
+        base.receivedAt = "2026-04-22";
+        base.confirmedAt = "2026-04-23";
+        // Alternate between Sarah and Maya so the team-handoff
+        // dynamic is visible on the checklist row's confirmedBy chip.
+        base.confirmedBy = i % 3 === 0 ? "Maya Patel" : "Sarah Mitchell";
         base.aiClassification = item.label;
         base.aiConfidence = "high";
         base.receivedFilename = `${item.itemType}-${taskId}.pdf`;
         break;
       case "received_unreviewed":
-        base.receivedAt = "2026-04-19";
+        base.receivedAt = "2026-05-02";
         base.aiClassification = item.label;
         base.aiConfidence = AI_CONFIDENCES[i % 3];
         base.receivedFilename = `${item.itemType}-${taskId}.pdf`;
         break;
       case "requested_waiting":
-        base.lastReminderAt = "2026-04-10";
-        base.nextReminderAt = "2026-04-24";
+        base.lastReminderAt = "2026-04-24";
+        base.nextReminderAt = "2026-05-08";
         break;
       case "received_issue": {
-        base.receivedAt = "2026-04-18";
+        base.receivedAt = "2026-05-01";
         base.aiClassification = item.label;
         base.aiConfidence = "medium";
         base.receivedFilename = `${item.itemType}-${taskId}.pdf`;

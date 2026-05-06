@@ -20,6 +20,7 @@ import {
 } from "../hooks/useTasks";
 import { env } from "../config";
 import { simulateInboundDocument } from "../lib/simulate-inbound";
+import { periodSuffix } from "../lib/formPeriod";
 import { DeadlineChip, defaultActionsForState } from "./ui/DeadlineChip";
 import { classifyDeadlineState } from "../data/dateHelpers";
 import { TaskActions } from "./TaskActions";
@@ -28,20 +29,14 @@ import { ClientChip } from "./ClientChip";
 interface Props {
   task: Task;
   client: Client;
-  /** @deprecated 2026-05-06 — ProgressRing was removed because the
-   *  unlabeled "0%" was opaque. The actual progress signal lives in
-   *  the checklist sections below. Prop kept on the API so existing
-   *  callers don't break. */
-  completionPct?: number;
   /** Open the AI email-draft modal in chase mode. The DeadlineChip
    *  surfaces this when `recommendedAction === "chase"`. Wired by the
-   *  parent (TaskDetail) so the modal state stays at page scope. */
+   *  parent (TaskPanel) so the modal state stays at panel scope. */
   onChase?: () => void;
-  /** Hide the "Clients > {client} > {form}" breadcrumb. TaskPanel sets
-   *  this when rendering inside a client drawer — the parent client
-   *  page already establishes the breadcrumb; repeating it inside the
-   *  drawer is redundant. The standalone /clients/:id/tasks/:taskId
-   *  page leaves the prop unset so the breadcrumb shows there. */
+  /** Hide the "Clients > {client} > {form}" breadcrumb. TaskPanel
+   *  sets this when rendering inside a client drawer — the parent
+   *  client page already establishes the breadcrumb; repeating it
+   *  inside the drawer is redundant. */
   hideBreadcrumb?: boolean;
 }
 
@@ -93,7 +88,13 @@ export function TaskHeader({
             showState={false}
           />
           <ChevronRight className="w-3 h-3" aria-hidden />
-          <span className="text-ink-900">{task.formType}</span>
+          <span className="text-ink-900">
+            {task.formType}
+            {(() => {
+              const period = periodSuffix(task.formType, task.officialDueDate);
+              return period ? ` · ${period}` : null;
+            })()}
+          </span>
         </nav>
       )}
 
@@ -111,6 +112,21 @@ export function TaskHeader({
               cling to the title row inside a flex layout. */}
           <h1 className="text-display font-semibold text-ink-900 leading-7 tracking-[-0.01em]">
             {task.formType}
+            {/* Quarterly disambiguator (941/720) so three same-form tasks
+                on one client read distinctly. Same logic FilingsTab uses
+                in the row title. Yuqi audit 2026-05-06 (Task surface). */}
+            {(() => {
+              const period = periodSuffix(task.formType, task.officialDueDate);
+              if (!period) return null;
+              return (
+                <span
+                  className="ml-2 align-middle text-sm font-semibold px-1.5 py-0.5 rounded bg-sunken text-ink-700 border border-line tabular-nums"
+                  title={`${period} of fiscal year (due ${task.officialDueDate})`}
+                >
+                  {period}
+                </span>
+              );
+            })()}
           </h1>
           {/* Deadline state chip — replaces the parallel "Due / Internal target /
               Client prep" labels. The mini-timeline below already shows every

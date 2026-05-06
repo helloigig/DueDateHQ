@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Sparkles, AlertOctagon, Pencil, X } from "lucide-react";
 import type { Task, ChecklistItem } from "../types";
 import { trpc } from "../lib/api/client";
+import { MarkCompleteDialog } from "./MarkCompleteDialog";
 // MILESTONE_STATUS_META + StatusPill (from main #151) intentionally NOT
 // imported here — the redesigned Waypoint + ActiveStagePanel use their
 // own coloring tied to the connector/progress story (filled green line
@@ -96,6 +97,11 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
     null,
   );
   const [editing, setEditing] = useState<Waypoint | null>(null);
+  // Mark-complete dialog (cascade-up entry point) — fires when the user
+  // clicks the File pillar's "Mark done" action. Routes through the
+  // same shared dialog as TaskActions/PriorityCard so the <80% guard
+  // rail and audit trail are identical regardless of entry point.
+  const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   // Selected waypoint type — drives which stage's actions appear in the
   // panel below the timeline. Starts unset; resolves to the active stage
   // (in_progress / overdue / blocked) once waypoints load.
@@ -118,8 +124,10 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
   const blockedCount = liveMilestones.filter((m) => m.status === "blocked").length;
 
   const waypoints = useMemo(() => {
-    if (hasLive) return milestonesToWaypoints(liveMilestones, checklist);
-    return deriveWaypoints(task, checklist);
+    const raw = hasLive
+      ? milestonesToWaypoints(liveMilestones, checklist)
+      : deriveWaypoints(task, checklist);
+    return enforceChronologicalInvariant(raw);
   }, [hasLive, liveMilestones, task, checklist]);
 
   // Resolve the currently-selected waypoint. Falls back to the active
@@ -299,24 +307,38 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
                   wp={selectedWaypoint}
                   slideDirection={slideDirection}
                   isMarkingDone={updateMilestone.isPending}
+                  isFileStage={selectedWaypoint.type === "file"}
+                  isCollectStage={selectedWaypoint.type === "collect"}
                   onMarkDone={
-                    selectedWaypoint.ids &&
-                    selectedWaypoint.ids.length > 0
-                      ? async () => {
-                          try {
-                            await Promise.all(
-                              selectedWaypoint.ids!.map((id) =>
-                                updateMilestone.mutateAsync({
-                                  id,
-                                  status: "done",
-                                }),
-                              ),
-                            );
-                          } catch {
-                            // Error toast surfaces via the hook's onError.
-                          }
-                        }
-                      : undefined
+                    // File pillar → cascade-up via the shared
+                    // MarkCompleteDialog. Marking File done IS marking
+                    // the task complete (locked 2026-05-06); same
+                    // confirmation rule applies.
+                    selectedWaypoint.type === "file"
+                      ? () => setCompleteDialogOpen(true)
+                      : // Collect pillar → not user-clickable. Status
+                        // is derived from the checklist below; marking
+                        // it done in isolation would lie about which
+                        // docs are actually in.
+                        selectedWaypoint.type === "collect"
+                        ? undefined
+                        : selectedWaypoint.ids &&
+                            selectedWaypoint.ids.length > 0
+                          ? async () => {
+                              try {
+                                await Promise.all(
+                                  selectedWaypoint.ids!.map((id) =>
+                                    updateMilestone.mutateAsync({
+                                      id,
+                                      status: "done",
+                                    }),
+                                  ),
+                                );
+                              } catch {
+                                // Error toast surfaces via hook onError.
+                              }
+                            }
+                          : undefined
                   }
                   onOverride={
                     selectedWaypoint.ids &&
@@ -354,6 +376,11 @@ export function TaskMiniTimeline({ task, checklist = [] }: Props) {
           isSaving={updateMilestone.isPending}
         />
       )}
+      <MarkCompleteDialog
+        open={completeDialogOpen}
+        onOpenChange={setCompleteDialogOpen}
+        task={task}
+      />
     </section>
   );
 }
@@ -384,11 +411,11 @@ function milestonesToWaypoints(
     label: string;
     canonical: string;
   }> = [
-    { type: "initial_meeting", label: "Initial mtg", canonical: "initial_meeting" },
-    { type: "collect", label: "Collect", canonical: "collect_materials" },
-    { type: "prepare", label: "Prepare", canonical: "prepare_workpapers" },
-    { type: "review", label: "Review", canonical: "internal_review" },
-    { type: "file", label: "File", canonical: "file" },
+    { type: "initial_meeting", label: "Scope", canonical: "initial_meeting" },
+    { type: "collect", label: "Collecting", canonical: "collect_materials" },
+    { type: "prepare", label: "Preparing", canonical: "prepare_workpapers" },
+    { type: "review", label: "Signature", canonical: "internal_review" },
+    { type: "file", label: "Filed", canonical: "file" },
   ];
   const waiting = checklist.filter(
     (c) =>
@@ -617,6 +644,8 @@ function ActiveStagePanel({
   onOverride,
   isMarkingDone,
   slideDirection,
+  isFileStage,
+  isCollectStage,
 }: {
   wp: Waypoint;
   onMarkDone?: () => void;
@@ -627,6 +656,13 @@ function ActiveStagePanel({
    *  enters from the right edge); "left" when picking a stage to the
    *  left. null on first mount = no animation. */
   slideDirection?: "left" | "right" | null;
+  /** File pillar — its CTA reads "Mark complete" (cascade-up to task)
+   *  rather than "Mark File done", since marking File done IS marking
+   *  the task complete (locked 2026-05-06). */
+  isFileStage?: boolean;
+  /** Collect pillar — derived from checklist, no user CTA. The panel
+   *  shows a hint pointing to the checklist below instead. */
+  isCollectStage?: boolean;
 }) {
   const isFinished = wp.status === "done";
   const headline = (() => {
@@ -671,6 +707,11 @@ function ActiveStagePanel({
       {wp.blockerReason && (
         <p className="mt-1 text-2xs text-danger-ink">{wp.blockerReason}</p>
       )}
+      {isCollectStage && !isFinished && (
+        <p className="mt-1 text-2xs text-ink-500">
+          Status follows the checklist below — confirm items there.
+        </p>
+      )}
       {(onMarkDone || onOverride) && (
         <div className="mt-2 flex items-center gap-3 flex-wrap justify-center">
           {onMarkDone && !isFinished && (
@@ -680,7 +721,11 @@ function ActiveStagePanel({
               disabled={isMarkingDone}
               className="text-xs font-medium px-3 py-1.5 rounded-md bg-indigo text-white hover:bg-indigo-hover disabled:opacity-50 inline-flex items-center gap-1"
             >
-              {isMarkingDone ? "Marking…" : `Mark ${wp.label} done`}
+              {isMarkingDone
+                ? "Marking…"
+                : isFileStage
+                  ? "Mark task complete"
+                  : `Mark ${wp.label} done`}
               <span aria-hidden>→</span>
             </button>
           )}
@@ -827,18 +872,25 @@ function MilestoneEditPopover({
 
 // Heuristic milestone derivation from existing Task fields. When the v0.8
 // TaskMilestone schema lands, this becomes a pass-through.
+//
+// Invariant (Yuqi audit 2026-05-06): phases progress chronologically. We
+// compute the SINGLE current active phase index from data, then derive
+// every phase's status from its position relative to that index:
+//   i < current  → done
+//   i = current  → in_progress (or overdue when due date has passed)
+//   i > current  → not_started
+// This makes "Scope=Not started while Collecting=Done" structurally
+// impossible — the prior heuristic computed each phase independently and
+// could emit non-monotonic timelines.
 function deriveWaypoints(task: Task, checklist: ChecklistItem[]): Waypoint[] {
   const today = new Date().toISOString().slice(0, 10);
   const due = task.officialDueDate;
   const target = task.internalTargetDate;
   const clientPrep = task.clientPrepDate;
 
-  // Compute a synthetic "initial meeting" ~30 days before client prep
   const initialMeeting = clientPrep
     ? offsetDays(clientPrep, -30)
     : offsetDays(due, -90);
-
-  // Synthetic "review" between target and due
   const review =
     target && due
       ? midpoint(target, due)
@@ -846,94 +898,108 @@ function deriveWaypoints(task: Task, checklist: ChecklistItem[]): Waypoint[] {
         ? offsetDays(target, 7)
         : offsetDays(due, -7);
 
-  // Status derivation: based on completion percentage + dates
   const total = checklist.filter((c) => c.state !== "not_applicable").length;
   const confirmed = checklist.filter((c) => c.state === "received_confirmed").length;
   const waiting = checklist.filter(
-    (c) => c.state === "requested_waiting" || c.state === "not_requested"
+    (c) => c.state === "requested_waiting" || c.state === "not_requested",
   ).length;
-  const review_pending = checklist.filter(
-    (c) => c.state === "received_unreviewed" || c.state === "received_issue"
+  const reviewPending = checklist.filter(
+    (c) => c.state === "received_unreviewed" || c.state === "received_issue",
   ).length;
-  const pct = total === 0 ? 0 : confirmed / total;
-
-  // Phase progression: initial → collect → prepare → review → file
-  // collect is "in_progress" if any items still waiting
-  // prepare is "in_progress" if all received but not all confirmed
-  // review is "in_progress" if all confirmed but not yet filed
-  // file is "in_progress" if status = in_progress / overdue and pct = 1
-  // file is "done" if status = completed
   const isComplete = task.status === "completed";
-  const isOverdue = task.status === "overdue" || (today > due && !isComplete);
+  const isOverdue =
+    task.status === "overdue" || (today > due && !isComplete);
 
-  const initialStatus: Status = "done"; // assume initial meeting happened
-  const collectStatus: Status =
-    waiting > 0 ? (today > clientPrep! ? "overdue" : "in_progress") : "done";
-  const prepareStatus: Status =
-    waiting > 0
-      ? "not_started"
-      : review_pending > 0
-        ? "in_progress"
-        : pct < 1
-          ? "in_progress"
-          : "done";
-  const reviewStatus: Status =
-    pct < 1 || prepareStatus !== "done"
-      ? "not_started"
-      : !isComplete
-        ? "in_progress"
-        : "done";
-  const fileStatus: Status = isComplete
-    ? "done"
-    : isOverdue
-      ? "overdue"
-      : pct === 1
-        ? "in_progress"
-        : "not_started";
+  // Phase indices: 0=Scope, 1=Collecting, 2=Preparing, 3=Signature, 4=Filed.
+  // The "current phase" is the leftmost phase that isn't yet complete. When
+  // the task is fully done, current = 5 (beyond Filed → all done).
+  const currentIdx = (() => {
+    if (isComplete) return 5;
+    // Scope: only the active phase if scope hasn't been confirmed yet. We
+    // treat a confirmed scope as "checklist exists" — once a task has any
+    // requested/received docs, scope is considered done.
+    const scopeConfirmed =
+      total > 0 &&
+      checklist.some(
+        (c) =>
+          c.state === "requested_waiting" ||
+          c.state === "received_unreviewed" ||
+          c.state === "received_issue" ||
+          c.state === "received_confirmed",
+      );
+    if (!scopeConfirmed) return 0;
+    if (waiting > 0) return 1; // still chasing docs
+    if (reviewPending > 0) return 2; // all received, some unreviewed
+    if (confirmed < total) return 2; // edge: zero waiting + zero pending but not all confirmed
+    // All docs received + reviewed + confirmed: ready for signature.
+    // Without a richer signal we can't distinguish Signature vs Filed
+    // here, so leave the active stage at Signature until the task flips
+    // to completed (Filed).
+    return 3;
+  })();
 
-  // 5 waypoints — one per stage, mirroring the BE canonical milestone
-  // shape. No more folding; the heuristic emits the same shape as
-  // milestonesToWaypoints does for live data.
-  return [
-    {
-      type: "initial_meeting",
-      label: "Initial mtg",
-      targetDate: initialMeeting,
-      status: initialStatus,
-    },
-    {
-      type: "collect",
-      label: "Collect",
-      targetDate: clientPrep,
-      status: collectStatus,
-      missingBadge:
-        collectStatus === "in_progress" || collectStatus === "overdue"
-          ? waiting || undefined
-          : undefined,
-    },
-    {
-      type: "prepare",
-      label: "Prepare",
-      targetDate: target,
-      status: prepareStatus,
-      missingBadge:
-        prepareStatus === "in_progress"
-          ? review_pending || undefined
-          : undefined,
-    },
-    {
-      type: "review",
-      label: "Review",
-      targetDate: review,
-      status: reviewStatus,
-    },
-    {
-      type: "file",
-      label: "File",
-      targetDate: due,
-      status: fileStatus,
-    },
+  const labels: Array<{ type: WaypointType; label: string; date?: string }> = [
+    { type: "initial_meeting", label: "Scope", date: initialMeeting },
+    { type: "collect", label: "Collecting", date: clientPrep },
+    { type: "prepare", label: "Preparing", date: target },
+    { type: "review", label: "Signature", date: review },
+    { type: "file", label: "Filed", date: due },
   ];
+
+  return labels.map((l, i) => {
+    let status: Status;
+    if (i < currentIdx) status = "done";
+    else if (i === currentIdx) status = isOverdue ? "overdue" : "in_progress";
+    else status = "not_started";
+    let missingBadge: number | undefined;
+    if (i === 1 && (status === "in_progress" || status === "overdue")) {
+      missingBadge = waiting || undefined;
+    } else if (i === 2 && status === "in_progress") {
+      missingBadge = reviewPending || undefined;
+    }
+    return {
+      type: l.type,
+      label: l.label,
+      targetDate: l.date,
+      status,
+      missingBadge,
+    };
+  });
+}
+
+/**
+ * Enforce the chronological invariant on a list of waypoints. Used by the
+ * live BE path (`milestonesToWaypoints`) where rows are read directly from
+ * the milestones table — bad data (manual edits, partial cascades) could
+ * still produce non-monotonic timelines without this guard.
+ *
+ * Rule: phases must progress monotonically. Find the rightmost phase that
+ * is started (done / in_progress / overdue / blocked); every phase before
+ * it must be `done`. Every phase after a `not_started` must also be
+ * `not_started` — but that direction is harder to enforce without
+ * dropping signal, so we only fix the backward direction.
+ */
+function enforceChronologicalInvariant(waypoints: Waypoint[]): Waypoint[] {
+  let rightmostStarted = -1;
+  for (let i = waypoints.length - 1; i >= 0; i--) {
+    const s = waypoints[i].status;
+    if (
+      s === "done" ||
+      s === "in_progress" ||
+      s === "overdue" ||
+      s === "blocked"
+    ) {
+      rightmostStarted = i;
+      break;
+    }
+  }
+  if (rightmostStarted <= 0) return waypoints;
+  return waypoints.map((w, i) => {
+    if (i < rightmostStarted && w.status !== "done") {
+      return { ...w, status: "done" as Status };
+    }
+    return w;
+  });
 }
 
 function offsetDays(iso: string, days: number): string {

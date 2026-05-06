@@ -1,12 +1,87 @@
 import type { Announcement } from "../types";
 
-// Detection times anchor to 2026-04-23T11:00:00Z ("now" for the demo):
-// · ~20h ago  = FRESH      (LA Hurricane)
-// · ~30h ago  = REMINDER   (CA PTE)
-// · ~55h ago  = ESCALATED  (NY nexus)
-// · ~90h ago  = BLOCKING   (TX penalty relief)
+// Anchor: today is 2026-05-05T11:00:00Z. Detection times are spread
+// across the past ~6 days so the bell shows fresh, recent, and
+// settled-into-history items at once:
+//   · ~3h ago    = JUST DROPPED   (CA storm relief — blockbuster, hits 18 clients)
+//   · ~22h ago   = FRESH          (LA Hurricane Delta)
+//   · ~30h ago   = REMINDER       (CA PTE)
+//   · ~55h ago   = ESCALATED      (NY nexus)
+//   · ~90h ago   = BLOCKING       (TX penalty relief)
+//   · 5-6d ago   = SETTLED        (form/rate updates the firm has read)
+//   · 9d ago     = DISMISSED      (one CPA explicitly dismissed)
 
 export const announcements: Announcement[] = [
+  // The 3 newest active alerts (IL Q1 underpayment, TX No-Tax-Due
+  // threshold, CA LA wildfire Q1 ext) are seeded via `STATE_FEED` in
+  // `mockStateFeed.ts` so their `detectedAt` is `new Date()` at runtime,
+  // putting them at the top of `useAnnouncements()` (sorted desc).
+  // Keeping seed data here to a single source — duplicating the trio
+  // here previously caused the same alert to appear twice in /alerts.
+
+  // ── BLOCKBUSTER: 18-client California storm relief ──────────────────
+  // The "state notification + suggested actions = THE surface" demo.
+  // Sweeps every CA + nexus-CA client. The CPA's first reaction to
+  // opening Today this morning should be: "oh shit, 18 clients."
+  {
+    id: "ann-ca-2026-storm-relief",
+    stateCode: "CA",
+    authority: "California Franchise Tax Board",
+    title: "Statewide storm relief — 18 NorCal counties extended to Aug 17",
+    summary:
+      "California has extended filing and payment deadlines for individuals and businesses in 18 Northern California counties affected by the April-May storm system. Affected returns and payments due May 5 - July 15 are postponed to August 17, 2026. IRS has issued matching federal relief.",
+    issuanceDate: "2026-05-05",
+    effectiveDate: "2026-05-05",
+    detectedAt: "2026-05-05T08:00:00Z",
+    type: "disaster_extension",
+    taxType: "multiple",
+    retroactive: false,
+    counties: [
+      "Alameda",
+      "Contra Costa",
+      "Marin",
+      "Mendocino",
+      "Monterey",
+      "Napa",
+      "Sacramento",
+      "San Benito",
+      "San Francisco",
+      "San Joaquin",
+      "San Mateo",
+      "Santa Clara",
+      "Santa Cruz",
+      "Solano",
+      "Sonoma",
+      "Stanislaus",
+      "Sutter",
+      "Yolo",
+    ],
+    entityTypes: ["LLC", "S-Corp", "C-Corp", "Individual", "Partnership", "Trust"],
+    taxTypes: ["State income", "PTE election", "Quarterly estimates", "Sales tax"],
+    oldDeadline: "2026-05-05",
+    newDeadline: "2026-08-17",
+    sourceUrl: "https://www.ftb.ca.gov/newsroom/2026-storm-relief.html",
+    relatedSourceUrls: [
+      "https://www.irs.gov/newsroom/2026-ca-disaster-relief",
+      "https://www.gov.ca.gov/2026/05/04/storm-state-of-emergency",
+    ],
+    sourceAuthority: "primary",
+    relatedAnnouncementIds: ["irs-disaster-2026-ca-storm-may"],
+    parseConfidence: "high",
+    matchConfidence: "high",
+    affectedClientIds: [
+      // Every CA primary-state client
+      "c-ca-01", "c-ca-02", "c-ca-03", "c-ca-04", "c-ca-05",
+      "c-ca-06", "c-ca-07", "c-ca-08", "c-ca-09", "c-ca-10", "c-ca-11",
+      // Plus nexus-CA clients
+      "c-tx-02", "c-ny-06", "c-fl-02", "c-ga-01",
+      // Plus a few LLC/Partnership in affected counties (multi-state)
+      "c-il-01", "c-ny-08",
+    ],
+    read: false,
+    dismissed: false,
+  },
+
   {
     id: "ann-la-2026-hurricane-delta",
     stateCode: "LA",
@@ -14,9 +89,9 @@ export const announcements: Announcement[] = [
     title: "Hurricane Delta disaster extension",
     summary:
       "Louisiana has granted an automatic filing and payment extension for taxpayers in federally declared disaster areas. Orleans, Jefferson, and St. Bernard parishes qualify. Affected filings due Oct 15, 2026 are postponed to Feb 15, 2027.",
-    issuanceDate: "2026-04-22",
-    effectiveDate: "2026-04-22",
-    detectedAt: "2026-04-22T15:00:00Z",
+    issuanceDate: "2026-05-04",
+    effectiveDate: "2026-05-04",
+    detectedAt: "2026-05-04T13:00:00Z",
     type: "disaster_extension",
     taxType: "multiple",
     retroactive: false,
@@ -30,12 +105,14 @@ export const announcements: Announcement[] = [
     relatedAnnouncementIds: ["irs-disaster-2026-la-delta"],
     parseConfidence: "high",
     matchConfidence: "high",
+    // c-la-05 lives in Jefferson but is `prospect` (not active), so
+    // computeAffectedClients() filters it out. Listing it here would
+    // make the seed disagree with detection (5 active matches, not 6).
     affectedClientIds: [
       "c-la-01",
       "c-la-02",
       "c-la-03",
       "c-la-04",
-      "c-la-05",
       "c-la-06",
     ],
     read: false,
@@ -48,9 +125,9 @@ export const announcements: Announcement[] = [
     title: "PTE election deadline extended to July 31",
     summary:
       "California FTB has extended the 2026 Pass-Through Entity (PTE) election deadline from June 15 to July 31 for qualifying S-Corps, LLCs taxed as partnerships, and partnerships. No separate application required; payment postmark controls.",
-    issuanceDate: "2026-04-22",
-    effectiveDate: "2026-04-22",
-    detectedAt: "2026-04-22T05:00:00Z",
+    issuanceDate: "2026-05-04",
+    effectiveDate: "2026-05-04",
+    detectedAt: "2026-05-04T05:00:00Z",
     type: "pte_change",
     taxType: "income",
     retroactive: false,
@@ -64,7 +141,9 @@ export const announcements: Announcement[] = [
     relatedAnnouncementIds: [],
     parseConfidence: "high",
     matchConfidence: "high",
-    affectedClientIds: ["c-ca-01", "c-ca-02", "c-ca-04", "c-ca-07", "c-ca-10"],
+    // c-ca-04 is a Partnership but `prospect` — drop it so the seed
+    // count (4) matches what computeAffectedClients() would produce.
+    affectedClientIds: ["c-ca-01", "c-ca-02", "c-ca-07", "c-ca-10"],
     read: false,
     dismissed: false,
   },
@@ -75,9 +154,9 @@ export const announcements: Announcement[] = [
     title: "Economic nexus threshold lowered to $300,000",
     summary:
       "New York has lowered its economic nexus threshold from $500,000 to $300,000 in receipts for sales tax purposes, effective Q3 2026. LLCs and partnerships with receipts over the new threshold must register for NY sales tax.",
-    issuanceDate: "2026-04-21",
+    issuanceDate: "2026-05-03",
     effectiveDate: "2026-07-01",
-    detectedAt: "2026-04-21T04:00:00Z",
+    detectedAt: "2026-05-03T04:00:00Z",
     type: "nexus_change",
     taxType: "sales_use",
     retroactive: false,
@@ -91,7 +170,7 @@ export const announcements: Announcement[] = [
     relatedAnnouncementIds: [],
     parseConfidence: "high",
     matchConfidence: "medium",
-    affectedClientIds: ["c-ny-01", "c-ny-03", "c-ny-08"],
+    affectedClientIds: ["c-ny-01", "c-ny-03", "c-ny-08", "c-nj-01"],
     read: false,
     dismissed: false,
   },
@@ -102,9 +181,9 @@ export const announcements: Announcement[] = [
     title: "Late-filing penalty waiver for May 15 Franchise filings",
     summary:
       "Texas Comptroller is offering a one-time penalty waiver for Franchise Tax filings due May 15, 2026. Penalties automatically waived on returns filed by May 31. No separate application required.",
-    issuanceDate: "2026-04-19",
+    issuanceDate: "2026-05-01",
     effectiveDate: "2026-05-15",
-    detectedAt: "2026-04-19T17:00:00Z",
+    detectedAt: "2026-05-01T17:00:00Z",
     type: "penalty_relief",
     taxType: "franchise",
     retroactive: false,
@@ -124,37 +203,41 @@ export const announcements: Announcement[] = [
     dismissed: false,
   },
 
-  // ── Non-affecting news items ──────────────────────────────────────────
-  // State announcements scraped from monitored authorities that do NOT
-  // touch this firm's roster. They live on /alerts under "All
-  // announcements" so the CPA can verify "we're watching" without them
-  // bubbling into Today's queue. The "Affecting you" tab counts only the
-  // intersection — which is the differentiator's whole point (gap > fill).
+  // ── LOW-CONFIDENCE MATCH — Georgia advisory ──────────────────────────
+  // Demonstrates the matchConfidence: "low" badge — Sarah needs to verify
+  // before taking action. The state monitor catches the bulletin but isn't
+  // sure which clients qualify because the eligibility criteria reference
+  // an industry classifier the firm hasn't tagged yet.
   {
-    id: "ann-or-2026-passthrough",
-    stateCode: "OR",
-    authority: "Oregon Department of Revenue",
-    title: "OR-PTE election form revised for 2026",
+    id: "ann-ga-2026-credit-program",
+    stateCode: "GA",
+    authority: "Georgia Department of Revenue",
+    title: "Job tax credit program — 2026 designated census tracts revised",
     summary:
-      "Oregon DOR has updated the Form OR-19 (pass-through entity tax election) instructions. Election deadline unchanged at April 15. No action required for filings already submitted.",
-    issuanceDate: "2026-04-21",
-    effectiveDate: "2026-04-21",
-    detectedAt: "2026-04-21T18:00:00Z",
-    type: "form_change",
+      "Georgia DOR has updated the 2026 list of census tracts eligible for the enhanced Job Tax Credit. Eligibility depends on industry NAICS code and physical employment location — review affected clients individually.",
+    issuanceDate: "2026-05-02",
+    effectiveDate: "2026-01-01",
+    detectedAt: "2026-05-02T11:30:00Z",
+    type: "rate_change",
     taxType: "income",
-    retroactive: false,
+    retroactive: true,
     counties: [],
-    entityTypes: ["S-Corp", "Partnership"],
-    taxTypes: ["PTE election"],
-    sourceUrl: "https://www.oregon.gov/dor/forms/or-19-2026",
+    entityTypes: ["S-Corp", "C-Corp", "LLC"],
+    taxTypes: ["Job Tax Credit"],
+    sourceUrl: "https://dor.georgia.gov/job-tax-credit-2026",
     sourceAuthority: "primary",
     relatedAnnouncementIds: [],
     parseConfidence: "high",
-    matchConfidence: "high",
-    affectedClientIds: [],
+    matchConfidence: "low",
+    affectedClientIds: ["c-ga-01"],
     read: false,
     dismissed: false,
   },
+
+  // ── DISMISSED — Sarah explicitly cleared this from the queue ────────
+  // This shows up on /alerts under "All" with the dismissed treatment but
+  // doesn't bubble into Today. Useful so the dismissed state has visible
+  // affordances when the CPA wants to undo or audit a dismiss decision.
   {
     id: "ann-mi-2026-rate",
     stateCode: "MI",
@@ -162,9 +245,9 @@ export const announcements: Announcement[] = [
     title: "Michigan corporate income tax rate held at 6.0%",
     summary:
       "Michigan Treasury confirmed the corporate income tax rate will remain at 6.0% for tax year 2026. No legislative change pending. Bulletin issued for clarity after market speculation.",
-    issuanceDate: "2026-04-20",
+    issuanceDate: "2026-04-26",
     effectiveDate: "2026-01-01",
-    detectedAt: "2026-04-20T14:00:00Z",
+    detectedAt: "2026-04-26T14:00:00Z",
     type: "rate_change",
     taxType: "income",
     retroactive: false,
@@ -177,8 +260,173 @@ export const announcements: Announcement[] = [
     relatedAnnouncementIds: [],
     parseConfidence: "high",
     matchConfidence: "high",
-    affectedClientIds: [],
+    affectedClientIds: ["c-mi-01"],
     read: true,
+    dismissed: true,
+  },
+
+  // ── SUPERSEDED — original IL form clarification, then a follow-up ────
+  // Two related entries demonstrating the "scraper saw a correction"
+  // pattern. The FE collapses the older one under the newer.
+  {
+    id: "ann-il-2026-form-revision",
+    stateCode: "IL",
+    authority: "Illinois Department of Revenue",
+    title: "IL-1040 instructions revised — Schedule M",
+    summary:
+      "Illinois DOR has updated the IL-1040 Schedule M instructions to clarify retirement-income subtraction for 2026 filings. Form unchanged.",
+    issuanceDate: "2026-04-30",
+    effectiveDate: "2026-04-30",
+    detectedAt: "2026-04-30T19:00:00Z",
+    type: "form_change",
+    taxType: "income",
+    retroactive: false,
+    counties: [],
+    entityTypes: ["Individual"],
+    taxTypes: ["Personal income"],
+    sourceUrl: "https://tax.illinois.gov/news/2026/il-1040-schedule-m-update",
+    sourceAuthority: "primary",
+    relatedAnnouncementIds: ["ann-il-2026-form-revision-correction"],
+    parseConfidence: "high",
+    matchConfidence: "high",
+    affectedClientIds: ["c-il-02"],
+    read: true,
+    dismissed: true,
+  },
+  {
+    id: "ann-il-2026-form-revision-correction",
+    stateCode: "IL",
+    authority: "Illinois Department of Revenue",
+    title: "IL-1040 Schedule M correction — supersedes Apr 30 update",
+    summary:
+      "Illinois DOR has issued a correction to the Schedule M update from April 30. Pension subtraction language reverted; the prior bulletin can be disregarded for filings already in progress.",
+    issuanceDate: "2026-05-02",
+    effectiveDate: "2026-05-02",
+    detectedAt: "2026-05-02T15:30:00Z",
+    type: "form_change",
+    taxType: "income",
+    retroactive: false,
+    counties: [],
+    entityTypes: ["Individual"],
+    taxTypes: ["Personal income"],
+    sourceUrl: "https://tax.illinois.gov/news/2026/il-1040-correction",
+    sourceAuthority: "primary",
+    relatedAnnouncementIds: ["ann-il-2026-form-revision"],
+    parseConfidence: "high",
+    matchConfidence: "high",
+    affectedClientIds: ["c-il-02"],
+    read: false,
+    dismissed: false,
+  },
+
+  // ── PA / NJ / MA — coverage of the firm's smaller-state footprint ────
+  {
+    id: "ann-pa-2026-ein-portal-outage",
+    stateCode: "PA",
+    authority: "Pennsylvania Department of Revenue",
+    title: "myPATH portal outage May 6-7 — filings paused",
+    summary:
+      "PA DOR has scheduled a 36-hour myPATH portal outage from May 6 18:00 ET through May 7 23:59 ET for system upgrades. Returns and payments due May 7 will be honored if filed by May 8 with no penalty.",
+    issuanceDate: "2026-05-04",
+    effectiveDate: "2026-05-06",
+    detectedAt: "2026-05-04T16:45:00Z",
+    type: "penalty_relief",
+    taxType: "income",
+    retroactive: false,
+    counties: [],
+    entityTypes: ["LLC", "S-Corp", "C-Corp", "Partnership", "Individual"],
+    taxTypes: ["Corporate income", "Personal income"],
+    oldDeadline: "2026-05-07",
+    newDeadline: "2026-05-08",
+    sourceUrl: "https://www.revenue.pa.gov/news/2026/mypath-may-outage",
+    sourceAuthority: "primary",
+    relatedAnnouncementIds: [],
+    parseConfidence: "high",
+    matchConfidence: "high",
+    affectedClientIds: ["c-pa-01"],
+    read: false,
+    dismissed: false,
+  },
+  {
+    id: "ann-nj-2026-pte-rate",
+    stateCode: "NJ",
+    authority: "New Jersey Division of Taxation",
+    title: "NJ BAIT (PTE) graduated rate brackets confirmed for 2026",
+    summary:
+      "NJ has confirmed the 2026 BAIT (Business Alternative Income Tax / PTE election) bracket structure. Rates unchanged at 5.675% / 6.52% / 9.12% / 10.9%. Filers can plan Q3 estimates accordingly.",
+    issuanceDate: "2026-04-29",
+    effectiveDate: "2026-01-01",
+    detectedAt: "2026-04-29T10:00:00Z",
+    type: "rate_change",
+    taxType: "income",
+    retroactive: false,
+    counties: [],
+    entityTypes: ["LLC", "Partnership", "S-Corp"],
+    taxTypes: ["BAIT / PTE"],
+    sourceUrl: "https://www.nj.gov/treasury/taxation/bait-2026.shtml",
+    sourceAuthority: "primary",
+    relatedAnnouncementIds: [],
+    parseConfidence: "high",
+    matchConfidence: "high",
+    affectedClientIds: ["c-nj-01"],
+    read: true,
+    dismissed: true,
+  },
+  {
+    id: "ann-ma-2026-trust-form-revised",
+    stateCode: "MA",
+    authority: "Massachusetts Department of Revenue",
+    title: "MA Form 2 (fiduciary) — Schedule B updated for trust DNI",
+    summary:
+      "Mass DOR has revised Schedule B of Form 2 to capture distributable net income (DNI) more precisely for complex trusts. New required line. No deadline change.",
+    issuanceDate: "2026-04-28",
+    effectiveDate: "2026-01-01",
+    detectedAt: "2026-04-28T09:00:00Z",
+    type: "form_change",
+    taxType: "income",
+    retroactive: false,
+    counties: [],
+    entityTypes: ["Trust"],
+    taxTypes: ["Fiduciary"],
+    sourceUrl: "https://www.mass.gov/dor/forms/2026/form-2-revisions",
+    sourceAuthority: "primary",
+    relatedAnnouncementIds: [],
+    parseConfidence: "high",
+    matchConfidence: "high",
+    affectedClientIds: ["c-ma-01"],
+    read: false,
+    dismissed: false,
+  },
+
+  // ── Non-affecting news ───────────────────────────────────────────────
+  // State announcements scraped from monitored authorities that do NOT
+  // touch this firm's roster. They live on /alerts under "All
+  // announcements" so the CPA can verify "we're watching" without them
+  // bubbling into Today's queue. The "Affecting you" tab counts only the
+  // intersection — which is the differentiator's whole point (gap > fill).
+  {
+    id: "ann-or-2026-passthrough",
+    stateCode: "OR",
+    authority: "Oregon Department of Revenue",
+    title: "OR-PTE election form revised for 2026",
+    summary:
+      "Oregon DOR has updated the Form OR-19 (pass-through entity tax election) instructions. Election deadline unchanged at April 15. No action required for filings already submitted.",
+    issuanceDate: "2026-05-01",
+    effectiveDate: "2026-05-01",
+    detectedAt: "2026-05-01T18:00:00Z",
+    type: "form_change",
+    taxType: "income",
+    retroactive: false,
+    counties: [],
+    entityTypes: ["S-Corp", "Partnership"],
+    taxTypes: ["PTE election"],
+    sourceUrl: "https://www.oregon.gov/dor/forms/or-19-2026",
+    sourceAuthority: "primary",
+    relatedAnnouncementIds: [],
+    parseConfidence: "high",
+    matchConfidence: "high",
+    affectedClientIds: ["c-or-01"],
+    read: false,
     dismissed: false,
   },
   {
@@ -188,9 +436,9 @@ export const announcements: Announcement[] = [
     title: "WA B&O small-business credit threshold raised to $125,000",
     summary:
       "Washington DOR has raised the small-business B&O credit threshold from $100,000 to $125,000 in gross receipts for 2026. Filers under the new threshold owe no B&O tax.",
-    issuanceDate: "2026-04-18",
+    issuanceDate: "2026-04-28",
     effectiveDate: "2026-01-01",
-    detectedAt: "2026-04-18T16:00:00Z",
+    detectedAt: "2026-04-28T16:00:00Z",
     type: "nexus_change",
     taxType: "sales_use",
     retroactive: true,
@@ -204,54 +452,28 @@ export const announcements: Announcement[] = [
     matchConfidence: "high",
     affectedClientIds: [],
     read: true,
-    dismissed: false,
+    dismissed: true,
   },
   {
-    // Yuqi audit 2026-05-05: previously this mock was about a sales-tax
-    // holiday extension labeled disaster_extension — semantically wrong
-    // (a sales-tax holiday is not a filing-deadline extension), and it
-    // had no newDeadline so the "Deadline shifts to" footer never fired.
-    // Reframed as a real Florida DOR hurricane-prep filing extension
-    // with old/new deadlines so the alert demonstrates the canonical
-    // disaster_extension shape: filing pushed back, CPA notifies clients.
     id: "ann-fl-2026-disaster",
     stateCode: "FL",
     authority: "Florida Department of Revenue",
     title: "FL sales-tax filing deadline extended — hurricane prep",
     summary:
-      "Florida Department of Revenue has extended the June 20 sales-tax filing deadline to August 17 for businesses in 23 hurricane-prep counties. No penalty for filings made between the original and extended dates. Affected entities should not refile early returns.",
-    issuanceDate: "2026-04-17",
+      "Florida DOR has extended the June 20 sales-tax filing deadline to August 17 for businesses in 23 hurricane-prep counties. No penalty for filings made between the original and extended dates. Affected entities should not refile early returns.",
+    issuanceDate: "2026-04-27",
     effectiveDate: "2026-06-20",
-    detectedAt: "2026-04-17T13:00:00Z",
+    detectedAt: "2026-04-27T13:00:00Z",
     type: "disaster_extension",
     taxType: "sales_use",
     retroactive: false,
     oldDeadline: "2026-06-20",
     newDeadline: "2026-08-17",
     counties: [
-      "Bay",
-      "Calhoun",
-      "Charlotte",
-      "Citrus",
-      "Collier",
-      "DeSoto",
-      "Dixie",
-      "Franklin",
-      "Gulf",
-      "Hardee",
-      "Hernando",
-      "Highlands",
-      "Hillsborough",
-      "Lee",
-      "Levy",
-      "Manatee",
-      "Pasco",
-      "Pinellas",
-      "Polk",
-      "Sarasota",
-      "Sumter",
-      "Taylor",
-      "Wakulla",
+      "Bay", "Calhoun", "Charlotte", "Citrus", "Collier", "DeSoto",
+      "Dixie", "Franklin", "Gulf", "Hardee", "Hernando", "Highlands",
+      "Hillsborough", "Lee", "Levy", "Manatee", "Pasco", "Pinellas",
+      "Polk", "Sarasota", "Sumter", "Taylor", "Wakulla",
     ],
     entityTypes: ["LLC", "S-Corp", "C-Corp"],
     taxTypes: ["Sales tax"],
@@ -260,293 +482,15 @@ export const announcements: Announcement[] = [
     relatedAnnouncementIds: [],
     parseConfidence: "high",
     matchConfidence: "high",
-    affectedClientIds: [],
-    read: true,
-    dismissed: false,
-  },
-  {
-    id: "ann-il-2026-form-revision",
-    stateCode: "IL",
-    authority: "Illinois Department of Revenue",
-    title: "IL-1040 instructions revised — Schedule M",
-    summary:
-      "Illinois DOR has updated the IL-1040 Schedule M instructions to clarify retirement-income subtraction for 2026 filings. Form unchanged.",
-    issuanceDate: "2026-04-16",
-    effectiveDate: "2026-04-16",
-    detectedAt: "2026-04-16T19:00:00Z",
-    type: "form_change",
-    taxType: "income",
-    retroactive: false,
-    counties: [],
-    entityTypes: ["Individual"],
-    taxTypes: ["Personal income"],
-    sourceUrl: "https://tax.illinois.gov/news/2026/il-1040-schedule-m-update",
-    sourceAuthority: "primary",
-    relatedAnnouncementIds: [],
-    parseConfidence: "high",
-    matchConfidence: "high",
-    affectedClientIds: [],
-    read: true,
-    dismissed: false,
-  },
-
-  // ── Expanded seed pack 2026-05-05 ──────────────────────────────
-  // Yuqi: "are those state alerts pre-embedded? if so, add more from
-  // different states and in a variety of notification types." Added 9
-  // entries fanning across 9 more states + every announcement type.
-  // Some hit the firm's actual roster (CA/NY/TX/LA/FL clients) so the
-  // "Affecting you" feed has more depth; others are jurisdictionally
-  // scoped to states without clients so "All announcements" reads as
-  // a real wire feed, not a five-state echo.
-
-  {
-    id: "ann-ca-2026-rate-update",
-    stateCode: "CA",
-    authority: "California Franchise Tax Board",
-    title: "2026 personal income tax brackets updated",
-    summary:
-      "California has published 2026 personal income tax brackets reflecting the annual inflation adjustment. Top marginal rate unchanged at 13.3%; bracket thresholds shifted ~3.1% higher across all filing statuses.",
-    issuanceDate: "2026-04-21",
-    effectiveDate: "2026-01-01",
-    detectedAt: "2026-04-21T18:00:00Z",
-    type: "rate_change",
-    taxType: "income",
-    retroactive: true,
-    counties: [],
-    entityTypes: ["Individual"],
-    taxTypes: ["Personal income"],
-    sourceUrl: "https://www.ftb.ca.gov/forms/2026/2026-tax-rates.html",
-    sourceAuthority: "primary",
-    relatedAnnouncementIds: [],
-    parseConfidence: "high",
-    matchConfidence: "high",
-    affectedClientIds: ["c-ca-03", "c-ca-04", "c-ca-08"],
-    read: false,
-    dismissed: false,
-  },
-  {
-    id: "ann-ny-2026-late-payment-waiver",
-    stateCode: "NY",
-    authority: "New York Department of Taxation and Finance",
-    title: "Late-payment penalty waiver for Q1 2026 personal income tax",
-    summary:
-      "NY DTF will waive the 10% late-payment penalty on 2026 Q1 personal-income-tax estimates received by May 31, 2026. Interest still accrues. Apply via TR-579 with reasonable-cause attachment.",
-    issuanceDate: "2026-04-20",
-    effectiveDate: "2026-04-20",
-    detectedAt: "2026-04-20T16:00:00Z",
-    type: "penalty_relief",
-    taxType: "income",
-    retroactive: false,
-    counties: [],
-    entityTypes: ["Individual", "S-Corp"],
-    taxTypes: ["Personal income", "Quarterly estimates"],
-    sourceUrl:
-      "https://www.tax.ny.gov/press/rel/2026/penalty-waiver-q1-pit.htm",
-    sourceAuthority: "primary",
-    relatedAnnouncementIds: [],
-    parseConfidence: "high",
-    matchConfidence: "medium",
-    affectedClientIds: ["c-ny-02", "c-ny-04", "c-ny-06"],
-    read: false,
-    dismissed: false,
-  },
-  {
-    id: "ann-tx-2026-franchise-threshold",
-    stateCode: "TX",
-    authority: "Texas Comptroller",
-    title: "TX franchise tax no-tax-due threshold raised to $2.7M",
-    summary:
-      "Texas has raised the no-tax-due revenue threshold for franchise tax filers from $2.47M to $2.7M, effective the 2026 report year. Filers below the threshold no longer file the No Tax Due Report — only the Public Information Report.",
-    issuanceDate: "2026-04-19",
-    effectiveDate: "2026-01-01",
-    detectedAt: "2026-04-19T14:30:00Z",
-    type: "rate_change",
-    taxType: "franchise",
-    retroactive: true,
-    counties: [],
-    entityTypes: ["LLC", "S-Corp", "Partnership"],
-    taxTypes: ["Franchise"],
-    sourceUrl: "https://comptroller.texas.gov/taxes/franchise/2026-update",
-    sourceAuthority: "primary",
-    relatedAnnouncementIds: [],
-    parseConfidence: "high",
-    matchConfidence: "high",
-    affectedClientIds: ["c-tx-01", "c-tx-03", "c-tx-05", "c-tx-07"],
-    read: false,
-    dismissed: false,
-  },
-  {
-    id: "ann-fl-2026-storm-relief",
-    stateCode: "FL",
-    authority: "Florida Department of Revenue",
-    title: "Tropical Storm Karina filing relief — 17 counties",
-    summary:
-      "Florida Department of Revenue has postponed sales-tax and reemployment-tax filings for businesses in 17 counties impacted by Tropical Storm Karina. Returns originally due May 1 are postponed to July 1, 2026. Federal IRS counterpart pending.",
-    issuanceDate: "2026-04-18",
-    effectiveDate: "2026-04-18",
-    detectedAt: "2026-04-18T22:00:00Z",
-    type: "disaster_extension",
-    taxType: "multiple",
-    retroactive: false,
-    counties: [
-      "Miami-Dade",
-      "Broward",
-      "Palm Beach",
-      "Monroe",
-      "Collier",
-      "Lee",
-    ],
-    entityTypes: ["LLC", "S-Corp", "Individual", "Partnership"],
-    taxTypes: ["Sales tax", "Reemployment tax"],
-    oldDeadline: "2026-05-01",
-    newDeadline: "2026-07-01",
-    sourceUrl:
-      "https://floridarevenue.com/taxes/news/Pages/2026-04-storm-karina.aspx",
-    sourceAuthority: "primary",
-    relatedAnnouncementIds: [],
-    parseConfidence: "high",
-    matchConfidence: "high",
-    affectedClientIds: ["c-fl-01", "c-fl-02", "c-fl-04", "c-fl-05", "c-fl-07"],
-    read: false,
-    dismissed: false,
-  },
-  {
-    id: "ann-la-2026-pte-election-form",
-    stateCode: "LA",
-    authority: "Louisiana Department of Revenue",
-    title: "Form R-6980 (PTE election) revised for 2026",
-    summary:
-      "Louisiana has reissued Form R-6980 with three new line items reflecting the 2026 PTE rate change. Submissions on the prior version after June 1 will be rejected.",
-    issuanceDate: "2026-04-15",
-    effectiveDate: "2026-06-01",
-    detectedAt: "2026-04-15T13:00:00Z",
-    type: "form_change",
-    taxType: "income",
-    retroactive: false,
-    counties: [],
-    entityTypes: ["S-Corp", "LLC", "Partnership"],
-    taxTypes: ["PTE election"],
-    sourceUrl:
-      "https://revenue.louisiana.gov/forms/IndividualIncome/R-6980-2026.pdf",
-    sourceAuthority: "primary",
-    relatedAnnouncementIds: [],
-    parseConfidence: "high",
-    matchConfidence: "high",
-    affectedClientIds: ["c-la-01", "c-la-03", "c-la-05"],
-    read: false,
-    dismissed: false,
-  },
-
-  // — States without firm clients (variety in "All announcements"):
-  {
-    id: "ann-nj-2026-nexus-broaden",
-    stateCode: "NJ",
-    authority: "New Jersey Division of Taxation",
-    title: "Marketplace facilitator threshold lowered to $100k",
-    summary:
-      "NJ Division of Taxation has lowered the economic-nexus threshold for marketplace facilitators from $250k to $100k in receipts. Effective Q3 2026; pre-existing registrations grandfathered.",
-    issuanceDate: "2026-04-14",
-    effectiveDate: "2026-07-01",
-    detectedAt: "2026-04-14T17:30:00Z",
-    type: "nexus_change",
-    taxType: "sales_use",
-    retroactive: false,
-    counties: [],
-    entityTypes: ["LLC", "Partnership", "S-Corp"],
-    taxTypes: ["Sales tax"],
-    sourceUrl:
-      "https://www.state.nj.us/treasury/taxation/news/2026-mfa-threshold.shtml",
-    sourceAuthority: "primary",
-    relatedAnnouncementIds: [],
-    parseConfidence: "high",
-    matchConfidence: "high",
-    affectedClientIds: [],
-    read: true,
-    dismissed: false,
-  },
-  {
-    id: "ann-pa-2026-corp-rate",
-    stateCode: "PA",
-    authority: "Pennsylvania Department of Revenue",
-    title: "PA corporate net income tax rate stepped to 7.99%",
-    summary:
-      "Pennsylvania's scheduled CNIT rate cut continues — 8.49% in 2025 → 7.99% in 2026 → 7.49% in 2027. Estimated payment safe harbor recomputes against the new rate.",
-    issuanceDate: "2026-04-12",
-    effectiveDate: "2026-01-01",
-    detectedAt: "2026-04-12T11:00:00Z",
-    type: "rate_change",
-    taxType: "income",
-    retroactive: true,
-    counties: [],
-    entityTypes: ["C-Corp"],
-    taxTypes: ["Corporate income"],
-    sourceUrl:
-      "https://www.revenue.pa.gov/TaxLawPoliciesBulletinsNotices/Bulletins/Pages/2026-CNIT.aspx",
-    sourceAuthority: "primary",
-    relatedAnnouncementIds: [],
-    parseConfidence: "high",
-    matchConfidence: "high",
-    affectedClientIds: [],
-    read: true,
-    dismissed: false,
-  },
-  {
-    id: "ann-ga-2026-disaster-tornado",
-    stateCode: "GA",
-    authority: "Georgia Department of Revenue",
-    title: "Severe-storm filing relief for 9 counties",
-    summary:
-      "Georgia DOR is postponing state filings for businesses in 9 north-Georgia counties impacted by April tornadoes. Returns due Apr 30 – Jun 30 are postponed to Aug 15, 2026.",
-    issuanceDate: "2026-04-11",
-    effectiveDate: "2026-04-11",
-    detectedAt: "2026-04-11T18:00:00Z",
-    type: "disaster_extension",
-    taxType: "multiple",
-    retroactive: false,
-    counties: [
-      "Fannin",
-      "Gilmer",
-      "Pickens",
-      "Dawson",
-      "Lumpkin",
-      "Habersham",
-    ],
-    entityTypes: ["LLC", "S-Corp", "Individual", "Partnership"],
-    taxTypes: ["State income", "Sales tax"],
-    oldDeadline: "2026-04-30",
-    newDeadline: "2026-08-15",
-    sourceUrl:
-      "https://dor.georgia.gov/announcement/2026-04-tornado-relief",
-    sourceAuthority: "primary",
-    relatedAnnouncementIds: [],
-    parseConfidence: "high",
-    matchConfidence: "medium",
-    affectedClientIds: [],
-    read: true,
-    dismissed: false,
-  },
-  {
-    id: "ann-nc-2026-penalty-amnesty",
-    stateCode: "NC",
-    authority: "North Carolina Department of Revenue",
-    title: "60-day penalty amnesty for unfiled 2024-2025 returns",
-    summary:
-      "NC DOR is offering a 60-day penalty amnesty (no failure-to-file or failure-to-pay penalty) on 2024 and 2025 returns filed by Jun 30, 2026. Interest still accrues. Limited to non-fraudulent omissions.",
-    issuanceDate: "2026-04-10",
-    effectiveDate: "2026-05-01",
-    detectedAt: "2026-04-10T14:00:00Z",
-    type: "penalty_relief",
-    taxType: "income",
-    retroactive: false,
-    counties: [],
-    entityTypes: ["Individual", "LLC", "S-Corp", "C-Corp"],
-    taxTypes: ["Personal income", "Corporate income"],
-    sourceUrl: "https://www.ncdor.gov/news/press-releases/2026/amnesty-window",
-    sourceAuthority: "primary",
-    relatedAnnouncementIds: [],
-    parseConfidence: "high",
-    matchConfidence: "high",
-    affectedClientIds: [],
+    // c-fl-07 (Johnson Family) lives in Hillsborough — also in the
+    // announced county list — but is `inactive`, so listing them here
+    // would conflict with computeAffectedClients() filtering by status
+    // and produce a "2 clients affected" header that resolves to a
+    // single chip on /alerts. c-fl-02 (Suncoast Advisors S-Corp,
+    // active, Pinellas) is the only honest match; surfacing just it
+    // also delivers the demo punchline: 23-county press release →
+    // ONE client of yours.
+    affectedClientIds: ["c-fl-02"],
     read: true,
     dismissed: false,
   },

@@ -74,10 +74,20 @@ export function Sidebar() {
           : storeClients,
     [liveClientsRaw, storeClients],
   );
-  const todayIso = new Date().toISOString().slice(0, 10);
-  // Alerts caption: count of unique CLIENTS affected by active (non-dismissed)
-  // alerts — the actionable number ("how many of MY clients does this touch")
-  // not the raw alert count. Matches the way Sarah scans the bell.
+  // Alerts caption: count of active (non-dismissed) alerts.
+  //
+  // Yuqi audit 2026-05-06: previously this counted unique CLIENTS
+  // affected (a different denominator from every other sidebar badge,
+  // which all report "count the entity this destination is named
+  // for"). The mismatch made the sidebar number ambiguous — users
+  // didn't know if "21" meant 21 alerts or 21 clients touched. Rule
+  // is now: each badge reports the count of the named entity. Affected
+  // client count moved into the alert card body ("Affects N clients"
+  // zone) where it belongs. Hover title still explains both.
+  const activeAlertsCount = useMemo(
+    () => announcements.filter((a) => !a.dismissed).length,
+    [announcements],
+  );
   const alertsAffectingCount = useMemo(() => {
     const set = new Set<string>();
     for (const a of announcements) {
@@ -94,32 +104,17 @@ export function Sidebar() {
       ).length,
     [sidebarClients],
   );
-  const STALLED_HOURS = 14 * 24;
-  const hoursSinceIso = (iso: string) =>
-    (Date.now() - new Date(iso).getTime()) / (60 * 60 * 1000);
-  // Sidebar badge must match what /to-review actually shows. The cut:
-  //   - Confirms: AI high/medium, not flagged
-  //   - Chases:  due today, NOT stalled >14d (those are Quiet-Clients
-  //              dashboard concerns — surfacing them here too would
-  //              double-count and inflate the badge into a wall)
-  const inboxCount = checklistItems.filter((c) => {
-    if (
-      c.state === "received_unreviewed" &&
-      !c.flagReason &&
-      (c.aiConfidence === "high" || c.aiConfidence === "medium")
-    ) {
-      return true;
-    }
-    if (
-      c.state === "requested_waiting" &&
-      c.nextReminderAt &&
-      c.nextReminderAt <= todayIso &&
-      (!c.lastReminderAt || hoursSinceIso(c.lastReminderAt) < STALLED_HOURS)
-    ) {
-      return true;
-    }
-    return false;
-  }).length;
+  // Mail badge — narrowed 2026-05-06 from "all chase + review items" to
+  // ONLY unreplied inbound (received_unreviewed, regardless of AI tier).
+  // Old filter mixed chase-due reminders with received-from-client items
+  // and inflated the count to "99+" on demo data. Chase-due items belong
+  // on Today's Action Queue (the daily action surface) — surfacing them
+  // again as a Mail badge double-counts and panics the eye. The Mail
+  // surface itself is for inbound thread context; the badge should
+  // reflect "what arrived and needs your attention" only.
+  const inboxCount = checklistItems.filter(
+    (c) => c.state === "received_unreviewed" && !c.flagReason,
+  ).length;
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem(COLLAPSED_KEY) === "1";
@@ -190,22 +185,25 @@ export function Sidebar() {
                 )}
                 <Icon className="w-4 h-4 shrink-0" aria-hidden />
                 {!collapsed && <span className="flex-1">{label}</span>}
-                {/* Alerts caption — # of CLIENTS the active announcements
-                    touch (not raw alert count). Yuqi audit 2026-05-05: the
-                    bare number "9+" was confusing — what does it count?
-                    Title now spells it out so hover disambiguates. */}
-                {!collapsed && to === "/alerts" && alertsAffectingCount > 0 && (
+                {/* Alerts caption — # of ACTIVE ALERTS (matches sidebar
+                    convention: each badge counts the entity its
+                    destination is named for). Hover title spells out
+                    the secondary "X clients affected" so the auxiliary
+                    number stays one breath away. */}
+                {!collapsed && to === "/alerts" && activeAlertsCount > 0 && (
                   <CountBadge
-                    count={alertsAffectingCount}
-                    tone="danger"
+                    count={activeAlertsCount}
+                    tone="neutral"
                     className="ml-auto"
-                    title={`${alertsAffectingCount} ${
+                    title={`${activeAlertsCount} active ${
+                      activeAlertsCount === 1 ? "alert" : "alerts"
+                    } · ${alertsAffectingCount} ${
                       alertsAffectingCount === 1 ? "client" : "clients"
-                    } affected by active alerts`}
+                    } affected`}
                   />
                 )}
-                {collapsed && to === "/alerts" && alertsAffectingCount > 0 && (
-                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-danger-solid" />
+                {collapsed && to === "/alerts" && activeAlertsCount > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-warn-solid" />
                 )}
                 {/* Clients caption — active roster size (excludes archived /
                     inactive / prospect). */}
@@ -226,7 +224,7 @@ export function Sidebar() {
                     className="ml-auto"
                     title={`${inboxCount} ${
                       inboxCount === 1 ? "item" : "items"
-                    } needing review (confirms + chase reminders due)`}
+                    } the client sent that you haven't reviewed yet`}
                   />
                 )}
                 {collapsed && to === "/mail" && inboxCount > 0 && (
@@ -299,8 +297,8 @@ function UserAccountTrigger({ collapsed }: { collapsed: boolean }) {
   const session = useSession();
   const navigate = useNavigate();
 
-  const initials = session?.userInitials || "SC";
-  const name = session?.userName || "Sarah Chen";
+  const initials = session?.userInitials || "SM";
+  const name = session?.userName || "Sarah Mitchell";
   const email = session?.userEmail;
 
   return (

@@ -30,23 +30,12 @@ import type {
 const delay = (ms = 150) =>
   new Promise((r) => setTimeout(r, ms + Math.random() * 100));
 
-// In-memory mock store for taskMilestones — survives across calls within a
-// page session, cleared on reload. Supports `proposeForTask` round-trips so
-// TaskMiniTimeline can demo the arrival-timing propose flow without a backend.
-type MockMilestoneRow = {
-  id: string;
-  firmId: string;
-  taskId: string;
-  milestoneType: string;
-  customLabel: string | null;
-  targetDate: string | null;
-  completedDate: string | null;
-  status: "not_started" | "in_progress" | "blocked" | "done" | "overdue";
-  blockerReason: string | null;
-  displayOrder: number;
-  proposedBy: "user" | "ai" | "system";
-};
-const mockMilestoneStore = new Map<string, MockMilestoneRow[]>();
+// taskMilestones now live on the main store (`state.milestones`) so the
+// task-complete cascade can mutate them transactionally. The previous
+// module-private Map was hoisted 2026-05-06; the row shape is the
+// canonical tRPC `TaskMilestoneRow` (router.ts:43) so mock and real
+// modes agree on schema.
+import type { TaskMilestoneRow } from "./router";
 
 // Mutable mock inbound-replies store. Lets the mock-mode UI exercise the
 // real linkToTask + markActioned flows: actioned rows are removed from
@@ -80,13 +69,13 @@ const mockInboundReplies: MockInboundReply[] = (() => {
       id: "reply-mock-1",
       firmId: "firm-mock",
       taskId: null,
-      clientId: null,
+      clientId: "c-ca-03",
       gmailMessageId: "gmail-mock-1",
-      fromAddress: "sarah.mitchell@example.com",
+      fromAddress: "mark.sullivan@gmail.com",
       toAddress: "intake@duedatehq.space",
-      subject: "1040 NY — K-1 timing",
+      subject: "1040 (extension) — K-1 timing",
       bodyText:
-        "Hi! K-1 from my fund won't be ready until late July...",
+        "Hi Sarah — my K-1 from the partnership won't be ready until late July. Can we push the timeline a bit?",
       attachmentMetadata: [],
       topLevelClass: "client_reply",
       replyIntent: "timeline_pushback",
@@ -100,11 +89,17 @@ const mockInboundReplies: MockInboundReply[] = (() => {
       id: "reply-mock-2",
       firmId: "firm-mock",
       taskId: null,
-      clientId: null,
+      // Originally also c-ca-03 (Mark Sullivan), giving the impression
+      // of a single prospect peppering the firm with two replies four
+      // hours apart — narratively odd. Repointed to c-ca-08 Anne
+      // Dupont (active CA Individual) so the inbox shows three
+      // distinct clients and the demo reads as a cross-section of the
+      // roster, not one anxious prospect.
+      clientId: "c-ca-08",
       gmailMessageId: "gmail-mock-2",
-      fromAddress: "jordan.lee@example.com",
+      fromAddress: "adupont@outlook.com",
       toAddress: "intake@duedatehq.space",
-      subject: "S-Corp CA — IRA limit",
+      subject: "1040 — IRA limit question",
       bodyText:
         "Quick question — what's the IRA contribution limit this year?",
       attachmentMetadata: [],
@@ -120,11 +115,11 @@ const mockInboundReplies: MockInboundReply[] = (() => {
       id: "reply-mock-3",
       firmId: "firm-mock",
       taskId: null,
-      clientId: null,
+      clientId: "c-ga-02",
       gmailMessageId: "gmail-mock-3",
-      fromAddress: "emily.hartfield@example.com",
+      fromAddress: "olivia.bennett@protonmail.com",
       toAddress: "intake@duedatehq.space",
-      subject: "1040 NY — W-2",
+      subject: "Q2 estimate (federal) — W-2",
       bodyText: "Attached: W-2 for 2025 (ADP via Acme Corp)",
       attachmentMetadata: [{ filename: "W2-2025.pdf", size: 12834 }],
       topLevelClass: "client_doc",
@@ -244,6 +239,37 @@ export const mockAdapter = {
     resetPassword: async () => {
       await delay(400);
       return { ok: true as const };
+    },
+    // Mock auth doesn't need a real action link — the FE detects
+    // mock mode and signs the user in directly. We still return a
+    // syntactically-valid shape so callers stay branch-free.
+    createDemoSession: async () => {
+      await delay(100);
+      return { actionLink: "/" };
+    },
+    // Mock-mode no-op: the local store already carries the 51-client
+    // demo roster via mockClients/mockDeadlines, so the FE doesn't
+    // need to do anything to populate the workspace. Returning the
+    // same counts shape as the real BE keeps callers branch-free.
+    // reseed is accepted but ignored — mock-mode resets via
+    // `actions.resetToSeeds()` already wired to the demo button.
+    bootstrapDemo: async (input?: { reseed?: boolean }) => {
+      await delay(200);
+      return {
+        firmId: "firm-mock",
+        reseed: input?.reseed ?? false,
+        clientsInserted: 0,
+        clientsExisting: 51,
+        clientsCleared: 0,
+        deadlinesInserted: 0,
+        deadlinesExisting: 70,
+        deadlinesBackfilled: 0,
+        tasksInserted: 0,
+        tasksExisting: 50,
+        milestonesInserted: 0,
+        checklistsInserted: 0,
+        draftsInserted: 0,
+      };
     },
   },
 
@@ -701,13 +727,14 @@ export const mockAdapter = {
   // taskMilestones — mock simulates arrival-timing target_date proposals so the FE
   // round-trip works in mock mode. proposeForTask synthesizes 5 substrate-
   // default milestones (per PRD §4.2 cold-start: -90/-60/-21/-7/0 days from
-  // due_date) and stashes them in mockMilestoneStore so subsequent listForTask
-  // calls return them. Real wiring happens against the backend when
+  // due_date) and stashes them in store.milestones (hoisted 2026-05-06 from
+  // a module-private Map so the task→milestones cascade can mutate them
+  // transactionally). Real wiring happens against the backend when
   // VITE_USE_MOCK_API=false — the BE calls predictMilestoneTargetDates.
   taskMilestones: {
     listForTask: async (input: { taskId: string }) => {
       await delay();
-      return mockMilestoneStore.get(input.taskId) ?? [];
+      return getState().milestones[input.taskId] ?? [];
     },
     fleetStack: async (_input?: { waitingOnly?: boolean; limit?: number }) => {
       await delay();
@@ -716,9 +743,9 @@ export const mockAdapter = {
       // Timeline assignee column has data in mock mode. Mock store keeps
       // a display name on the task; we map it to the session userId since
       // the mock firm has exactly one user.
-      const flat = Array.from(mockMilestoneStore.values()).flat();
+      const { milestones, tasks } = getState();
+      const flat = Object.values(milestones).flat();
       const session = sessionOrDefault();
-      const { tasks } = getState();
       return flat.map((m) => {
         const task = tasks.find((t) => t.id === m.taskId);
         const isMine =
@@ -742,7 +769,7 @@ export const mockAdapter = {
     },
     detectBlockers: async (input: { taskId: string }) => {
       await delay(400);
-      const existing = mockMilestoneStore.get(input.taskId) ?? [];
+      const existing = getState().milestones[input.taskId] ?? [];
       if (existing.length === 0) {
         return { decisions: [], appliedCount: 0 };
       }
@@ -750,7 +777,11 @@ export const mockAdapter = {
       // is in the past. Mirrors the backend heuristic fallback so dev
       // demos see meaningful cross-year-insighter behavior without an API key.
       const todayMs = Date.now();
-      let appliedCount = 0;
+      const patches: Array<{
+        id: string;
+        status?: TaskMilestoneRow["status"];
+        blockerReason?: string | null;
+      }> = [];
       const decisions = existing.map((m) => {
         if (m.status === "done") {
           return {
@@ -765,11 +796,12 @@ export const mockAdapter = {
             (todayMs - new Date(m.targetDate).getTime()) /
               (24 * 60 * 60 * 1000),
           );
-          // Apply the block to the in-memory store so listForTask reflects it
           if (m.status !== "blocked") {
-            m.status = "blocked";
-            m.blockerReason = `target was ${daysLate}d ago; status still ${m.status}`;
-            appliedCount++;
+            patches.push({
+              id: m.id,
+              status: "blocked",
+              blockerReason: `target was ${daysLate}d ago; status still ${m.status}`,
+            });
           }
           return {
             milestoneId: m.id,
@@ -785,19 +817,24 @@ export const mockAdapter = {
           confidence: "low" as const,
         };
       });
-      return { decisions, appliedCount };
+      if (patches.length > 0) {
+        actions.patchMilestonesBulk(input.taskId, patches);
+      }
+      return { decisions, appliedCount: patches.length };
     },
     proposeForTask: async (input: { taskId: string }) => {
       await delay();
-      const existing = mockMilestoneStore.get(input.taskId);
+      const existing = getState().milestones[input.taskId];
       if (existing && existing.length > 0) {
         return { proposed: false, milestones: existing };
       }
       // Synthesize 5 substrate milestones from the task's due date if known.
-      // The mock store doesn't have task data; default to ~April 15 of next
-      // year as a reasonable filing-due anchor for demo purposes. Real BE
-      // looks up officialDueDate from the deadline row.
-      const due = nextApril15();
+      // Pull the matched task's officialDueDate so the rendered "Path to
+      // filing" reflects the actual filing date (the prior nextApril15
+      // fallback was a debug shim). Falls through to nextApril15 if the
+      // task can't be located (defensive).
+      const task = getState().tasks.find((t) => t.id === input.taskId);
+      const due = task?.officialDueDate ?? nextApril15();
       const offsetDays = (days: number) => {
         const d = new Date(due);
         d.setDate(d.getDate() - days);
@@ -810,20 +847,68 @@ export const mockAdapter = {
         { type: "internal_review", offset: 7 },
         { type: "file", offset: 0 },
       ] as const;
-      const synthesized = stages.map((s, idx) => ({
-        id: `mock-mil-${input.taskId}-${idx}`,
-        firmId: "mock-firm",
-        taskId: input.taskId,
-        milestoneType: s.type,
-        customLabel: null,
-        targetDate: s.offset === 0 ? due : offsetDays(s.offset),
-        completedDate: null,
-        status: "not_started" as const,
-        blockerReason: null,
-        displayOrder: idx,
-        proposedBy: "ai" as const,
-      }));
-      mockMilestoneStore.set(input.taskId, synthesized);
+      // Compute the current active phase from real task + checklist state
+      // so synthesized rows reflect reality, not a flat all-not_started
+      // wall. Mirrors the chronological-invariant logic in
+      // TaskMiniTimeline.deriveWaypoints. Yuqi audit 2026-05-06: previously
+      // every Propose-dates click produced 5 not_started rows regardless of
+      // task progress; the timeline then jarringly snapped backward.
+      const checklist = getState().checklistItems.filter(
+        (c) => c.taskId === input.taskId,
+      );
+      const total = checklist.filter((c) => c.state !== "not_applicable").length;
+      const confirmed = checklist.filter(
+        (c) => c.state === "received_confirmed",
+      ).length;
+      const waiting = checklist.filter(
+        (c) =>
+          c.state === "requested_waiting" || c.state === "not_requested",
+      ).length;
+      const reviewPending = checklist.filter(
+        (c) =>
+          c.state === "received_unreviewed" || c.state === "received_issue",
+      ).length;
+      const isComplete = task?.status === "completed";
+      const currentIdx = (() => {
+        if (isComplete) return 5;
+        const scopeConfirmed =
+          total > 0 &&
+          checklist.some(
+            (c) =>
+              c.state === "requested_waiting" ||
+              c.state === "received_unreviewed" ||
+              c.state === "received_issue" ||
+              c.state === "received_confirmed",
+          );
+        if (!scopeConfirmed) return 0;
+        if (waiting > 0) return 1;
+        if (reviewPending > 0) return 2;
+        if (confirmed < total) return 2;
+        return 3;
+      })();
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const isOverdue =
+        task?.status === "overdue" || (todayIso > due && !isComplete);
+      const synthesized: TaskMilestoneRow[] = stages.map((s, idx) => {
+        let status: TaskMilestoneRow["status"];
+        if (idx < currentIdx) status = "done";
+        else if (idx === currentIdx) status = isOverdue ? "overdue" : "in_progress";
+        else status = "not_started";
+        return {
+          id: `mock-mil-${input.taskId}-${idx}`,
+          firmId: "mock-firm",
+          taskId: input.taskId,
+          milestoneType: s.type,
+          customLabel: null,
+          targetDate: s.offset === 0 ? due : offsetDays(s.offset),
+          completedDate: status === "done" ? offsetDays(s.offset) : null,
+          status,
+          blockerReason: null,
+          displayOrder: idx,
+          proposedBy: "ai" as const,
+        };
+      });
+      actions.setMilestonesForTask(input.taskId, synthesized);
       return {
         proposed: true,
         milestones: synthesized,
@@ -832,9 +917,52 @@ export const mockAdapter = {
           "mock substrate (PRD §4.2 cold-start defaults — no firm history)",
       };
     },
-    update: async (_input: unknown) => {
+    update: async (input: {
+      id: string;
+      status?: TaskMilestoneRow["status"];
+      targetDate?: string;
+      blockerReason?: string | null;
+    }) => {
       await delay();
-      return {} as unknown;
+      // Locate the parent taskId by scanning the milestones map. Cheap
+      // for mock (max ~50 tasks × 5 milestones).
+      const { milestones } = getState();
+      let foundTaskId: string | null = null;
+      let foundRow: TaskMilestoneRow | null = null;
+      for (const [taskId, rows] of Object.entries(milestones)) {
+        const m = rows.find((r) => r.id === input.id);
+        if (m) {
+          foundTaskId = taskId;
+          foundRow = m;
+          break;
+        }
+      }
+      if (!foundTaskId || !foundRow) {
+        throw new Error("milestone not found");
+      }
+      const patch: Partial<
+        Pick<TaskMilestoneRow, "status" | "targetDate" | "blockerReason">
+      > = {};
+      if (input.status !== undefined) patch.status = input.status;
+      if (input.targetDate !== undefined) patch.targetDate = input.targetDate;
+      if (input.blockerReason !== undefined)
+        patch.blockerReason = input.blockerReason;
+      actions.updateMilestone(foundTaskId, input.id, patch);
+
+      // Cascade-up: marking the File milestone done completes the task.
+      // PRD §9.4.1 — the BE writes a TaskMilestoneEvent regardless; the
+      // task-level cascade is what makes "click File done" equivalent
+      // to "click Mark complete." Other milestones don't cascade.
+      if (
+        input.status === "done" &&
+        (foundRow.milestoneType === "file" || foundRow.milestoneType === "filing")
+      ) {
+        const task = getState().tasks.find((t) => t.id === foundTaskId);
+        if (task && task.status !== "completed") {
+          actions.updateTaskStatus(task.id, "completed");
+        }
+      }
+      return getState().milestones[foundTaskId]?.find((r) => r.id === input.id) as unknown;
     },
     add: async (_input: unknown) => {
       await delay();
@@ -948,9 +1076,15 @@ export const mockAdapter = {
     list: async (input: { activeOnly?: boolean } = {}) => {
       await delay();
       const { announcements } = getState();
-      if (input.activeOnly)
-        return announcements.filter((a) => !a.dismissed);
-      return announcements;
+      // Sort newest-first so callers (Today preview, /alerts feed, bell)
+      // can rely on the order without re-sorting client-side. Yuqi audit
+      // 2026-05-06: Today previously rendered in mock-list order, which
+      // wasn't chronological — the freshest authority drops were buried.
+      const sorted = [...announcements].sort((a, b) =>
+        b.detectedAt.localeCompare(a.detectedAt),
+      );
+      if (input.activeOnly) return sorted.filter((a) => !a.dismissed);
+      return sorted;
     },
     get: async ({ id }: { id: string }) => {
       await delay();
@@ -1685,7 +1819,10 @@ export const mockAdapter = {
       await delay();
       const u = currentUser();
       // Mirror the BE shape `{ members, invites }`. Mock-mode firm has
-      // exactly one member (the signed-in user); no pending invites.
+      // the signed-in owner plus a junior preparer (Maya Patel) so
+      // assignment/reviewer flows have a real second user to target.
+      // The deadline seeds carry `assignedUser: "Maya Patel"` on ~25% of
+      // rows; this list is what the FE reads to resolve those names.
       return {
         members: [
           {
@@ -1696,8 +1833,24 @@ export const mockAdapter = {
             timezone: u.timezone,
             lastActiveAt: u.lastActiveAt ?? null,
           },
+          {
+            id: "user-maya",
+            email: "maya@mitchellcpa.com",
+            displayName: "Maya Patel",
+            role: "member" as const,
+            timezone: "America/Los_Angeles",
+            lastActiveAt: "2026-05-05T10:42:00Z",
+          },
         ],
-        invites: [] as Array<{
+        invites: [
+          {
+            id: "inv-pending-1",
+            email: "alex@mitchellcpa.com",
+            role: "member" as const,
+            invitedAt: "2026-05-03T15:00:00Z",
+            expiresAt: "2026-05-10T15:00:00Z",
+          },
+        ] as Array<{
           id: string;
           email: string;
           role: "owner" | "member";

@@ -16,6 +16,7 @@ import {
   UNSUPPORTED_STATE_HINT,
 } from "../data/supportedStates";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { actions } from "../data/store";
 import {
   parseCsv,
   detectMapping,
@@ -186,7 +187,10 @@ export function Import({ chromeless = false }: { chromeless?: boolean } = {}) {
         <DoneStep
           importedCount={importedIds.length}
           skippedCount={skipped}
-          onDashboard={() => navigate("/")}
+          onDashboard={() => {
+            actions.resetToSeeds();
+            navigate("/");
+          }}
           onClients={() => navigate("/clients")}
         />
       )}

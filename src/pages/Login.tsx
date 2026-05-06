@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Sparkles, ArrowRight, ArrowLeft, Mail } from "lucide-react";
+import { ArrowLeft, Mail } from "lucide-react";
 import { signIn } from "../data/session";
 import { authInputClass } from "./auth/AuthShell";
 import { env } from "../config";
 import { supabase } from "../lib/supabase";
+import { trpc } from "../lib/api/client";
 import { SsoButton } from "../components/SsoButton";
 
 // Lazy: only loaded when the user actually triggers sign-in. Keeps the
@@ -42,6 +43,7 @@ export function Login() {
   const [email, setEmail] = useState("");
   const [pending, setPending] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const createDemoSession = trpc.auth.createDemoSession.useMutation();
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,26 +128,68 @@ export function Login() {
   };
 
   const tryDemo = async () => {
-    const actions = await loadActions();
-    actions.resetToSeeds();
-    signIn({
-      firmName: "Mitchell CPA (demo)",
-      userName: "Sarah Mitchell",
-      userEmail: "demo@duedatehq.com",
-      tier: "pro",
-    });
-    const raw = localStorage.getItem("duedatehq.session.v1");
-    if (raw) {
-      try {
-        const s = JSON.parse(raw);
-        s.onboardingComplete = true;
-        s.primaryStates = ["CA"];
-        localStorage.setItem("duedatehq.session.v1", JSON.stringify(s));
-      } catch {
-        /* ignore */
+    // Mock-mode: the local store carries the seeded 51-client roster
+    // already, so we just sign in locally and land on Today. No
+    // network hop, no email round-trip — instant demo.
+    if (env.useMockAuth) {
+      const actions = await loadActions();
+      actions.resetToSeeds();
+      signIn({
+        firmName: "Mitchell CPA (demo)",
+        userName: "Sarah Mitchell",
+        userEmail: "demo@duedatehq.com",
+        tier: "pro",
+      });
+      const raw = localStorage.getItem("duedatehq.session.v1");
+      if (raw) {
+        try {
+          const s = JSON.parse(raw);
+          s.onboardingComplete = true;
+          s.primaryStates = ["CA"];
+          localStorage.setItem("duedatehq.session.v1", JSON.stringify(s));
+        } catch {
+          /* ignore */
+        }
       }
+      navigate("/", { replace: true });
+      return;
     }
-    navigate("/", { replace: true });
+
+    // Real-mode: ask the BE to mint a one-click sign-in URL via
+    // Supabase admin API (auth.admin.generateLink), then navigate to
+    // it. This bypasses Supabase's email-deliverability check on the
+    // synthetic demo@duedatehq.com address — no real inbox required.
+    // SupabaseAuthBridge picks up the SIGNED_IN event after the
+    // redirect and calls auth.bootstrapDemo to populate the firm.
+    setSubmitError(null);
+    setPending(true);
+    try {
+      // Forward `?reseed=1` through the magic-link round trip — the bridge
+      // reads this flag right before calling bootstrapDemo, passing
+      // reseed=true so the BE wipes the existing demo firm and re-seeds
+      // from clean state. Use case: a demo firm provisioned under an
+      // older seed version that's missing newer rows (tasks, milestones,
+      // etc.) — the additive seed pass alone won't reach it.
+      const wantReseed =
+        new URLSearchParams(window.location.search).get("reseed") === "1";
+      if (wantReseed) {
+        localStorage.setItem("duedatehq.bootstrap_demo_reseed", "1");
+      }
+      localStorage.setItem("duedatehq.bootstrap_demo_pending", "1");
+      const { actionLink } = await createDemoSession.mutateAsync();
+      window.location.href = actionLink;
+    } catch (err) {
+      localStorage.removeItem("duedatehq.bootstrap_demo_pending");
+      const msg = err instanceof Error ? err.message : String(err);
+      setSubmitError(
+        msg.includes("fetch") || msg.includes("network")
+          ? "Couldn't reach the demo service. Try again in a moment."
+          : msg,
+      );
+      setPending(false);
+    }
+    // Note: `setPending(false)` only runs on error — on success we
+    // navigate away so the spinner state doesn't matter.
   };
 
   // Link-sent confirmation view
@@ -271,31 +315,25 @@ export function Login() {
           </p>
         </div>
 
-        {/* Demo workspace — only in mock mode + not for invited users */}
-        {env.useMockData && !inviteToken && (
-          <button
-            onClick={() => void tryDemo()}
-            className="w-full mt-3 bg-surface border border-line hover:border-accent rounded-md p-4 text-left transition-colors group"
-          >
-            <div className="flex items-start gap-3">
-              <span className="w-8 h-8 rounded-full bg-info-bg border border-info-border text-info-ink flex items-center justify-center shrink-0">
-                <Sparkles className="w-3.5 h-3.5" aria-hidden />
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-ink-900">
-                  Try the demo workspace
-                </p>
-                <p className="text-xs text-ink-500 mt-0.5">
-                  49 fake clients, live state alert, 3 years of prior history.
-                  No email, no waiting — just see how it works.
-                </p>
-              </div>
-              <ArrowRight
-                className="w-4 h-4 text-ink-400 mt-2 group-hover:text-ink-900 transition-colors"
-                aria-hidden
-              />
-            </div>
-          </button>
+        {/* Demo workspace — quiet inline link, not a CTA card. Real
+            users have a job to do (sign in or sign up); the demo is a
+            secondary path for prospects, so it gets the smallest
+            visual weight that still makes it discoverable.
+            Hidden when following an invite (the user is joining a
+            specific firm and shouldn't be detoured into the demo). */}
+        {!inviteToken && (
+          <p className="text-2xs text-ink-400 mt-3 text-center">
+            <button
+              onClick={() => void tryDemo()}
+              disabled={pending}
+              className="text-ink-500 underline hover:text-ink-900 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Or try the demo workspace
+            </button>{" "}
+            <span className="text-ink-400">
+              · 51 fake clients, no signup
+            </span>
+          </p>
         )}
       </div>
     </div>

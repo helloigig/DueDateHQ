@@ -820,9 +820,10 @@ function NotificationsPanel() {
  * Settings card for the alert triage modal. The modal fires on first
  * /-page-land per browser session when there are state alerts that
  * arrived since the user's last_active_at and have at least one
- * matched client. Toggle off when it becomes noise — the inline
- * `<WhatChangedBanner>` on Dashboard continues to surface the same
- * urgency without the modal interruption.
+ * matched client. Toggle off when it becomes noise — the freshness
+ * chip in the Today page's "Alerts to act on today" section header
+ * ("N new since last visit") continues to surface the same urgency
+ * inline without the modal interruption.
  */
 function AlertTriageCard() {
   const utils = trpc.useUtils();
@@ -1710,6 +1711,9 @@ function FirmPanel() {
   const [statesText, setStatesText] = useState(
     (session?.primaryStates ?? ["CA"]).join(", ")
   );
+  const [bufferDays, setBufferDays] = useState<number>(
+    session?.internalDeadlineBufferDays ?? 14,
+  );
   const save = () => {
     updateSession({
       firmName,
@@ -1717,6 +1721,7 @@ function FirmPanel() {
         .split(",")
         .map((s) => s.trim().toUpperCase())
         .filter(Boolean),
+      internalDeadlineBufferDays: bufferDays,
     });
   };
   return (
@@ -1751,6 +1756,23 @@ function FirmPanel() {
               <option>America/Chicago</option>
               <option>America/Denver</option>
             </select>
+          </Field>
+          <Field label="Internal deadline buffer (days before official)">
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={60}
+                value={bufferDays}
+                onChange={(e) => {
+                  const n = Number.parseInt(e.target.value, 10);
+                  if (Number.isFinite(n))
+                    setBufferDays(Math.max(1, Math.min(60, n)));
+                }}
+                className="w-20 h-9 bg-sunken border border-line rounded-md px-3 py-2 text-sm tabular-nums focus-visible:outline-none focus-visible:bg-surface focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 hover:border-line-strong"
+              />
+              <span className="text-sm text-ink-600">days</span>
+            </div>
           </Field>
           <button
             onClick={save}

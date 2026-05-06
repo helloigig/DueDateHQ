@@ -499,14 +499,14 @@
     <span>States <strong>50</strong></span>
     <span>Categories <strong>9</strong></span>
     <span>Slots <strong>450</strong></span>
-    <span>Designed Badges <strong>13 / 50</strong></span>
+    <span>Designed Badges <strong>19 / 50</strong></span>
     <span>Format <strong>Editable HTML</strong></span>
   </div>
 </header>
 
 <section class="instructions">
   <h2>How to use</h2>
-  <p><strong>Designed badges:</strong> Original circular icons distilled from each state's most recognizable visual signature — bear and red star for California, lone star for Texas, Zia sun for New Mexico, and so on. 13 of 50 are drawn so far; the rest sit empty awaiting design. To draft another, add an entry to the <code>stateBadges</code> object keyed by lowercase-hyphenated state name, with an inline SVG string as its value.</p>
+  <p><strong>Designed badges:</strong> Original circular icons distilled from each state's most recognizable visual signature — bear and red star for California, lone star for Texas, Zia sun for New Mexico, and so on. 19 of 50 are drawn so far; the rest sit empty awaiting design. To draft another, add an entry to the <code>stateBadges</code> object keyed by lowercase-hyphenated state name, with an inline SVG string as its value.</p>
   <p><strong>Auto-populated:</strong> Flags, seals, and outlines for all 50 states are pulled live from Wikimedia Commons (public-domain government works). They appear automatically when the page loads.</p>
   <p><strong>Needs manual sourcing:</strong> License plates, route shields, quarters, welcome signs, and capitol photos. These are either copyrighted photographs or have inconsistent file naming on Wikipedia. To add one, locate the <code>stateImages</code> override object near the bottom of this file and paste an image URL or local path against the matching state and category key. Save and reload.</p>
   <p>Slots accept any web-renderable format (<code>.svg</code>, <code>.png</code>, <code>.jpg</code>, <code>.webp</code>). If a Wikimedia auto-load fails (rare naming exception), the slot reverts to its empty state automatically. Use the search bar to filter by state name.</p>
@@ -514,7 +514,7 @@
 
 <section class="size-preview">
   <h2>Designed badges · small-size legibility test</h2>
-  <p>The 13 designed badges shown at four scales. The 24px row is the stress test — each motif must remain distinguishable at favicon / list-icon size. Hover any badge to see its state name.</p>
+  <p>The 19 designed badges shown at four scales. The 24px row is the stress test — each motif must remain distinguishable at favicon / list-icon size. Hover any badge to see its state name.</p>
   <div class="size-preview-row" data-label="24 px" data-size="24"></div>
   <div class="size-preview-row" data-label="40 px" data-size="40"></div>
   <div class="size-preview-row" data-label="72 px" data-size="72"></div>
@@ -666,7 +666,7 @@
   // colors, no typography (illegible below ~64px). Each badge
   // should still read at 24×24 px. Add more states by adding
   // entries keyed by lowercase-hyphenated state name.
-  // Currently designed: 13 most iconic states.
+  // Currently designed: 19 most iconic states.
   // ───────────────────────────────────────────────────────────
 
   const stateBadges = {
@@ -899,6 +899,82 @@
         <circle cx="30" cy="40" r="16" fill="none" stroke="#FFFFFF" stroke-width="6"/>
         <circle cx="30" cy="40" r="8" fill="#CD212A"/>
       </g>
+    </svg>`,
+
+    // ILLINOIS — Lincoln's stovepipe hat + red ribbon + Springfield star
+    'illinois': `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="100" r="95" fill="#EFE4BD"/>
+      <circle cx="100" cy="100" r="95" fill="none" stroke="#1A1814" stroke-width="3"/>
+      <g fill="#1A1814">
+        <rect x="64" y="36" width="72" height="78"/>
+        <rect x="44" y="110" width="112" height="14"/>
+      </g>
+      <rect x="64" y="92" width="72" height="12" fill="#B91C1C"/>
+      <path d="M100,134 L107,150 L124,150 L110,160 L116,176 L100,166 L84,176 L90,160 L76,150 L93,150 Z" fill="#B91C1C"/>
+    </svg>`,
+
+    // NEW JERSEY — bold horse-head silhouette on buff (Garden State seal heritage)
+    'new-jersey': `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="100" r="95" fill="#E6CFA0"/>
+      <circle cx="100" cy="100" r="95" fill="none" stroke="#1A1814" stroke-width="3"/>
+      <path d="M70,176 L70,142 Q52,134 48,116 Q38,108 42,86 Q50,68 66,58 L78,40 L76,18 L96,28 L122,40 L146,58 L158,80 L156,100 L150,118 L136,128 L132,150 L132,176 Z" fill="#1A1814"/>
+      <circle cx="120" cy="76" r="3.5" fill="#E6CFA0"/>
+      <path d="M64,58 L70,82 L74,108 L78,134" stroke="#E6CFA0" stroke-width="2.5" fill="none" opacity="0.45"/>
+    </svg>`,
+
+    // MASSACHUSETTS — Sacred Cod, the State House icon
+    'massachusetts': `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="100" r="95" fill="#1F4E8C"/>
+      <circle cx="100" cy="100" r="95" fill="none" stroke="#1A1814" stroke-width="3"/>
+      <g fill="#F4B83C">
+        <path d="M40,100 L20,70 L30,100 L20,130 Z"/>
+        <path d="M40,100 Q66,62 130,68 Q160,76 170,100 Q160,124 130,132 Q66,138 40,100 Z"/>
+        <path d="M84,68 L92,48 L108,50 L106,72 Z"/>
+        <path d="M84,132 L92,152 L108,150 L106,128 Z"/>
+      </g>
+      <path d="M118,82 Q112,100 118,118" stroke="#1F4E8C" stroke-width="3.5" fill="none"/>
+      <circle cx="150" cy="92" r="5" fill="#1F4E8C"/>
+      <circle cx="150" cy="92" r="2.2" fill="#F4B83C"/>
+    </svg>`,
+
+    // GEORGIA — peach with leaf, the unmistakable Peach State symbol
+    'georgia': `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="100" r="95" fill="#FBF3D6"/>
+      <circle cx="100" cy="100" r="95" fill="none" stroke="#1A1814" stroke-width="3"/>
+      <ellipse cx="100" cy="118" rx="58" ry="54" fill="#F2A269"/>
+      <ellipse cx="78" cy="100" rx="22" ry="18" fill="#E97955" opacity="0.75"/>
+      <path d="M100,72 Q100,118 100,168" stroke="#B8492A" stroke-width="3.5" fill="none" opacity="0.65"/>
+      <path d="M100,68 Q102,54 102,46" stroke="#5A4A2A" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M104,62 Q126,46 148,50 Q140,72 120,76 Q108,76 104,62 Z" fill="#5A8B3A"/>
+      <path d="M108,66 Q124,58 140,58" stroke="#3F6B26" stroke-width="2" fill="none"/>
+    </svg>`,
+
+    // LOUISIANA — fleur-de-lis, gold on Mardi Gras purple
+    'louisiana': `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="100" r="95" fill="#5B2C8E"/>
+      <circle cx="100" cy="100" r="95" fill="none" stroke="#1A1814" stroke-width="3"/>
+      <g fill="#F4B83C">
+        <path d="M100,28 Q90,54 90,86 L110,86 Q110,54 100,28 Z"/>
+        <path d="M62,68 C 54,92 60,114 82,112 Q80,98 78,86 Q74,72 72,66 Q66,62 62,68 Z"/>
+        <path d="M138,68 C 146,92 140,114 118,112 Q120,98 122,86 Q126,72 128,66 Q134,62 138,68 Z"/>
+        <rect x="56" y="98" width="88" height="14" rx="2"/>
+        <path d="M84,112 L90,168 L110,168 L116,112 Z"/>
+      </g>
+    </svg>`,
+
+    // PENNSYLVANIA — keystone with Liberty Bell silhouette
+    'pennsylvania': `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="100" r="95" fill="#003F87"/>
+      <circle cx="100" cy="100" r="95" fill="none" stroke="#1A1814" stroke-width="3"/>
+      <path d="M44,46 L156,46 L132,156 L68,156 Z" fill="#F4B83C"/>
+      <g fill="#003F87">
+        <rect x="94" y="64" width="12" height="6"/>
+        <rect x="84" y="70" width="32" height="7"/>
+        <path d="M76,77 L124,77 L132,118 L68,118 Z"/>
+        <rect x="64" y="118" width="72" height="9"/>
+        <rect x="98" y="127" width="4" height="9"/>
+      </g>
+      <path d="M115,77 L113,92 L117,104 L113,118" stroke="#F4B83C" stroke-width="2.2" fill="none"/>
     </svg>`,
   };
 

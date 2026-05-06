@@ -104,8 +104,12 @@ const TONE: Record<
   },
 };
 
-function signedDeltaLabel(daysBehind: number): string {
+function signedDeltaLabel(
+  daysBehind: number,
+  opts?: { absolute?: boolean },
+): string {
   if (daysBehind === 0) return "0d";
+  if (opts?.absolute) return `${Math.abs(daysBehind)}d`;
   return daysBehind > 0 ? `+${daysBehind}d` : `${daysBehind}d`;
 }
 
@@ -267,7 +271,7 @@ function renderChipText(
     case "past_file_tight":
       return (
         <>
-          <span className="font-medium">File</span>
+          <span className="font-medium">Filed</span>
           <span className={tone.arrow}>→</span>
           <DateLabel
             value={result.activeMilestone!.targetDate}
@@ -302,20 +306,36 @@ function renderChipText(
         </>
       );
     case "overdue":
-      // Compact mode used to show "OVERDUE · +39d" in solid red — the
-      // signal was loud but the *justification* (the actual IRS date
-      // that's past) was hidden until you hovered the tooltip. Now both
-      // variants show "Past IRS · Mar 15 · +39d" so the chip carries
-      // its own evidence — the eye sees the past date right there
-      // without inferring "OVERDUE" was magic.
+      // Compact mode shows "Overdue · IRS due Mar 15" — the slip count is
+      // redundant in dense list contexts (Timeline) where the row's
+      // own "Xd behind" status pill on the right rail already carries
+      // the magnitude. Default mode keeps the explicit "15d late" so
+      // standalone surfaces (TaskHeader) stay self-evident.
+      // Copy 2026-05-06: renamed "Past IRS · Mar 15 · -15d" →
+      // "Overdue 15d · IRS due Mar 15" — the old form jargon-stacked
+      // the agency name, the date, and a negative delta in three
+      // segments; new form leads with the human signal ("how late?")
+      // and the official date follows as context.
       return (
         <>
-          <span className="font-medium">Past IRS</span>
-          <span className={tone.arrow}>·</span>
-          <DateLabel value={officialDueDate} format="short" />
-          <span className={tone.delta}>
-            · {signedDeltaLabel(-result.daysBehind)}
-          </span>
+          {!isCompact && (
+            <>
+              <span className="font-medium">
+                Overdue {signedDeltaLabel(-result.daysBehind, { absolute: true })}
+              </span>
+              <span className={tone.arrow}>·</span>
+              <span>IRS due</span>
+              <DateLabel value={officialDueDate} format="short" />
+            </>
+          )}
+          {isCompact && (
+            <>
+              <span className="font-medium">Overdue</span>
+              <span className={tone.arrow}>·</span>
+              <span>IRS due</span>
+              <DateLabel value={officialDueDate} format="short" />
+            </>
+          )}
         </>
       );
     case "extension":

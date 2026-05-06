@@ -19,26 +19,23 @@ export type ClientGroupRow = {
   verbCounts: Partial<Record<MockTodoItem["verb"], number>>;
 };
 
-export type StateAlertRow = {
-  kind: "state_alert";
-  key: string;
-  item: QueueTodoItem;
-};
-
 export type BulkBatchRow = {
   kind: "bulk_batch";
   key: string;
   item: QueueTodoItem;
 };
 
-export type QueueRow = ClientGroupRow | StateAlertRow | BulkBatchRow;
+export type QueueRow = ClientGroupRow | BulkBatchRow;
 
-// state-monitor state alerts (verb=Apply) fan out to N clients — they're event-shaped,
-// not client-shaped, so they render as their own row. email-drafter bulk drafts have
-// "N clients" as the client field — also not a single-client row.
+// state-monitor state alerts (verb=Apply / source=mode_f_alert) live in the
+// dedicated state-alert surface (StateAlertsPreview on Dashboard, the State
+// alerts section on Today). They DON'T appear here — duplicating them as
+// pinned queue rows violated "one thing, one entrance, one name" (see
+// feedback_one_entrance_one_name). They're filtered out below.
 //
-// Heuristic: if `client` looks like "12 clients" / "8 clients", treat as
-// non-grouping. Otherwise group by client name (mock) or clientId (live).
+// email-drafter bulk drafts have "N clients" as the client field — that's
+// the only multi-client row that still belongs in the queue (no other
+// canonical surface owns those drafts yet).
 const MULTI_CLIENT_RE = /^\d+\s+clients?$/i;
 
 function isMultiClient(item: QueueTodoItem): boolean {
@@ -100,15 +97,13 @@ export function pickPrimaryItem(
 }
 
 export function buildQueueRows(items: QueueTodoItem[]): QueueRow[] {
-  const stateAlerts: StateAlertRow[] = [];
   const bulks: BulkBatchRow[] = [];
   const groups = new Map<string, QueueTodoItem[]>();
 
   for (const item of items) {
-    if (item.source === "mode_f_alert" || item.verb === "Apply") {
-      stateAlerts.push({ kind: "state_alert", key: `alert:${item.id}`, item });
-      continue;
-    }
+    // Mode F state alerts live in the dedicated state-alert surface, not
+    // here — skip them so the queue stays focused on per-client chase work.
+    if (item.source === "mode_f_alert" || item.verb === "Apply") continue;
     if (isMultiClient(item)) {
       bulks.push({ kind: "bulk_batch", key: `bulk:${item.id}`, item });
       continue;
@@ -141,21 +136,29 @@ export function buildQueueRows(items: QueueTodoItem[]): QueueRow[] {
     });
   }
 
-  // Final order: state alerts pinned to top (sorted by urgencyScore among
-  // themselves), then a merged stream of client groups + bulk rows by score.
-  stateAlerts.sort((a, b) => b.item.urgencyScore - a.item.urgencyScore);
-  const tail: QueueRow[] = [...clientGroups, ...bulks].sort((a, b) => {
+  return [...clientGroups, ...bulks].sort((a, b) => {
     const aScore =
       a.kind === "client_group" ? a.maxUrgencyScore : a.item.urgencyScore;
     const bScore =
       b.kind === "client_group" ? b.maxUrgencyScore : b.item.urgencyScore;
     return bScore - aScore;
   });
-  return [...stateAlerts, ...tail];
 }
 
-// Summarize the items for a client group as a single sentence, e.g.
-//   "Send 2 reminders · Confirm 1 inbound · across 1040 + 1040-ES"
+// Summarize the items for a client group as a single sentence verb
+// breakdown, e.g. "Send 2 reminders · Confirm 1 inbound · Resolve 1 flag".
+//
+// Yuqi audit 2026-05-06: the prior version emitted a "{verbs} · across
+// {tasks}" string that didn't reconcile with the row's separate
+// "{N} items pending" footer (different denominators — verbs counts
+// only Send/Confirm/Discuss/Apply, items pending counted every non-
+// confirmed checklist row). Split: this returns ONLY the verb
+// breakdown so the displayed action count = sum of verbs in the
+// summary. The "across {tasks}" fragment moved to
+// `summarizeClientGroupTasks` so the row can render it on its own
+// meta line, and `summarizeClientGroupCount` returns the integer the
+// summary expands to (collapsed-row footer can read it without
+// recomputing).
 export function summarizeClientGroup(group: ClientGroupRow): string {
   const parts: string[] = [];
   const verbOrder: MockTodoItem["verb"][] = [
@@ -176,11 +179,29 @@ export function summarizeClientGroup(group: ClientGroupRow): string {
     const [s, p] = verbNoun[v];
     parts.push(`${v} ${n} ${n === 1 ? s : p}`);
   }
+  return parts.join(" · ");
+}
+
+/** Total action count across all verbs — the integer the row footer
+ *  shows to match the verb breakdown returned by `summarizeClientGroup`. */
+export function summarizeClientGroupCount(group: ClientGroupRow): number {
+  const verbOrder: MockTodoItem["verb"][] = [
+    "Send",
+    "Confirm",
+    "Discuss",
+    "Apply",
+  ];
+  let total = 0;
+  for (const v of verbOrder) total += group.verbCounts[v] ?? 0;
+  return total;
+}
+
+/** Task-scope fragment, e.g. "across 1040 + 1040-ES" or "across 4 tasks". */
+export function summarizeClientGroupTasks(group: ClientGroupRow): string | null {
   const tasks = Array.from(
     new Set(group.items.map((i) => i.task).filter((t): t is string => !!t)),
   );
-  if (tasks.length > 0) {
-    parts.push(`across ${tasks.slice(0, 3).join(" + ")}${tasks.length > 3 ? ` +${tasks.length - 3}` : ""}`);
-  }
-  return parts.join(" · ");
+  if (tasks.length === 0) return null;
+  if (tasks.length <= 3) return `across ${tasks.join(" + ")}`;
+  return `across ${tasks.slice(0, 3).join(" + ")} +${tasks.length - 3}`;
 }

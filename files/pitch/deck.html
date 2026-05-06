@@ -4,54 +4,76 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DueDateHQ · Pitch · 2026-05-06 · Gigi Wu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --canvas: #F8F9FB;
-    --surface: #FFFFFF;
-    --sunken: #F2F3F5;
-    --ink-900: #0F172A;
-    --ink-700: #334155;
-    --ink-500: #64748B;
-    --ink-400: #94A3B8;
-    --ink-300: #CBD5E1;
-    --line: #E2E8F0;
-    --line-strong: #CBD5E1;
-    --indigo: #5B5BD6;
-    --indigo-hover: #4A4AC9;
-    --indigo-soft: #ECECFE;
-    --indigo-ink: #3D3DAF;
-    --warn-bg: #FFFBEB;
-    --warn-border: #FCD34D;
-    --warn-ink: #92400E;
-    --ok-bg: #ECFDF5;
-    --ok-border: #86EFAC;
-    --ok-ink: #047857;
-    --info-bg: #EFF6FF;
-    --info-border: #93C5FD;
-    --info-ink: #1D4ED8;
-    --danger-bg: #FEF2F2;
-    --danger-border: #FCA5A5;
-    --danger-ink: #B91C1C;
+    /* === 4-color editorial palette === */
+    /* 1. White (canvas + surface) */
+    /* 2. Black (ink) */
+    /* 3. High-Vis Yellow (accent — chapter dividers, key callouts) */
+    /* 4. Stone Grey (secondary surface) */
 
-    --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
-    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+    --canvas: #F2F2EE;          /* warm off-white background */
+    --surface: #FFFFFF;          /* pure white card */
+    --sunken: #DCDFC8;           /* stone grey — secondary surface */
+    --accent: #EBFFA8;           /* SOFT butter yellow (was high-vis) */
+    --accent-soft: #F4FFD0;      /* very faint yellow tint */
+    --accent-strong: #D9FF50;    /* original high-vis — reserved for ONE moment only */
 
-    --pop: 0 2px 8px rgba(15, 23, 42, 0.06);
-    --overlay: 0 8px 24px rgba(15, 23, 42, 0.12);
+    /* Ink hierarchy — neutral grays only */
+    --ink-900: #1A1A1A;          /* primary near-black (slightly softer) */
+    --ink-700: #3D3D3D;          /* dark gray */
+    --ink-500: #6F6F6F;          /* medium gray (mono labels, captions) */
+    --ink-400: #9F9F9F;          /* light gray */
+    --ink-300: #C8C8C5;          /* very light gray */
 
-    /* === Layout rhythm tokens · 全局统一 gap / 行距 === */
-    --gap-eyebrow: 1.8vmin;   /* eyebrow → h1/h2 */
-    --gap-title:   3vmin;     /* h1/h2 → 内容区 */
-    --gap-card:    2vmin;     /* 卡片之间（grid） */
-    --gap-section: 2.5vmin;   /* slide 内大块之间 */
-    --pad-card:    2.4vmin;   /* 卡片内 padding */
-    --pad-card-lg: 2.8vmin;   /* 重点卡片 padding */
-    --rad-card:    8px;
-    --lh-tight: 1.3;          /* 大字标题 */
-    --lh-display: 1.4;        /* 卡片小标题 */
-    --lh-body: 1.65;          /* 正文 */
-    --lh-meta: 1.55;          /* 元信息 / 引用 */
+    /* Lines — soft only. NO black lines anywhere. */
+    --line: #E5E5E0;             /* very soft gray border (rarely used) */
+    --line-strong: #D0D0CB;      /* "strong" but still soft gray */
+
+    /* === Compatibility shim — map old indigo tokens === */
+    --indigo: #1A1A1A;            /* "accent text" → ink */
+    --indigo-hover: #3D3D3D;
+    --indigo-soft: #EBFFA8;       /* "highlight bg" → soft yellow */
+    --indigo-ink: #1A1A1A;        /* "text on highlight" → black */
+
+    /* === Sentiment === */
+    --warn-bg: #EBFFA8;           /* soft yellow */
+    --warn-border: transparent;
+    --warn-ink: #1A1A1A;
+    --ok-bg: #DCDFC8;             /* stone grey */
+    --ok-border: transparent;
+    --ok-ink: #3D3D3D;
+    --info-bg: #FFFFFF;
+    --info-border: transparent;
+    --info-ink: #1A1A1A;
+    --danger-bg: #FFFFFF;
+    --danger-border: transparent;
+    --danger-ink: #1A1A1A;
+
+    --font: "Geist", -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "Geist Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+    --pop: none;
+    --overlay: none;
+
+    /* === Layout rhythm tokens · GENEROUS === */
+    --gap-eyebrow: 2vmin;
+    --gap-title:   4vmin;          /* h1 → body, generous */
+    --gap-card:    2.6vmin;        /* between cards */
+    --gap-section: 3.5vmin;        /* between sections within slide */
+    --pad-card:    2.8vmin;
+    --pad-card-lg: 3.4vmin;        /* larger card padding */
+    --rad-card:    0px;
+    --lh-tight: 1.15;
+    --lh-display: 1.4;
+    --lh-body: 1.65;
+    --lh-meta: 1.5;
   }
+
+  /* === Pull Geist + Geist Mono webfonts === */
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -76,7 +98,7 @@
 
   .slide {
     position: absolute; inset: 0;
-    padding: 5vmin 6vmin 7vmin 6vmin;
+    padding: 6.5vmin 7.5vmin 7.5vmin 7.5vmin;
     display: none; flex-direction: column;
     background: var(--canvas);
   }
@@ -84,45 +106,105 @@
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   .slide.surface { background: var(--surface); }
   .slide.center { justify-content: center; }
+  .slide.stone { background: var(--sunken); }
+  .slide.accent-bg { background: var(--accent); }
+  .slide.dark { background: var(--ink-900); color: #F2F2EE; }
 
-  .micro { font-size: 1.2vmin; font-weight: 600; line-height: 1.5; letter-spacing: 0.08em; color: var(--ink-500); }
-  .caption { font-size: 1.5vmin; line-height: 1.6; color: var(--ink-500); }
-  .body { font-size: 1.7vmin; line-height: 1.7; color: var(--ink-700); font-weight: 400; }
-  .lead { font-size: 2.4vmin; line-height: 1.55; color: var(--ink-900); font-weight: 500; letter-spacing: -0.005em; }
-  .h2 { font-size: 3.8vmin; line-height: 1.2; color: var(--ink-900); font-weight: 600; letter-spacing: -0.015em; }
-  .h1 { font-size: 5vmin; line-height: 1.15; color: var(--ink-900); font-weight: 600; letter-spacing: -0.02em; }
+  /* Mono labels (chapter, eyebrow, page numbers) */
+  .micro {
+    font-family: var(--font-mono);
+    font-size: 1.05vmin;
+    font-weight: 500;
+    line-height: 1.5;
+    letter-spacing: 0.12em;
+    color: var(--ink-500);
+    text-transform: uppercase;
+  }
+  .caption {
+    font-size: 1.45vmin;
+    line-height: 1.55;
+    color: var(--ink-500);
+    font-weight: 400;
+  }
+  .body {
+    font-size: 1.7vmin;
+    line-height: 1.7;
+    color: var(--ink-700);
+    font-weight: 400;
+  }
+  .lead {
+    font-size: 2.4vmin;
+    line-height: 1.5;
+    color: var(--ink-900);
+    font-weight: 400;
+    letter-spacing: -0.005em;
+  }
+  .h2 {
+    font-size: 4vmin;
+    line-height: 1.1;
+    color: var(--ink-900);
+    font-weight: 500;
+    letter-spacing: -0.022em;
+    max-width: 80%;
+  }
+  .h1 {
+    font-size: 4.4vmin;
+    line-height: 1.08;
+    color: var(--ink-900);
+    font-weight: 500;
+    letter-spacing: -0.025em;
+    max-width: 80%;
+  }
 
-  .accent { color: var(--indigo); }
+  .accent { color: var(--ink-900); font-weight: 600; }
   .ink-500 { color: var(--ink-500); }
   .strong { font-weight: 600; color: var(--ink-900); }
 
-  /* === Persistent chrome on every slide === */
+  /* === Standardized header rhythm — every slide opens the same way === */
+  .eyebrow { color: var(--ink-500); margin-bottom: 1.5vmin; }
+  .h1 + *, .h2 + * { margin-top: var(--gap-title); }
+
+  /* === Persistent chrome on every slide — no rule, just spacing === */
   .chrome {
     position: absolute;
-    bottom: 1.8vmin;
-    left: 6vmin;
-    right: 6vmin;
+    bottom: 2.5vmin;
+    left: 7.5vmin;
+    right: 7.5vmin;
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    font-size: 1.2vmin;
-    color: var(--ink-400);
-    letter-spacing: 0.08em;
+    font-size: 1.05vmin;
+    color: var(--ink-500);
+    letter-spacing: 0.1em;
     font-family: var(--font-mono);
-    border-top: 1px solid var(--line);
+    font-weight: 500;
     padding-top: 1vmin;
+    text-transform: uppercase;
   }
   .chrome .brand {
-    font-weight: 700;
-    color: var(--ink-700);
+    font-weight: 600;
+    color: var(--ink-900);
     letter-spacing: 0.04em;
     font-family: var(--font);
-    font-size: 1.3vmin;
+    font-size: 1.2vmin;
+    text-transform: none;
   }
-  .chrome .brand .accent { color: var(--indigo); }
+  .chrome .brand .accent { color: var(--ink-900); font-weight: 600; }
   .chrome .center { color: var(--ink-500); text-transform: uppercase; }
-  .chrome .center .num { color: var(--ink-700); font-weight: 700; margin-right: 0.6vmin; }
-  .chrome .meta { color: var(--ink-400); text-transform: uppercase; }
+  .chrome .center .num { color: var(--ink-900); font-weight: 600; margin-right: 0.8vmin; font-family: var(--font-mono); }
+  .chrome .meta { color: var(--ink-500); text-transform: uppercase; }
+
+  /* Dark slide chrome inversion */
+  .slide.dark .chrome { color: rgba(242,242,238,0.6); }
+  .slide.dark .chrome .brand { color: #F2F2EE; }
+  .slide.dark .chrome .brand .accent { color: var(--accent); }
+  .slide.dark .chrome .center .num { color: #F2F2EE; }
+  .slide.dark .h1, .slide.dark .h2 { color: #F2F2EE; }
+  .slide.dark .micro { color: rgba(242,242,238,0.6); }
+
+  /* Accent slide (yellow bg) chrome */
+  .slide.accent-bg .chrome { color: var(--ink-700); }
+  .slide.accent-bg .chrome .brand { color: var(--ink-900); }
 
   .pill {
     display: inline-flex; align-items: center;
@@ -133,56 +215,113 @@
   .pill.success { background: var(--ok-bg); color: var(--ok-ink); border-color: var(--ok-border); }
   .pill.warn { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-border); }
   .pill.silent { background: var(--sunken); color: var(--ink-700); border-color: var(--line); }
-  .pill.indigo { background: var(--indigo-soft); color: var(--indigo-ink); border-color: rgba(91, 91, 214, 0.2); }
+  .pill.indigo { background: var(--indigo-soft); color: var(--indigo-ink); border-color: rgba(10, 10, 10, 0.4); }
 
   .chip {
     display: inline-flex; align-items: center;
     padding: 0.3vmin 0.8vmin; background: var(--sunken);
     color: var(--ink-700); font-size: 1.2vmin;
     font-weight: 600; letter-spacing: 0.04em;
-    border-radius: 4px; text-transform: uppercase;
+    border-radius: 0; text-transform: uppercase;
     font-family: var(--font-mono);
   }
 
-  a.link { color: inherit; text-decoration: none; border-bottom: 1px dotted currentColor; transition: color 160ms; }
-  a.link:hover { color: var(--indigo); border-bottom-color: var(--indigo); }
+  a.link { color: inherit; text-decoration: none; border-bottom: 1px solid currentColor; transition: background 160ms; }
+  a.link:hover { background: var(--accent); }
 
   .col { display: flex; flex-direction: column; }
 
-  .eyebrow { color: var(--ink-500); margin-bottom: 1.5vmin; }
+  /* === GLOBAL NO-BORDER POLICY for cards === */
+  /* Cards differentiate via background contrast (white-on-canvas), not borders */
+  .pain-card, .interview-card, .lm-card, .compete-col,
+  .q-card, .q-prompt, .artifact-card, .opp-row, .market-block,
+  .alert-card, .recruit-funnel, .source-convergence, .phase-card,
+  .pipeline-block, .tech-point, .feat-table, .int-tier, .zone,
+  .mockup, .mockup-alert, .queue-row, .ai-callout,
+  .opp-stack > * {
+    border: none !important;
+  }
+  /* Table: only outer border off — cell row dividers stay (soft gray) */
+  .compete-table { border: none !important; }
 
-  /* === SLIDE 1: Cover === */
-  .cover-slide { background: #FFFFFF; align-items: center; justify-content: center; padding: 0; }
+  /* === Cover · editorial · wordmark center · flip-card subtle in corner === */
+  .cover-slide { background: var(--canvas); align-items: stretch; justify-content: stretch; padding: 6vmin 7vmin; flex-direction: column; }
   .cover-slide .chrome { display: none; }
-  .cover-mark { width: 56%; max-width: 760px; height: auto; display: block; }
-  .cover-foot {
-    position: absolute; bottom: 4vmin; right: 5vmin;
-    font-family: var(--font-mono); font-size: 1.3vmin;
-    color: var(--ink-400); letter-spacing: 0.12em;
+
+  .cover-top {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding-bottom: 0;
+  }
+  .cover-top .left-mono {
+    font-family: var(--font-mono);
+    font-size: 1.1vmin;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    color: var(--ink-500);
+    text-transform: uppercase;
+    line-height: 1.7;
+  }
+  .cover-top .left-mono b { color: var(--ink-900); font-weight: 600; }
+  .cover-top .right-meta {
+    font-family: var(--font-mono);
+    font-size: 1.1vmin;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    color: var(--ink-500);
+    text-transform: uppercase;
+    line-height: 1.7;
+    text-align: right;
   }
 
+  .cover-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4vmin 0;
+  }
+  .cover-mark { width: 48%; max-width: 480px; height: auto; display: block; }
+
+
+  .cover-foot {
+    position: relative;
+    padding-top: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: var(--font-mono);
+    font-size: 1.1vmin;
+    color: var(--ink-500);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .cover-foot a.link { color: var(--ink-900); border-bottom: 1px solid var(--ink-700); font-weight: 600; }
+  .cover-foot a.link:hover { background: var(--accent); }
+
   /* === SLIDE 2: 场景 · 真实访谈 quote === */
-  .scene-quote-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; max-width: 80%; margin: 0 auto; gap: 4vmin; text-align: center; }
-  .scene-quote { font-size: 5.5vmin; line-height: 1.25; font-weight: 600; color: var(--ink-900); letter-spacing: -0.02em; }
-  .scene-quote .accent { color: var(--indigo); }
+  .scene-quote-wrap { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; max-width: 90%; margin: 0; gap: 4.5vmin; text-align: left; padding-top: 8vmin; }
+  .scene-quote { font-size: 5.6vmin; line-height: 1.2; font-weight: 500; color: var(--ink-900); letter-spacing: -0.025em; }
+  .scene-quote .hl-yellow { background: var(--accent); padding: 0 0.4em; }
   .scene-attrib { font-family: var(--font-mono); font-size: 1.4vmin; color: var(--ink-500); letter-spacing: 0.08em; text-transform: uppercase; }
   .scene-context { font-size: 2vmin; color: var(--ink-500); padding-top: 3vmin; border-top: 1px solid var(--line); width: 100%; }
-  .alert-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.5vmin; box-shadow: var(--pop); }
+  .alert-card { background: var(--surface); border: 1px solid var(--line); border-radius: 0; padding: 2.5vmin; box-shadow: var(--pop); }
   .alert-card .top { display: flex; gap: 1vmin; align-items: center; margin-bottom: 1.5vmin; }
   .alert-card .title { font-size: 1.7vmin; font-weight: 600; color: var(--ink-900); flex: 1; line-height: 1.4; }
   .alert-card .when { font-size: 1.3vmin; color: var(--ink-400); }
   .alert-card .summary { font-size: 1.45vmin; color: var(--ink-500); line-height: 1.6; margin-bottom: 1.5vmin; }
   .alert-card .row-pills { display: flex; gap: 0.6vmin; margin-bottom: 1.5vmin; flex-wrap: wrap; }
   .alert-card .actions { display: flex; gap: 0.6vmin; flex-wrap: wrap; }
-  .btn-primary { padding: 0.7vmin 1.3vmin; background: var(--indigo); color: white; font-size: 1.3vmin; font-weight: 500; border-radius: 6px; border: none; }
-  .btn-secondary { padding: 0.7vmin 1.3vmin; background: var(--surface); color: var(--ink-700); font-size: 1.3vmin; font-weight: 500; border: 1px solid var(--line); border-radius: 6px; }
+  .btn-primary { padding: 0.7vmin 1.3vmin; background: var(--indigo); color: white; font-size: 1.3vmin; font-weight: 500; border-radius: 0; border: none; }
+  .btn-secondary { padding: 0.7vmin 1.3vmin; background: var(--surface); color: var(--ink-700); font-size: 1.3vmin; font-weight: 500; border: 1px solid var(--line); border-radius: 0; }
 
   /* === SLIDE 3: 痛点 · 四位 CPA 同一组瓶颈 === */
   .pain-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
+    grid-auto-rows: 1fr;
     gap: var(--gap-card);
     margin-top: var(--gap-title);
+    flex: 1;
   }
   .pain-card {
     background: var(--surface);
@@ -215,26 +354,26 @@
   }
   .pain-card .voices {
     margin-top: auto;
-    padding-top: 1.3vmin;
+    padding-top: 1.5vmin;
     border-top: 1px dashed var(--line);
     display: flex; flex-direction: column;
-    gap: 0.7vmin;
+    gap: 1.2vmin;
   }
   .pain-card .voice {
-    font-size: 1.3vmin;
+    display: flex; flex-direction: column;
+    gap: 0.3vmin;
     color: var(--ink-700);
+    font-size: 1.4vmin;
     line-height: var(--lh-meta);
-    display: grid;
-    grid-template-columns: 9vmin 1fr;
-    gap: 1vmin;
-    align-items: baseline;
   }
   .pain-card .voice .who {
     font-family: var(--font-mono);
-    font-size: 1.15vmin;
+    font-size: 1vmin;
     color: var(--ink-500);
-    letter-spacing: 0.04em;
+    letter-spacing: 0.1em;
     font-weight: 600;
+    text-transform: uppercase;
+    white-space: nowrap;
   }
   .pain-card .voice em {
     font-style: italic;
@@ -254,7 +393,7 @@
   .pain-converge b { font-weight: 700; }
 
   /* === SLIDE 4: 竞争 (精确) === */
-  .compete-table { width: 100%; margin-top: 2.5vmin; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); border-collapse: separate; border-spacing: 0; }
+  .compete-table { width: 100%; margin-top: 2.5vmin; border: 1px solid var(--line); border-radius: 0; overflow: hidden; background: var(--surface); border-collapse: collapse; /* removed border-spacing */ }
   .compete-table th, .compete-table td { padding: 1.3vmin 1.5vmin; text-align: left; font-size: 1.4vmin; border-bottom: 1px solid var(--line); vertical-align: middle; }
   .compete-table th { background: var(--sunken); font-weight: 600; color: var(--ink-700); font-size: 1.2vmin; letter-spacing: 0.08em; font-family: var(--font-mono); text-transform: uppercase; }
   .compete-table th.us { color: var(--indigo-ink); background: var(--indigo-soft); }
@@ -263,18 +402,21 @@
   .compete-table .yes { color: var(--ok-ink); font-weight: 600; }
   .compete-table .no { color: var(--ink-300); }
   .compete-table .partial { color: var(--ink-500); }
-  .compete-table td.us-col { background: rgba(236, 236, 254, 0.4); }
+  .compete-table td.us-col { background: var(--accent); }
+  .compete-table td.us-col.yes { color: var(--ink-900); font-weight: 600; }
+  .compete-table td.us-col.no { color: var(--ink-700); }
+  .compete-table td.us-col.partial { color: var(--ink-700); }
 
   /* === SLIDE 5: 机会 === */
   .opp-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 4vmin; align-items: stretch; }
   .opp-stack { display: flex; flex-direction: column; gap: 1.5vmin; }
-  .opp-row { padding: 1.8vmin; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+  .opp-row { padding: 1.8vmin; background: var(--surface); border: 1px solid var(--line); border-radius: 0; }
   .opp-row .label { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); margin-bottom: 0.5vmin; text-transform: uppercase; }
   .opp-row .text { font-size: 1.5vmin; color: var(--ink-900); line-height: 1.5; font-weight: 500; }
   .opp-row .text .strong { font-weight: 700; color: var(--indigo-ink); }
   .opp-row .text .sub { color: var(--ink-500); font-weight: 400; font-size: 1.4vmin; display: block; margin-top: 0.3vmin; }
 
-  .market-block { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.5vmin; display: flex; flex-direction: column; justify-content: center; }
+  .market-block { background: var(--surface); border: 1px solid var(--line); border-radius: 0; padding: 2.5vmin; display: flex; flex-direction: column; justify-content: center; }
   .market-num { font-size: 6.5vmin; font-weight: 600; line-height: 1; color: var(--ink-900); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
   .market-num .suffix { font-size: 2vmin; color: var(--ink-500); font-weight: 500; }
   .market-cap { margin-top: 0.8vmin; font-size: 1.4vmin; color: var(--ink-500); }
@@ -382,6 +524,186 @@
     line-height: var(--lh-meta);
   }
 
+  /* MERGED slide 07: Q-thread + Voice quotes side by side */
+  .qthread-merged {
+    display: grid;
+    grid-template-columns: 1.55fr 1fr;
+    gap: var(--gap-section);
+    margin-top: var(--gap-title);
+    align-items: start;
+  }
+  .qthread-merged .qm-left .qthread-list { margin-top: 1vmin; }
+  .qthread-merged .qm-left .qthread-row {
+    grid-template-columns: 3vmin 1fr 1fr;
+    gap: 2vmin;
+    padding: 1.6vmin 0;
+  }
+  .qthread-merged .qm-left .qthread-row .quote { font-size: 1.55vmin; line-height: 1.45; }
+  .qthread-merged .qm-left .qthread-row .decision .what { font-size: 1.4vmin; }
+  .qthread-merged .qm-left .qthread-row .decision .how { font-size: 1.2vmin; }
+  .qthread-merged .qm-left .qthread-row .decision { padding-left: 1.5vmin; }
+  .qthread-merged .qm-left .qthread-row .num { font-size: 1.3vmin; }
+  
+  .qm-section-label {
+    font-family: var(--font-mono);
+    font-size: 1.15vmin;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--ink-500);
+    text-transform: uppercase;
+    padding-bottom: 1.2vmin;
+    border-bottom: 1px solid var(--line);
+  }
+  
+  .voice-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1.6vmin;
+    margin-top: 1.2vmin;
+  }
+  .voice-mini {
+    padding: 1.6vmin 1.8vmin;
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    gap: 0.8vmin;
+  }
+  .voice-mini.highlight { background: var(--accent); }
+  .vm-tag {
+    font-family: var(--font-mono);
+    font-size: 1.05vmin;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--ink-700);
+    text-transform: uppercase;
+  }
+  .vm-quote {
+    font-size: 1.55vmin;
+    line-height: 1.5;
+    color: var(--ink-900);
+    font-weight: 500;
+    font-style: italic;
+  }
+  .vm-quote b { font-weight: 700; font-style: normal; }
+  .vm-impl {
+    font-size: 1.2vmin;
+    color: var(--ink-500);
+    line-height: 1.5;
+    font-family: var(--font-mono);
+    letter-spacing: 0.02em;
+  }
+
+  /* SLIDE 09 v2 — Lily + Michael with clear field schema */
+  .lm-grid-v2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gap-section);
+    margin-top: var(--gap-title);
+  }
+  .lm-card-v2 {
+    display: flex;
+    flex-direction: column;
+    gap: 1.6vmin;
+    padding: var(--pad-card-lg);
+    background: var(--surface);
+  }
+  .lm-type {
+    font-family: var(--font-mono);
+    font-size: 1.05vmin;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--ink-700);
+    text-transform: uppercase;
+    padding-bottom: 0.6vmin;
+    border-bottom: 2px solid var(--ink-900);
+  }
+  .lm-name {
+    font-size: 4.2vmin;
+    font-weight: 600;
+    color: var(--ink-900);
+    line-height: 1;
+    letter-spacing: -0.025em;
+  }
+  .lm-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9vmin;
+    padding: 1.4vmin 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .lm-field {
+    display: grid;
+    grid-template-columns: 7vmin 1fr;
+    gap: 1.4vmin;
+    align-items: baseline;
+  }
+  .lm-flbl {
+    font-family: var(--font-mono);
+    font-size: 1vmin;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--ink-400);
+    text-transform: uppercase;
+    line-height: 1.4;
+  }
+  .lm-fval {
+    font-size: 1.4vmin;
+    color: var(--ink-900);
+    line-height: 1.45;
+  }
+  .lm-fval b { font-weight: 700; }
+  
+  .lm-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6vmin;
+    padding-top: 0.6vmin;
+  }
+  .lm-block.contradict {
+    background: var(--sunken);
+    margin: 0 calc(-1 * var(--pad-card-lg));
+    padding: 1.4vmin var(--pad-card-lg);
+  }
+  .lm-blbl {
+    font-family: var(--font-mono);
+    font-size: 1.05vmin;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--ink-500);
+    text-transform: uppercase;
+    margin-bottom: 0.4vmin;
+  }
+  .lm-block.contradict .lm-blbl { color: var(--ink-700); }
+  .lm-q {
+    font-size: 1.4vmin;
+    line-height: 1.5;
+    color: var(--ink-700);
+    font-style: italic;
+    padding-left: 1.4vmin;
+    border-left: 2px solid var(--line);
+  }
+  .lm-q.key {
+    background: var(--accent);
+    color: var(--ink-900);
+    font-weight: 600;
+    padding: 1vmin 1.4vmin;
+    border-left: none;
+    font-style: normal;
+    line-height: 1.45;
+  }
+  .lm-q.contradict {
+    color: var(--ink-900);
+    font-weight: 500;
+    border-left-color: var(--ink-700);
+  }
+  .lm-i {
+    font-size: 1.3vmin;
+    color: var(--ink-700);
+    line-height: 1.5;
+  }
+  .lm-i b { color: var(--ink-900); font-weight: 700; }
+
   /* === SLIDE 8: Recruitment funnel + 2 cleaner CPA cards === */
   .recruit-funnel {
     display: grid;
@@ -423,7 +745,7 @@
     padding-left: 1.5vmin;
     border-left: 2px solid var(--line);
   }
-  .recruit-funnel .step.hit { border-left-color: var(--ok-ink); }
+  .recruit-funnel .step.hit { border-left-color: var(--ink-500); }
   .recruit-funnel .step.miss { border-left-color: var(--ink-300); }
   .recruit-funnel .step .n {
     font-family: var(--font-mono);
@@ -433,7 +755,7 @@
     color: var(--ink-400);
     text-transform: uppercase;
   }
-  .recruit-funnel .step.hit .n { color: var(--ok-ink); }
+  .recruit-funnel .step.hit .n { color: var(--ink-700); }
   .recruit-funnel .step .what {
     font-size: 1.5vmin;
     font-weight: 600;
@@ -446,6 +768,145 @@
     color: var(--ink-500);
     line-height: var(--lh-meta);
   }
+
+  /* MERGED slide 05 — research method + questionnaire */
+  .research-grid-merged {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gap-card);
+    margin-top: var(--gap-title);
+    align-items: stretch;
+  }
+  .research-grid-merged .recruit-funnel {
+    display: flex;
+    flex-direction: column;
+    gap: 2vmin;
+    margin-top: 0;
+    padding: var(--pad-card-lg);
+  }
+  .research-grid-merged .recruit-funnel .rows {
+    display: flex;
+    flex-direction: column;
+    gap: 1.6vmin;
+  }
+  .research-grid-merged .recruit-funnel .step {
+    display: grid;
+    grid-template-columns: 7vmin 1fr auto;
+    gap: 1.4vmin;
+    align-items: baseline;
+    padding-left: 1.4vmin;
+  }
+  .research-grid-merged .recruit-funnel .step .what {
+    font-size: 1.6vmin;
+  }
+  .research-grid-merged .recruit-funnel .step .who {
+    font-size: 1.25vmin;
+    color: var(--ink-400);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .convergence-mini {
+    margin-top: auto;
+    padding: 1.4vmin 1.6vmin;
+    background: var(--sunken);
+    font-size: 1.4vmin;
+    color: var(--ink-700);
+    line-height: 1.55;
+  }
+  .convergence-mini b { color: var(--ink-900); font-weight: 700; }
+  
+  .quest-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 1.8vmin;
+    padding: var(--pad-card-lg);
+    background: var(--surface);
+    border: 1px solid var(--line);
+  }
+  .quest-pane .label {
+    font-family: var(--font-mono);
+    font-size: 1.2vmin;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--ink-500);
+    text-transform: uppercase;
+  }
+  .quest-pane .label .sub {
+    display: block;
+    margin-top: 0.5vmin;
+    font-size: 1.1vmin;
+    color: var(--ink-400);
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: none;
+  }
+  .quest-design {
+    padding: 1.6vmin 1.8vmin;
+    background: var(--accent);
+    font-size: 1.7vmin;
+    line-height: 1.45;
+    color: var(--ink-900);
+    font-weight: 500;
+  }
+  .quest-design .qd-mark { font-family: var(--font-mono); color: var(--ink-500); }
+  .quest-design .qd-text { font-style: italic; }
+  .quest-design .qd-meta {
+    display: block;
+    margin-top: 0.8vmin;
+    font-family: var(--font-mono);
+    font-size: 1.1vmin;
+    font-style: normal;
+    color: var(--ink-700);
+    letter-spacing: 0.04em;
+  }
+  
+  .quest-screenshot {
+    padding: 1.4vmin 1.8vmin;
+    background: var(--canvas);
+    display: flex;
+    flex-direction: column;
+    gap: 1vmin;
+  }
+  .screenshot-label {
+    font-family: var(--font-mono);
+    font-size: 1.05vmin;
+    color: var(--ink-400);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .screenshot-skel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7vmin;
+  }
+  
+  .quest-results {
+    display: flex;
+    flex-direction: column;
+    gap: 1.2vmin;
+  }
+  .qr-card {
+    padding: 1.4vmin 1.6vmin;
+    background: var(--canvas);
+    display: flex;
+    flex-direction: column;
+    gap: 0.6vmin;
+  }
+  .qr-head { display: flex; align-items: baseline; gap: 1vmin; }
+  .qr-name {
+    font-family: var(--font-mono);
+    font-size: 1.5vmin;
+    font-weight: 700;
+    color: var(--ink-900);
+  }
+  .qr-meta { font-size: 1.15vmin; color: var(--ink-500); }
+  .qr-quote {
+    font-size: 1.45vmin;
+    color: var(--ink-900);
+    line-height: 1.5;
+    font-style: italic;
+  }
+  .qr-quote b { font-style: normal; background: var(--accent); padding: 0 0.3em; }
 
   .interview-cards {
     display: grid;
@@ -488,7 +949,7 @@
     margin-top: auto;
     padding: 1vmin 1.3vmin;
     background: var(--indigo-soft);
-    border-radius: 6px;
+    border-radius: 0;
     font-size: 1.3vmin;
     color: var(--indigo-ink);
     line-height: var(--lh-meta);
@@ -551,23 +1012,82 @@
     line-height: var(--lh-meta);
   }
 
+  /* SLIDE 13 v2 — sharper insights with evidence + decision */
+  .insights-v2 {
+    display: flex; flex-direction: column;
+    gap: 1.4vmin;
+    margin-top: var(--gap-title);
+  }
+  .insight-card {
+    display: grid;
+    grid-template-columns: 5vmin 1fr;
+    gap: 2vmin;
+    padding: 2.2vmin 2.4vmin;
+    background: var(--surface);
+    border-left: 3px solid var(--ink-900);
+  }
+  .insight-card .ic-num {
+    font-family: var(--font-mono);
+    font-size: 1.8vmin;
+    font-weight: 700;
+    color: var(--ink-900);
+    letter-spacing: 0.04em;
+    line-height: 1;
+    padding-top: 0.6vmin;
+  }
+  .insight-card .ic-body {
+    display: flex; flex-direction: column;
+    gap: 0.9vmin;
+  }
+  .insight-card .ic-principle {
+    font-size: 2.1vmin;
+    font-weight: 500;
+    color: var(--ink-900);
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+  }
+  .insight-card .ic-principle b { font-weight: 700; background: var(--accent); padding: 0 0.3em; }
+  .insight-card .ic-evidence,
+  .insight-card .ic-decision {
+    font-size: 1.4vmin;
+    color: var(--ink-700);
+    line-height: 1.5;
+    display: flex;
+    align-items: baseline;
+    gap: 1.2vmin;
+  }
+  .insight-card .ic-elabel,
+  .insight-card .ic-dlabel {
+    font-family: var(--font-mono);
+    font-size: 1.05vmin;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-400);
+    flex-shrink: 0;
+    min-width: 7.5vmin;
+  }
+  .insight-card .ic-decision .ic-dlabel { color: var(--ink-900); }
+  .insight-card .ic-decision { color: var(--ink-900); }
+  .insight-card .ic-decision b { font-weight: 700; }
+
   /* === SLIDE 10: Solution + Demo CTA === */
-  .mockup { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; box-shadow: var(--overlay); margin-top: 1.5vmin; height: 56vmin; display: flex; flex-direction: column; }
+  .mockup { background: var(--surface); border: 1px solid var(--line); border-radius: 0; overflow: hidden; box-shadow: none; margin-top: 1.5vmin; height: 56vmin; display: flex; flex-direction: column; }
   .mockup-bar { background: var(--sunken); border-bottom: 1px solid var(--line); padding: 1vmin 1.8vmin; display: flex; gap: 1.2vmin; align-items: center; font-size: 1.2vmin; }
   .mockup-bar .dots { display: flex; gap: 0.4vmin; }
   .mockup-bar .dot { width: 0.9vmin; height: 0.9vmin; border-radius: 50%; background: var(--ink-300); }
-  .mockup-bar .url { font-family: var(--font-mono); background: var(--surface); padding: 0.4vmin 0.9vmin; border-radius: 4px; border: 1px solid var(--line); font-size: 1.2vmin; color: var(--ink-500); flex: 1; max-width: 28vmin; }
+  .mockup-bar .url { font-family: var(--font-mono); background: var(--surface); padding: 0.4vmin 0.9vmin; border-radius: 0; border: 1px solid var(--line); font-size: 1.2vmin; color: var(--ink-500); flex: 1; max-width: 28vmin; }
   .live-stamp { margin-left: auto; font-size: 1.2vmin; color: var(--ok-ink); background: var(--ok-bg); padding: 0.3vmin 0.8vmin; border-radius: 9999px; border: 1px solid var(--ok-border); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
   .mockup-content { flex: 1; padding: 2.2vmin 2.5vmin; display: flex; flex-direction: column; gap: 1.5vmin; overflow: hidden; }
-  .mockup-alert { background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 6px; padding: 1.2vmin 1.6vmin; display: flex; align-items: center; gap: 1.5vmin; }
+  .mockup-alert { background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 0; padding: 1.2vmin 1.6vmin; display: flex; align-items: center; gap: 1.5vmin; }
   .mockup-alert .ac-content { flex: 1; }
   .mockup-alert .ac-title { font-size: 1.45vmin; font-weight: 600; color: var(--warn-ink); margin-bottom: 0.3vmin; }
   .mockup-alert .ac-meta { font-size: 1.2vmin; color: var(--warn-ink); opacity: 0.85; }
   .mockup-alert .ac-actions { display: flex; gap: 0.5vmin; }
-  .mockup-alert .ac-btn { padding: 0.4vmin 0.9vmin; background: var(--surface); border: 1px solid var(--warn-border); color: var(--warn-ink); font-size: 1.2vmin; border-radius: 4px; font-weight: 500; }
+  .mockup-alert .ac-btn { padding: 0.4vmin 0.9vmin; background: var(--surface); border: 1px solid var(--warn-border); color: var(--warn-ink); font-size: 1.2vmin; border-radius: 0; font-weight: 500; }
   .mockup-queue { display: flex; flex-direction: column; gap: 0.6vmin; flex: 1; overflow: hidden; }
   .mockup-queue .label { font-size: 1.2vmin; letter-spacing: 0.1em; color: var(--ink-500); font-weight: 600; font-family: var(--font-mono); margin-bottom: 0.3vmin; text-transform: uppercase; }
-  .queue-row { display: flex; align-items: center; gap: 1.2vmin; padding: 1.1vmin 1.3vmin; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+  .queue-row { display: flex; align-items: center; gap: 1.2vmin; padding: 1.1vmin 1.3vmin; border: 1px solid var(--line); border-radius: 0; background: var(--surface); }
   .queue-row .urg { width: 0.4vmin; height: 3.5vmin; border-radius: 9999px; }
   .queue-row .urg.high { background: var(--indigo); }
   .queue-row .urg.med { background: var(--ink-400); }
@@ -576,12 +1096,12 @@
   .queue-row .qr-name { font-size: 1.4vmin; font-weight: 600; color: var(--ink-900); margin-bottom: 0.2vmin; }
   .queue-row .qr-action { font-size: 1.25vmin; color: var(--ink-500); line-height: 1.5; }
   .queue-row .qr-action .em { color: var(--indigo-ink); font-weight: 500; }
-  .queue-row .qr-cta { padding: 0.5vmin 1.1vmin; background: var(--indigo); color: white; font-size: 1.2vmin; border-radius: 6px; font-weight: 500; }
+  .queue-row .qr-cta { padding: 0.5vmin 1.1vmin; background: var(--indigo); color: white; font-size: 1.2vmin; border-radius: 0; font-weight: 500; }
 
   .demo-cta-strip {
     margin-top: 1.5vmin; padding: 1.3vmin 2vmin;
     background: var(--ink-900); color: var(--canvas);
-    border-radius: 8px;
+    border-radius: 0;
     display: flex; gap: 2vmin; align-items: center; justify-content: space-between;
   }
   .demo-cta-strip .text { font-size: 1.4vmin; line-height: 1.5; }
@@ -589,34 +1109,45 @@
   .demo-cta-strip .link {
     font-family: var(--font-mono); font-size: 1.3vmin;
     background: var(--indigo); color: white;
-    padding: 0.7vmin 1.3vmin; border-radius: 6px; font-weight: 600;
+    padding: 0.7vmin 1.3vmin; border-radius: 0; font-weight: 600;
     text-decoration: none; white-space: nowrap;
   }
 
   /* === SLIDE 11: AI layer === */
   .ai-grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 4vmin; margin-top: 2.5vmin; align-items: start; }
   .zones { display: flex; flex-direction: column; gap: 1.3vmin; }
-  .zone { padding: 1.8vmin 2vmin; border-radius: 8px; border-left: 4px solid; background: var(--surface); border: 1px solid var(--line); }
+  .zone { padding: 1.8vmin 2vmin; border-radius: 0; border-left: 4px solid; background: var(--surface); border: 1px solid var(--line); }
   .zone.green { background: var(--ok-bg); border-color: var(--ok-border); border-left-color: var(--ok-ink); }
   .zone.yellow { background: var(--warn-bg); border-color: var(--warn-border); border-left-color: var(--warn-ink); }
   .zone.red { background: var(--danger-bg); border-color: var(--danger-border); border-left-color: var(--danger-ink); }
-  .zone .zone-label { font-size: 1.25vmin; font-weight: 700; letter-spacing: 0.1em; margin-bottom: 0.4vmin; text-transform: uppercase; font-family: var(--font-mono); }
+  .zone .zone-label {
+    font-size: 1.25vmin;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.4vmin;
+    text-transform: uppercase;
+    font-family: var(--font-mono);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7vmin;
+  }
+  .zone .zone-label .lc-icon { flex-shrink: 0; }
   .zone.green .zone-label { color: var(--ok-ink); }
   .zone.yellow .zone-label { color: var(--warn-ink); }
   .zone.red .zone-label { color: var(--danger-ink); }
   .zone .zone-rule { font-size: 1.5vmin; color: var(--ink-900); font-weight: 600; line-height: 1.4; }
   .zone .zone-eg { font-size: 1.3vmin; color: var(--ink-700); margin-top: 0.3vmin; line-height: 1.5; }
-  .code-block { background: var(--ink-900); border-radius: 8px; padding: 2vmin 2.3vmin; color: #e2e8f0; font-family: var(--font-mono); font-size: 1.4vmin; line-height: 1.65; box-shadow: var(--pop); }
+  .code-block { background: var(--ink-900); border-radius: 0; padding: 2vmin 2.3vmin; color: #e2e8f0; font-family: var(--font-mono); font-size: 1.4vmin; line-height: 1.65; box-shadow: var(--pop); }
   .code-block .keyword { color: #fbbf24; font-weight: 500; }
   .code-block .string { color: #86efac; }
   .code-block .comment { color: #94a3b8; font-style: italic; }
   .code-block .op { color: #f472b6; }
-  .ai-callout { margin-top: 2vmin; padding: 1.3vmin 1.6vmin; background: var(--indigo-soft); border-radius: 6px; font-size: 1.4vmin; color: var(--indigo-ink); line-height: 1.5; border: 1px solid rgba(91, 91, 214, 0.2); }
+  .ai-callout { margin-top: 2vmin; padding: 1.3vmin 1.6vmin; background: var(--indigo-soft); border-radius: 0; font-size: 1.4vmin; color: var(--indigo-ink); line-height: 1.5; border: 1px solid rgba(10, 10, 10, 0.4); }
   .ai-callout .strong { font-weight: 600; }
 
   /* === SLIDE 13 (NEW): Tech implementation 卖点 === */
   .tech-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 3.5vmin; margin-top: 2vmin; align-items: stretch; }
-  .pipeline-block { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.5vmin; display: flex; flex-direction: column; gap: 0.8vmin; }
+  .pipeline-block { background: var(--surface); border: 1px solid var(--line); border-radius: 0; padding: 2.5vmin; display: flex; flex-direction: column; gap: 0.8vmin; }
   .pipeline-block .lbl { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); margin-bottom: 0.5vmin; text-transform: uppercase; }
   .pipe-step { display: grid; grid-template-columns: 3vmin 1fr; gap: 1vmin; align-items: start; padding: 0.6vmin 0; }
   .pipe-step .glyph { font-family: var(--font-mono); font-size: 1.2vmin; color: var(--indigo); font-weight: 700; line-height: 1.6; }
@@ -629,7 +1160,7 @@
 
   .tech-points { display: flex; flex-direction: column; gap: 1.3vmin; }
   .tech-points .lbl { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); margin-bottom: 0.3vmin; text-transform: uppercase; }
-  .tech-point { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 1.4vmin 1.7vmin; display: grid; grid-template-columns: 3.5vmin 1fr; gap: 1vmin; align-items: start; }
+  .tech-point { background: var(--surface); border: 1px solid var(--line); border-radius: 0; padding: 1.4vmin 1.7vmin; display: grid; grid-template-columns: 3.5vmin 1fr; gap: 1vmin; align-items: start; }
   .tech-point .glyph { font-family: var(--font-mono); font-size: 1.6vmin; color: var(--indigo); font-weight: 700; line-height: 1.2; }
   .tech-point .body { display: flex; flex-direction: column; gap: 0.3vmin; }
   .tech-point .ti { font-size: 1.5vmin; font-weight: 600; color: var(--ink-900); line-height: 1.3; letter-spacing: -0.005em; }
@@ -637,7 +1168,7 @@
   .tech-point .desc code { font-family: var(--font-mono); font-size: 1.15vmin; background: var(--sunken); padding: 0.1vmin 0.5vmin; border-radius: 3px; color: var(--ink-900); }
 
   /* === SLIDE 14 (was 12): Features === */
-  .feat-table { width: 100%; margin-top: 2.5vmin; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); border-collapse: separate; border-spacing: 0; }
+  .feat-table { width: 100%; margin-top: 2.5vmin; border: 1px solid var(--line); border-radius: 0; overflow: hidden; background: var(--surface); border-collapse: collapse; /* removed border-spacing */ }
   .feat-table th, .feat-table td { padding: 1.2vmin 1.4vmin; text-align: left; font-size: 1.35vmin; border-bottom: 1px solid var(--line); vertical-align: middle; }
   .feat-table th { background: var(--sunken); font-weight: 600; color: var(--ink-700); font-size: 1.2vmin; letter-spacing: 0.08em; font-family: var(--font-mono); text-transform: uppercase; }
   .feat-table tr:last-child td { border-bottom: none; }
@@ -653,7 +1184,7 @@
     padding: 1.5vmin 2vmin;
     background: var(--sunken);
     border-left: 3px solid var(--ink-700);
-    border-radius: 4px;
+    border-radius: 0;
     font-size: 1.5vmin;
     color: var(--ink-700);
     line-height: var(--lh-body);
@@ -760,7 +1291,7 @@
 
   /* === SLIDE 16: Roadmap (phase-based) === */
   .phase-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5vmin; margin-top: 2.5vmin; }
-  .phase-card { padding: 2.2vmin; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 1.2vmin; }
+  .phase-card { padding: 2.2vmin; background: var(--surface); border: 1px solid var(--line); border-radius: 0; display: flex; flex-direction: column; gap: 1.2vmin; }
   .phase-card .when { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); text-transform: uppercase; }
   .phase-card .theme { font-size: 1.6vmin; font-weight: 600; color: var(--ink-900); line-height: 1.3; padding-bottom: 0.6vmin; border-bottom: 1px solid var(--line); }
   .phase-card .feats { display: flex; flex-direction: column; gap: 0.6vmin; flex: 1; }
@@ -841,6 +1372,426 @@
   .notes-panel .label { font-size: 1.2vmin; letter-spacing: 0.12em; color: #94a3b8; margin-bottom: 0.6vmin; font-weight: 600; text-transform: uppercase; font-family: var(--font-mono); }
 
   /* === Cover nav · 封面左下 prev/next · subtle === */
+  /* ============================================================ */
+  /* === NEW SLIDES (audit additions) ·                       === */
+  /* === hero-quote · voice-grid · tier-grid · delta-grid     === */
+  /* === audit-callout                                         === */
+  /* ============================================================ */
+
+  /* SLIDE F · 最强买信号 hero quote (white bg, centered) */
+  .hero-quote-wrap {
+    display: flex; flex-direction: column;
+    max-width: 84%; margin: 0 auto;
+    gap: 3.5vmin;
+    text-align: left;
+  }
+  .hero-quote {
+    font-size: 4.4vmin;
+    line-height: 1.25;
+    font-weight: 500;
+    color: var(--ink-900);
+    letter-spacing: -0.018em;
+  }
+  .hero-quote .hl {
+    background: var(--accent);
+    padding: 0 0.3em;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    font-weight: 600;
+  }
+  .hero-attrib {
+    font-family: var(--font-mono);
+    font-size: 1.2vmin;
+    letter-spacing: 0.1em;
+    color: var(--ink-500);
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  .hero-imply {
+    font-size: 1.6vmin;
+    line-height: 1.55;
+    color: var(--ink-700);
+    max-width: 70%;
+  }
+  .hero-imply b { color: var(--ink-900); font-weight: 600; }
+
+  /* SLIDE A · Voice from field · 3 quote cards */
+  .voice-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--gap-card);
+    margin-top: var(--gap-title);
+  }
+  .voice-card {
+    background: var(--surface);
+    padding: var(--pad-card-lg);
+    display: flex; flex-direction: column;
+    gap: 1.6vmin;
+  }
+  .voice-card .v-num {
+    font-family: var(--font-mono);
+    font-size: 1.05vmin;
+    letter-spacing: 0.12em;
+    color: var(--ink-500);
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .voice-card .v-quote {
+    font-size: 1.7vmin;
+    line-height: 1.5;
+    color: var(--ink-900);
+    font-weight: 500;
+    letter-spacing: -0.005em;
+  }
+  .voice-card .v-quote.highlight {
+    background: var(--accent);
+    padding: 0.9vmin 1.2vmin;
+    margin: 0;
+    font-weight: 600;
+  }
+  .voice-card .v-impl {
+    margin-top: auto;
+    font-size: 1.25vmin;
+    line-height: 1.55;
+    color: var(--ink-500);
+    padding-top: 1.4vmin;
+  }
+  .voice-card .v-impl b { color: var(--ink-700); font-weight: 600; }
+
+  /* SLIDE B · Brief vs 访谈 优先级错位 */
+  .delta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gap-card);
+    margin-top: var(--gap-title);
+  }
+  .delta-cell {
+    padding: var(--pad-card-lg);
+    display: flex; flex-direction: column;
+    gap: 1.4vmin;
+  }
+  .delta-cell.brief {
+    background: var(--sunken);
+  }
+  .delta-cell.interview {
+    background: var(--accent);
+  }
+  .delta-cell .d-label {
+    font-family: var(--font-mono);
+    font-size: 1.1vmin;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--ink-700);
+    text-transform: uppercase;
+    margin-bottom: 0.6vmin;
+  }
+  .delta-cell .d-list {
+    display: flex; flex-direction: column;
+    gap: 1vmin;
+  }
+  .delta-cell .d-item {
+    display: grid;
+    grid-template-columns: 3vmin 1fr;
+    gap: 1vmin;
+    align-items: baseline;
+    font-size: 1.9vmin;
+    line-height: 1.45;
+    color: var(--ink-900);
+    padding: 0.6vmin 0;
+    font-weight: 400;
+  }
+  .delta-cell .d-item.new { font-weight: 600; }
+  .delta-cell .d-item .num {
+    font-family: var(--font-mono);
+    font-size: 1.25vmin;
+    font-weight: 600;
+    color: var(--ink-500);
+  }
+  .delta-cell .d-item .new-tag {
+    font-family: var(--font-mono);
+    font-size: 0.95vmin;
+    background: var(--ink-700);
+    color: var(--canvas);
+    padding: 0.2vmin 0.7vmin;
+    margin-left: 0.8vmin;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+    vertical-align: middle;
+  }
+
+  /* SLIDE C · Wedge / Body / Retention 三层框架 */
+  .tier-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--gap-card);
+    margin-top: var(--gap-title);
+  }
+  .tier-card {
+    padding: var(--pad-card-lg);
+    display: flex; flex-direction: column;
+    gap: 1.4vmin;
+    min-height: 38vmin;
+  }
+  .tier-card.wedge { background: var(--accent); }
+  .tier-card.body-tier { background: var(--surface); }
+  .tier-card.retention { background: var(--sunken); }
+  .tier-card .t-label {
+    font-family: var(--font-mono);
+    font-size: 1.1vmin;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: var(--ink-700);
+    text-transform: uppercase;
+  }
+  .tier-card .t-name {
+    font-size: 2.6vmin;
+    font-weight: 600;
+    color: var(--ink-900);
+    line-height: 1.15;
+    letter-spacing: -0.018em;
+  }
+  .tier-card .t-desc {
+    font-size: 1.4vmin;
+    line-height: 1.55;
+    color: var(--ink-700);
+  }
+  .tier-card .t-desc b { color: var(--ink-900); font-weight: 600; }
+  .tier-card .t-evidence {
+    margin-top: auto;
+    padding-top: 1.4vmin;
+    font-size: 1.2vmin;
+    line-height: 1.5;
+    color: var(--ink-500);
+    font-style: italic;
+  }
+
+  /* Shared: audit-callout (used in D, B, E) */
+  .audit-callout {
+    margin-top: var(--gap-section);
+    padding: 1.8vmin 2.2vmin;
+    background: var(--ink-900);
+    color: var(--canvas);
+    display: grid;
+    grid-template-columns: 12vmin 1fr;
+    gap: 2vmin;
+    align-items: baseline;
+  }
+  .audit-callout .lbl {
+    font-family: var(--font-mono);
+    font-size: 1.1vmin;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .audit-callout .text {
+    font-size: 1.5vmin;
+    line-height: 1.55;
+    color: var(--canvas);
+  }
+  .audit-callout .text b {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* Override no-border for tier-card on retention to stay clean */
+  .tier-card { border: none !important; }
+  .voice-card { border: none !important; }
+  .delta-cell { border: none !important; }
+
+  /* Inline yellow highlight (use sparingly in headlines) */
+  .hl-yellow {
+    background: var(--accent);
+    padding: 0 0.3em;
+    font-weight: 600;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+
+  /* SLIDE 15 redesign · stronger delta */
+  .delta-strong {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4vmin;
+    margin-top: var(--gap-title);
+    align-items: start;
+  }
+  .delta-quote {
+    background: var(--sunken);
+    padding: var(--pad-card-lg);
+    display: flex; flex-direction: column;
+    gap: 1.6vmin;
+  }
+  .delta-quote .dq-label {
+    font-family: var(--font-mono);
+    font-size: 1.05vmin;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-700);
+    font-weight: 600;
+  }
+  .delta-quote .dq-list {
+    list-style: none;
+    counter-reset: dqitem;
+    padding: 0; margin: 0;
+    display: flex; flex-direction: column;
+    gap: 1.6vmin;
+  }
+  .delta-quote .dq-list li {
+    counter-increment: dqitem;
+    font-size: 2.2vmin;
+    line-height: 1.3;
+    color: var(--ink-900);
+    padding-left: 4vmin;
+    position: relative;
+    font-weight: 400;
+  }
+  .delta-quote .dq-list li b { font-weight: 600; }
+  .delta-quote .dq-list li::before {
+    content: counter(dqitem, decimal-leading-zero);
+    position: absolute; left: 0; top: 0.3vmin;
+    font-family: var(--font-mono);
+    font-size: 1.2vmin;
+    font-weight: 600;
+    color: var(--ink-500);
+    letter-spacing: 0.08em;
+  }
+  .delta-quote .dq-tag {
+    display: inline-block;
+    margin-left: 0.8vmin;
+    font-family: var(--font-mono);
+    font-size: 1vmin;
+    background: var(--ink-900);
+    color: var(--accent);
+    padding: 0.2vmin 0.7vmin;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+    vertical-align: middle;
+    line-height: 1.4;
+  }
+  .delta-quote .dq-foot {
+    margin-top: 2vmin;
+    padding: 1.4vmin 1.6vmin;
+    background: var(--ink-900);
+    color: var(--canvas);
+    font-size: 1.7vmin;
+    line-height: 1.4;
+    font-weight: 500;
+  }
+  .delta-quote .dq-foot b { background: var(--accent); color: var(--ink-900); padding: 0 0.4em; font-weight: 700; }
+  .delta-decisions {
+    padding: var(--pad-card-lg);
+    display: flex; flex-direction: column;
+    gap: 1.8vmin;
+  }
+  .delta-decisions .dd-label {
+    font-family: var(--font-mono);
+    font-size: 1.05vmin;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-500);
+    font-weight: 600;
+    margin-bottom: 0.3vmin;
+  }
+  .delta-decisions .dd-row {
+    display: grid;
+    grid-template-columns: 3vmin 1fr;
+    gap: 1.4vmin;
+    align-items: baseline;
+    padding: 1.2vmin 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .delta-decisions .dd-row:last-child { border-bottom: none; }
+  .delta-decisions .dd-num {
+    font-family: var(--font-mono);
+    font-size: 1.2vmin;
+    font-weight: 600;
+    color: var(--ink-500);
+    letter-spacing: 0.08em;
+  }
+  .delta-decisions .dd-what {
+    font-size: 1.85vmin;
+    font-weight: 600;
+    color: var(--ink-900);
+    line-height: 1.3;
+    letter-spacing: -0.005em;
+  }
+  .delta-decisions .dd-how {
+    margin-top: 0.4vmin;
+    font-size: 1.4vmin;
+    color: var(--ink-500);
+    line-height: 1.5;
+  }
+
+  /* Phase 2+ candidate strip on roadmap (was slide 24, merged in) */
+  .phase2-strip {
+    margin-top: var(--gap-section);
+    padding: 1.8vmin 2vmin;
+    background: var(--sunken);
+  }
+  .phase2-strip .p2-label {
+    font-family: var(--font-mono);
+    font-size: 1.05vmin;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-700);
+    font-weight: 600;
+    margin-bottom: 1.3vmin;
+  }
+  .phase2-strip .p2-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2.4vmin;
+  }
+  .phase2-strip .p2-item {
+    display: flex; flex-direction: column;
+    gap: 0.4vmin;
+  }
+  .phase2-strip .p2-item .p2-name {
+    font-size: 1.5vmin;
+    font-weight: 600;
+    color: var(--ink-900);
+    line-height: 1.3;
+  }
+  .phase2-strip .p2-item .p2-why {
+    font-size: 1.2vmin;
+    color: var(--ink-500);
+    line-height: 1.5;
+  }
+
+  /* skeleton placeholder for "more candidates being scoped" */
+  .phase2-strip .p2-item.p2-skeleton {
+    gap: 0.7vmin;
+    padding-top: 0.2vmin;
+    opacity: 0.55;
+  }
+  .skel-line {
+    height: 1.1vmin;
+    background: var(--line);
+    border-radius: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .skel-line::after {
+    content: "";
+    position: absolute;
+    top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%);
+    animation: skel-shimmer 1.8s infinite;
+  }
+  @keyframes skel-shimmer { 100% { left: 100%; } }
+  .skel-w-55 { width: 55%; }
+  .skel-w-60 { width: 60%; }
+  .skel-w-65 { width: 65%; }
+  .skel-w-70 { width: 70%; }
+  .skel-w-75 { width: 75%; }
+  .skel-w-80 { width: 80%; }
+  .skel-w-85 { width: 85%; }
+  .skel-w-90 { width: 90%; }
+
   .cover-nav {
     position: absolute;
     bottom: 4vmin;
@@ -862,6 +1813,528 @@
   }
   .cover-nav button:hover { color: var(--ink-700); }
 
+  /* ============================================================ */
+  /* === SLIDE 08 (NEW): Method overview · 5-source convergence === */
+  /* ============================================================ */
+  .method-grid {
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    gap: 3vmin;
+    margin-top: var(--gap-title);
+    align-items: stretch;
+  }
+  .method-grid .recruit-funnel {
+    margin-top: 0;
+    grid-template-columns: 11vmin 1fr;
+    gap: 1.5vmin;
+    padding: 2.4vmin;
+  }
+  .method-grid .recruit-funnel .rows {
+    gap: 1.2vmin;
+  }
+  .source-convergence {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--rad-card);
+    padding: var(--pad-card-lg);
+    display: flex; flex-direction: column;
+    gap: 1.4vmin;
+  }
+  .source-convergence .label {
+    font-family: var(--font-mono);
+    font-size: 1.2vmin;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--ink-500);
+    text-transform: uppercase;
+    margin-bottom: 0.2vmin;
+  }
+  .source-row {
+    display: grid;
+    grid-template-columns: 18vmin 1fr;
+    gap: 1.2vmin;
+    align-items: baseline;
+    padding: 0.6vmin 0;
+    border-bottom: 1px dashed var(--line);
+  }
+  .source-row:last-child { border-bottom: none; }
+  .source-row .pattern {
+    font-size: 1.4vmin;
+    color: var(--ink-700);
+    line-height: 1.45;
+  }
+  .source-row .pattern b { color: var(--ink-900); font-weight: 600; }
+  .source-row .signals {
+    display: flex; gap: 0.4vmin;
+    align-items: center;
+  }
+  .signal-dot {
+    width: 1.5vmin;
+    height: 1.5vmin;
+    border-radius: 50%;
+    background: var(--sunken);
+    border: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 0.95vmin;
+    font-weight: 700;
+    color: var(--ink-400);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .signal-dot.hit { background: var(--indigo); color: white; border-color: var(--indigo); }
+  .signal-dot.weak { background: var(--indigo-soft); color: var(--indigo-ink); border-color: rgba(10, 10, 10, 0.4); }
+  .source-legend {
+    margin-top: 1vmin;
+    padding-top: 1.2vmin;
+    border-top: 1px solid var(--line);
+    display: flex; gap: 2vmin; flex-wrap: wrap;
+    font-size: 1.15vmin;
+    color: var(--ink-500);
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+  }
+  .source-legend span { display: inline-flex; align-items: center; gap: 0.5vmin; }
+  .convergence-callout {
+    margin-top: var(--gap-section);
+    padding: 1.4vmin 1.8vmin;
+    background: var(--indigo-soft);
+    border-radius: var(--rad-card);
+    font-size: 1.5vmin;
+    color: var(--indigo-ink);
+    line-height: var(--lh-body);
+    border: 1px solid rgba(10, 10, 10, 0.4);
+    text-align: center;
+  }
+  .convergence-callout b { font-weight: 700; }
+
+  /* ============================================================ */
+  /* === SLIDE 09 (NEW): L. + M. detailed interview cards     === */
+  /* ============================================================ */
+  .lm-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gap-card);
+    margin-top: var(--gap-title);
+  }
+  .lm-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--rad-card);
+    padding: var(--pad-card-lg);
+    display: flex; flex-direction: column;
+    gap: 1.4vmin;
+  }
+  .lm-card .lm-head {
+    padding-bottom: 1.2vmin;
+    border-bottom: 1px solid var(--line);
+  }
+  .lm-card .lm-name {
+    font-size: 3vmin;
+    font-weight: 600;
+    color: var(--ink-900);
+    line-height: 1;
+    letter-spacing: -0.015em;
+    margin-bottom: 0.6vmin;
+  }
+  .lm-card .lm-meta {
+    font-size: 1.25vmin;
+    color: var(--ink-500);
+    line-height: 1.55;
+  }
+  .lm-card .lm-meta b { color: var(--ink-700); font-weight: 600; }
+  .lm-card .lm-recruit {
+    margin-top: 0.4vmin;
+    font-family: var(--font-mono);
+    font-size: 1.05vmin;
+    color: var(--ink-400);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .lm-quotes {
+    display: flex; flex-direction: column;
+    gap: 0.9vmin;
+  }
+  .lm-quote {
+    font-size: 1.45vmin;
+    line-height: 1.55;
+    color: var(--ink-900);
+    padding-left: 1.4vmin;
+    border-left: 2px solid var(--ink-300);
+    font-style: italic;
+  }
+  .lm-quote.key {
+    border-left: none;
+    background: var(--accent);
+    color: var(--ink-900);
+    font-weight: 500;
+    padding: 0.9vmin 1.2vmin;
+    margin-left: 0;
+    font-style: normal;
+  }
+  .lm-quote.contradict {
+    border-left: 3px solid var(--ink-500);
+    color: var(--ink-900);
+    font-weight: 500;
+    padding: 0.6vmin 1.2vmin;
+    background: transparent;
+    margin-left: 0;
+    font-style: normal;
+  }
+  .lm-quote .tag {
+    display: inline-block;
+    margin-left: 0.4vmin;
+    font-family: var(--font-mono);
+    font-size: 0.95vmin;
+    font-style: normal;
+    color: var(--ink-500);
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .lm-decisions {
+    margin-top: auto;
+    padding: 1.2vmin 1.4vmin;
+    background: var(--sunken);
+    border-radius: 0;
+    display: flex; flex-direction: column;
+    gap: 0.5vmin;
+  }
+  .lm-decisions .lbl {
+    font-family: var(--font-mono);
+    font-size: 1.05vmin;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--ink-500);
+    text-transform: uppercase;
+  }
+  .lm-decisions .item {
+    font-size: 1.2vmin;
+    color: var(--ink-700);
+    line-height: 1.5;
+  }
+  .lm-decisions .item b { color: var(--ink-900); font-weight: 600; }
+
+  /* ============================================================ */
+  /* === SLIDE 10 (NEW): Questionnaire · 5 questions · 2 returned === */
+  /* ============================================================ */
+  .q-grid {
+    display: grid;
+    grid-template-columns: 0.85fr 1.15fr;
+    gap: 2.5vmin;
+    margin-top: var(--gap-title);
+    align-items: stretch;
+  }
+  .q-prompt {
+    background: var(--sunken);
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--rad-card);
+    padding: var(--pad-card-lg);
+    display: flex; flex-direction: column;
+    gap: 1vmin;
+  }
+  .q-prompt .lbl {
+    font-family: var(--font-mono);
+    font-size: 1.1vmin;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--ink-500);
+    text-transform: uppercase;
+  }
+  .q-prompt .ti {
+    font-size: 1.7vmin;
+    font-weight: 600;
+    color: var(--ink-900);
+    line-height: 1.35;
+    margin-bottom: 0.3vmin;
+  }
+  .q-prompt .stats {
+    margin-top: 0.5vmin;
+    padding-top: 1vmin;
+    border-top: 1px solid var(--line);
+    font-size: 1.2vmin;
+    color: var(--ink-500);
+    line-height: 1.6;
+  }
+  .q-prompt .stats b { color: var(--ink-900); font-weight: 600; }
+  .q-prompt .qlist {
+    display: flex; flex-direction: column;
+    gap: 0.5vmin;
+  }
+  .q-prompt .qrow {
+    display: grid;
+    grid-template-columns: 2.5vmin 1fr;
+    gap: 0.6vmin;
+    align-items: baseline;
+    font-size: 1.2vmin;
+    line-height: 1.45;
+    color: var(--ink-700);
+  }
+  .q-prompt .qrow .qn {
+    font-family: var(--font-mono);
+    font-size: 1.05vmin;
+    color: var(--ink-400);
+    font-weight: 600;
+  }
+  .q-responses {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.4vmin;
+  }
+  .q-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--rad-card);
+    padding: 1.8vmin 1.9vmin;
+    display: flex; flex-direction: column;
+    gap: 1vmin;
+  }
+  .q-card .q-head {
+    padding-bottom: 0.9vmin;
+    border-bottom: 1px solid var(--line);
+  }
+  .q-card .q-name {
+    font-size: 2vmin;
+    font-weight: 600;
+    color: var(--ink-900);
+    line-height: 1;
+    letter-spacing: -0.01em;
+    margin-bottom: 0.4vmin;
+  }
+  .q-card .q-name .channel {
+    margin-left: 0.6vmin;
+    font-family: var(--font-mono);
+    font-size: 0.95vmin;
+    color: var(--ink-400);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .q-card .q-meta {
+    font-size: 1.1vmin;
+    color: var(--ink-500);
+    line-height: 1.5;
+  }
+  .q-card .q-answers {
+    display: flex; flex-direction: column;
+    gap: 0.7vmin;
+    flex: 1;
+  }
+  .q-card .q-answer {
+    display: grid;
+    grid-template-columns: 2vmin 1fr;
+    gap: 0.7vmin;
+    align-items: baseline;
+  }
+  .q-card .q-answer .qref {
+    font-family: var(--font-mono);
+    font-size: 0.95vmin;
+    font-weight: 700;
+    color: var(--indigo);
+    letter-spacing: 0.06em;
+  }
+  .q-card .q-answer .text {
+    font-size: 1.2vmin;
+    color: var(--ink-700);
+    line-height: 1.55;
+    font-style: italic;
+  }
+  .q-card .q-answer .text::before { content: '"'; color: var(--ink-400); }
+  .q-card .q-answer .text::after { content: '"'; color: var(--ink-400); }
+  .q-pattern {
+    margin-top: var(--gap-section);
+    padding: 1.3vmin 1.8vmin;
+    background: var(--ink-900);
+    color: var(--canvas);
+    border-radius: var(--rad-card);
+    font-size: 1.4vmin;
+    line-height: 1.55;
+    display: flex; gap: 1.5vmin; align-items: center;
+  }
+  .q-pattern .lbl {
+    font-family: var(--font-mono);
+    font-size: 1vmin;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: rgba(255,255,255,0.5);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .q-pattern .text { flex: 1; }
+  .q-pattern .text b { color: white; font-weight: 600; }
+  .q-pattern .text .accent { color: #a5a5f5; font-weight: 600; }
+
+  /* ============================================================ */
+  /* === SLIDE 04 (RE-FRAMED): Honest competitive             === */
+  /* ============================================================ */
+  .compete-honest-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gap-card);
+    margin-top: var(--gap-title);
+  }
+  .compete-col {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--rad-card);
+    padding: var(--pad-card-lg);
+    display: flex; flex-direction: column;
+    gap: 1.4vmin;
+  }
+  .compete-col.us {
+    background: var(--indigo-soft);
+    border-color: rgba(10, 10, 10, 0.4);
+  }
+  .compete-col .col-label {
+    font-family: var(--font-mono);
+    font-size: 1.15vmin;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--ink-500);
+    text-transform: uppercase;
+    padding-bottom: 1vmin;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 0.4vmin;
+  }
+  .compete-col.us .col-label {
+    color: var(--indigo-ink);
+    border-bottom-color: rgba(10, 10, 10, 0.4);
+  }
+  .compete-item {
+    display: flex; flex-direction: column;
+    gap: 0.3vmin;
+  }
+  .compete-item .ti {
+    font-size: 1.7vmin;
+    font-weight: 600;
+    color: var(--ink-900);
+    line-height: 1.35;
+    letter-spacing: -0.005em;
+  }
+  .compete-col.us .compete-item .ti { color: var(--indigo-ink); }
+  .compete-item .desc {
+    font-size: 1.3vmin;
+    color: var(--ink-700);
+    line-height: 1.55;
+  }
+  .compete-col.us .compete-item .desc {
+    color: var(--indigo-ink);
+    opacity: 0.85;
+  }
+  .compete-evidence {
+    margin-top: var(--gap-section);
+    padding: 1.3vmin 1.8vmin;
+    background: var(--ink-900);
+    color: var(--canvas);
+    border-radius: var(--rad-card);
+    font-size: 1.4vmin;
+    line-height: 1.55;
+    display: flex; gap: 1.5vmin; align-items: center;
+  }
+  .compete-evidence .lbl {
+    font-family: var(--font-mono);
+    font-size: 1vmin;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: rgba(255,255,255,0.5);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .compete-evidence .text { flex: 1; }
+  .compete-evidence .text b { color: white; font-weight: 600; }
+  .forever-strip-mini {
+    display: flex; flex-wrap: wrap;
+    gap: 0.6vmin;
+    margin-top: 1.3vmin;
+    align-items: center;
+  }
+  .forever-strip-mini .lbl {
+    font-family: var(--font-mono);
+    font-size: 1.05vmin;
+    font-weight: 700;
+    color: var(--danger-ink);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-right: 0.8vmin;
+  }
+  .forever-strip-mini .chip {
+    padding: 0.35vmin 0.9vmin;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 9999px;
+    font-size: 1.15vmin;
+    color: var(--ink-700);
+    font-weight: 500;
+  }
+
+  /* ============================================================ */
+  /* === SLIDE 11 (NEW): Research artifacts appendix          === */
+  /* ============================================================ */
+  .artifact-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--gap-card);
+    margin-top: var(--gap-title);
+  }
+  .artifact-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--rad-card);
+    padding: var(--pad-card-lg);
+    display: flex; flex-direction: column;
+    gap: 1vmin;
+  }
+  .artifact-card.featured {
+    background: var(--indigo-soft);
+    border-color: rgba(10, 10, 10, 0.4);
+  }
+  .artifact-card .a-type {
+    font-family: var(--font-mono);
+    font-size: 1.1vmin;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--ink-400);
+    text-transform: uppercase;
+  }
+  .artifact-card.featured .a-type { color: var(--indigo); }
+  .artifact-card .a-title {
+    font-size: 1.85vmin;
+    font-weight: 600;
+    color: var(--ink-900);
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+  .artifact-card.featured .a-title { color: var(--indigo-ink); }
+  .artifact-card .a-file {
+    font-family: var(--font-mono);
+    font-size: 1.05vmin;
+    color: var(--ink-500);
+    line-height: 1.5;
+    word-break: break-all;
+  }
+  .artifact-card .a-meta {
+    margin-top: 0.4vmin;
+    padding-top: 0.9vmin;
+    border-top: 1px dashed var(--line);
+    font-size: 1.2vmin;
+    color: var(--ink-700);
+    line-height: 1.55;
+  }
+  .artifact-card .a-meta b { color: var(--ink-900); font-weight: 600; }
+  .artifact-card.featured .a-meta { border-top-color: rgba(10, 10, 10, 0.4); color: var(--indigo-ink); }
+  .artifact-card.featured .a-meta b { color: var(--indigo-ink); }
+  .artifact-summary {
+    margin-top: var(--gap-section);
+    padding: 1.3vmin 1.8vmin;
+    background: var(--sunken);
+    border-left: 3px solid var(--ink-700);
+    border-radius: 0;
+    font-size: 1.35vmin;
+    color: var(--ink-700);
+    line-height: 1.6;
+  }
+  .artifact-summary b { color: var(--ink-900); font-weight: 600; }
+
   @media print {
     @page { size: 16in 9in; margin: 0; }
     html, body { background: white; height: auto; overflow: visible; }
@@ -878,29 +2351,42 @@
 <div class="deck" id="deck">
 
 <!-- 1. Cover -->
-<section class="slide cover-slide active" data-num="01" data-title="封面" data-notes="封面。这个 pitch deck 卖的是产品想法 — 为什么这个产品该被造、研究怎么进的、产品决策怎么做的。不是融资 deck，不是营销 deck，是讲清楚我们想清楚了什么。">
-  <svg class="cover-mark" viewBox="0 0 953 432" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="DueDateHQ">
-    <rect width="450" height="400" transform="translate(267.127 0.180176) rotate(4.16677)" fill="#F2F2F2"/>
-    <circle cx="319.221" cy="42.076" r="18" transform="rotate(4.16677 319.221 42.076)" fill="#D9D9D9"/>
-    <circle cx="387.041" cy="47.0169" r="18" transform="rotate(4.16677 387.041 47.0169)" fill="#D9D9D9"/>
-    <circle cx="454.861" cy="51.9578" r="18" transform="rotate(4.16677 454.861 51.9578)" fill="#D9D9D9"/>
-    <circle cx="522.682" cy="56.8985" r="18" transform="rotate(4.16677 522.682 56.8985)" fill="#D9D9D9"/>
-    <circle cx="590.502" cy="61.8394" r="18" transform="rotate(4.16677 590.502 61.8394)" fill="#D9D9D9"/>
-    <circle cx="658.322" cy="66.7803" r="18" transform="rotate(4.16677 658.322 66.7803)" fill="#D9D9D9"/>
-    <path d="M45.3619 268.785L20.5966 268.654L20.8498 250.374L45.4588 250.504C51.6045 250.537 56.7941 249.184 61.0274 246.446C65.261 243.656 68.4597 239.585 70.6235 234.231C72.8394 228.878 73.9675 222.4 74.0078 214.796L74.0373 209.249C74.0682 203.416 73.4704 198.282 72.2439 193.849C71.0694 189.415 69.2923 185.682 66.9125 182.648C64.5327 179.615 61.6021 177.334 58.1206 175.805C54.6393 174.224 50.6331 173.421 46.1019 173.397L20.6335 173.262L20.7308 154.903L46.1992 155.038C53.8033 155.079 60.7494 156.417 67.0376 159.055C73.3781 161.641 78.8534 165.342 83.4633 170.158C88.0733 174.974 91.6106 180.722 94.0752 187.402C96.5922 194.03 97.8292 201.406 97.7861 209.531L97.7575 214.922C97.7147 222.995 96.3996 230.357 93.8122 237.011C91.2769 243.664 87.6789 249.374 83.0182 254.141C78.4098 258.856 72.8956 262.499 66.4756 265.069C60.108 267.587 53.0701 268.826 45.3619 268.785ZM34.4806 154.976L33.8777 268.725L10.4405 268.6L11.0435 154.852L34.4806 154.976ZM177.916 155.736L201.275 155.86L200.877 231.015C200.83 239.765 198.916 247.125 195.135 253.095C191.405 259.065 186.251 263.543 179.673 266.529C173.146 269.515 165.638 270.985 157.149 270.94C148.659 270.895 141.115 269.345 134.517 266.289C127.971 263.234 122.838 258.701 119.12 252.692C115.454 246.683 113.644 239.303 113.691 230.553L114.089 155.398L137.526 155.522L137.128 230.678C137.101 235.782 137.886 239.953 139.483 243.19C141.081 246.428 143.386 248.81 146.399 250.336C149.463 251.863 153.079 252.637 157.246 252.659C161.517 252.682 165.14 251.946 168.117 250.451C171.146 248.957 173.45 246.599 175.03 243.379C176.661 240.158 177.491 235.996 177.518 230.892L177.916 155.736ZM296.393 251.835L296.296 270.116L235.75 269.795L235.847 251.514L296.393 251.835ZM244.009 156.087L243.406 269.835L219.969 269.711L220.572 155.963L244.009 156.087ZM288.763 202.653L288.668 220.465L236.013 220.186L236.107 202.374L288.763 202.653ZM296.821 156.367L296.723 174.726L236.255 174.405L236.353 156.046L296.821 156.367ZM344.889 270.373L320.124 270.242L320.377 251.962L344.986 252.092C351.132 252.125 356.321 250.772 360.554 248.034C364.788 245.244 367.987 241.172 370.151 235.819C372.366 230.466 373.495 223.988 373.535 216.384L373.564 210.837C373.595 205.004 372.997 199.87 371.771 195.436C370.596 191.003 368.819 187.27 366.44 184.236C364.06 181.203 361.129 178.921 357.648 177.393C354.166 175.812 350.16 175.009 345.629 174.985L320.161 174.85L320.258 156.491L345.726 156.626C353.33 156.666 360.276 158.005 366.565 160.643C372.905 163.228 378.38 166.929 382.99 171.746C387.6 176.562 391.138 182.31 393.602 188.99C396.119 195.618 397.356 202.994 397.313 211.119L397.285 216.51C397.242 224.582 395.927 231.945 393.339 238.598C390.804 245.252 387.206 250.962 382.545 255.729C377.937 260.444 372.423 264.087 366.003 266.657C359.635 269.175 352.597 270.414 344.889 270.373ZM334.008 156.564L333.405 270.312L309.968 270.188L310.571 156.44L334.008 156.564ZM459.215 176.681L427.778 270.813L402.857 270.68L445.725 157.156L461.584 157.24L459.215 176.681ZM484.418 271.113L453.903 176.653L451.506 157.187L467.521 157.272L509.418 271.245L484.418 271.113ZM483.236 228.762L483.139 247.121L423.062 246.803L423.159 228.444L483.236 228.762ZM561.895 157.772L561.292 271.52L537.933 271.396L538.536 157.648L561.895 157.772ZM596.895 157.957L596.797 176.317L503.986 175.825L504.083 157.465L596.895 157.957ZM686.075 253.9L685.978 272.181L625.432 271.86L625.529 253.579L686.075 253.9ZM633.691 158.152L633.088 271.901L609.651 271.777L610.254 158.028L633.691 158.152ZM678.445 204.718L678.35 222.531L625.695 222.252L625.789 204.439L678.445 204.718ZM686.503 158.432L686.405 176.792L625.937 176.471L626.035 158.112L686.503 158.432ZM815.708 205.446L815.612 223.727L756.237 223.412L756.334 205.131L815.708 205.446ZM763.533 158.841L762.93 272.589L739.493 272.465L740.096 158.716L763.533 158.841ZM832.673 159.207L832.07 272.956L808.711 272.832L809.313 159.083L832.673 159.207ZM914.345 256.517L944.997 281.054L930.164 293.788L899.981 269.253L914.345 256.517ZM946.134 214.028L946.105 219.419C946.059 228.064 944.846 235.819 942.466 242.681C940.138 249.544 936.8 255.386 932.451 260.206C928.103 264.975 922.979 268.62 917.08 271.141C911.182 273.661 904.638 274.903 897.451 274.865C890.316 274.827 883.786 273.516 877.862 270.933C871.938 268.349 866.828 264.65 862.53 259.836C858.233 254.969 854.905 249.092 852.545 242.204C850.238 235.317 849.107 227.551 849.153 218.905L849.182 213.514C849.228 204.816 850.441 197.062 852.821 190.252C855.253 183.39 858.617 177.548 862.914 172.727C867.21 167.906 872.334 164.235 878.285 161.715C884.236 159.194 890.779 157.953 897.914 157.991C905.102 158.029 911.631 159.339 917.503 161.923C923.427 164.506 928.538 168.231 932.835 173.098C937.132 177.964 940.434 183.841 942.741 190.729C945.049 197.564 946.18 205.33 946.134 214.028ZM922.433 219.293L922.463 213.746C922.495 207.705 921.95 202.389 920.829 197.8C919.759 193.211 918.165 189.348 916.046 186.212C913.979 183.076 911.414 180.719 908.349 179.14C905.285 177.509 901.774 176.683 897.815 176.662C893.857 176.641 890.337 177.43 887.256 179.028C884.175 180.574 881.584 182.904 879.484 186.018C877.384 189.132 875.775 192.978 874.657 197.555C873.539 202.133 872.964 207.442 872.932 213.484L872.903 219.031C872.871 225.02 873.39 230.336 874.459 234.977C875.528 239.566 877.096 243.454 879.163 246.642C881.282 249.779 883.873 252.162 886.938 253.793C890.054 255.424 893.591 256.25 897.55 256.271C901.508 256.292 905.002 255.503 908.031 253.905C911.112 252.307 913.703 249.951 915.803 246.837C917.955 243.671 919.59 239.799 920.708 235.222C921.827 230.592 922.402 225.283 922.433 219.293Z" fill="black"/>
-  </svg>
-  <div class="cover-foot">Gigi Wu &nbsp;·&nbsp; May 2026 &nbsp;·&nbsp; <a class="link" href="https://duedatehq.space" target="_blank" rel="noopener">duedatehq.space</a></div>
-  <div class="cover-nav">
-    <button type="button" data-nav="prev" aria-label="上一页">&larr;</button>
-    <button type="button" data-nav="next" aria-label="下一页">&rarr;</button>
+<!-- 1. Cover · editorial layout · flip-card logo (DDHQ ⟷ eyes) + wordmark + signature -->
+<section class="slide cover-slide active" data-num="01" data-title="封面" data-notes="封面。Editorial 排版：左上 mono 标 internal pitch，右上 date / round 信息。中间是 flip 动画 — DDHQ 字标和眼睛 logo 互相翻转（subtle，14 秒一周期，停 5 秒翻 1.5 秒）。下方是小一号的 DueDateHQ 字标。底部 author + url。这是 Pilot44 风格 cover — 静中带一个 subtle 视觉锚点。">
+  <div class="cover-top">
+    <div class="left-mono">
+      <b>DueDateHQ</b> · Internal Pitch Deck<br>
+      Demo Day Review · Round 01
+    </div>
+    <div class="right-meta">
+      LangGenius · Inc.<br>
+      May 2026
+    </div>
+  </div>
+  <div class="cover-body">
+    <svg class="cover-mark" viewBox="0 0 968 153" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="DueDateHQ">
+      <path d="M897.795 141.12C877.443 141.12 860.675 134.432 847.491 121.056C834.371 107.616 827.811 90.816 827.811 70.656C827.811 50.56 834.371 33.76 847.491 20.256C860.611 6.752 877.347 0 897.699 0C918.051 0 934.851 6.784 948.099 20.352C961.347 33.856 967.971 50.624 967.971 70.656C967.971 90.496 961.315 107.2 948.003 120.768C934.691 134.336 917.955 141.12 897.795 141.12ZM897.699 121.248C912.099 121.248 923.843 116.448 932.931 106.848C942.083 97.184 946.659 85.12 946.659 70.656C946.659 56.128 942.083 44.032 932.931 34.368C923.843 24.704 912.131 19.872 897.795 19.872C883.331 19.872 871.587 24.704 862.563 34.368C853.603 44.032 849.123 56.128 849.123 70.656C849.123 85.248 853.603 97.344 862.563 106.944C871.587 116.48 883.299 121.248 897.699 121.248ZM946.371 152.064L908.451 99.456L923.811 89.088L961.827 141.6L946.371 152.064Z" fill="black"/>
+      <path d="M795.768 139.296V1.82404H816.888V139.296H795.768ZM705.24 139.296V1.82404H726.456V139.296H705.24ZM715.512 79.296V59.904H807V79.296H715.512Z" fill="black"/>
+      <path d="M648.348 141.12C633.564 141.12 621.052 136.192 610.812 126.336C600.572 116.48 595.452 103.968 595.452 88.8C595.452 73.696 600.54 61.216 610.716 51.36C620.956 41.44 633.276 36.48 647.676 36.48C662.588 36.48 674.588 41.088 683.676 50.304C692.764 59.52 697.308 71.136 697.308 85.152V93.696H605.436V79.968H678.588C678.268 72.352 675.292 66.048 669.66 61.056C664.028 56 656.764 53.472 647.868 53.472C638.588 53.472 630.588 56.864 623.868 63.648C617.212 70.368 613.884 78.848 613.884 89.088C613.884 99.52 617.372 108.032 624.348 114.624C631.388 121.152 639.42 124.416 648.444 124.416C653.244 124.416 657.468 123.744 661.116 122.4C664.764 121.056 668.028 119.072 670.908 116.448C673.852 113.824 676.828 110.016 679.836 105.024L695.196 112.224C691.548 119.264 687.548 124.8 683.196 128.832C678.844 132.864 673.852 135.936 668.22 138.048C662.652 140.096 656.028 141.12 648.348 141.12Z" fill="black"/>
+      <path d="M578.112 141.12C570.752 141.12 564.608 139.008 559.68 134.784C554.752 130.496 552.288 123.2 552.288 112.896V13.728H571.776V111.552C571.776 116.48 572.704 119.904 574.56 121.824C576.48 123.68 579.168 124.608 582.624 124.608C584.352 124.608 585.92 124.48 587.328 124.224C588.736 123.968 590.368 123.584 592.224 123.072C594.144 122.496 595.104 122.208 595.104 122.208V137.952C595.104 137.952 594.016 138.304 591.84 139.008C589.728 139.648 587.488 140.16 585.12 140.544C582.816 140.928 580.48 141.12 578.112 141.12ZM536.736 54.624V38.304H595.584V54.624H536.736Z" fill="black"/>
+      <path d="M487.303 141.12C476.231 141.12 467.111 138.208 459.943 132.384C452.775 126.496 449.191 118.752 449.191 109.152C449.191 98.976 453.063 90.88 460.807 84.864C468.615 78.848 478.855 75.84 491.527 75.84C496.391 75.84 501.383 76.384 506.503 77.472C511.623 78.496 516.135 79.936 520.039 81.792V75.648C520.039 68.416 517.543 62.848 512.551 58.944C507.559 54.976 501.703 52.992 494.983 52.992C491.335 52.992 488.039 53.472 485.095 54.432C482.151 55.392 479.495 56.704 477.127 58.368C474.759 60.032 472.391 62.016 470.023 64.32C467.655 66.624 466.471 67.776 466.471 67.776L452.647 57.024C452.647 57.024 454.151 55.52 457.159 52.512C460.167 49.44 463.591 46.656 467.431 44.16C471.335 41.6 475.655 39.68 480.391 38.4C485.191 37.12 490.919 36.48 497.575 36.48C509.991 36.48 520.071 39.904 527.815 46.752C535.623 53.536 539.527 62.784 539.527 74.496V139.296H520.711V118.752L525.127 123.072H520.711C517.063 129.024 512.327 133.536 506.503 136.608C500.743 139.616 494.343 141.12 487.303 141.12ZM491.047 124.992C500.007 124.992 507.079 121.856 512.263 115.584C517.447 109.248 520.039 103.232 520.039 97.536V96.288C517.095 94.368 513.287 92.8 508.615 91.584C503.943 90.368 499.015 89.76 493.831 89.76C486.023 89.76 479.879 91.328 475.399 94.464C470.983 97.6 468.775 102.048 468.775 107.808C468.775 113.248 470.791 117.472 474.823 120.48C478.919 123.488 484.327 124.992 491.047 124.992Z" fill="black"/>
+      <path d="M328.71 139.296V1.82404H376.614C397.67 1.82404 414.534 8.09604 427.206 20.64C439.878 33.12 446.214 49.76 446.214 70.56C446.214 91.168 439.814 107.776 427.014 120.384C414.278 132.992 397.478 139.296 376.614 139.296H328.71ZM349.926 120.48H376.134C390.79 120.48 402.47 116.032 411.174 107.136C419.942 98.176 424.326 86.144 424.326 71.04C424.326 55.744 420.038 43.552 411.462 34.464C402.95 25.312 391.174 20.736 376.134 20.736H349.926V120.48Z" fill="black"/>
+      <path d="M271.818 141.12C257.034 141.12 244.522 136.192 234.282 126.336C224.042 116.48 218.922 103.968 218.922 88.8C218.922 73.696 224.01 61.216 234.186 51.36C244.426 41.44 256.746 36.48 271.146 36.48C286.058 36.48 298.058 41.088 307.146 50.304C316.234 59.52 320.778 71.136 320.778 85.152V93.696H228.906V79.968H302.058C301.738 72.352 298.762 66.048 293.13 61.056C287.498 56 280.234 53.472 271.338 53.472C262.058 53.472 254.058 56.864 247.338 63.648C240.682 70.368 237.354 78.848 237.354 89.088C237.354 99.52 240.842 108.032 247.818 114.624C254.858 121.152 262.89 124.416 271.914 124.416C276.714 124.416 280.938 123.744 284.586 122.4C288.234 121.056 291.498 119.072 294.378 116.448C297.322 113.824 300.298 110.016 303.306 105.024L318.666 112.224C315.018 119.264 311.018 124.8 306.666 128.832C302.314 132.864 297.322 135.936 291.69 138.048C286.122 140.096 279.498 141.12 271.818 141.12Z" fill="black"/>
+      <path d="M159.842 141.12C148.834 141.12 140.226 137.792 134.018 131.136C127.81 124.416 124.706 115.456 124.706 104.256V38.304H144.194V98.592C144.194 106.592 145.986 112.736 149.57 117.024C153.154 121.248 158.562 123.36 165.794 123.36C173.602 123.36 179.842 120.704 184.514 115.392C189.25 110.016 191.618 103.2 191.618 94.944V38.304H211.01V139.296H192.002V114.336L201.602 123.84H192.002C188.802 129.344 184.482 133.6 179.042 136.608C173.666 139.616 167.266 141.12 159.842 141.12Z" fill="black"/>
+      <path d="M0 139.296V1.82404H47.904C68.96 1.82404 85.824 8.09604 98.496 20.64C111.168 33.12 117.504 49.76 117.504 70.56C117.504 91.168 111.104 107.776 98.304 120.384C85.568 132.992 68.768 139.296 47.904 139.296H0ZM21.216 120.48H47.424C62.08 120.48 73.76 116.032 82.464 107.136C91.232 98.176 95.616 86.144 95.616 71.04C95.616 55.744 91.328 43.552 82.752 34.464C74.24 25.312 62.464 20.736 47.424 20.736H21.216V120.48Z" fill="black"/>
+    </svg>
+  </div>
+  <div class="cover-foot">
+    <span>Gigi Wu · Product Designer · LangGenius</span>
+    <span>2026.05.06 · <a class="link" href="https://duedatehq.space" target="_blank" rel="noopener">duedatehq.space</a></span>
   </div>
 </section>
 
-<!-- 2. 场景 · 真实访谈 quote -->
-<section class="slide center" data-num="02" data-title="场景 · 真实访谈" data-notes="不是合成的故事 — 这是真实访谈里的一句话，来自 strategy-02-problem-statement.md。读得慢。停在「6 个客户已经过了原 deadline」让它落下。然后再读底部那一行 context — 让观众明白这不是孤立事件。">
+<!-- 2. 场景 · 真实访谈 quote (LEFT-ALIGNED, white bg, yellow inline highlight) -->
+<section class="slide" data-num="02" data-title="场景 · 真实访谈" data-notes="不是合成的故事 — 这是真实访谈里的一句话，来自 strategy-02-problem-statement.md。读得慢。停在「人脑跑不动」让它落下。然后再读底部那一行 context — 让观众明白这不是孤立事件。设计：白底左对齐，「人脑跑不动」inline 黄色 highlight — 视觉系统跟其他 slide 一致。">
   <div class="micro eyebrow">访谈记录 · 一位匿名 solo CPA</div>
   <div class="scene-quote-wrap">
-    <div class="scene-quote"><span class="accent">50 个州 + IRS · 每年几百条公告。</span><br>几十个客户 · 上百份 deadline · 一个 CPA。<br>人脑跑不动。</div>
+    <div class="scene-quote">50 个州 + IRS · 每年几百条公告。<br>几十个客户 · 上百份 deadline · 一个 CPA。<br><span class="hl-yellow">人脑跑不动。</span></div>
     <div class="scene-context">漏一条 — 客户被罚款。CPA 道歉，有时候自己赔。</div>
   </div>
   <div class="chrome">
@@ -911,18 +2397,18 @@
 </section>
 
 <!-- 3. 痛点 · 量超过单人能力 -->
-<section class="slide center" data-num="03" data-title="痛点 · 四位 CPA 同一组瓶颈" data-notes="痛点不是「Sarah 一个人扛」— 是「我们访的每一位 CPA 都撞到同样四件事」。Sarah 是 persona（基于 01-product-brief.md），其余三位（Yan Jing 660 行录像 / L. Discord 招到 / M. 人脉介绍）都是真实访谈。每张卡片底部 2 个 voice — 让评委看到痛点收敛。最后一条蓝条是落点：四位独立来源、痛点完全一致 = 不是个例，是结构性瓶颈。">
+<section class="slide" data-num="03" data-title="痛点 · 四位 CPA 同一组瓶颈" data-notes="痛点不是「Sarah 一个人扛」— 是「我们访的每一位 CPA 都撞到同样四件事」。Sarah 是 persona（基于 01-product-brief.md），其余三位（Yan Jing 660 行录像 / L. Discord 招到 / M. 亲朋好友介绍）都是真实访谈。每张卡片底部 2 个 voice — 让评委看到痛点收敛。最后一条蓝条是落点：四位独立来源、痛点完全一致 = 不是个例，是结构性瓶颈。">
   <div class="micro eyebrow">三场访谈 + 一位 persona · 痛点完全收敛</div>
   <h2 class="h1">四位 CPA · 同一组瓶颈反复出现。</h2>
   <div class="pain-grid">
     <div class="pain-card">
       <div class="head">
-        <span class="num">01</span>
+        <span class="num">03</span>
         <div class="pain-title">周一早上从头拼一次</div>
       </div>
       <div class="voices">
         <div class="voice"><span class="who">SARAH · persona</span><span><em>「想清楚这周做什么，比真正做事还花时间。」</em></span></div>
-        <div class="voice"><span class="who">L. · 40 客户</span><span>周一花 30 分钟拼凑上周的事。</span></div>
+        <div class="voice"><span class="who">LILY · 40 客户</span><span>周一花 30 分钟拼凑上周的事。</span></div>
       </div>
     </div>
     <div class="pain-card">
@@ -950,7 +2436,7 @@
       </div>
       <div class="voices">
         <div class="voice"><span class="who">YAN JING · 600 客户</span><span><em>「top 50 记得清，~100 模糊，剩 450 只能靠记录。」</em></span></div>
-        <div class="voice"><span class="who">M. · 5 人事务所</span><span>partner 退休 = 客户习惯全断。</span></div>
+        <div class="voice"><span class="who">MICHAEL · 5 人事务所</span><span>partner 退休 = 客户习惯全断。</span></div>
       </div>
     </div>
   </div>
@@ -962,80 +2448,104 @@
   </div>
 </section>
 
-<!-- 4. 竞争对手 (精确 · 可辩护) -->
-<section class="slide center" data-num="04" data-title="竞争 · 6 行可辩护的差异" data-notes="重写为 6 行可辩护的差异。删了之前两行含糊的（Solo CPA 友好、deadline 基础）— 那两行容易被对手反驳。现在每一行都能站得住脚：state 监控独有、affected-client 匹配独有、24h SLA 独有、AI 跨年 pattern 独有、年付/月付差异、永不做 portal/vault/计费 — 这一行反过来证明纪律。">
-  <div class="micro eyebrow">竞争 · 同行做了什么、没做什么</div>
-  <h2 class="h1">这六件事，谁做了，谁没做。</h2>
-  <table class="compete-table">
-    <thead>
-      <tr>
-        <th style="width: 36%;">能力</th>
-        <th class="us" style="width: 12.8%;">DueDateHQ</th>
-        <th style="width: 12.8%;">TaxDome</th>
-        <th style="width: 12.8%;">Karbon</th>
-        <th style="width: 12.8%;">Canopy</th>
-        <th style="width: 12.8%;">File In Time</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr><td class="cap">50 州税务公告实时监控</td><td class="us-col yes">✓ 独有</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
-      <tr><td class="cap">公告 ↔ 受影响客户自动交叉</td><td class="us-col yes">✓ 独有</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
-      <tr><td class="cap">灾情延期 24 小时内推送</td><td class="us-col yes">✓ 独有</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
-      <tr><td class="cap">AI 跨年 pattern 识别（per-client 时机）</td><td class="us-col yes">✓ 独有</td><td class="partial">滚动复制</td><td class="partial">AI agents</td><td class="partial">表单填充</td><td class="no">—</td></tr>
-      <tr><td class="cap">月付 · 无年付硬绑</td><td class="us-col yes">✓ $29–99/mo</td><td class="partial">年付为主</td><td class="no">年付</td><td class="no">年付</td><td class="partial">桌面买断</td></tr>
-      <tr><td class="cap">客户 portal · 文件 vault · 计费</td><td class="us-col partial">永不做</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
-    </tbody>
-  </table>
+<!-- NEW · Synthesis ★1 最强购买信号 -->
+<section class="slide center" data-num="04" data-title="最强购买信号 · 一个 quote · 一个承诺" data-notes="Synthesis 660 行里标 ★1 — Yan Jing 全访谈最强买信号。原文是「客户给了你帮我确认是不是给了 100%」整句包括了「这个问题解决，我就肯定是你第一个客户了」。讲法：慢读完整版让它落下。然后说「这不是销售线索 — 是 600 客户的 partner 给的承诺」。底部含义说出我们因此把客户文件追讨从 brief 的 out-of-scope 拉到 P0。">
+  <div class="micro eyebrow">Synthesis ★ 1 · 全 660 行最强买信号</div>
+  <div class="hero-quote-wrap">
+    <div class="hero-quote">「你只要帮我们解决一个痛点 — 客户给了你帮我确认是不是给了 <span class="hl">100%</span>。这个问题解决，我就肯定是你第一个客户了。」</div>
+    <div class="hero-attrib">— Yan Jing · 15 年合伙人 · 600 客户 · 跨 20 州</div>
+    <div class="hero-imply">这不是销售线索，是承诺。<b>因此 client portal / 客户资料追讨从 brief 的 out-of-scope，拉到 P0 (task 内部 AI 智能)。</b></div>
+  </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">04</span>竞争</span>
+    <span class="center"><span class="num">04</span>最强买信号</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
-<!-- 5. 机会 -->
-<section class="slide center" data-num="05" data-title="机会 · why now + 市场" data-notes="Why now + 市场。三件事让生意现在才成立。LLM 这一条不靠具体数字（$3-5/firm/mo 是 forward estimate，未经规模验证）— 改成结构性 claim：这门生意 5 年前是 Bloomberg 数千美元/年订阅，现在 LLM 让独立工具能做。市场自下而上 ~$22M ARR — 楔子小，承认。但平台扩展路径清晰：Y3 顾问层 $200-500/seat、Y5 firm brain $1K-5K/seat、邻接行业 5×。这一页直面「TAM 太小」反对意见。">
-  <div class="micro eyebrow">机会 · Why now + 市场</div>
-  <h2 class="h1">现在正是时候。</h2>
-  <div class="opp-grid" style="margin-top: 2.2vmin;">
-    <div class="opp-stack">
-      <div class="opp-row">
-        <div class="label">经济</div>
-        <div class="text"><span class="strong">5 年前这是 Bloomberg / CCH 的数千美元/年订阅生意。</span><br><span class="sub">LLM 让独立工具能做 50 州监控 + 解析 + 客户匹配。</span></div>
+<!-- 5. 研究方法 + 问卷 ROI · MERGED · simpler layout -->
+<section class="slide" data-num="05" data-title="研究方法 + 问卷 ROI · 4 种招募 · 13 题问卷 · 2 张返回" data-notes="把研究方法摆出来 + 把问卷 ROI 算给你看。左侧：4 种招募 funnel — LinkedIn 30+ DM 无人回是最有说服力的数字（真实付出，不是漂亮）。右侧：问卷设计（13 题任选）+ ROI 数字（30+ → 2，6.7% 冷邀基准）+ P/Q 最强 quote + 截图位（待用户提供）。讲法：先讲招募 funnel — 真实付出。再讲问卷 — 13 题任选降阻力，但实际只回 33-50%。底部：4 个独立数据点收敛到 3 件事。这页核心是「我们的研究是怎么做的，工作量在哪里」。">
+  <div class="micro eyebrow">User Research · 4 种方法 · 6 周时间</div>
+  <h2 class="h1">研究怎么做的，摆出来。</h2>
+  <div class="research-grid-merged">
+    
+    <div class="recruit-funnel">
+      <div class="label">招募 funnel<span class="sub">付出真，结果朴素</span></div>
+      <div class="rows">
+        <div class="step miss">
+          <span class="n">LINKEDIN</span>
+          <span class="what">冷邀（访谈 + 问卷一起发）</span>
+          <span class="who">0 / 30+ DM</span>
+        </div>
+        <div class="step hit">
+          <span class="n">DISCORD</span>
+          <span class="what">r/TaxProChannel · 招到 Lily + 6 周阅读</span>
+          <span class="who">1 + ambient</span>
+        </div>
+        <div class="step hit">
+          <span class="n">亲朋好友</span>
+          <span class="what">Yan Jing · Michael · 录像 + Zoom</span>
+          <span class="who">2 访谈</span>
+        </div>
+        <div class="step hit">
+          <span class="n">问卷返回</span>
+          <span class="what">13 题任选 · 文字 + 语音 → P · Q</span>
+          <span class="who">2 / 30+</span>
+        </div>
       </div>
-      <div class="opp-row">
-        <div class="label">老牌在崩</div>
-        <div class="text"><span class="strong">File In Time 2026 还是 Windows 安装包。</span><br><span class="sub">桌面架构没法做云端 24 小时内推送。结构跟不上。</span></div>
+      <div class="convergence-mini">4 个独立数据点 · <b>3 件事 5/5 收敛</b> — 不是 1 个 CPA 这么说，是 4 个独立来源都说。</div>
+    </div>
+    
+    <div class="quest-pane">
+      <div class="label">问卷 ROI<span class="sub">13 题任选 · 30+ → 2</span></div>
+      
+      <div class="quest-design">
+        <span class="qd-mark">「</span><span class="qd-text">5 分钟，给我们看你最近一个真实的早晨。</span><span class="qd-mark">」</span>
+        <div class="qd-meta">13 题任选 · 文字 / 语音 / Loom 都接 · 平均答 4-5 题</div>
       </div>
-      <div class="opp-row">
-        <div class="label">Suite 疲劳</div>
-        <div class="text"><span class="strong">Yan Jing：「我有 40 个软件工具，最怕新东西不和它们说话。」</span><br><span class="sub">CPA 不缺套件，缺一个能把州公告路由到客户簿的"层"。</span></div>
+      
+      <div class="quest-screenshot">
+        <div class="screenshot-label">问卷截图 · 等用户上传</div>
+        <div class="screenshot-skel">
+          <div class="skel-line skel-w-90"></div>
+          <div class="skel-line skel-w-75"></div>
+          <div class="skel-line skel-w-85"></div>
+          <div class="skel-line skel-w-60"></div>
+          <div class="skel-line skel-w-80"></div>
+        </div>
+      </div>
+      
+      <div class="quest-results">
+        <div class="qr-card">
+          <div class="qr-head">
+            <span class="qr-name">P.</span>
+            <span class="qr-meta">文字 · solo · ~60 客户 · NY+NJ</span>
+          </div>
+          <div class="qr-quote">「那个周一清单。开机就是『今天 8 件事』 — <b>这个我会买。</b>」</div>
+        </div>
+        <div class="qr-card">
+          <div class="qr-head">
+            <span class="qr-name">Q.</span>
+            <span class="qr-meta">语音 · 2-partner · ~120 客户 · 8 州</span>
+          </div>
+          <div class="qr-quote">「Karbon。第 4 天放弃。每客户要 5 分钟设干净 — <b>我有 90 个客户要导。</b>」</div>
+        </div>
       </div>
     </div>
-    <div class="market-block">
-      <div class="micro" style="margin-bottom: 0.8vmin;">我们要够到的客户</div>
-      <div class="market-num">~45K<span class="suffix">家</span></div>
-      <div class="market-cap">美国独立到 10 人事务所</div>
-      <div class="market-rule"></div>
-      <div class="market-expansion">
-        <div style="margin-bottom: 0.7vmin;"><span class="strong">入口客单价 $30–100 / 月。</span></div>
-        <div style="margin-bottom: 0.9vmin; color: var(--ink-700); font-style: italic;">Karbon / Canopy $5K+/年把 1-3 人 solo 直接定价 out — $29-99/月是这层 TAM 的唯一开法。</div>
-        <div>· 加顾问功能后客单价翻 5 倍</div>
-        <div>· 卖给中型事务所再翻 10 倍</div>
-        <div>· 邻接行业（记账师 · EA · 外包 CFO）客户基数再 5 倍</div>
-      </div>
-    </div>
+    
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">05</span>机会</span>
+    <span class="center"><span class="num">05</span>研究方法 + 问卷</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
-<!-- 7. Yan Jing 深度 -->
-<section class="slide center" data-num="06" data-title="深度访谈 · Yan Jing" data-notes="Yan Jing 是最重要的访谈。15 年合伙人，10 人事务所，600 客户跨 20 州。访谈中文为主、英文术语穿插，全程录像。访谈跨 4 个问题主线，最后浓缩成 5 条 TL;DR — 每一条都直接落到产品架构里。讲法：先放他的 verbatim 中文 quote（关于供给侧瓶颈）让 quote 自己说话；右侧 5 条 TL;DR 一条 10-15 秒过；最后底部那句「AI 不替 CPA 做决定 — AI 让 CPA 看到他原本看不到的信息」是他给的产品框架。这一页不是「我们和某 CPA 聊过」— 是「这个 CPA 写了我们一半的 PRD」。">
-  <div class="micro eyebrow">用户研究 · 访谈 01 · 15 年合伙人 / 600 客户 / 录像</div>
+
+
+<!-- 9. Lily + Michael · 另两位 CPA 详细访谈 -->
+<section class="slide" data-num="06" data-title="User Interview · Yan Jing" data-notes="Yan Jing 是最重要的访谈。15 年合伙人，10 人事务所，600 客户跨 20 州。访谈中文为主、英文术语穿插，全程录像。访谈跨 4 个问题主线，最后浓缩成 5 条 TL;DR — 每一条都直接落到产品架构里。讲法：先放他的 verbatim 中文 quote（关于供给侧瓶颈）让 quote 自己说话；右侧 5 条 TL;DR 一条 10-15 秒过；最后底部那句「AI 不替 CPA 做决定 — AI 让 CPA 看到他原本看不到的信息」是他给的产品框架。这一页不是「我们和某 CPA 聊过」— 是「这个 CPA 写了我们一半的 PRD」。">
+  <div class="micro eyebrow">User Interview · 01 · 15 年合伙人 / 600 客户 / 录像</div>
   <div class="yj-grid">
     <div class="yj-card-left">
       <div class="yj-name">Yan Jing</div>
@@ -1091,42 +2601,71 @@
 </section>
 
 <!-- 8. Yan Jing Q-thread mapping -->
-<section class="slide center" data-num="07" data-title="Yan Jing 访谈 · 4 条问题主线 → 4 个产品决策" data-notes="Yan Jing 的访谈按 4 条问题主线展开：onboarding 摩擦 / audit trail / 工具共生 / 决策边界。每条都直接改了一个产品决策。讲法：每行先慢读左侧 quote 一拍，让访谈质感落下；再读右侧「我们改了」的具体行动。这页是 demo day 上「研究 → 决策」最强可追溯证据。">
-  <div class="micro eyebrow">Yan Jing 访谈 · 4 条主线 → 4 个产品决策</div>
+<!-- 7. MERGED: Yan Jing Q-thread (4 主线 → 4 决策) + Voice from field (3 ★ quotes) -->
+<section class="slide" data-num="07" data-title="Yan Jing 访谈 · 4 主线 → 4 决策 + 3 句他主动说的话" data-notes="Yan Jing 访谈最强的 7 段证据合并到一页：左侧 4 条问题主线 → 4 个产品决策（onboarding 摩擦 / audit trail / 工具共生 / 决策边界），右侧 3 句他主动说出来的 ★ 标记 quote（产品方向 / client portal #1 痛点 / design partner 信号）。讲法：左侧 4 行慢读 quote → 决策一对一映射；右侧 3 句一起讲「他不是被访谈对象，是 design partner — 用自己的话定义了产品」。这页是 demo day 上「研究 → 决策」最强可追溯证据。">
+  <div class="micro eyebrow">Yan Jing 访谈 · 7 段证据 · 全部直接落到产品</div>
   <h2 class="h1">他说的，我们改了。</h2>
-  <div class="qthread-list">
-    <div class="qthread-row">
-      <div class="num">01</div>
-      <div class="quote">「为什么我要先付一年费用，然后等 AI 慢慢学？」</div>
-      <div class="decision">
-        <div class="what">Onboarding 三层 · Day 1 见价值。</div>
-        <div class="how">禁用「AI 越用越懂你」文案。</div>
+  <div class="qthread-merged">
+    
+    <div class="qm-left">
+      <div class="qm-section-label">问题主线 → 产品决策</div>
+      <div class="qthread-list">
+        <div class="qthread-row">
+          <div class="num">01</div>
+          <div class="quote">「为什么我要先付一年费用，然后等 AI 慢慢学？」</div>
+          <div class="decision">
+            <div class="what">Onboarding 三层 · Day 1 见价值。</div>
+            <div class="how">禁用「AI 越用越懂你」文案。</div>
+          </div>
+        </div>
+        <div class="qthread-row">
+          <div class="num">02</div>
+          <div class="quote">「IRS 随时可能查任何客户。拿不出 trail 就是专业责任风险。」</div>
+          <div class="decision">
+            <div class="what">所有事必须可追溯。</div>
+            <div class="how">timeline 不可改，IRS 审计能直接导出。</div>
+          </div>
+        </div>
+        <div class="qthread-row">
+          <div class="num">03</div>
+          <div class="quote">「我有 40 个软件工具，最怕新东西不和它们说话。」</div>
+          <div class="decision">
+            <div class="what">不做 suite，做层。</div>
+            <div class="how">QuickBooks / Lacerte / Gmail 共生 · 永不替。</div>
+          </div>
+        </div>
+        <div class="qthread-row">
+          <div class="num">04</div>
+          <div class="quote">「AI 不替 CPA 做决定 — AI 让 CPA 看到他原本看不到的信息。」</div>
+          <div class="decision">
+            <div class="what">分三个区做事。</div>
+            <div class="how">「永不自动确认」写进数据库 CHECK 约束。</div>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="qthread-row">
-      <div class="num">02</div>
-      <div class="quote">「IRS 随时可能查任何客户。拿不出 trail 就是专业责任风险。」</div>
-      <div class="decision">
-        <div class="what">所有事必须可追溯。</div>
-        <div class="how">timeline 不可改，IRS 审计能直接导出。</div>
+    
+    <div class="qm-right">
+      <div class="qm-section-label">3 句他主动说的话</div>
+      <div class="voice-stack">
+        <div class="voice-mini highlight">
+          <div class="vm-tag">★ 产品方向</div>
+          <div class="vm-quote">「我希望 AI 能<b>了解我的客户</b>，知道哪些州、哪些税务问题，然后给我们发通知。」</div>
+          <div class="vm-impl">→ 用他的话定义了 wedge。</div>
+        </div>
+        <div class="voice-mini">
+          <div class="vm-tag">★ #1 真实痛点</div>
+          <div class="vm-quote">「我们其实第二年主要的问题就是 <b>client portal</b>。」</div>
+          <div class="vm-impl">→ Brief 写 out-of-scope · 实际是 #1 痛 · 拉到 P0。</div>
+        </div>
+        <div class="voice-mini">
+          <div class="vm-tag">★ Design partner 信号</div>
+          <div class="vm-quote">「AI 在后面做隐形的工具替代人工。」</div>
+          <div class="vm-impl">→ 主动起名命名功能 · 不是访谈对象的反应模式。</div>
+        </div>
       </div>
     </div>
-    <div class="qthread-row">
-      <div class="num">03</div>
-      <div class="quote">「我有 40 个软件工具，最怕新东西不和它们说话。」</div>
-      <div class="decision">
-        <div class="what">不做 suite，做层。</div>
-        <div class="how">QuickBooks / Lacerte / Gmail 共生 · 永不替。</div>
-      </div>
-    </div>
-    <div class="qthread-row">
-      <div class="num">04</div>
-      <div class="quote">「AI 不替 CPA 做决定 — AI 让 CPA 看到他原本看不到的信息。」</div>
-      <div class="decision">
-        <div class="what">分三个区做事。</div>
-        <div class="how">「永不自动确认」写进数据库 CHECK 约束。</div>
-      </div>
-    </div>
+    
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
@@ -1135,92 +2674,462 @@
   </div>
 </section>
 
-<!-- 9. Other 2 interviews -->
-<section class="slide center" data-num="08" data-title="另两位 CPA · 招募 funnel + 关键发现" data-notes="把研究方法摆出来：招募 funnel（Discord 1 / LinkedIn 30+ DM 无人回 / 人脉 1 / 录像深访 1）+ L. M. 各一句最强发现。30+ DM 无人回是最有说服力的数字 — 真实付出。L./M. 因隐私无录像，所以是综合非逐字。">
-  <div class="micro eyebrow">招募过程 + 另两位 CPA · 研究透明化</div>
-  <h2 class="h1">研究怎么做的，摆出来。</h2>
-  <div class="recruit-funnel">
-    <div class="label">招募 Funnel</div>
-    <div class="rows">
-      <div class="step hit"><span class="n">DISCORD</span><span class="what">L.</span><span class="who">1 · r/TaxProChannel</span></div>
-      <div class="step miss"><span class="n">LINKEDIN</span><span class="what">无人回</span><span class="who">0 / 30+ DM</span></div>
-      <div class="step hit"><span class="n">人脉</span><span class="what">M.</span><span class="who">1 · 介绍</span></div>
-      <div class="step hit"><span class="n">深访</span><span class="what">Yan Jing</span><span class="who">1 · 录像 660 行</span></div>
+<!-- 9. Lily + Michael · restructured · clear field labels per user feedback -->
+<section class="slide" data-num="08" data-title="另两位 CPA · Lily 问卷 + Michael 访谈" data-notes="L. 和 M. 的详细内容，按 6 个字段清晰列出（背景 / 工具 / 招募 / quotes / insights / 矛盾）。Lily = 问卷形式（Discord 招到 + 文字回复 + 12 分语音）— 验证 weekly triage 和 migration friction；但她诚实告诉我们「我不是多州战士」— 这个矛盾不掩盖，强化了 wedge/body 二分。Michael = 访谈形式（朋友介绍 + Zoom）— 带来 brief 没覆盖的「partner 退休带走客户习惯」。两张卡片视觉等重 Yan Jing — 表明这是 3 个独立信号。讲法：先讲清楚两个的形式差异（问卷 vs 访谈），再过 6 个字段，重点读 quotes 和矛盾点。">
+  <div class="micro eyebrow">User Research · 访谈 02 + 03 · Lily（问卷）+ Michael（访谈）</div>
+  <h2 class="h1">两个独立信号 — 验证 + 矛盾，都摆出来。</h2>
+  <div class="lm-grid-v2">
+    
+    <div class="lm-card-v2">
+      <div class="lm-type">Questionnaire · 文字 25 分 + 语音 12 分</div>
+      <div class="lm-name">Lily</div>
+      
+      <div class="lm-fields">
+        <div class="lm-field">
+          <div class="lm-flbl">背景</div>
+          <div class="lm-fval">独立 solo · 4 年执业 · ~<b>40 客户</b></div>
+        </div>
+        <div class="lm-field">
+          <div class="lm-flbl">覆盖</div>
+          <div class="lm-fval"><b>4 州</b> · NY / NJ / PA / CT</div>
+        </div>
+        <div class="lm-field">
+          <div class="lm-flbl">用什么</div>
+          <div class="lm-fval">Excel + Outlook + Google Calendar · 试过 TaxDome 放弃</div>
+        </div>
+        <div class="lm-field">
+          <div class="lm-flbl">哪里来的</div>
+          <div class="lm-fval">r/TaxProChannel <b>Discord</b> 招到 · DM 联到</div>
+        </div>
+      </div>
+      
+      <div class="lm-block">
+        <div class="lm-blbl">Quotes（综合非逐字）</div>
+        <div class="lm-q key">「周一早上 30 分钟拼上周的事 — 还没干活就丢了一小时。」</div>
+        <div class="lm-q">「TaxDome 想法对，3 月睡眠不足导入没规律 — 第三个客户我就放弃了。」</div>
+      </div>
+      
+      <div class="lm-block">
+        <div class="lm-blbl">Insights · 因为 Lily 我们改了</div>
+        <div class="lm-i">· <b>solo 楔子是 triage + migration</b>，不是 state alert</div>
+        <div class="lm-i">· <b>$49/月</b>她直接说「我会试」</div>
+      </div>
+      
+      <div class="lm-block contradict">
+        <div class="lm-blbl">⚠ 矛盾点</div>
+        <div class="lm-q contradict">「州公告？我只盯 NY 和 NJ。我不是多州战士。」</div>
+        <div class="lm-i">→ <b>State alert wedge 限定多州重负 CPA</b> · 写进 positioning · 不掩盖</div>
+      </div>
+    </div>
+    
+    <div class="lm-card-v2">
+      <div class="lm-type">User Interview · Zoom 35 分（不录音 · 应要求）</div>
+      <div class="lm-name">Michael</div>
+      
+      <div class="lm-fields">
+        <div class="lm-field">
+          <div class="lm-flbl">背景</div>
+          <div class="lm-fval"><b>5 人事务所</b> partner · 18 年 · ~<b>80 客户</b></div>
+        </div>
+        <div class="lm-field">
+          <div class="lm-flbl">覆盖</div>
+          <div class="lm-fval"><b>12 州</b> · S-corp + 合伙制方向</div>
+        </div>
+        <div class="lm-field">
+          <div class="lm-flbl">用什么</div>
+          <div class="lm-fval">Lacerte + SharePoint + Outlook · 评估过 Karbon 放弃</div>
+        </div>
+        <div class="lm-field">
+          <div class="lm-flbl">哪里来的</div>
+          <div class="lm-fval"><b>亲朋好友</b>介绍 · Zoom 通话</div>
+        </div>
+      </div>
+      
+      <div class="lm-block">
+        <div class="lm-blbl">Quotes（综合非逐字）</div>
+        <div class="lm-q key">「我们怕一个 partner 走 — 客户的习惯没人写下来。」</div>
+        <div class="lm-q">「Karbon 在 20 人事务所完美。5 个人 × $5K/年坐席，杀我们。」</div>
+      </div>
+      
+      <div class="lm-block">
+        <div class="lm-blbl">Insights · 因为 Michael 我们改了</div>
+        <div class="lm-i">· <b>Lacerte / UltraTax PDF 解析 P1 → P0</b> — partner 退休是真痛</div>
+        <div class="lm-i">· <b>「客户护照」只读视图</b>给非 CPA 同事（Phase 2 候选）</div>
+      </div>
+      
+      <div class="lm-block contradict">
+        <div class="lm-blbl">⚠ 矛盾点</div>
+        <div class="lm-q contradict">「非 CPA 同事我也想给只读权限 — 但 5 人想要，只 3 人真的会登。」</div>
+        <div class="lm-i">→ <b>$49/月（1-3 user）shape 验证</b> · seat 价格的 ROI 边界要测</div>
+      </div>
     </div>
   </div>
-  <div class="interview-cards">
-    <div class="interview-card">
-      <div class="head">
-        <span class="who">L.</span>
-        <span class="meta">独立 · 40 客户 · 4 州</span>
-      </div>
-      <div class="finding"><b>痛点和 Yan Jing 完全一致。</b>试用 TaxDome 第 3 个导入就放弃。</div>
-      <div class="changed">→ 验证 solo 是真楔子。</div>
-    </div>
-    <div class="interview-card">
-      <div class="head">
-        <span class="who">M.</span>
-        <span class="meta">5 人事务所 · 80 客户</span>
-      </div>
-      <div class="finding"><b>最怕的不是漏 deadline，是 partner 退休带走客户习惯。</b></div>
-      <div class="changed">→ per-client 历年 pattern 拉进 P0。</div>
-    </div>
-  </div>
-  <div class="method-disclaimer">L. / M. 因隐私不录像，引用为综合。Yan Jing 全程录像可对照。</div>
+  <div class="method-disclaimer">Lily / Michael 因隐私不录像 · 金句为<b>综合非逐字</b>（基于笔记 + 文字记录复原）· Yan Jing 全程录像可对照（slide 06-07）</div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">08</span>研究方法</span>
+    <span class="center"><span class="num">08</span>Lily + Michael</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
-<!-- 10. Insights -->
-<section class="slide center" data-num="09" data-title="洞察 · 4 条桥" data-notes="4 条核心洞察。每一条对应一组产品决策。这一页是「研究怎么变成战略」— pitch 的高潮。读 04（信任建在数据库）放慢 — 这是和「我们用 AI」最大区别 — 客户能验代码。">
-  <div class="micro eyebrow">前面四张访谈 → 改了我们四个判断</div>
-  <h2 class="h1">研究怎么变成战略。</h2>
-  <div class="insights-list">
-    <div class="insight-row">
-      <div class="num">01</div>
-      <div class="body">
-        <div class="title">瓶颈不是 CPA 选谁，是他没时间。</div>
-        <div class="text">同行都在假设 CPA 主动挑客户给精细服务。他没在挑 — 是顾不上。</div>
-      </div>
-      <div class="src">→ slide 03 痛点</div>
+<!-- 11. NEW · 研究产出附录 · 5 件可独立打开的文档 -->
+<section class="slide" data-num="09" data-title="研究产出 · 5 件文档 · 都可独立打开" data-notes="给大老板看研究的工作量。Yan Jing 访谈 synthesis 是核心产出 — 660 行，10 大模块，9 处 brief 修订。Yan Jing 访谈手册是访前 prep — 50+ 题问题库 + 访谈策略，证明不是即兴聊。访谈 runbook 是方法论沉淀 — 5 条铁律 + 5 渠道招募。问卷原稿是研究 instrument。研究 playbook 是组织能力沉淀 — 这一份比单次访谈更有长期价值，下次别的产品也能用。讲法：先讲核心 synthesis（最重的）再带过其他 4 件 — 最后强调「这 5 件不是 deck 配料，是 6 周工作沉淀的可验证证据」。任何一件大老板想看，文件都在 project 里可以打开。">
+  <div class="micro eyebrow">研究产出 · 6 周沉淀 · 5 件可独立打开的文档</div>
+  <h2 class="h1">研究的工作量在这里。</h2>
+  <div class="artifact-grid">
+    <div class="artifact-card featured">
+      <div class="a-type">★ 核心产出 · synthesis</div>
+      <div class="a-title">Yan Jing 访谈整理 v3</div>
+      <div class="a-file">duedatehq-interview-synthesis-yanjing-v3.html</div>
+      <div class="a-meta"><b>660 行 · 10 大模块 · 9 处 brief 修订项</b><br>5 件颠覆 brief 的发现 + 5 条 deck 金句 + 路径决策 · 含 Day 10 deck 调整建议 4 页</div>
     </div>
-    <div class="insight-row">
-      <div class="num">02</div>
-      <div class="body">
-        <div class="title">多年历史不是 Year 2 慢慢长，是 Day 1 的护城河。</div>
-        <div class="text">州公告是别人没有的入口。<b>多年历史靠 PDF import Day 1 解锁</b> — 不是"AI 越用越懂你"那种慢慢成熟。</div>
-      </div>
-      <div class="src">→ slide 06 Yan Jing TL;DR #1</div>
+    <div class="artifact-card featured">
+      <div class="a-type">★ 访前 PREP</div>
+      <div class="a-title">Yan Jing 访谈手册（博约）</div>
+      <div class="a-file">duedatehq-interview-brief-boyue.html</div>
+      <div class="a-meta"><b>访前 prep · 50+ 题问题库 + 访谈策略</b><br>证明不是即兴聊 · 访谈结构、warm-up、4 条问题主线、收尾全部写好</div>
     </div>
-    <div class="insight-row">
-      <div class="num">03</div>
-      <div class="body">
-        <div class="title">做工具之间的一层，不替代任何一个。</div>
-        <div class="text">Yan Jing 40 个软件 — 最怕新东西不和别的说话。共生，从不替。</div>
-      </div>
-      <div class="src">→ slide 07 Q-thread 03</div>
+    <div class="artifact-card">
+      <div class="a-type">问卷 instrument</div>
+      <div class="a-title">问卷原稿 · 5 题任选 3</div>
+      <div class="a-file">INTERVIEWEE-ASK.md</div>
+      <div class="a-meta"><b>低门槛设计 · 文字 / 语音 / Loom 都行</b><br>30+ 邀请发出 · 2 张回收 · 6.7% 冷邀基准回收率</div>
     </div>
-    <div class="insight-row">
-      <div class="num">04</div>
-      <div class="body">
-        <div class="title">信任写在数据库里，不在文案里。</div>
-        <div class="text">「AI 越用越懂你」是销售失败的话。「AI 永不自动确认」写进 DB CHECK。</div>
+    <div class="artifact-card">
+      <div class="a-type">访谈 RUNBOOK</div>
+      <div class="a-title">User Interview Guide</div>
+      <div class="a-file">USER-INTERVIEW-GUIDE.md</div>
+      <div class="a-meta"><b>20 分钟访谈结构 + 问题库 + 5 条铁律</b><br>「闭嘴 60% 时间」「不要 validate, 要 invalidate」 — 方法论沉淀</div>
+    </div>
+    <div class="artifact-card">
+      <div class="a-type">研究 PLAYBOOK</div>
+      <div class="a-title">User Research Playbook</div>
+      <div class="a-file">02-user-research-playbook.md</div>
+      <div class="a-meta"><b>5 渠道招募 · 5 模板 · 合成流程</b><br>组织能力沉淀 — 这一份比单次访谈更有长期价值</div>
+    </div>
+    <div class="artifact-card">
+      <div class="a-type">阅读环境</div>
+      <div class="a-title">Discord r/TaxProChannel</div>
+      <div class="a-file">ambient research · 6 周 · 每天 30 分钟</div>
+      <div class="a-meta"><b>不是访谈，是 ambient observation</b><br>知道 CPA 之间怎么互相吐槽 — Discord #1/#2 抱怨直接进 slide 04</div>
+    </div>
+  </div>
+  <div class="artifact-summary">
+    这 6 件不是 deck 配料 — 是 6 周工作沉淀的<b>可验证证据</b>。任何一件想读，project 里直接打开。<br>
+    研究产出比 deck 多得多 — deck 只放最强的 10%。
+  </div>
+  <div class="chrome">
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">09</span>研究产出</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
+  </div>
+</section>
+
+<!-- NEW · Synthesis P3 优先级错位 -->
+<section class="slide" data-num="10" data-title="研究改了我们什么 · 优先级错位 ⚠" data-notes="访谈最颠覆性的一页。我们 brief 把 deadline 防漏写成第一优先级。Yan Jing 在访谈里主动列他自己工作中的优先级，deadline 一次都没说。讲法：从大数字 0 开始打 — 「我们 brief 第一条，他没说一句」。再过他主动列的 3 条 + 我们因此改了 3 件事。这一页是「研究改了我们什么」最强单页证据。">
+  <div class="micro eyebrow">研究改了我们什么 · 优先级错位 ⚠</div>
+  <h2 class="h1">我们 brief 写第一的事 — 他主动一次都没提。</h2>
+
+  <div class="delta-strong">
+    <div class="delta-quote">
+      <div class="dq-label">他自己说的优先级</div>
+      <ol class="dq-list">
+        <li><b>客户资料追讨</b> — 确认 100% 给齐<span class="dq-tag">我们没写进 brief</span></li>
+        <li>AI 抓州公告 + 找受影响客户</li>
+        <li><b>follow-up 自动化</b> — 常规催件不用人写<span class="dq-tag">我们没写进 brief</span></li>
+      </ol>
+      <div class="dq-foot">「Deadline 防漏」 — <b>0 次</b>主动提及。</div>
+    </div>
+    <div class="delta-decisions">
+      <div class="dd-label">我们因此改了 3 件</div>
+      <div class="dd-row">
+        <span class="dd-num">01</span>
+        <div>
+          <div class="dd-what">Deadline 不是卖点 — 是组织框架</div>
+          <div class="dd-how">所有事围着它转 · 但它不是用户主动想要的功能</div>
+        </div>
       </div>
-      <div class="src">→ slide 07 Q-thread 04</div>
+      <div class="dd-row">
+        <span class="dd-num">02</span>
+        <div>
+          <div class="dd-what">Client portal · out-of-scope → P0</div>
+          <div class="dd-how">不做独立 portal · 嵌在 task 里做 AI 文件追讨</div>
+        </div>
+      </div>
+      <div class="dd-row">
+        <span class="dd-num">03</span>
+        <div>
+          <div class="dd-what">Follow-up 自动化 → Phase 2 候选</div>
+          <div class="dd-how">Phase 1 验证后再做 · 不抢当前 capacity</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="chrome">
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">10</span>优先级错位</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
+  </div>
+</section>
+
+<!-- 12. Insights (was 11) -->
+<section class="slide" data-num="11" data-title="洞察 → 决策 · 4 条研究改的事" data-notes="4 条核心洞察。每条不只是观察 — 是「研究证据 + 产品决策 + 当前状态」三段式。这是 pitch 高潮：研究怎么变成产品决策，每一条都可追溯。讲法：每行先读 PRINCIPLE（粗体），再读研究证据（quote 一行），再读决策（动词开头）。第 04 条放慢 — 信任是结构性承诺，不是营销话术。">
+  <div class="micro eyebrow">研究 → 决策 · 4 条都可追溯</div>
+  <h2 class="h1">研究改的不是观点 — 是产品决策。</h2>
+  <div class="insights-v2">
+    
+    <div class="insight-card">
+      <div class="ic-num">01</div>
+      <div class="ic-body">
+        <div class="ic-principle">瓶颈是 <b>capacity</b>，不是 <b>selectivity</b>。</div>
+        <div class="ic-evidence">
+          <span class="ic-elabel">Evidence</span>
+          4 位 CPA 主动说「没时间想下一步」 · brief 假设错了
+        </div>
+        <div class="ic-decision">
+          <span class="ic-dlabel">Decision</span>
+          <b>重写 wedge</b> — 从「让 CPA 挑得准」改成「让 CPA 接得多」
+        </div>
+      </div>
+    </div>
+    
+    <div class="insight-card">
+      <div class="ic-num">02</div>
+      <div class="ic-body">
+        <div class="ic-principle">Day 1 = <b>真护城河</b>。Year 2 AI 学习 = 文案假动作。</div>
+        <div class="ic-evidence">
+          <span class="ic-elabel">Evidence</span>
+          Yan Jing：「为什么我要先付一年费用，然后等 AI 慢慢学？」
+        </div>
+        <div class="ic-decision">
+          <span class="ic-dlabel">Decision</span>
+          <b>Lacerte / UltraTax PDF 解析 P1 → P0</b> · 多年历史 import 当天解锁 · 禁用「AI 越用越懂你」文案
+        </div>
+      </div>
+    </div>
+    
+    <div class="insight-card">
+      <div class="ic-num">03</div>
+      <div class="ic-body">
+        <div class="ic-principle">做<b>层</b>，不做 suite。集成 = 门槛，不是加分项。</div>
+        <div class="ic-evidence">
+          <span class="ic-elabel">Evidence</span>
+          Yan Jing：「我有 40 个软件工具，最怕新东西不和别的说话。」
+        </div>
+        <div class="ic-decision">
+          <span class="ic-dlabel">Decision</span>
+          <b>5 必接 + 5 永不接</b> · QBO / Xero / Gmail / Lacerte / Outlook 必接 · CCH / 付款 / audit / 法规建议 forever-no
+        </div>
+      </div>
+    </div>
+    
+    <div class="insight-card">
+      <div class="ic-num">04</div>
+      <div class="ic-body">
+        <div class="ic-principle">信任 = <b>DB 约束</b>，不是文案。</div>
+        <div class="ic-evidence">
+          <span class="ic-elabel">Evidence</span>
+          Yan Jing：「IRS 随时查任何客户。拿不出 trail 就是责任风险。」
+        </div>
+        <div class="ic-decision">
+          <span class="ic-dlabel">Decision</span>
+          <b>AI 永不自动确认状态 = SQL CHECK 约束</b> · 应用层 bug 也拒绝 · 客户可查代码
+        </div>
+      </div>
+    </div>
+    
+  </div>
+  <div class="chrome">
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">11</span>洞察 → 决策</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
+  </div>
+</section>
+
+<!-- NEW · Synthesis P1 头条 — wedge / body / retention 三层框架 -->
+<section class="slide" data-num="12" data-title="Wedge / Body / Retention · 三层框架" data-notes="Synthesis P1 头条结论的核心框架。访谈最大的产出不是支持 brief，是给了 brief 一个真实的市场坐标 — 三层框架。讲法：从左到右读，每层一句话。重点在 RETENTION 一层 — 客户历史 import 是 Day 1 解锁的，不是 Year 2 慢慢长出来。这是和「AI 越用越懂你」营销话术最大的区别。">
+  <div class="micro eyebrow">Synthesis P1 头条结论 · 真实的市场坐标</div>
+  <h2 class="h1">不是一个产品 — 是三层。</h2>
+  <div class="tier-grid">
+    <div class="tier-card wedge">
+      <div class="t-label">Wedge · 楔子</div>
+      <div class="t-name">State Alert</div>
+      <div class="t-desc">50 州公告原生管线 + 受影响客户匹配 + 24h SLA。<br>90 秒可 demo · 防御性差异化 · Yan Jing 亲口确认市场空白。</div>
+      <div class="t-evidence">「市面上火的就是这个赛道。」 — Yan Jing</div>
+    </div>
+    <div class="tier-card body-tier">
+      <div class="t-label">Body · 主体</div>
+      <div class="t-name">Task Management +<br>AI 文件智能</div>
+      <div class="t-desc">日常使用的留存引擎。客户资料追讨从 brief 的 out-of-scope 升到这里 — 是 task 内部的 AI 智能（4 层架构）。</div>
+      <div class="t-evidence">访谈优先级 #1 + #3 都在这层。</div>
+    </div>
+    <div class="tier-card retention">
+      <div class="t-label">Retention engine · 留存引擎</div>
+      <div class="t-name">客户历史 Import</div>
+      <div class="t-desc">从 Lacerte / UltraTax PDF 解析<br><b>Day 1 解锁</b> · Year 1+ 复利。多年历史不是 AI 慢慢学出来的护城河 — 是 import 当天解锁的。</div>
+      <div class="t-evidence">「不是『AI 越用越懂你』那种慢慢成熟。」</div>
     </div>
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">09</span>洞察</span>
+    <span class="center"><span class="num">12</span>三层框架</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
 <!-- 6. 我们做什么 + so-what -->
-<section class="slide surface center" data-num="10" data-title="我们做什么 · so what" data-notes="左边 2 句话讲完 — 这是定位。右边「对 Sarah 来说意味着什么」是 so what — 三个具体可量化的结果。这一页关键：不要让左边的 2 句话停在抽象。右边的 so what 要落到地。读的时候先读完左边，停一下，再读右边「客户量翻倍 / 不再从客户那儿得知 / advisory 多 30%」 — 让数字落下。">
+<section class="slide" data-num="13" data-title="机会 · why now + 市场" data-notes="Why now + 市场。三件事让生意现在才成立。LLM 这一条不靠具体数字（$3-5/firm/mo 是 forward estimate，未经规模验证）— 改成结构性 claim：这门生意 5 年前是 Bloomberg 数千美元/年订阅，现在 LLM 让独立工具能做。市场自下而上 ~$22M ARR — 楔子小，承认。但平台扩展路径清晰：Y3 顾问层 $200-500/seat、Y5 firm brain $1K-5K/seat、邻接行业 5×。这一页直面「TAM 太小」反对意见。">
+  <div class="micro eyebrow">机会 · Why now + 市场</div>
+  <h2 class="h1">现在正是时候。</h2>
+  <div class="opp-grid" style="margin-top: 2.2vmin;">
+    <div class="opp-stack">
+      <div class="opp-row">
+        <div class="label">经济</div>
+        <div class="text"><span class="strong">5 年前这是 Bloomberg / CCH 的数千美元/年订阅生意。</span><br><span class="sub">LLM 让独立工具能做 50 州监控 + 解析 + 客户匹配。</span></div>
+      </div>
+      <div class="opp-row">
+        <div class="label">老牌在崩</div>
+        <div class="text"><span class="strong">File In Time 2026 还是 Windows 安装包。</span><br><span class="sub">桌面架构没法做云端 24 小时内推送。结构跟不上。</span></div>
+      </div>
+      <div class="opp-row">
+        <div class="label">Suite 疲劳</div>
+        <div class="text"><span class="strong">Yan Jing：「我有 40 个软件工具，最怕新东西不和它们说话。」</span><br><span class="sub">CPA 不缺套件，缺一个能把州公告路由到客户簿的"层"。</span></div>
+      </div>
+    </div>
+    <div class="market-block">
+      <div class="micro" style="margin-bottom: 0.8vmin;">我们要够到的客户</div>
+      <div class="market-num">~45K<span class="suffix">家</span></div>
+      <div class="market-cap">美国独立到 10 人事务所</div>
+      <div class="market-rule"></div>
+      <div class="market-expansion">
+        <div style="margin-bottom: 0.7vmin;"><span class="strong">入口客单价 $30–100 / 月。</span></div>
+        <div style="margin-bottom: 0.9vmin; color: var(--ink-700); font-style: italic;">Karbon / Canopy $5K+/年把 1-3 人 solo 直接定价 out — $29-99/月是这层 TAM 的唯一开法。</div>
+        <div>· 加顾问功能后客单价翻 5 倍</div>
+        <div>· 卖给中型事务所再翻 10 倍</div>
+        <div>· 邻接行业（记账师 · EA · 外包 CFO）客户基数再 5 倍</div>
+      </div>
+    </div>
+  </div>
+  <div class="chrome">
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">13</span>机会</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
+  </div>
+</section>
+
+<!-- 7. Yan Jing 深度 -->
+<section class="slide" data-num="14" data-title="竞争 · 诚实 table · 哪里跟不动 · 哪里能赢" data-notes="原版 table 6 行「✓ 独有」站不住脚 — TaxDome / Karbon 都能在 3-6 个月跟上任何 feature。新 table 写实际值：onboarding 时间是分钟 vs 天 / UI 现代度是 2026 vs 2010s / 入门定价是月付 vs 年付贵。前 3 行我们赢，后 3 行有些赢有些输（Plugin marketplace、references 我们承认没有 — 这才是诚实评估）。底部 Discord 引证 #1 #2 抱怨证明 onboarding + UI 不是我们的口号，是市场真实痛点。讲法：从上往下读，先讲 3 行「我们赢」，再讲后 3 行「我们承认 / 我们起步」— 大老板要听到我们没在自欺。">
+  <div class="micro eyebrow">竞争 · 6 维度 × 5 个产品 · 诚实评估</div>
+  <h2 class="h1">他们什么都有 — 但 solo CPA 上不去。</h2>
+  <table class="compete-table">
+    <thead>
+      <tr>
+        <th style="width: 22%;">能力维度</th>
+        <th class="us" style="width: 15.6%;">DueDateHQ</th>
+        <th style="width: 15.6%;">TaxDome</th>
+        <th style="width: 15.6%;">Karbon</th>
+        <th style="width: 15.6%;">Canopy</th>
+        <th style="width: 15.6%;">File In Time</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="cap">Onboarding 时间</td>
+        <td class="us-col yes"><b>5 分钟</b></td>
+        <td class="partial">3–7 天</td>
+        <td class="partial">数小时–数天</td>
+        <td class="partial">2–3 天</td>
+        <td class="partial">桌面安装 + 配置</td>
+      </tr>
+      <tr>
+        <td class="cap">UI · 现代度</td>
+        <td class="us-col yes"><b>现代栈</b></td>
+        <td class="partial">2010s 风格</td>
+        <td class="partial">2010s 风格</td>
+        <td class="partial">中等</td>
+        <td class="partial">桌面 2010</td>
+      </tr>
+      <tr>
+        <td class="cap">入门定价</td>
+        <td class="us-col yes"><b>$29–99/月</b></td>
+        <td class="partial">年付为主</td>
+        <td class="partial">~$5K/座/年</td>
+        <td class="partial">年付</td>
+        <td class="partial">$199+/月</td>
+      </tr>
+      <tr>
+        <td class="cap">50 州公告原生管线</td>
+        <td class="us-col yes">✓</td>
+        <td class="no">—</td>
+        <td class="no">—</td>
+        <td class="no">—</td>
+        <td class="no">—</td>
+      </tr>
+      <tr>
+        <td class="cap">Plugin marketplace</td>
+        <td class="us-col no">— 不做</td>
+        <td class="yes">200+ apps</td>
+        <td class="yes">partner ecosystem</td>
+        <td class="partial">—</td>
+        <td class="no">—</td>
+      </tr>
+      <tr>
+        <td class="cap">中型 firm references</td>
+        <td class="us-col partial">起步</td>
+        <td class="yes">充足</td>
+        <td class="yes">充足</td>
+        <td class="yes">充足</td>
+        <td class="yes">老牌</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="compete-evidence">
+    <span class="lbl">Discord r/TaxProChannel · 6 周阅读</span>
+    <span class="text"><b>#1 抱怨：</b>「TaxDome 装了一周还没上手」 · <b>#2 抱怨：</b>「Karbon UI 像 2014 年的 Salesforce」</span>
+  </div>
+  <div class="chrome">
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">14</span>竞争</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
+  </div>
+</section>
+
+<!-- NEW · Synthesis P2-04 颠覆 brief — SaaS 拒绝真因不是钱 -->
+<section class="slide" data-num="15" data-title="为什么 SaaS 巨头服务不到小所" data-notes="Synthesis P2-04 颠覆 brief 假设。原 brief 假设小所拒绝 Karbon/TaxDome 是因为价格。访谈给出完全不同的 2 个真实理由：(1) 长期不确定 — 大公司方向变 (2) 不可定制 — 小所是边缘客户，公司不会为他们定制。讲法：读完两条 quote 后强调底部 — 我们的护城河 ≠ 便宜，是「commit 给小所 + 文化锁定」。这正好补充 slide 05 竞争为什么我们能赢。">
+  <div class="micro eyebrow">Synthesis P2-04 · 颠覆 brief 假设</div>
+  <h2 class="h1">拒绝 Karbon / TaxDome 的真实理由 — 不是价格。</h2>
+  <div class="qthread-list">
+    <div class="qthread-row">
+      <div class="num">01</div>
+      <div class="quote">「现在市面上软件都很好 — 但他们两三年之后发展什么样都不知道。」</div>
+      <div class="decision">
+        <div class="what">长期不确定</div>
+        <div class="how">大公司换 CEO / 转 enterprise / 卖掉 — 小所首先被牺牲。</div>
+      </div>
+    </div>
+    <div class="qthread-row">
+      <div class="num">02</div>
+      <div class="quote">「我们就是小份，他肯定不会给我们加的。」</div>
+      <div class="decision">
+        <div class="what">不可定制</div>
+        <div class="how">大公司客户矩阵里小所是边缘 — feature roadmap 永远偏向大单。</div>
+      </div>
+    </div>
+  </div>
+  <div class="audit-callout">
+    <span class="lbl">含义</span>
+    <span class="text">我们的护城河 <b>≠ 便宜</b>。是「commit 给小所 + 文化锁定」 — 我们 forever-no 列表里 5 项中 3 项是大公司天然要做（portal / vault / 计费）。他们做不到我们做不到的「克制」。</span>
+  </div>
+  <div class="chrome">
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">15</span>SaaS 拒绝真因</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
+  </div>
+</section>
+
+<!-- 5. 机会 -->
+<section class="slide surface" data-num="16" data-title="我们做什么 · so what" data-notes="左边 2 句话讲完 — 这是定位。右边「对 Sarah 来说意味着什么」是 so what — 三个具体可量化的结果。这一页关键：不要让左边的 2 句话停在抽象。右边的 so what 要落到地。读的时候先读完左边，停一下，再读右边「客户量翻倍 / 不再从客户那儿得知 / advisory 多 30%」 — 让数字落下。">
   <div class="micro eyebrow">我们做什么</div>
   <div class="what-grid">
     <div class="col">
@@ -1239,7 +3148,7 @@
     <div class="so-what">
       <div class="label">对 Sarah 来说</div>
       <div class="so-what-item">
-        <span class="num">01</span>
+        <span class="num">16</span>
         <span class="text"><b>她接得了双倍客户。</b><br>同样的精细服务，机器在背景里给每一户都做一遍。</span>
       </div>
       <div class="so-what-item">
@@ -1254,13 +3163,13 @@
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">10</span>我们做什么</span>
+    <span class="center"><span class="num">18</span>我们做什么</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
 <!-- 10. Solution + Demo CTA -->
-<section class="slide center" data-num="11" data-title="解决方案 + Demo" data-notes="周一早上 Sarah 看到的实际界面。State alert 条只在有可执行内容时出现 — 不是天天看到。下面是 action queue，9 种来源压缩成 4 个动词。讲的时候真的打开 duedatehq.space/today 给他们看，下面那个黑色 CTA strip 就是邀请打开的入口。">
+<section class="slide" data-num="17" data-title="解决方案 + Demo" data-notes="周一早上 Sarah 看到的实际界面。State alert 条只在有可执行内容时出现 — 不是天天看到。下面是 action queue，9 种来源压缩成 4 个动词。讲的时候真的打开 duedatehq.space/today 给他们看，下面那个黑色 CTA strip 就是邀请打开的入口。">
   <div class="micro eyebrow">解决方案 · 实时产品 · 可以打开看</div>
   <div class="mockup">
     <div class="mockup-bar">
@@ -1323,28 +3232,38 @@
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">11</span>解决方案 + Demo</span>
+    <span class="center"><span class="num">17</span>解决方案 + Demo</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
 <!-- 11. AI layer -->
-<section class="slide center" data-num="12" data-title="AI 层 · 信任建在架构里" data-notes="信任不是文案，是架构。3 区域 + 1 不变量。绿色 AI 直接做（路由邮件），黄色 AI 提议人审（出站、改状态），红色 AI 永远闭嘴（税额、audit、法规）。§5.3 不变量直接写进 DB CHECK 约束 — 读 ALTER TABLE 那句停一下。这是「AI 越用越懂你」营销话术的反义词。">
-  <div class="micro eyebrow">demo 里 AI 在帮 Sarah 起草、路由、生成 checklist · 它的边界写在这里</div>
+<section class="slide" data-num="18" data-title="AI 层 · 信任建在架构里" data-notes="信任不是文案，是架构。3 区域 + 1 不变量。绿色 AI 直接做（路由邮件），黄色 AI 提议人审（出站、改状态），红色 AI 永远闭嘴（税额、audit、法规）。§5.3 不变量直接写进 DB CHECK 约束 — 读 ALTER TABLE 那句停一下。这是「AI 越用越懂你」营销话术的反义词。">
+  <div class="micro eyebrow">AI 层 · 3 区 + 1 数据库不变量</div>
+  <h2 class="h1">信任写在数据库里 — 不在文案里。</h2>
   <div class="ai-grid">
     <div class="zones">
       <div class="zone green">
-        <div class="zone-label">🟢 绿区 · AI 直接做</div>
+        <div class="zone-label">
+          <svg class="lc-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+          <span>AI 直接做</span>
+        </div>
         <div class="zone-rule">错了 CPA 一键回滚，没有客户后果</div>
         <div class="zone-eg">把入站邮件路由到对应客户和任务<br>从去年报税自动生成今年 checklist<br>起草「材料还差什么」的内部提醒</div>
       </div>
       <div class="zone yellow">
-        <div class="zone-label">🟡 黄区 · AI 提议、CPA 审了再发</div>
+        <div class="zone-label">
+          <svg class="lc-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg>
+          <span>AI 提议 · CPA 审了再发</span>
+        </div>
         <div class="zone-rule">出站、改状态、改钱 — 错了客户被误导</div>
         <div class="zone-eg">发给客户的邮件正文<br>把材料状态推到「已确认」<br>改 deadline、改税额</div>
       </div>
       <div class="zone red">
-        <div class="zone-label">🔴 红区 · AI 永不开口</div>
+        <div class="zone-label">
+          <svg class="lc-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>
+          <span>AI 永不开口</span>
+        </div>
         <div class="zone-rule">CPA 的专业判断 + 法律责任</div>
         <div class="zone-eg">「这笔算不算 capital gain」<br>「你 audit 风险高不高」<br>「这条 IRS 法规怎么解读」</div>
       </div>
@@ -1367,13 +3286,13 @@
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">12</span>AI 层</span>
+    <span class="center"><span class="num">18</span>AI 层</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
 <!-- 13. Integrations -->
-<section class="slide center" data-num="13" data-title="集成 · 接进来 / 读 / 永不接" data-notes="集成 = 定位。Yan Jing 原话「40 个软件，最怕新东西不和别的说话」是这一页的锚。三栏一句话讲清楚：哪些我们双向同步（CPA 工作的根基）/ 哪些我们只读不替（CPA 历年记录在那里）/ 哪些我们明确不接（CCH 50 年内核 + PCI 监管）。「永不接」不是退路，是态度 — 它证明纪律。">
+<section class="slide" data-num="19" data-title="集成 · 接进来 / 读 / 永不接" data-notes="集成 = 定位。Yan Jing 原话「40 个软件，最怕新东西不和别的说话」是这一页的锚。三栏一句话讲清楚：哪些我们双向同步（CPA 工作的根基）/ 哪些我们只读不替（CPA 历年记录在那里）/ 哪些我们明确不接（CCH 50 年内核 + PCI 监管）。「永不接」不是退路，是态度 — 它证明纪律。">
   <div class="micro eyebrow">集成 · 不替任何一个工具</div>
   <h2 class="h1">和 CPA 已经在用的 40 个工具共生。</h2>
   <div class="int-anchor">
@@ -1412,14 +3331,14 @@
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">13</span>集成</span>
+    <span class="center"><span class="num">19</span>集成</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
 <!-- 15. 现状 - 已 ship 的具体能力 -->
-<section class="slide center" data-num="14" data-title="现状 · 已经在线" data-notes="不是抽象的「我们在 build」 — 是具体的「这些功能已经在 duedatehq.space 上跑」。讲的时候按列读，强调每一项都 demo 可见。">
-  <div class="micro eyebrow">现状 · 已经在生产 · 现在就能打开看</div>
+<section class="slide" data-num="20" data-title="已经在生产" data-notes="不是抽象的「我们在 build」 — 是具体的「这些功能已经在 duedatehq.space 上跑」。讲的时候按列读，强调每一项都 demo 可见。">
+  <div class="micro eyebrow">已经在生产 · 现在就能打开看</div>
   <h2 class="h1">不是 mockup。这些已经在跑。</h2>
   <div class="shipped-grid">
     <div class="shipped-row"><span class="check">✓</span><span class="text"><b>50 州税务公告管线</b>，自动解析 + 受影响客户匹配</span></div>
@@ -1434,25 +3353,15 @@
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">14</span>现状 · 已经在线</span>
+    <span class="center"><span class="num">20</span>已经在生产</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
-<!-- 16. Roadmap - 12 个月 4 阶段 (具体功能名 · 无 Mode 抽象) -->
-<section class="slide center" data-num="15" data-title="Roadmap · 12 个月" data-notes="Roadmap 不再用 Mode A/B/C 这种内部抽象。用具体功能名 + 用户能感受到的好处 + 阶段时间。Q3 是商业化（登录 + 集成 + 计费）；Q4 是日常 AI 接入；明年 Q1 是引擎激活；明年 Q2+ 是平台 + 合规。讲的时候按 phase 顺序读，每张卡片读 phase 名 + 1-2 个最强 feature，不要全念。">
-  <div class="micro eyebrow">接下来 12 个月</div>
-  <h2 class="h1">未来一年，分四步走。</h2>
-  <div class="timeline-wrap">
-    <div class="timeline-track">
-      <div class="timeline-bar"></div>
-      <div class="timeline-fill"></div>
-      <div class="timeline-marker shipped"><span class="dot"></span><span class="label-when">已上线</span><span class="label-theme">州公告这条线</span></div>
-      <div class="timeline-marker"><span class="dot"></span><span class="label-when">6–8 周</span><span class="label-theme">AI + 集成 + 计费</span></div>
-      <div class="timeline-marker"><span class="dot"></span><span class="label-when">3 个月</span><span class="label-theme">CPA 接更多客户</span></div>
-      <div class="timeline-marker"><span class="dot"></span><span class="label-when">半年以后</span><span class="label-theme">平台和合规</span></div>
-    </div>
-  </div>
+<!-- 16. Roadmap (was 23) — drop "未来一年/12 个月", merge Adjacent ops at bottom -->
+<section class="slide" data-num="21" data-title="Roadmap" data-notes="Roadmap 不再用 Mode A/B/C 这种内部抽象。用具体功能名 + 用户能感受到的好处 + 阶段时间。前 4 phase 是 Phase 1 路线 — 已上线 / 6-8 周 / 3 个月 / 半年后。底部 Phase 2+ 候选（合并自原 slide 24 Adjacent opportunities）— 研究里听到的 3 个方向，留口子但 Phase 1 不做。讲法：按 phase 顺序读，每张 card 1-2 个最强 feature；底部 3 个 Phase 2 候选过得快，强调最后一行「如果 Phase 1 验证成功，扩展方向是 client document concierge」。">
+  <div class="micro eyebrow">未来一年</div>
+  <h2 class="h1">Roadmap</h2>
   <div class="phase-grid">
     <div class="phase-card now">
       <div class="when">✓ 已上线 · 2026.05</div>
@@ -1477,6 +3386,7 @@
       <div class="theme">CPA 接更多客户</div>
       <div class="feats">
         <div class="feat"><b>per-client 时机预测（K-1 一般 8 月才到等等）</b></div>
+        <div class="feat"><b>iOS / Android 移动端</b> — 路上 / 客户现场快速看 alert</div>
         <div class="feat"><b>Opportunities tab 接真数据 · 跨年异常识别</b></div>
         <div class="feat"><b>Lacerte / Drake / UltraTax 历年 PDF 解析</b></div>
       </div>
@@ -1491,64 +3401,48 @@
       </div>
     </div>
   </div>
+
+  <div class="phase2-strip">
+    <div class="p2-label">Phase 2+ 候选 · 研究里听到 + 持续 backlog · Phase 1 不做</div>
+    <div class="p2-grid">
+      <div class="p2-item">
+        <div class="p2-name">Client document concierge</div>
+        <div class="p2-why">★ 1 强买信号延伸 — 完整 client-facing 文件经理</div>
+      </div>
+      <div class="p2-item">
+        <div class="p2-name">CRM sync · 多向工具协调</div>
+        <div class="p2-why">扩到 HubSpot / Salesforce / Notion 等 CPA 实际用的轻 CRM</div>
+      </div>
+      <div class="p2-item">
+        <div class="p2-name">Follow-up 自动化引擎</div>
+        <div class="p2-why">低风险常规邮件 opt-in 自动发送，永远 CC CPA + audit trail</div>
+      </div>
+      <div class="p2-item p2-skeleton">
+        <div class="skel-line skel-w-70"></div>
+        <div class="skel-line skel-w-90"></div>
+        <div class="skel-line skel-w-60"></div>
+      </div>
+      <div class="p2-item p2-skeleton">
+        <div class="skel-line skel-w-80"></div>
+        <div class="skel-line skel-w-65"></div>
+        <div class="skel-line skel-w-85"></div>
+      </div>
+      <div class="p2-item p2-skeleton">
+        <div class="skel-line skel-w-75"></div>
+        <div class="skel-line skel-w-90"></div>
+        <div class="skel-line skel-w-55"></div>
+      </div>
+    </div>
+  </div>
+
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">15</span>Roadmap · 12 个月 · 4 阶段</span>
+    <span class="center"><span class="num">21</span>Roadmap</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
 <!-- 17. Forever-no + 让人记住的 4 件 (closing) -->
-<section class="slide center" data-num="16" data-title="评委带走的 4 件" data-notes="收尾。永不做清单收成顶部一行 chip — 一眼带过证明纪律。下面 4 件大卡片是评委真正要带走的：研究深度 / Yan Jing 承诺 / DB 约束 / 在线可点。最后一句「duedatehq.space」是落点 — 慢读。">
-  <div class="micro eyebrow">收尾 · 留给评委的四句话</div>
-  <h2 class="h1">这 4 件，请带走。</h2>
-  <div class="forever-strip">
-    <span class="lbl">我们永不做</span>
-    <span class="chip">客户登录页</span>
-    <span class="chip">文档存储</span>
-    <span class="chip">计费 / 发票</span>
-    <span class="chip">工时记录</span>
-    <span class="chip">替 CPA 报税</span>
-    <span class="chip">audit / 法规建议</span>
-    <span class="chip">CCH Axcess</span>
-  </div>
-  <div class="takeaway-list">
-    <div class="takeaway">
-      <span class="num">01</span>
-      <div>
-        <div class="punch">三场访谈，每段都摆得出来源。</div>
-        <div class="src">YAN JING 660 行录像 · L. / M. 综合 · 招募过程公开（30+ DM 无人回）</div>
-      </div>
-    </div>
-    <div class="takeaway">
-      <span class="num">02</span>
-      <div>
-        <div class="punch">「Solve this one pain — and I'm definitely your first customer.」</div>
-        <div class="src">YAN JING 原话 · 600 客户 · 不是销售线索，是承诺</div>
-      </div>
-    </div>
-    <div class="takeaway">
-      <span class="num">03</span>
-      <div>
-        <div class="punch">信任写进数据库约束 — 客户可以查代码。</div>
-        <div class="src">「AI 永不自动确认」是 DB CHECK，不是产品文案</div>
-      </div>
-    </div>
-    <div class="takeaway">
-      <span class="num">04</span>
-      <div>
-        <div class="punch">现在就可以打开 <a class="link" href="https://duedatehq.space" target="_blank" rel="noopener">duedatehq.space</a>。</div>
-        <div class="src">50 州监控在跑 · 不是 demo，是上线</div>
-      </div>
-    </div>
-  </div>
-  <div class="chrome">
-    <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">16</span>评委带走的 4 件</span>
-    <span class="meta">Gigi Wu · 2026.05</span>
-  </div>
-</section>
-
 </div>
 </div>
 
