@@ -98,9 +98,12 @@ export function AlertTriageModal() {
             surface in the modal frames the headline; the body returns
             to neutral surface so the alerts list reads as content. */}
         <header className="px-region pt-region pb-card bg-gradient-to-br from-warn-bg/60 via-warn-bg/40 to-transparent border-b border-warn-border/40 flex items-start gap-3 relative">
+          {/* Header icon tile sized to match the row state-code pill
+              below (w-9 h-9 = 36px) so the header reads as one of the
+              row family. Yuqi audit 2026-05-06. */}
           <span
             aria-hidden
-            className="w-10 h-10 rounded-md bg-warn-bg border border-warn-border/60 flex items-center justify-center text-warn-ink shrink-0 shadow-[inset_0_-1px_0_rgba(154,59,18,0.06)]"
+            className="w-9 h-9 rounded-md bg-warn-bg border border-warn-border/60 flex items-center justify-center text-warn-ink shrink-0 shadow-[inset_0_-1px_0_rgba(154,59,18,0.06)]"
           >
             <Bell className="w-4 h-4" aria-hidden />
           </span>
@@ -152,9 +155,11 @@ export function AlertTriageModal() {
                 }
               }}
             >
+              {/* State badge sized to match the header bell tile
+                  (w-9 h-9). One icon family per modal. */}
               <span
                 aria-hidden
-                className="inline-flex items-center justify-center min-w-[28px] h-6 px-1.5 rounded text-[10px] font-mono font-semibold uppercase tracking-wider text-ink-700 bg-sunken border border-line shrink-0 mt-0.5 tabular-nums group-hover:bg-surface group-hover:border-line-strong transition-colors"
+                className="inline-flex items-center justify-center w-9 h-9 rounded-md text-xs font-bold tracking-wide text-ink-900 bg-sunken shrink-0 group-hover:bg-surface transition-colors"
               >
                 {a.stateCode}
               </span>

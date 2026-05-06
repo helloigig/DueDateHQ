@@ -372,10 +372,14 @@ export function Dashboard() {
       <OnboardingLayer2Widget />
 
       {/* Blocking-alerts overlay — fires only at >72h escalation. Stays as
-          a modal because the spec demands a forced ack at that tier. */}
+          a modal because the spec demands a forced ack at that tier. The
+          totalAffecting prop carries the full "Affecting you" count so
+          the modal can show "5 of {N} affecting you" — clarifying that
+          this popup is a strict subset of the /alerts "Affecting you" tab. */}
       {showBlockingDialog && !blockingDismissed && (
         <BlockingAlertsDialog
           alerts={alertsByTier.blocking}
+          totalAffecting={firmRelevantAlerts.length}
           onSnooze={(reason) => {
             update({ alerts_snoozed_until: toIso(TODAY) });
             if (reason) {
