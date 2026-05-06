@@ -236,7 +236,6 @@ export function TaskPanel({ clientId, taskId, onClose }: Props) {
         <TaskHeader
           task={task}
           client={client}
-          completionPct={completionPct(checklist)}
           onChase={() => setEmailIntent({ task, client })}
           hideBreadcrumb
         />
@@ -244,15 +243,27 @@ export function TaskPanel({ clientId, taskId, onClose }: Props) {
         <TaskMiniTimeline task={task} checklist={checklist} />
 
         {/* Single-column body — drawer is too narrow for the page's
-            two-column layout. Documents+Activity render full-width;
-            AI Insights collapses to a button + expandable; Notes
-            renders below activity. */}
-        <SectionLabel>Documents &amp; activity</SectionLabel>
+            two-column layout. Yuqi audit 2026-05-06: prior single
+            "Documents & activity" label sat at equal weight above
+            both the checklist AND the activity feed, even though
+            those are two distinct concepts. Split into matching
+            section labels (with item counts when applicable) so the
+            structure mirrors the rest of the surface (one label per
+            data shape, count beside the label). */}
+        <SectionLabel>
+          Checklist
+          {checklist.length > 0 && (
+            <span className="ml-2 font-normal text-ink-500 tabular-nums">
+              · {checklist.length} {checklist.length === 1 ? "item" : "items"}
+            </span>
+          )}
+        </SectionLabel>
         <ChecklistList
           taskId={task.id}
           items={checklist}
           onOpenEmailDraft={openEmail}
         />
+        <SectionLabel>Activity</SectionLabel>
         <ActivityTimeline
           entries={activity}
           scopeDeadlineId={task.deadlineId}
@@ -401,15 +412,6 @@ function ExtensionBanner({
       </p>
     </div>
   );
-}
-
-function completionPct(items: ChecklistItem[]): number {
-  const relevant = items.filter((c) => c.state !== "not_applicable");
-  if (relevant.length === 0) return 0;
-  const done = relevant.filter(
-    (c) => c.state === "received_confirmed",
-  ).length;
-  return Math.round((done / relevant.length) * 100);
 }
 
 function contextFor(

@@ -137,7 +137,13 @@ export function MarkCompleteDialog({
           </div>
         )
       }
-      commitLabel={isLowConfidence ? "Close anyway" : "Mark complete"}
+      commitLabel={
+        relevantItems.length === 0
+          ? "Close task"
+          : isLowConfidence
+            ? "Close anyway"
+            : "Mark complete"
+      }
       onConfirm={onConfirm}
     />
   );
