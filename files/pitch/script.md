@@ -245,7 +245,7 @@
 
 **[转到底部黑色 CTA strip]**
 
-> 「这不是 mockup。**现在就可以打开 duedatehq.space/today 看**。22 个页面、83 个组件、~63K 行 TypeScript、Hono + tRPC + Drizzle + Supabase。」
+> 「这不是 mockup。**现在就可以打开 duedatehq.space/today 看**。50 州监控在跑、4 alert 通道在工作、Action Queue 真实排序、客户 fleet 真数据。」
 
 **过渡**：「信任不是文案问题，是架构问题。」
 
@@ -329,7 +329,7 @@
 
 **Cue**：4 个数字 + 10 行 shipped feature 列表。强调"在线"两个字。
 
-> 「**这些都在 duedatehq.space 上跑**。50 州监控管线 24h SLA、4 个 alert 通道、Action Queue、Client fleet、Multi-state apply wizard、7 步 onboarding、公开的 /changes 历档。22 个页面、83 个组件、~63K 行 TypeScript。」
+> 「**这些都在 duedatehq.space 上跑**。50 州监控管线 24h SLA、4 个 alert 通道、Action Queue、Client fleet、Multi-state apply wizard、7 步 onboarding、公开的 /changes 历档。50 州监控在跑、4 alert 通道、Action Queue + Client fleet 全部能用。」
 
 **过渡**：「接下来 12 个月——」
 
@@ -369,7 +369,7 @@
 
 **[最后一句最慢]**
 
-> 「**04 现在就可以打开 duedatehq.space**。22 个页面、83 个组件、~63K 行、真实用户在试用。**不是 prototype，是 production**。」
+> 「**04 现在就可以打开 duedatehq.space**。50 州监控在跑、4 alert 通道、Action Queue 真实排序、真实用户在试用。**不是 prototype，是 production**。」
 
 **[停 2 秒，让最后一句落下]**
 
@@ -404,7 +404,7 @@
 > 三件事：(1) L. 在 40 客户级别独立验证了同样的 chase loop 痛和供给侧框架。(2) M. 揭示了 Yan Jing 看不到的小事务所 junior 视角，给 Year-5 retention 论点。(3) PRD §0.5 是 57-row traceability table，每一条产品决策可以追到具体访谈引述——所以 selection bias 在 traceability 上是可验证的。
 
 ### 4. "tech stack 这么深，6 周内做完吗？"
-> Dashboard 已经 ship——22 页 / 83 组件 / ~63K 行 / 4 alert 通道在生产。State 管线在跑。剩下的 Q3-Q4 是把 AI Mode A+C+D 接进现有的 ChecklistItem state machine。基础设施都在了，wire-up 工作。
+> Dashboard 已经 ship——50 州监控管线在跑 · 4 alert 通道 · Action Queue + Client fleet 全部在生产。State 管线在跑。剩下的 Q3-Q4 是把 AI Mode A+C+D 接进现有的 ChecklistItem state machine。基础设施都在了，wire-up 工作。
 
 ### 5. "Forever-no 这么多东西不做，怎么和 TaxDome 抢客户？"
 > 我们不抢 TaxDome 的客户。我们抢 Excel 的客户——50% 以上的 solo CPA 还在用 Excel + Outlook。TaxDome 客户 churn 出来时，我们是 layer，他们 keep 现有 Lacerte / QBO 也行。我们和 TaxDome 不是替代关系，是不同 segment。
