@@ -256,14 +256,24 @@ export const mockAdapter = {
     // demo roster via mockClients/mockDeadlines, so the FE doesn't
     // need to do anything to populate the workspace. Returning the
     // same counts shape as the real BE keeps callers branch-free.
-    bootstrapDemo: async () => {
+    // reseed is accepted but ignored — mock-mode resets via
+    // `actions.resetToSeeds()` already wired to the demo button.
+    bootstrapDemo: async (input?: { reseed?: boolean }) => {
       await delay(200);
       return {
         firmId: "firm-mock",
+        reseed: input?.reseed ?? false,
         clientsInserted: 0,
         clientsExisting: 51,
+        clientsCleared: 0,
         deadlinesInserted: 0,
         deadlinesExisting: 70,
+        deadlinesBackfilled: 0,
+        tasksInserted: 0,
+        tasksExisting: 50,
+        milestonesInserted: 0,
+        checklistsInserted: 0,
+        draftsInserted: 0,
       };
     },
   },
