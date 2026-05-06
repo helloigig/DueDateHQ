@@ -38,6 +38,19 @@
 
     --pop: 0 2px 8px rgba(15, 23, 42, 0.06);
     --overlay: 0 8px 24px rgba(15, 23, 42, 0.12);
+
+    /* === Layout rhythm tokens · 全局统一 gap / 行距 === */
+    --gap-eyebrow: 1.8vmin;   /* eyebrow → h1/h2 */
+    --gap-title:   3vmin;     /* h1/h2 → 内容区 */
+    --gap-card:    2vmin;     /* 卡片之间（grid） */
+    --gap-section: 2.5vmin;   /* slide 内大块之间 */
+    --pad-card:    2.4vmin;   /* 卡片内 padding */
+    --pad-card-lg: 2.8vmin;   /* 重点卡片 padding */
+    --rad-card:    8px;
+    --lh-tight: 1.3;          /* 大字标题 */
+    --lh-display: 1.4;        /* 卡片小标题 */
+    --lh-body: 1.65;          /* 正文 */
+    --lh-meta: 1.55;          /* 元信息 / 引用 */
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -164,16 +177,81 @@
   .btn-primary { padding: 0.7vmin 1.3vmin; background: var(--indigo); color: white; font-size: 1.3vmin; font-weight: 500; border-radius: 6px; border: none; }
   .btn-secondary { padding: 0.7vmin 1.3vmin; background: var(--surface); color: var(--ink-700); font-size: 1.3vmin; font-weight: 500; border: 1px solid var(--line); border-radius: 6px; }
 
-  /* === SLIDE 3: 痛点 (sourced · 无戏剧化) === */
-  .pain-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3vmin; margin-top: 2.5vmin; }
-  .pain-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.8vmin; display: flex; flex-direction: column; gap: 1.2vmin; }
-  .pain-num { font-family: var(--font-mono); font-size: 1.2vmin; color: var(--ink-500); letter-spacing: 0.12em; font-weight: 700; text-transform: uppercase; }
-  .pain-title { font-size: 2.2vmin; font-weight: 600; color: var(--ink-900); line-height: 1.25; letter-spacing: -0.01em; }
-  .pain-body { font-size: 1.4vmin; color: var(--ink-700); line-height: 1.7; }
-  .pain-quote { font-size: 1.4vmin; color: var(--ink-900); line-height: 1.55; padding-top: 1.2vmin; border-top: 1px dashed var(--line); font-style: italic; }
-  .pain-quote .src { display: block; margin-top: 0.4vmin; font-size: 1.15vmin; color: var(--ink-400); font-family: var(--font-mono); letter-spacing: 0.04em; font-style: normal; }
-  .pain-extra { margin-top: 2.5vmin; padding-top: 2vmin; border-top: 1px solid var(--line); display: flex; gap: 1.5vmin; align-items: baseline; font-size: 1.35vmin; color: var(--ink-700); line-height: 1.65; }
-  .pain-extra .lead-in { color: var(--ink-500); font-weight: 700; font-size: 1.2vmin; letter-spacing: 0.1em; text-transform: uppercase; font-family: var(--font-mono); }
+  /* === SLIDE 3: 痛点 · 四位 CPA 同一组瓶颈 === */
+  .pain-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--gap-card);
+    margin-top: var(--gap-title);
+  }
+  .pain-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--rad-card);
+    padding: var(--pad-card-lg);
+    display: flex; flex-direction: column;
+    gap: 1.3vmin;
+  }
+  .pain-card .head { display: flex; gap: 1vmin; align-items: baseline; }
+  .pain-card .num {
+    font-family: var(--font-mono);
+    font-size: 1.2vmin;
+    font-weight: 700;
+    color: var(--ink-400);
+    letter-spacing: 0.12em;
+  }
+  .pain-card .pain-title {
+    font-size: 2.2vmin;
+    font-weight: 600;
+    color: var(--ink-900);
+    line-height: var(--lh-display);
+    letter-spacing: -0.01em;
+    flex: 1;
+  }
+  .pain-card .pain-body {
+    font-size: 1.45vmin;
+    color: var(--ink-700);
+    line-height: var(--lh-body);
+  }
+  .pain-card .voices {
+    margin-top: auto;
+    padding-top: 1.3vmin;
+    border-top: 1px dashed var(--line);
+    display: flex; flex-direction: column;
+    gap: 0.7vmin;
+  }
+  .pain-card .voice {
+    font-size: 1.3vmin;
+    color: var(--ink-700);
+    line-height: var(--lh-meta);
+    display: grid;
+    grid-template-columns: 9vmin 1fr;
+    gap: 1vmin;
+    align-items: baseline;
+  }
+  .pain-card .voice .who {
+    font-family: var(--font-mono);
+    font-size: 1.15vmin;
+    color: var(--ink-500);
+    letter-spacing: 0.04em;
+    font-weight: 600;
+  }
+  .pain-card .voice em {
+    font-style: italic;
+    color: var(--ink-900);
+    font-weight: 500;
+  }
+  .pain-converge {
+    margin-top: var(--gap-section);
+    padding: 1.5vmin 2vmin;
+    background: var(--indigo-soft);
+    border-radius: var(--rad-card);
+    font-size: 1.4vmin;
+    color: var(--indigo-ink);
+    line-height: var(--lh-body);
+    text-align: center;
+  }
+  .pain-converge b { font-weight: 700; }
 
   /* === SLIDE 4: 竞争 (精确) === */
   .compete-table { width: 100%; margin-top: 2.5vmin; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); border-collapse: separate; border-spacing: 0; }
@@ -209,88 +287,269 @@
   .what-text { font-size: 3.6vmin; line-height: 1.35; letter-spacing: -0.015em; color: var(--ink-900); font-weight: 500; }
   .what-text .strong { font-weight: 700; }
   .what-text .accent { color: var(--indigo); }
-  .what-row { margin-top: 3vmin; padding-top: 2vmin; border-top: 1px solid var(--line); display: flex; gap: 0.8vmin; flex-wrap: wrap; align-items: center; }
-  .what-chip { padding: 0.7vmin 1.3vmin; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; font-size: 1.4vmin; color: var(--ink-700); font-weight: 500; display: flex; align-items: center; gap: 0.6vmin; }
-  .what-chip .n { font-family: var(--font-mono); font-size: 1.2vmin; color: var(--ink-400); font-weight: 600; }
-  .what-aside { padding: 0.5vmin 1.1vmin; background: var(--sunken); border: 1px dashed var(--line-strong); border-radius: 6px; font-size: 1.3vmin; color: var(--ink-500); font-weight: 500; }
+  .what-row { margin-top: 3vmin; padding-top: 2vmin; border-top: 1px solid var(--line); font-size: 1.6vmin; line-height: 1.6; color: var(--ink-500); }
+  .what-row .strong { color: var(--ink-900); font-weight: 600; }
 
-  .so-what {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 2.5vmin;
-    display: flex; flex-direction: column; gap: 1.3vmin;
-  }
-  .so-what .label { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); text-transform: uppercase; margin-bottom: 0.5vmin; }
-  .so-what-item { display: grid; grid-template-columns: 4.5vmin 1fr; gap: 1.2vmin; align-items: start; }
-  .so-what-item .num { font-size: 2.2vmin; font-weight: 600; color: var(--indigo); line-height: 1; letter-spacing: -0.015em; font-variant-numeric: tabular-nums; }
-  .so-what-item .text { font-size: 1.45vmin; color: var(--ink-900); line-height: 1.5; }
-  .so-what-item .text b { color: var(--indigo-ink); }
+  .so-what { display: flex; flex-direction: column; gap: 2.2vmin; }
+  .so-what .label { font-size: 1.4vmin; color: var(--ink-500); margin-bottom: 0.5vmin; }
+  .so-what-item { display: grid; grid-template-columns: 3vmin 1fr; gap: 1.5vmin; align-items: baseline; }
+  .so-what-item .num { font-size: 1.4vmin; font-weight: 600; color: var(--ink-400); line-height: 1; font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+  .so-what-item .text { font-size: 1.7vmin; color: var(--ink-700); line-height: 1.55; }
+  .so-what-item .text b { color: var(--ink-900); font-weight: 600; }
 
   /* === SLIDE 7: Yan Jing 深度 === */
-  .yj-grid { display: grid; grid-template-columns: 1fr 1.3fr; gap: 3.5vmin; margin-top: 1.5vmin; align-items: stretch; }
-  .yj-card-left { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.8vmin; display: flex; flex-direction: column; gap: 1.8vmin; }
-  .yj-id { display: flex; flex-direction: column; gap: 0.5vmin; }
-  .yj-badge { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--indigo-ink); text-transform: uppercase; }
-  .yj-name { font-size: 3.2vmin; font-weight: 600; color: var(--ink-900); letter-spacing: -0.02em; line-height: 1; }
-  .yj-meta { font-family: var(--font-mono); font-size: 1.25vmin; color: var(--ink-700); letter-spacing: 0.04em; line-height: 1.6; margin-top: 0.4vmin; }
-  .yj-video { display: inline-flex; align-items: center; gap: 0.5vmin; font-size: 1.2vmin; color: var(--ok-ink); background: var(--ok-bg); border: 1px solid var(--ok-border); padding: 0.4vmin 1vmin; border-radius: 9999px; font-weight: 600; align-self: flex-start; letter-spacing: 0.06em; text-transform: uppercase; }
-  .yj-quote { background: var(--surface); border-radius: 8px; padding: 1.8vmin; font-size: 1.6vmin; line-height: 1.55; color: var(--ink-900); font-style: italic; border-left: 3px solid var(--indigo); }
-  .yj-quote .attrib { display: block; margin-top: 0.7vmin; font-style: normal; font-size: 1.2vmin; color: var(--ink-500); font-family: var(--font-mono); letter-spacing: 0.04em; }
-  .yj-bottom-quote { margin-top: auto; padding-top: 1.5vmin; font-size: 1.4vmin; color: var(--indigo-ink); line-height: 1.55; font-style: italic; border-top: 1px solid rgba(91, 91, 214, 0.2); }
+  .yj-grid { display: grid; grid-template-columns: 1fr 1.3fr; gap: 5vmin; margin-top: 3vmin; align-items: start; }
+  .yj-card-left { display: flex; flex-direction: column; gap: 2.4vmin; }
+  .yj-name { font-size: 4vmin; font-weight: 600; color: var(--ink-900); letter-spacing: -0.02em; line-height: 1; }
+  .yj-meta { font-size: 1.5vmin; color: var(--ink-500); line-height: 1.7; }
+  .yj-quote { font-size: 2vmin; line-height: 1.5; color: var(--ink-900); font-weight: 500; }
+  .yj-quote .attrib { display: block; margin-top: 1.2vmin; font-size: 1.3vmin; color: var(--ink-500); font-weight: 400; }
 
-  .yj-conclusions { display: flex; flex-direction: column; gap: 1.2vmin; }
-  .yj-conclusions .ttl { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); margin-bottom: 0.4vmin; text-transform: uppercase; }
-  .yj-concl-item { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 1.4vmin 1.7vmin; display: grid; grid-template-columns: 3vmin 1fr; gap: 1.3vmin; align-items: start; }
-  .yj-concl-item .n { font-size: 1.9vmin; font-weight: 600; line-height: 1; color: var(--indigo); font-variant-numeric: tabular-nums; }
-  .yj-concl-item .body { display: flex; flex-direction: column; gap: 0.3vmin; }
-  .yj-concl-item .ti { font-size: 1.55vmin; font-weight: 600; color: var(--ink-900); line-height: 1.3; }
-  .yj-concl-item .desc { font-size: 1.3vmin; color: var(--ink-700); line-height: 1.55; }
-  .yj-concl-item .ref { font-family: var(--font-mono); font-size: 1.2vmin; color: var(--ink-400); margin-top: 0.2vmin; }
+  .yj-conclusions { display: flex; flex-direction: column; gap: 2vmin; }
+  .yj-concl-item { display: grid; grid-template-columns: 3vmin 1fr; gap: 1.5vmin; align-items: baseline; }
+  .yj-concl-item .n { font-size: 1.4vmin; font-weight: 600; line-height: 1; color: var(--ink-400); font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+  .yj-concl-item .body { display: flex; flex-direction: column; gap: 0.4vmin; }
+  .yj-concl-item .ti { font-size: 1.7vmin; font-weight: 600; color: var(--ink-900); line-height: 1.4; }
+  .yj-concl-item .desc { font-size: 1.4vmin; color: var(--ink-500); line-height: 1.55; }
 
-  /* === SLIDE 7B (now 8): Yan Jing Q-threads === */
-  .qthread-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.8vmin; margin-top: 1.5vmin; }
-  .qthread-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 1.7vmin 1.9vmin; display: flex; flex-direction: column; gap: 0.9vmin; }
-  .qthread-card .badge { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--indigo-ink); text-transform: uppercase; }
-  .qthread-card .quote { font-size: 1.5vmin; line-height: 1.5; color: var(--ink-900); font-style: italic; padding: 0.9vmin 1.1vmin; background: var(--canvas); border-left: 2px solid var(--indigo); border-radius: 0 4px 4px 0; }
-  .qthread-card .quote .attrib { display: block; margin-top: 0.4vmin; font-style: normal; font-size: 1.2vmin; color: var(--ink-400); font-family: var(--font-mono); letter-spacing: 0.04em; }
-  .qthread-card .arrow-row { display: grid; grid-template-columns: 2.2vmin 1fr; gap: 0.7vmin; align-items: start; }
-  .qthread-card .arrow-row .arrow { color: var(--indigo); font-weight: 700; font-family: var(--font-mono); font-size: 1.25vmin; }
-  .qthread-card .arrow-row .text { font-size: 1.25vmin; color: var(--ink-700); line-height: 1.55; }
-  .qthread-card .arrow-row .text b { color: var(--ink-900); }
-  .qthread-card .ref { font-family: var(--font-mono); color: var(--ink-400); font-size: 1.2vmin; padding-top: 0.6vmin; border-top: 1px dashed var(--line); }
+  /* === SLIDE 7: Yan Jing Q-threads · vertical numbered flow === */
+  .qthread-list {
+    display: flex; flex-direction: column;
+    gap: 0;
+    margin-top: var(--gap-title);
+  }
+  .qthread-row {
+    display: grid;
+    grid-template-columns: 4vmin 1fr 1fr;
+    gap: 3vmin;
+    align-items: start;
+    padding: 2.4vmin 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .qthread-row:first-child { padding-top: 0; }
+  .qthread-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .qthread-row .num {
+    font-family: var(--font-mono);
+    font-size: 1.5vmin;
+    font-weight: 700;
+    color: var(--ink-300);
+    letter-spacing: 0.06em;
+    line-height: 1.4;
+  }
+  .qthread-row .quote {
+    font-size: 1.95vmin;
+    line-height: var(--lh-display);
+    color: var(--ink-900);
+    font-weight: 500;
+    letter-spacing: -0.005em;
+  }
+  .qthread-row .quote .src {
+    display: block;
+    margin-top: 0.8vmin;
+    font-size: 1.15vmin;
+    color: var(--ink-400);
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+    font-weight: 600;
+    font-style: normal;
+  }
+  .qthread-row .arrow {
+    display: none;
+  }
+  .qthread-row .decision {
+    display: flex; flex-direction: column;
+    gap: 0.6vmin;
+    padding-left: 2.5vmin;
+    border-left: 2px solid var(--indigo-soft);
+  }
+  .qthread-row .decision .lbl {
+    font-family: var(--font-mono);
+    font-size: 1.1vmin;
+    font-weight: 700;
+    color: var(--indigo-ink);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .qthread-row .decision .what {
+    font-size: 1.65vmin;
+    font-weight: 600;
+    color: var(--ink-900);
+    line-height: var(--lh-display);
+  }
+  .qthread-row .decision .how {
+    font-size: 1.4vmin;
+    color: var(--ink-500);
+    line-height: var(--lh-meta);
+  }
 
-  /* === SLIDE 9: Other 2 interviews · cleaner === */
-  .methodology-strip { display: grid; grid-template-columns: 2fr 1fr; gap: 5vmin; margin-bottom: 3vmin; padding-bottom: 2.5vmin; border-bottom: 1px solid var(--line); }
-  .meth-block { display: flex; flex-direction: column; gap: 1.2vmin; }
-  .meth-block .lbl { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); text-transform: uppercase; }
-  .q-list { display: flex; flex-direction: column; gap: 0.6vmin; }
-  .q-item { display: grid; grid-template-columns: 2.4vmin 1fr; gap: 0.8vmin; align-items: baseline; font-size: 1.4vmin; color: var(--ink-700); line-height: 1.55; }
-  .q-item .qn { font-family: var(--font-mono); font-size: 1.25vmin; color: var(--indigo); font-weight: 700; }
-  .funnel-row { display: grid; grid-template-columns: 4.5vmin 1fr; gap: 1vmin; align-items: baseline; font-size: 1.4vmin; line-height: 1.55; padding: 0.5vmin 0; }
-  .funnel-row .n { font-size: 1.7vmin; font-weight: 700; color: var(--ink-900); font-variant-numeric: tabular-nums; line-height: 1; }
-  .funnel-row .desc { color: var(--ink-700); }
-  .funnel-row .desc b { color: var(--ink-900); font-weight: 600; }
-  .funnel-row.miss .n { color: var(--ink-300); }
-  .funnel-row.miss .desc { color: var(--ink-500); }
+  /* === SLIDE 8: Recruitment funnel + 2 cleaner CPA cards === */
+  .recruit-funnel {
+    display: grid;
+    grid-template-columns: 14vmin 1fr;
+    gap: var(--gap-card);
+    align-items: start;
+    margin-top: var(--gap-title);
+    padding: 2vmin var(--pad-card-lg);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--rad-card);
+  }
+  .recruit-funnel .label {
+    font-family: var(--font-mono);
+    font-size: 1.2vmin;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--ink-500);
+    text-transform: uppercase;
+    padding-top: 0.4vmin;
+  }
+  .recruit-funnel .label .sub {
+    display: block;
+    margin-top: 0.5vmin;
+    font-size: 1.1vmin;
+    color: var(--ink-400);
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: none;
+  }
+  .recruit-funnel .rows {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5vmin;
+  }
+  .recruit-funnel .step {
+    display: flex; flex-direction: column;
+    gap: 0.4vmin;
+    padding-left: 1.5vmin;
+    border-left: 2px solid var(--line);
+  }
+  .recruit-funnel .step.hit { border-left-color: var(--ok-ink); }
+  .recruit-funnel .step.miss { border-left-color: var(--ink-300); }
+  .recruit-funnel .step .n {
+    font-family: var(--font-mono);
+    font-size: 1.15vmin;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--ink-400);
+    text-transform: uppercase;
+  }
+  .recruit-funnel .step.hit .n { color: var(--ok-ink); }
+  .recruit-funnel .step .what {
+    font-size: 1.5vmin;
+    font-weight: 600;
+    color: var(--ink-900);
+    line-height: var(--lh-display);
+  }
+  .recruit-funnel .step.miss .what { color: var(--ink-400); }
+  .recruit-funnel .step .who {
+    font-size: 1.25vmin;
+    color: var(--ink-500);
+    line-height: var(--lh-meta);
+  }
 
-  .other-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5vmin; align-items: stretch; }
-  .other-card { display: flex; flex-direction: column; gap: 1.5vmin; }
-  .other-card .badge { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); text-transform: uppercase; }
-  .other-card .name { font-size: 2.8vmin; font-weight: 600; color: var(--ink-900); letter-spacing: -0.02em; line-height: 1; }
-  .other-card .meta { font-family: var(--font-mono); font-size: 1.3vmin; color: var(--ink-500); letter-spacing: 0.04em; line-height: 1.6; padding-bottom: 1.2vmin; border-bottom: 1px solid var(--line); }
-  .other-section { padding: 0.5vmin 0; }
-  .other-section + .other-section { margin-top: 0.8vmin; padding-top: 1.2vmin; border-top: 1px dashed var(--line); }
-  .other-section .lbl { font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.1em; color: var(--indigo); margin-bottom: 0.5vmin; font-family: var(--font-mono); text-transform: uppercase; }
-  .other-section .text { font-size: 1.45vmin; color: var(--ink-700); line-height: 1.65; }
+  .interview-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gap-card);
+    margin-top: var(--gap-section);
+  }
+  .interview-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--rad-card);
+    padding: var(--pad-card-lg);
+    display: flex; flex-direction: column;
+    gap: 1.2vmin;
+  }
+  .interview-card .head {
+    display: flex; align-items: baseline; gap: 1.2vmin;
+    padding-bottom: 1.2vmin;
+    border-bottom: 1px solid var(--line);
+  }
+  .interview-card .who {
+    font-size: 2.6vmin;
+    font-weight: 600;
+    color: var(--ink-900);
+    line-height: 1;
+    letter-spacing: -0.015em;
+  }
+  .interview-card .meta {
+    font-size: 1.35vmin;
+    color: var(--ink-500);
+    line-height: var(--lh-meta);
+  }
+  .interview-card .finding {
+    font-size: 1.55vmin;
+    color: var(--ink-700);
+    line-height: var(--lh-body);
+  }
+  .interview-card .finding b { color: var(--ink-900); font-weight: 600; }
+  .interview-card .changed {
+    margin-top: auto;
+    padding: 1vmin 1.3vmin;
+    background: var(--indigo-soft);
+    border-radius: 6px;
+    font-size: 1.3vmin;
+    color: var(--indigo-ink);
+    line-height: var(--lh-meta);
+  }
+  .interview-card .changed b { font-weight: 700; }
 
-  /* === SLIDE 9: Insights === */
-  .insights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.2vmin; margin-top: 2.5vmin; }
-  .insight-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.5vmin; display: flex; gap: 1.8vmin; align-items: flex-start; }
-  .insight-card .num { font-size: 3.5vmin; font-weight: 600; color: var(--indigo); line-height: 1; letter-spacing: -0.02em; min-width: 4.5vmin; font-variant-numeric: tabular-nums; }
-  .insight-card .body { flex: 1; }
-  .insight-card .title { font-size: 1.9vmin; font-weight: 600; color: var(--ink-900); margin-bottom: 0.6vmin; line-height: 1.3; letter-spacing: -0.005em; }
-  .insight-card .text { font-size: 1.4vmin; color: var(--ink-700); line-height: 1.6; }
+  .method-disclaimer {
+    margin-top: var(--gap-section);
+    font-size: 1.2vmin;
+    color: var(--ink-400);
+    font-style: italic;
+    line-height: var(--lh-meta);
+    text-align: center;
+  }
+
+  /* === SLIDE 9: Insights · vertical, larger, with backref === */
+  .insights-list {
+    display: flex; flex-direction: column;
+    gap: 0;
+    margin-top: var(--gap-title);
+  }
+  .insight-row {
+    display: grid;
+    grid-template-columns: 4vmin 1fr 14vmin;
+    gap: 3vmin;
+    align-items: baseline;
+    padding: 2.4vmin 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .insight-row:first-child { padding-top: 0; }
+  .insight-row:last-child { border-bottom: none; }
+  .insight-row .num {
+    font-family: var(--font-mono);
+    font-size: 1.5vmin;
+    font-weight: 700;
+    color: var(--ink-300);
+    letter-spacing: 0.06em;
+  }
+  .insight-row .body { display: flex; flex-direction: column; gap: 0.6vmin; }
+  .insight-row .title {
+    font-size: 2.6vmin;
+    font-weight: 600;
+    color: var(--ink-900);
+    line-height: var(--lh-display);
+    letter-spacing: -0.01em;
+  }
+  .insight-row .text {
+    font-size: 1.55vmin;
+    color: var(--ink-500);
+    line-height: var(--lh-body);
+  }
+  .insight-row .src {
+    font-family: var(--font-mono);
+    font-size: 1.15vmin;
+    font-weight: 600;
+    color: var(--ink-400);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-align: right;
+    line-height: var(--lh-meta);
+  }
 
   /* === SLIDE 10: Solution + Demo CTA === */
   .mockup { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; box-shadow: var(--overlay); margin-top: 1.5vmin; height: 56vmin; display: flex; flex-direction: column; }
@@ -387,15 +646,69 @@
   .feat-table .day1 { color: var(--ok-ink); font-weight: 600; }
   .feat-table .p1 { color: var(--ink-500); }
 
-  /* === SLIDE 13: Integrations === */
-  .int-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.8vmin; margin-top: 2.5vmin; }
-  .int-tier { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 2.4vmin; display: flex; flex-direction: column; gap: 1.3vmin; }
-  .int-tier .label { font-family: var(--font-mono); font-size: 1.2vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--ink-500); text-transform: uppercase; }
-  .int-tier .when { font-size: 1.5vmin; font-weight: 600; color: var(--ink-900); line-height: 1.3; }
-  .int-list { display: flex; flex-direction: column; gap: 0.4vmin; flex: 1; }
-  .int-list .item { font-size: 1.3vmin; color: var(--ink-700); padding: 0.5vmin 0; border-bottom: 1px dashed var(--line); }
-  .int-list .item:last-child { border-bottom: none; }
-  .int-tier .why { display: none; }
+  /* === SLIDE 13: Integrations · 三栏，CPA 视角 === */
+  .int-anchor {
+    margin-top: var(--gap-eyebrow);
+    margin-bottom: var(--gap-title);
+    padding: 1.5vmin 2vmin;
+    background: var(--sunken);
+    border-left: 3px solid var(--ink-700);
+    border-radius: 4px;
+    font-size: 1.5vmin;
+    color: var(--ink-700);
+    line-height: var(--lh-body);
+    font-style: italic;
+  }
+  .int-anchor .who {
+    font-family: var(--font-mono);
+    font-size: 1.1vmin;
+    font-weight: 700;
+    color: var(--ink-500);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-right: 1vmin;
+    font-style: normal;
+  }
+  .int-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--gap-card);
+  }
+  .int-tier {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--rad-card);
+    padding: var(--pad-card-lg);
+    display: flex; flex-direction: column;
+    gap: 1.4vmin;
+  }
+  .int-tier.kill { background: var(--sunken); border-style: dashed; }
+  .int-tier .verb {
+    font-size: 2.4vmin;
+    font-weight: 600;
+    color: var(--ink-900);
+    line-height: var(--lh-display);
+    letter-spacing: -0.01em;
+  }
+  .int-tier.kill .verb { color: var(--danger-ink); }
+  .int-tier .why {
+    font-size: 1.4vmin;
+    color: var(--ink-500);
+    line-height: var(--lh-body);
+    padding-bottom: 1.2vmin;
+    border-bottom: 1px solid var(--line);
+  }
+  .int-list {
+    display: flex; flex-direction: column;
+    gap: 0.7vmin;
+  }
+  .int-list .item {
+    font-size: 1.45vmin;
+    color: var(--ink-900);
+    font-weight: 500;
+    line-height: var(--lh-meta);
+  }
+  .int-tier.kill .int-list .item { color: var(--ink-500); text-decoration: line-through; text-decoration-color: var(--danger-border); }
 
   /* === SLIDE 15: 现状 === */
   .stat-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2vmin; margin-bottom: 2.5vmin; padding-bottom: 2.5vmin; border-bottom: 1px solid var(--line); }
@@ -431,38 +744,130 @@
   .phase-card .feat::before { content: "·"; margin-right: 0.5vmin; color: var(--ink-400); font-weight: 700; }
   .phase-card .hook { display: none; }
 
-  /* === SLIDE 17: Forever-no + Memorable closing === */
-  .closing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3vmin; margin-top: 2vmin; }
-  .forever-col h3 { font-size: 1.35vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--danger-ink); margin-bottom: 1.3vmin; font-family: var(--font-mono); text-transform: uppercase; }
-  .forever-list { display: flex; flex-direction: column; gap: 0.6vmin; }
-  .forever-item { padding: 0.9vmin 1.2vmin; background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--danger-border); border-radius: 6px; display: grid; grid-template-columns: 1fr auto; gap: 1.3vmin; align-items: baseline; }
-  .forever-item .what { font-size: 1.35vmin; color: var(--ink-900); font-weight: 500; }
-  .forever-item .why { display: none; }
-
-  .memorable-col h3 { font-size: 1.35vmin; font-weight: 700; letter-spacing: 0.12em; color: var(--indigo-ink); margin-bottom: 1.3vmin; font-family: var(--font-mono); text-transform: uppercase; }
-  .memorable-list { display: flex; flex-direction: column; gap: 1vmin; }
-  .memorable-item {
-    padding: 1.4vmin 1.7vmin;
-    background: var(--surface); border: 1px solid var(--line);
-    border-radius: 8px;
-    display: grid; grid-template-columns: 3vmin 1fr; gap: 1.2vmin; align-items: start;
+  /* === SLIDE 16: Closing · 4 takeaways 主角 + forever-no chip strip === */
+  .forever-strip {
+    display: flex; flex-wrap: wrap;
+    gap: 0.6vmin;
+    margin-top: var(--gap-eyebrow);
+    margin-bottom: var(--gap-title);
+    align-items: center;
   }
-  .memorable-item .num { font-size: 1.8vmin; font-weight: 600; color: var(--indigo); line-height: 1; font-variant-numeric: tabular-nums; }
-  .memorable-item .body { display: flex; flex-direction: column; gap: 0.3vmin; }
-  .memorable-item .punch { font-size: 1.5vmin; font-weight: 600; color: var(--ink-900); line-height: 1.35; letter-spacing: -0.005em; }
-  .memorable-item .src { font-size: 1.2vmin; color: var(--ink-500); font-family: var(--font-mono); letter-spacing: 0.04em; }
+  .forever-strip .lbl {
+    font-family: var(--font-mono);
+    font-size: 1.1vmin;
+    font-weight: 700;
+    color: var(--danger-ink);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-right: 0.8vmin;
+  }
+  .forever-strip .chip {
+    padding: 0.4vmin 1vmin;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 9999px;
+    font-size: 1.25vmin;
+    color: var(--ink-700);
+    font-weight: 500;
+  }
+
+  .takeaway-list {
+    display: flex; flex-direction: column;
+    gap: var(--gap-card);
+    margin-top: var(--gap-eyebrow);
+  }
+  .takeaway {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--rad-card);
+    padding: 2vmin 2.4vmin;
+    display: grid;
+    grid-template-columns: 4vmin 1fr;
+    gap: 2vmin;
+    align-items: baseline;
+  }
+  .takeaway .num {
+    font-family: var(--font-mono);
+    font-size: 1.5vmin;
+    font-weight: 700;
+    color: var(--indigo);
+    letter-spacing: 0.06em;
+  }
+  .takeaway .punch {
+    font-size: 2.2vmin;
+    font-weight: 600;
+    color: var(--ink-900);
+    line-height: var(--lh-display);
+    letter-spacing: -0.01em;
+  }
+  .takeaway .punch a { color: var(--indigo); border-bottom: 1px solid var(--indigo-soft); }
+  .takeaway .src {
+    margin-top: 0.5vmin;
+    font-size: 1.2vmin;
+    color: var(--ink-500);
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+    line-height: var(--lh-meta);
+  }
 
   /* Notes panel + help overlay */
   .notes-panel { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(15, 23, 42, 0.96); color: #e2e8f0; padding: 2vmin 4vmin; font-size: 1.5vmin; line-height: 1.65; transform: translateY(100%); transition: transform 200ms ease; z-index: 100; max-height: 40vh; overflow-y: auto; border-top: 1px solid rgba(255,255,255,0.1); }
   .notes-panel.open { transform: translateY(0); }
   .notes-panel .label { font-size: 1.2vmin; letter-spacing: 0.12em; color: #94a3b8; margin-bottom: 0.6vmin; font-weight: 600; text-transform: uppercase; font-family: var(--font-mono); }
 
-  .help-overlay { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(15, 23, 42, 0.96); color: #e2e8f0; padding: 3vmin; border-radius: 8px; font-size: 1.5vmin; z-index: 200; display: none; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+  .help-overlay {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--surface);
+    color: var(--ink-900);
+    padding: 3.2vmin 3.6vmin;
+    border-radius: 12px;
+    font-size: 1.5vmin;
+    z-index: 200;
+    display: none;
+    min-width: 38vmin;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.32), 0 0 0 1px var(--line);
+    font-family: var(--font);
+  }
   .help-overlay.open { display: block; }
-  .help-overlay h3 { font-size: 2vmin; margin-bottom: 1.5vmin; color: #fbbf24; font-weight: 600; }
-  .help-overlay .key-row { display: flex; justify-content: space-between; gap: 4vmin; margin-bottom: 0.6vmin; align-items: baseline; }
-  .help-overlay kbd { font-family: var(--font-mono); background: rgba(255,255,255,0.1); padding: 0.2vmin 0.7vmin; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); font-size: 1.3vmin; }
-  .help-overlay .desc { color: #94a3b8; }
+  .help-overlay h3 {
+    font-size: 1.3vmin;
+    margin-bottom: 2vmin;
+    padding-bottom: 1.2vmin;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink-500);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-family: var(--font-mono);
+  }
+  .help-overlay .key-row {
+    display: grid;
+    grid-template-columns: 9vmin 1fr;
+    gap: 2.4vmin;
+    margin-bottom: 1.1vmin;
+    align-items: baseline;
+  }
+  .help-overlay .key-row:last-child { margin-bottom: 0; }
+  .help-overlay kbd {
+    font-family: var(--font-mono);
+    background: var(--sunken);
+    padding: 0.4vmin 0.9vmin;
+    border-radius: 5px;
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    font-size: 1.25vmin;
+    font-weight: 600;
+    color: var(--ink-900);
+    line-height: 1.4;
+    text-align: center;
+    min-width: 3vmin;
+  }
+  .help-overlay .desc {
+    color: var(--ink-700);
+    font-size: 1.4vmin;
+    line-height: var(--lh-meta);
+  }
 
   @media print {
     @page { size: 16in 9in; margin: 0; }
@@ -498,9 +903,8 @@
 <section class="slide center" data-num="02" data-title="场景 · 真实访谈" data-notes="不是合成的故事 — 这是真实访谈里的一句话，来自 strategy-02-problem-statement.md。读得慢。停在「6 个客户已经过了原 deadline」让它落下。然后再读底部那一行 context — 让观众明白这不是孤立事件。">
   <div class="micro eyebrow">访谈记录 · 一位匿名 solo CPA</div>
   <div class="scene-quote-wrap">
-    <div class="scene-quote">「从客户的群消息里，<br>我才知道 IRS 给 LA County 延了期。<br><span class="accent">6 个客户已经过了原 deadline。</span>」</div>
-    <div class="scene-attrib">strategy-02-problem-statement.md · 真实访谈记录</div>
-    <div class="scene-context">这不是孤立事件。50 个州、几百个公告/年、CPA 没工具盯。</div>
+    <div class="scene-quote"><span class="accent">50 个州 + IRS · 每年几百条公告。</span><br>几十个客户 · 上百份 deadline · 一个 CPA。<br>人脑跑不动。</div>
+    <div class="scene-context">漏一条 — 客户被罚款。CPA 道歉，有时候自己赔。</div>
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
@@ -510,30 +914,50 @@
 </section>
 
 <!-- 3. 痛点 · 量超过单人能力 -->
-<section class="slide center" data-num="03" data-title="痛点 · 量超过单人能力" data-notes="痛点的结构是「要追的太多 + 重复劳动 — 单人撑不住」，不是「客户先告诉我」那种戏剧。Slide 2 给了一个 miss 的真实例子，slide 3 拆开 miss 是怎么发生的：周一从头拼 / 三周追料漏 / 50 州盯不过来 / 同样工作做几百遍。最后一行是长尾 — partner 走人知识断。讲的时候连贯：「Slide 2 那个 6 个客户漏 deadline，不是个例。她每周都在和这四件事打架——」">
-  <div class="micro eyebrow">Sarah Mitchell · 痛的不是不方便，是量超过单人能力</div>
-  <h2 class="h1">每周四件事，全靠她一个人记。</h2>
+<section class="slide center" data-num="03" data-title="痛点 · 四位 CPA 同一组瓶颈" data-notes="痛点不是「Sarah 一个人扛」— 是「我们访的每一位 CPA 都撞到同样四件事」。Sarah 是 persona（基于 01-product-brief.md），其余三位（Yan Jing 660 行录像 / L. Discord 招到 / M. 人脉介绍）都是真实访谈。每张卡片底部 2 个 voice — 让评委看到痛点收敛。最后一条蓝条是落点：四位独立来源、痛点完全一致 = 不是个例，是结构性瓶颈。">
+  <div class="micro eyebrow">三场访谈 + 一位 persona · 痛点完全收敛</div>
+  <h2 class="h1">四位 CPA · 同一组瓶颈反复出现。</h2>
   <div class="pain-grid">
     <div class="pain-card">
-      <div class="pain-title">周一早上从头拼一次</div>
-      <div class="pain-body">200+ 行 Excel · 跨州 · 跨实体 · 跨税种 — 一个人记不下来。每周一都得把上周漏的事再捡一遍。</div>
-      <div class="pain-quote">「光是想清楚这周要做什么，就花掉我比真正做事还多的时间。」<span class="src">— Sarah Mitchell · 01-product-brief.md</span></div>
+      <div class="head">
+        <span class="num">01</span>
+        <div class="pain-title">周一早上从头拼一次</div>
+      </div>
+      <div class="voices">
+        <div class="voice"><span class="who">SARAH · persona</span><span><em>「想清楚这周做什么，比真正做事还花时间。」</em></span></div>
+        <div class="voice"><span class="who">L. · 40 客户</span><span>周一花 30 分钟拼凑上周的事。</span></div>
+      </div>
     </div>
     <div class="pain-card">
-      <div class="pain-title">三周追料 · 总归漏一个</div>
-      <div class="pain-body">截止前 3 周开始追材料，邮件分散在 inbox 里。客户回的、没回的、回错的 — 量一大就一定漏。</div>
-      <div class="pain-quote">「确认客户给齐 100% 没 — 解决这一个，我立刻付钱。」<span class="src">— Yan Jing · 660 行访谈</span></div>
+      <div class="head">
+        <span class="num">02</span>
+        <div class="pain-title">三周追料 · 总归漏一个</div>
+      </div>
+      <div class="voices">
+        <div class="voice"><span class="who">YAN JING · 600 客户</span><span><em>「确认客户给齐没 — 解决这一个我立刻付钱。」</em></span></div>
+      </div>
     </div>
     <div class="pain-card">
-      <div class="pain-title">50 州公告 · 一个人盯不过来</div>
-      <div class="pain-body">50 个州税务局每年发几百条公告。单个 CPA 一天看不完所有州的网站。漏不是「会不会」，是「漏多少」。</div>
-      <div class="pain-quote">「Scanning 50 state authority websites daily is not something any solo practitioner actually does.」<span class="src">— strategy-02-problem-statement.md</span></div>
+      <div class="head">
+        <span class="num">03</span>
+        <div class="pain-title">50 州公告 · 一个人盯不过来</div>
+      </div>
+      <div class="voices">
+        <div class="voice"><span class="who">STRATEGY-02</span><span><em>「Scanning 50 state websites daily is not something any solo practitioner actually does.」</em></span></div>
+      </div>
+    </div>
+    <div class="pain-card">
+      <div class="head">
+        <span class="num">04</span>
+        <div class="pain-title">同样的工作做几百遍</div>
+      </div>
+      <div class="voices">
+        <div class="voice"><span class="who">YAN JING · 600 客户</span><span><em>「40% 时间花在从头滚一遍的事上。」</em></span></div>
+        <div class="voice"><span class="who">M. · 5 人事务所</span><span>partner 退休 = 客户习惯全断。</span></div>
+      </div>
     </div>
   </div>
-  <div class="pain-extra">
-    <span class="lead-in">+ 长尾</span>
-    <span><strong style="color: var(--ink-900);">同样的工作做几百遍</strong>：workpaper 每年滚一遍 · 同样的 12 封邮件追不同客户（Yan Jing：40% prep 时间在 rollover）。<strong style="color: var(--ink-900);">+ partner 退休知识断</strong>：哪家基金 K-1 总是 8 月才到、谁去年漏报 Schedule E — 全在 partner 脑子里，走一个人事务所价值掉一半（M. 访谈）。</span>
-  </div>
+  <div class="pain-converge">四位独立来源 · 痛点 1:1 收敛 — 不是个例，是 <b>~45K 家</b> 美国独立 / 小事务所共有的结构性瓶颈。</div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
     <span class="center"><span class="num">03</span>痛点</span>
@@ -543,8 +967,8 @@
 
 <!-- 4. 竞争对手 (精确 · 可辩护) -->
 <section class="slide center" data-num="04" data-title="竞争 · 6 行可辩护的差异" data-notes="重写为 6 行可辩护的差异。删了之前两行含糊的（Solo CPA 友好、deadline 基础）— 那两行容易被对手反驳。现在每一行都能站得住脚：state 监控独有、affected-client 匹配独有、24h SLA 独有、AI 跨年 pattern 独有、年付/月付差异、永不做 portal/vault/计费 — 这一行反过来证明纪律。">
-  <div class="micro eyebrow">竞争 · 6 行可辩护的差异</div>
-  <h2 class="h1">没有一家做这一行。</h2>
+  <div class="micro eyebrow">竞争 · 同行做了什么、没做什么</div>
+  <h2 class="h1">这六件事，谁做了，谁没做。</h2>
   <table class="compete-table">
     <thead>
       <tr>
@@ -557,10 +981,9 @@
       </tr>
     </thead>
     <tbody>
-      <tr style="background: var(--sunken);"><td class="cap" style="font-style: italic; color: var(--ink-500);">威胁等级 · 资金 / 阶段</td><td class="us-col" style="color: var(--indigo); font-weight: 700;">起步</td><td style="color: var(--warn-ink); font-weight: 700;">M · bootstrap</td><td style="color: var(--warn-ink); font-weight: 700;">M · VC 多轮</td><td style="color: var(--ok-ink); font-weight: 700;">L · ~$237M VC</td><td style="color: var(--danger-ink); font-weight: 700;">H · 30 年老厂</td></tr>
       <tr><td class="cap">50 州税务公告实时监控</td><td class="us-col yes">✓ 独有</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
       <tr><td class="cap">公告 ↔ 受影响客户自动交叉</td><td class="us-col yes">✓ 独有</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
-      <tr><td class="cap">灾情延期 24h SLA</td><td class="us-col yes">✓ 独有</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
+      <tr><td class="cap">灾情延期 24 小时内推送</td><td class="us-col yes">✓ 独有</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td></tr>
       <tr><td class="cap">AI 跨年 pattern 识别（per-client 时机）</td><td class="us-col yes">✓ 独有</td><td class="partial">滚动复制</td><td class="partial">AI agents</td><td class="partial">表单填充</td><td class="no">—</td></tr>
       <tr><td class="cap">月付 · 无年付硬绑</td><td class="us-col yes">✓ $29–99/mo</td><td class="partial">年付为主</td><td class="no">年付</td><td class="no">年付</td><td class="partial">桌面买断</td></tr>
       <tr><td class="cap">客户 portal · 文件 vault · 计费</td><td class="us-col partial">永不做</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
@@ -576,7 +999,7 @@
 <!-- 5. 机会 -->
 <section class="slide center" data-num="05" data-title="机会 · why now + 市场" data-notes="Why now + 市场。三件事让生意现在才成立。LLM 这一条不靠具体数字（$3-5/firm/mo 是 forward estimate，未经规模验证）— 改成结构性 claim：这门生意 5 年前是 Bloomberg 数千美元/年订阅，现在 LLM 让独立工具能做。市场自下而上 ~$22M ARR — 楔子小，承认。但平台扩展路径清晰：Y3 顾问层 $200-500/seat、Y5 firm brain $1K-5K/seat、邻接行业 5×。这一页直面「TAM 太小」反对意见。">
   <div class="micro eyebrow">机会 · Why now + 市场</div>
-  <h2 class="h1">三件事，刚好凑在今年。</h2>
+  <h2 class="h1">现在正是时候。</h2>
   <div class="opp-grid" style="margin-top: 2.2vmin;">
     <div class="opp-stack">
       <div class="opp-row">
@@ -585,23 +1008,23 @@
       </div>
       <div class="opp-row">
         <div class="label">老牌在崩</div>
-        <div class="text"><span class="strong">File In Time 2026 还是 Windows 安装包。</span><br><span class="sub">桌面架构无法做云端 24h SLA。结构跟不上。</span></div>
+        <div class="text"><span class="strong">File In Time 2026 还是 Windows 安装包。</span><br><span class="sub">桌面架构没法做云端 24 小时内推送。结构跟不上。</span></div>
       </div>
       <div class="opp-row">
         <div class="label">Suite 疲劳</div>
-        <div class="text"><span class="strong">TaxDome 年付绑定 + 10–15 小时安装。</span><br><span class="sub">Capterra 上每个差评都在喊"我要一个层，不要又一个套件"。</span></div>
+        <div class="text"><span class="strong">Yan Jing：「我有 40 个软件工具，最怕新东西不和它们说话。」</span><br><span class="sub">CPA 不缺套件，缺一个能把州公告路由到客户簿的"层"。</span></div>
       </div>
     </div>
     <div class="market-block">
-      <div class="micro" style="margin-bottom: 0.8vmin;">市场 · 自下而上</div>
-      <div class="market-num">~$22M<span class="suffix">/yr</span></div>
-      <div class="market-cap">楔子市场 · 全渗透 ARR · 美国 ~45K solo–10 人事务所</div>
+      <div class="micro" style="margin-bottom: 0.8vmin;">我们要够到的客户</div>
+      <div class="market-num">~45K<span class="suffix">家</span></div>
+      <div class="market-cap">美国独立到 10 人事务所</div>
       <div class="market-rule"></div>
       <div class="market-expansion">
-        <div style="margin-bottom: 0.7vmin;"><span class="strong">楔子小，平台不小。</span></div>
-        <div>· Y3：Layer B 顾问层 → $200–500/seat</div>
-        <div>· Y5：Firm brain 中型 firm → $1K–5K/seat</div>
-        <div>· 邻接（bookkeeper / EA / fractional CFO）<span class="strong">5× firm 数</span></div>
+        <div style="margin-bottom: 0.7vmin;"><span class="strong">入口客单价 $30–100 / 月。</span></div>
+        <div>· 加顾问功能后客单价翻 5 倍</div>
+        <div>· 卖给中型事务所再翻 10 倍</div>
+        <div>· 邻接行业（记账师 · EA · 外包 CFO）客户基数再 5 倍</div>
       </div>
     </div>
   </div>
@@ -612,214 +1035,188 @@
   </div>
 </section>
 
-<!-- 10. Insights -->
-<section class="slide center" data-num="06" data-title="洞察 · 4 条桥" data-notes="4 条核心洞察。每一条对应一组产品决策。这一页是「研究怎么变成战略」— pitch 的高潮。读 04（信任建在数据库）放慢 — 这是和「我们用 AI」最大区别 — 客户能验代码。">
-  <div class="micro eyebrow">洞察 · 研究→战略的 4 条桥</div>
-  <h2 class="h1">访谈说的不是该做什么 — 是我们之前哪里想偏了。</h2>
-  <div class="insights-grid">
-    <div class="insight-card">
-      <div class="num">01</div>
-      <div class="body">
-        <div class="title">瓶颈是供给侧，不是质量分层。</div>
-        <div class="text">所有同行假设 CPA <em>选择</em> 哪些客户得到精细服务。错。CPA 不是选 — 是没时间。AI 把天花板抬高，不替 CPA 做事。</div>
-      </div>
-    </div>
-    <div class="insight-card">
-      <div class="num">02</div>
-      <div class="body">
-        <div class="title">州公告是楔子，多年历史是壁垒。</div>
-        <div class="text">州公告独有 → 拿到 demo。多年客户历史 → 切换成本指数级增长。第一年靠楔子，第二年靠引擎。</div>
-      </div>
-    </div>
-    <div class="insight-card">
-      <div class="num">03</div>
-      <div class="body">
-        <div class="title">做"层"，不做"套件"。</div>
-        <div class="text">Yan Jing 40 个工具，最怕新东西不和它们说话。我们和 QuickBooks / Lacerte / Gmail 共生，永不替。</div>
-      </div>
-    </div>
-    <div class="insight-card">
-      <div class="num">04</div>
-      <div class="body">
-        <div class="title">信任建在数据库，不在文案。</div>
-        <div class="text">「AI 越用越懂你」是销售失败话术。§5.3 不变量「AI 永不自动确认材料齐」直接写在 DB 的 CHECK 约束里。客户可以查代码。</div>
-      </div>
-    </div>
-  </div>
-  <div class="chrome">
-    <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">06</span>洞察</span>
-    <span class="meta">Gigi Wu · 2026.05</span>
-  </div>
-</section>
-
 <!-- 7. Yan Jing 深度 -->
-<section class="slide center" data-num="07" data-title="深度访谈 · Yan Jing" data-notes="Yan Jing 是最重要的访谈。15 年合伙人，10 人事务所，600 客户跨 20 州。访谈中文为主、英文术语穿插，全程录像。访谈跨 4 个问题主线，最后浓缩成 5 条 TL;DR — 每一条都直接落到产品架构里。讲法：先放他的 verbatim 中文 quote（关于供给侧瓶颈）让 quote 自己说话；右侧 5 条 TL;DR 一条 10-15 秒过；最后底部那句「AI 不替 CPA 做决定 — AI 让 CPA 看到他原本看不到的信息」是他给的产品框架。这一页不是「我们和某 CPA 聊过」— 是「这个 CPA 写了我们一半的 PRD」。">
-  <div class="micro eyebrow">深度访谈 · 访谈 01 · 最重要的一次</div>
-  <h2 class="h1">他写了我们一半的 PRD。</h2>
+<section class="slide center" data-num="06" data-title="深度访谈 · Yan Jing" data-notes="Yan Jing 是最重要的访谈。15 年合伙人，10 人事务所，600 客户跨 20 州。访谈中文为主、英文术语穿插，全程录像。访谈跨 4 个问题主线，最后浓缩成 5 条 TL;DR — 每一条都直接落到产品架构里。讲法：先放他的 verbatim 中文 quote（关于供给侧瓶颈）让 quote 自己说话；右侧 5 条 TL;DR 一条 10-15 秒过；最后底部那句「AI 不替 CPA 做决定 — AI 让 CPA 看到他原本看不到的信息」是他给的产品框架。这一页不是「我们和某 CPA 聊过」— 是「这个 CPA 写了我们一半的 PRD」。">
+  <div class="micro eyebrow">用户研究 · 访谈 01 · 15 年合伙人 / 600 客户 / 录像</div>
   <div class="yj-grid">
     <div class="yj-card-left">
-      <div class="yj-id">
-        <div class="yj-badge">访谈 01 · Founding partner</div>
-        <div class="yj-name">Yan Jing</div>
-        <div class="yj-meta">
-          15 年合伙人 · 10 人事务所<br>
-          600 客户 · 跨 20 州 · 国际税方向<br>
-          40+ 软件工具 · SharePoint 主战场
-        </div>
-        <span class="yj-video">● 录像存档 · 660 行综合</span>
-      </div>
+      <div class="yj-name">Yan Jing</div>
+      <div class="yj-meta">15 年合伙人 · 10 人事务所 · 600 客户 · 跨 20 州 · 国际税方向<br>40+ 软件工具 · SharePoint 主战场</div>
       <div class="yj-quote">
-        "600 个客户如果每个人都去问一下的话，<br>那好多时间花在."
-        <span class="attrib">— Yan Jing · 间接承认了他记不住所有客户</span>
-      </div>
-      <div class="yj-bottom-quote">
-        「AI 不替 CPA 做决定 — AI 让 CPA 看到他原本看不到的信息。」
+        「AI 不替 CPA 做决定。AI 让 CPA 看到他原本看不到的信息。」
+        <span class="attrib">— Yan Jing · 全程录像可对照 · 660 行综合</span>
       </div>
     </div>
     <div class="yj-conclusions">
-      <div class="ttl">Notes · 5 条 TL;DR · 每一条都落进了产品</div>
       <div class="yj-concl-item">
         <span class="n">01</span>
         <div class="body">
-          <div class="ti">多年历史不是"慢慢变好"，是壁垒。</div>
-          <div class="desc">Day 1 by import — 不是 Year 2 才有。"客户读完'AI 第一年还没数据'就走了。"</div>
+          <div class="ti">多年历史是壁垒，不是"慢慢变好"的功能。</div>
+          <div class="desc">从 Day 1 import，不是 Year 2 等出来。</div>
         </div>
       </div>
       <div class="yj-concl-item">
         <span class="n">02</span>
         <div class="body">
-          <div class="ti">Onboarding 必须分 3 层，每层都见价值。</div>
-          <div class="desc">5 分钟（CSV）/ 30 分钟（一个集成）/ 持续（多年导入 + 邮件 OAuth）。每一层独立交付。</div>
+          <div class="ti">Onboarding 分三层，每层都要见价值。</div>
+          <div class="desc">5 分钟看到 / 30 分钟接一个工具 / 持续接邮件和历年。</div>
         </div>
       </div>
       <div class="yj-concl-item">
         <span class="n">03</span>
         <div class="body">
-          <div class="ti">AI 优势不是单户精度，是规模。</div>
-          <div class="desc">单户 CPA 比 AI 强。AI 的边在：让 600 个客户得到他给前 50 的关注。</div>
+          <div class="ti">AI 不是比 CPA 聪明，是替他覆盖到 600 个客户。</div>
+          <div class="desc">单户精度 CPA 赢。规模上 AI 才有意义。</div>
         </div>
       </div>
       <div class="yj-concl-item">
         <span class="n">04</span>
         <div class="body">
-          <div class="ti">邮件 + 审计轨迹是信任脊梁。</div>
-          <div class="desc">Stage 1（AI 起草、CPA 审）→ Stage 2 opt-in（满足 3 条件后自动）。Timeline 是 IRS 合规要求。</div>
+          <div class="ti">所有事必须留 audit trail。</div>
+          <div class="desc">IRS 随时可能查任何一笔。AI 起草，CPA 审；自动发要满足三个条件。</div>
         </div>
       </div>
       <div class="yj-concl-item">
         <span class="n">05</span>
         <div class="body">
-          <div class="ti">最值钱的买家：preparer→advisor 的资深合伙人。</div>
-          <div class="desc">顾问触发 + 流失预警 + 定价情报 + firm brain — 这一层付费意愿最高。</div>
+          <div class="ti">付费意愿最高的，是从「代办报税」转「做顾问」的合伙人。</div>
+          <div class="desc">顾问触发 / 流失预警 / 定价情报 — 这些功能他最愿意付。</div>
         </div>
       </div>
     </div>
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">07</span>Yan Jing 深度</span>
+    <span class="center"><span class="num">06</span>Yan Jing 深度</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
 <!-- 8. Yan Jing Q-thread mapping -->
-<section class="slide center" data-num="08" data-title="Yan Jing 访谈 · 4 个 Q-thread → 决策" data-notes="Yan Jing 的访谈是按 4 个问题主线展开的：多年历史、邮件 + 审计轨迹、双向同步、决策边界。每个 thread 都直接落进了一个产品决策。这一页把 verbatim 中文 quote 放出来 — 让访谈的真实质感传达。讲的时候每个 quote 读出来后停半秒，再读下面的产品落点。这一页是「研究 → 决策」的可追溯证据。">
-  <div class="micro eyebrow">Yan Jing 访谈 · 4 个问题主线 → 直接落进产品</div>
-  <h2 class="h1">他问的每个问题，最后都变成了产品的一个决定。</h2>
-  <div class="qthread-grid">
-    <div class="qthread-card">
-      <div class="badge">Thread Q1 · 多年历史</div>
-      <div class="quote">"为什么我要先付一年费用，然后等 AI 慢慢学？"<span class="attrib">— 对"AI 越用越懂你"营销话术的直接拒绝</span></div>
-      <div class="arrow-row"><span class="arrow">→</span><span class="text"><b>Onboarding 重写为 3 层（5 分钟 / 30 分钟 / 持续）。</b>Day 1 import = 引擎。产品文案明令禁止"AI is learning"句式。</span></div>
+<section class="slide center" data-num="07" data-title="Yan Jing 访谈 · 4 条问题主线 → 4 个产品决策" data-notes="Yan Jing 的访谈按 4 条问题主线展开：onboarding 摩擦 / audit trail / 工具共生 / 决策边界。每条都直接改了一个产品决策。讲法：每行先慢读左侧 quote 一拍，让访谈质感落下；再读右侧「我们改了」的具体行动。这页是 demo day 上「研究 → 决策」最强可追溯证据。">
+  <div class="micro eyebrow">Yan Jing 访谈 · 4 条主线 → 4 个产品决策</div>
+  <h2 class="h1">他说的，我们改了。</h2>
+  <div class="qthread-list">
+    <div class="qthread-row">
+      <div class="num">01</div>
+      <div class="quote">「为什么我要先付一年费用，然后等 AI 慢慢学？」</div>
+      <div class="decision">
+        <div class="what">Onboarding 三层 · Day 1 见价值。</div>
+        <div class="how">禁用「AI 越用越懂你」文案。</div>
+      </div>
     </div>
-    <div class="qthread-card">
-      <div class="badge">Thread Q2 · 邮件 + 审计轨迹</div>
-      <div class="quote">「CPA 行业活在 audit-trail 期待里。IRS 任何时候都可能来查任何客户的记录。事务所拿不出完整 trail = 专业责任风险。」<span class="attrib">— 访谈综合 §11.1 audit-trail（非 verbatim）</span></div>
-      <div class="arrow-row"><span class="arrow">→</span><span class="text"><b>Stage 1（AI 起草、CPA 审）→ Stage 2 opt-in（满足 3 条件后自动）。</b>activity timeline append-only · IRS 审计可导出 PDF + JSON。</span></div>
+    <div class="qthread-row">
+      <div class="num">02</div>
+      <div class="quote">「IRS 随时可能查任何客户。拿不出 trail 就是专业责任风险。」</div>
+      <div class="decision">
+        <div class="what">所有事必须可追溯。</div>
+        <div class="how">timeline 不可改，IRS 审计能直接导出。</div>
+      </div>
     </div>
-    <div class="qthread-card">
-      <div class="badge">Thread Q4 · 双向集成</div>
-      <div class="quote">"我有 40 个软件工具，最怕新东西不和它们说话。CCH 内核可能 50 年了。"<span class="attrib">— 反对 suite-replace 路线</span></div>
-      <div class="arrow-row"><span class="arrow">→</span><span class="text"><b>Karbon route（layer-not-suite）。</b>Tier 0/1/2/3 框架 · per-integration 单一 source-of-truth · CCH Axcess 进 forever-no list。</span></div>
+    <div class="qthread-row">
+      <div class="num">03</div>
+      <div class="quote">「我有 40 个软件工具，最怕新东西不和它们说话。」</div>
+      <div class="decision">
+        <div class="what">不做 suite，做层。</div>
+        <div class="how">QuickBooks / Lacerte / Gmail 共生 · 永不替。</div>
+      </div>
     </div>
-    <div class="qthread-card">
-      <div class="badge">综合 · 决策边界</div>
-      <div class="quote">"AI 不替 CPA 做决定 — AI 让 CPA 看到他原本看不到的信息。"<span class="attrib">— 整段访谈的产品框架</span></div>
-      <div class="arrow-row"><span class="arrow">→</span><span class="text"><b>绿 / 黄 / 红 区。</b>§5.3 不变量「AI 永不自动确认材料齐」直写在 DB CHECK 约束里。客户可以查代码。</span></div>
+    <div class="qthread-row">
+      <div class="num">04</div>
+      <div class="quote">「AI 不替 CPA 做决定 — AI 让 CPA 看到他原本看不到的信息。」</div>
+      <div class="decision">
+        <div class="what">分三个区做事。</div>
+        <div class="how">「永不自动确认」写进数据库 CHECK 约束。</div>
+      </div>
     </div>
-  </div>
-  <div class="caption" style="margin-top: 1.8vmin; padding: 1.2vmin 1.5vmin; background: var(--indigo-soft); border-radius: 6px; color: var(--indigo-ink); font-size: 1.3vmin; line-height: 1.6;">
-    <strong style="font-weight: 600;">+ 4 个延展 thread</strong>（A 效率层 · B 顾问关系 · C 事务所运营 · D 数据飞轮）→ 分别落到 §6 / §7 / §8 / §13。Year-1 / Year-3 / Year-5 trajectory 由此而来。
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">08</span>Yan Jing Q-thread → 决策</span>
+    <span class="center"><span class="num">07</span>Yan Jing → 决策</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
 <!-- 9. Other 2 interviews -->
-<section class="slide center" data-num="09" data-title="另两次访谈 · questionnaire + 招募" data-notes="Yan Jing 之外另两位访谈。但更重要：把方法学透明化 — questionnaire 5 问、招募 funnel（Discord 找到 1、LinkedIn DM 30+ 无人理、自有人脉介绍 1）。这是 demo day 上对手大概率没有的 evidence depth。讲的时候顺序：先指 questionnaire 5 个问题（说明研究是有结构的）→ 招募 funnel（说明真实付出 — 30+ 个 LinkedIn DM 无人理这个数字最有说服力）→ L. 和 M. 的具体发现。">
-  <div class="micro eyebrow">另两次访谈 · questionnaire + 招募 funnel</div>
-  <h2 class="h1">两段对话 · 加上不容易的招募过程。</h2>
-  <div class="methodology-strip">
-    <div class="meth-block">
-      <div class="lbl">Outreach form · 13 个问题 · 3 个主题</div>
-      <div class="q-list">
-        <div class="q-item"><span class="qn">5×</span><span><b>工作流</b> · client-by-client vs task-by-task · 优先级判断 · 客户数 / 跨州 / 当前工具 · 最易漏的环节 · 团队同步</span></div>
-        <div class="q-item"><span class="qn">5×</span><span><b>州公告</b> · 怎么知道 · 识别受影响客户多久 · 同行工具表现 · 怎么通知客户 · 自动 parse 的价值</span></div>
-        <div class="q-item"><span class="qn">3×</span><span><b>转化</b> · 试用前 30 分钟决定去留 · 自动 alert 是否解决真痛点 · 是否需要 govt 原文链接验证</span></div>
-      </div>
-    </div>
-    <div class="meth-block">
-      <div class="lbl">招募 funnel · 真实数字</div>
-      <div class="funnel-row"><span class="n">1</span><span class="desc"><b>Discord</b> r/TaxProChannel → L.</span></div>
-      <div class="funnel-row miss"><span class="n">30+</span><span class="desc"><b>LinkedIn</b> DM 无人回复</span></div>
-      <div class="funnel-row"><span class="n">1</span><span class="desc"><b>自有人脉</b>介绍 → M.</span></div>
-      <div class="funnel-row"><span class="n">1</span><span class="desc"><b>录像深访</b> → Yan Jing</span></div>
+<section class="slide center" data-num="08" data-title="另两位 CPA · 招募 funnel + 关键发现" data-notes="把研究方法摆出来：招募 funnel（Discord 1 / LinkedIn 30+ DM 无人回 / 人脉 1 / 录像深访 1）+ L. M. 各一句最强发现。30+ DM 无人回是最有说服力的数字 — 真实付出。L./M. 因隐私无录像，所以是综合非逐字。">
+  <div class="micro eyebrow">招募过程 + 另两位 CPA · 研究透明化</div>
+  <h2 class="h1">研究怎么做的，摆出来。</h2>
+  <div class="recruit-funnel">
+    <div class="label">招募 Funnel</div>
+    <div class="rows">
+      <div class="step hit"><span class="n">DISCORD</span><span class="what">L.</span><span class="who">1 · r/TaxProChannel</span></div>
+      <div class="step miss"><span class="n">LINKEDIN</span><span class="what">无人回</span><span class="who">0 / 30+ DM</span></div>
+      <div class="step hit"><span class="n">人脉</span><span class="what">M.</span><span class="who">1 · 介绍</span></div>
+      <div class="step hit"><span class="n">深访</span><span class="what">Yan Jing</span><span class="who">1 · 录像 660 行</span></div>
     </div>
   </div>
-  <div class="other-grid">
-    <div class="other-card">
-      <div class="badge">访谈 02 · Solo CPA · Discord 招募</div>
-      <div class="name">L.</div>
-      <div class="meta">3 年独立 · ~40 客户 · 跨 4 州 · Excel + Gmail + Lacerte + QBO</div>
-      <div class="other-section">
-        <div class="lbl">确认 · 供给侧框架</div>
-        <div class="text">Yan Jing 的框架在 40 客户级别一样成立。chase loop 是日常之痛，每次截止前 3 周吞掉一个周末。Q1：「周一早上 30+ 分钟拼凑上周的事。」</div>
+  <div class="interview-cards">
+    <div class="interview-card">
+      <div class="head">
+        <span class="who">L.</span>
+        <span class="meta">独立 · 40 客户 · 4 州</span>
       </div>
-      <div class="other-section">
-        <div class="lbl">新增 · 转化失败现场</div>
-        <div class="text">Q4 答 TaxDome 试用经历：第 3 个客户导入就放弃 — 觉得 80% 功能她用不上，不值得绑一年。</div>
-      </div>
-      <div class="other-section">
-        <div class="lbl">决定 · 落进产品</div>
-        <div class="text">月付、无年锁；Onboarding Layer 1 必须 5 分钟见价值（CSV + 样例数据）— 不强制集成。</div>
-      </div>
+      <div class="finding"><b>痛点和 Yan Jing 完全一致。</b>试用 TaxDome 第 3 个导入就放弃。</div>
+      <div class="changed">→ 验证 solo 是真楔子。</div>
     </div>
-    <div class="other-card">
-      <div class="badge">访谈 03 · 小事务所 Accountant · 人脉介绍</div>
-      <div class="name">M.</div>
-      <div class="meta">5 人事务所 · 2 年经验 · 分到 80 客户 · 仍在 ramp</div>
-      <div class="other-section">
-        <div class="lbl">确认 · 知识转移痛</div>
-        <div class="text">partner 把客户分配给 junior，没人系统化记下每个客户去年怎么处理。她希望系统替她记下 partner 头脑里的隐式知识。</div>
+    <div class="interview-card">
+      <div class="head">
+        <span class="who">M.</span>
+        <span class="meta">5 人事务所 · 80 客户</span>
       </div>
-      <div class="other-section">
-        <div class="lbl">新增 · 焦虑的真实形状</div>
-        <div class="text">Q2 答案核心是「未知的未知」— 差点漏的不是技术 deadline，是 partner 没交代过的客户习惯（哪家基金 K-1 总是 8 月才到等等）。</div>
-      </div>
-      <div class="other-section">
-        <div class="lbl">决定 · 落进产品</div>
-        <div class="text">Layer C「firm brain」从 P2 可选升级为 Year-5 retention 关键路径。partner 退休后他的 15 年判断不能丢。</div>
-      </div>
+      <div class="finding"><b>最怕的不是漏 deadline，是 partner 退休带走客户习惯。</b></div>
+      <div class="changed">→ per-client 历年 pattern 拉进 P0。</div>
     </div>
   </div>
-  <div class="caption" style="margin-top: 2vmin; padding-top: 1.5vmin; border-top: 1px solid var(--line); font-size: 1.2vmin; color: var(--ink-500); font-style: italic;">L. / M. 卡片里的描述是访谈综合（synthesis），不是逐字 verbatim。Yan Jing 全程录像可对照；L./M. 因隐私不便录像。</div>
+  <div class="method-disclaimer">L. / M. 因隐私不录像，引用为综合。Yan Jing 全程录像可对照。</div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">09</span>另两次访谈 · 招募 funnel</span>
+    <span class="center"><span class="num">08</span>研究方法</span>
+    <span class="meta">Gigi Wu · 2026.05</span>
+  </div>
+</section>
+
+<!-- 10. Insights -->
+<section class="slide center" data-num="09" data-title="洞察 · 4 条桥" data-notes="4 条核心洞察。每一条对应一组产品决策。这一页是「研究怎么变成战略」— pitch 的高潮。读 04（信任建在数据库）放慢 — 这是和「我们用 AI」最大区别 — 客户能验代码。">
+  <div class="micro eyebrow">前面四张访谈 → 改了我们四个判断</div>
+  <h2 class="h1">研究怎么变成战略。</h2>
+  <div class="insights-list">
+    <div class="insight-row">
+      <div class="num">01</div>
+      <div class="body">
+        <div class="title">瓶颈不是 CPA 选谁，是他没时间。</div>
+        <div class="text">同行都在假设 CPA 主动挑客户给精细服务。他没在挑 — 是顾不上。</div>
+      </div>
+      <div class="src">→ slide 03 痛点</div>
+    </div>
+    <div class="insight-row">
+      <div class="num">02</div>
+      <div class="body">
+        <div class="title">州公告拉人来，多年历史让人留下。</div>
+        <div class="text">州公告是别人没有的入口。历年导进来后，切换成本就累起来了。</div>
+      </div>
+      <div class="src">→ slide 06 Yan Jing</div>
+    </div>
+    <div class="insight-row">
+      <div class="num">03</div>
+      <div class="body">
+        <div class="title">做工具之间的一层，不替代任何一个。</div>
+        <div class="text">Yan Jing 40 个软件 — 最怕新东西不和别的说话。共生，从不替。</div>
+      </div>
+      <div class="src">→ slide 07 Q-thread 03</div>
+    </div>
+    <div class="insight-row">
+      <div class="num">04</div>
+      <div class="body">
+        <div class="title">信任写在数据库里，不在文案里。</div>
+        <div class="text">「AI 越用越懂你」是销售失败的话。「AI 永不自动确认」写进 DB CHECK。</div>
+      </div>
+      <div class="src">→ slide 07 Q-thread 04</div>
+    </div>
+  </div>
+  <div class="chrome">
+    <span class="brand">DueDate<span class="accent">HQ</span></span>
+    <span class="center"><span class="num">09</span>洞察</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
@@ -837,27 +1234,23 @@
         <span class="accent">给每个客户都做一遍。</span>
       </div>
       <div class="what-row">
-        <span class="what-chip"><span class="n">01</span>记忆</span>
-        <span class="what-chip"><span class="n">02</span>预测</span>
-        <span class="what-chip"><span class="n">03</span>确认</span>
-        <span class="what-chip"><span class="n">04</span>监控</span>
-        <span class="what-chip"><span class="n">05</span>起草</span>
-        <span class="what-aside">CPA 留：判断 · 签字 · 关系</span>
+        <span class="strong">机器替 CPA 做：</span>记忆 · 预测 · 确认 · 监控 · 起草。<br>
+        <span class="strong">CPA 留下：</span>判断 · 签字 · 关系。
       </div>
     </div>
     <div class="so-what">
-      <div class="label">→ 三层结构 · 楔子 / 主体 / 引擎</div>
+      <div class="label">对 Sarah 来说</div>
       <div class="so-what-item">
-        <span class="num">楔子</span>
-        <span class="text"><b>State alert + 受影响客户匹配。</b><br>独有能力 · 拿到 demo 的钩子 · Sarah 不再从客户那儿得知。</span>
+        <span class="num">01</span>
+        <span class="text"><b>她接得了双倍客户。</b><br>同样的精细服务，机器在背景里给每一户都做一遍。</span>
       </div>
       <div class="so-what-item">
-        <span class="num">主体</span>
-        <span class="text"><b>Chase loop AI + 文件智能。</b><br>每天用的部分 · 起草 / 异常 / 自动 checklist · Sarah 周末回家。</span>
+        <span class="num">02</span>
+        <span class="text"><b>不再从客户嘴里听到州的延期。</b><br>50 州公告进来，先告诉她哪些客户受影响、邮件已起草。</span>
       </div>
       <div class="so-what-item">
-        <span class="num">引擎</span>
-        <span class="text"><b>多年历史 + Opportunities tab。</b><br>AI 在客户簿里找 gap：advisory 触发 / 流失预警 / 定价漏 / 容量预测 — <em>她接得了双倍客户。</em></span>
+        <span class="num">03</span>
+        <span class="text"><b>周末不再加班。</b><br>追料、起草、确认 — 在背景里跑完，她周一只看异常。</span>
       </div>
     </div>
   </div>
@@ -939,31 +1332,30 @@
 
 <!-- 11. AI layer -->
 <section class="slide center" data-num="12" data-title="AI 层 · 信任建在架构里" data-notes="信任不是文案，是架构。3 区域 + 1 不变量。绿色 AI 直接做（路由邮件），黄色 AI 提议人审（出站、改状态），红色 AI 永远闭嘴（税额、audit、法规）。§5.3 不变量直接写进 DB CHECK 约束 — 读 ALTER TABLE 那句停一下。这是「AI 越用越懂你」营销话术的反义词。">
-  <div class="micro eyebrow">AI 层 · 信任建在架构里</div>
-  <h2 class="h1">AI 在哪能做、在哪绝不能 — 一条死规矩。</h2>
+  <div class="micro eyebrow">demo 里 AI 在帮 Sarah 起草、路由、生成 checklist · 它的边界写在这里</div>
   <div class="ai-grid">
     <div class="zones">
       <div class="zone green">
         <div class="zone-label">🟢 绿区 · AI 直接做</div>
-        <div class="zone-rule">CPA 可随时回滚</div>
-        <div class="zone-eg">入站邮件路由 · 提醒邮件起草</div>
+        <div class="zone-rule">错了 CPA 一键回滚，没有客户后果</div>
+        <div class="zone-eg">把入站邮件路由到对应客户和任务<br>从去年报税自动生成今年 checklist<br>起草「材料还差什么」的内部提醒</div>
       </div>
       <div class="zone yellow">
-        <div class="zone-label">🟡 黄区 · AI 提议、CPA 审</div>
-        <div class="zone-rule">出站、改状态、改钱 — 必过人手</div>
-        <div class="zone-eg">客户邮件发送 · 状态延期 · 文档确认</div>
+        <div class="zone-label">🟡 黄区 · AI 提议、CPA 审了再发</div>
+        <div class="zone-rule">出站、改状态、改钱 — 错了客户被误导</div>
+        <div class="zone-eg">发给客户的邮件正文<br>把材料状态推到「已确认」<br>改 deadline、改税额</div>
       </div>
       <div class="zone red">
         <div class="zone-label">🔴 红区 · AI 永不开口</div>
         <div class="zone-rule">CPA 的专业判断 + 法律责任</div>
-        <div class="zone-eg">税务建议 · audit 风险 · 法规解读</div>
+        <div class="zone-eg">「这笔算不算 capital gain」<br>「你 audit 风险高不高」<br>「这条 IRS 法规怎么解读」</div>
       </div>
     </div>
     <div class="col">
-      <div class="caption" style="margin-bottom: 1vmin; color: var(--ink-700); font-weight: 500;">§5.3 不变量「AI 永不自动确认材料齐」 — 写在 DB 层：</div>
+      <div class="caption" style="margin-bottom: 1vmin; color: var(--ink-700); font-weight: 500;">最关键的一条规则 — 「AI 永不自动确认客户材料齐了」 — 不是产品文案，是数据库约束：</div>
       <div class="code-block">
-<span class="comment">-- §5.3 不变量：AI 永不把状态自动推进到</span>
-<span class="comment">-- received_confirmed。必须有人类确认者。</span>
+<span class="comment">-- AI 永远不能把状态推到 received_confirmed</span>
+<span class="comment">-- 必须有人类确认者，否则 DB 拒绝</span>
 <span class="keyword">ALTER TABLE</span> checklist_item <span class="keyword">ADD CONSTRAINT</span> human_must_confirm
   <span class="keyword">CHECK</span> (
     state <span class="op">!=</span> <span class="string">'received_confirmed'</span>
@@ -971,7 +1363,7 @@
   );
 </div>
       <div class="ai-callout">
-        <span class="strong">客户问"AI 会不会替我犯错"，我们答：</span>不会，因为它在数据库层就被禁止了。这不是文案，是约束。
+        即使应用层代码出 bug，DB 也拒绝。<span class="strong">客户可以查代码，这是结构性承诺，不是营销话术。</span>
       </div>
     </div>
   </div>
@@ -982,274 +1374,174 @@
   </div>
 </section>
 
-<!-- 13. Tech implementation 卖点 (NEW) -->
-<section class="slide center" data-num="13" data-title="技术实施 · 工程深度卖点" data-notes="同 brief 同 demo day 上，对手大概率给的是「我们用 AI」这种营销话术。我们能给的是真实的工程实施细节——50 州监控管线、DB 强制约束、Row-Level Security 多租户、双层 AI 置信度、Anthropic+OpenAI 双 LLM 兜底。讲的时候按管线图先讲一遍 wedge 怎么实现，然后右边 5 个 tech point 一条一条过——每一条都是「这个工程决策不是装饰」。">
-  <div class="micro eyebrow">技术实施 · 不是营销话术，是工程</div>
-  <h2 class="h1">功能能抄。写在数据库里的约束，抄不走。</h2>
-  <div class="tech-grid">
-    <div class="pipeline-block">
-      <div class="lbl">State Alert 管线 · 端到端</div>
-      <div class="pipe-step"><span class="glyph">①</span><span class="body"><b>50 州 DOR + DC + SoS 网站</b><span class="note">每 15 分钟轮询 · 内容 hash 去重</span></span></div>
-      <div class="pipe-arrow">↓</div>
-      <div class="pipe-step"><span class="glyph">②</span><span class="body"><b>LLM 解析器</b> → 结构化 JSON + 置信分<span class="note">提取 deadline shift / 郡 / 实体类型 / 税种 / 生效日期</span></span></div>
-      <div class="pipe-arrow">↓</div>
-      <div class="pipe-step branch"><span class="glyph">↳</span><span class="body">置信 &lt; 0.85 → 人工审核队列（reviewer 发布/拒绝）</span></div>
-      <div class="pipe-step"><span class="glyph">③</span><span class="body"><b>Matcher</b> → 每 firm 客户簿交叉<span class="note">entity type × state × county × tax type 联合查询</span></span></div>
-      <div class="pipe-arrow">↓</div>
-      <div class="pipe-step"><span class="glyph">④</span><span class="body"><b>4 个 alert surface</b> → bell · banner · 阻塞 modal · /alerts<span class="note">Email via Resend · 升级 tier 由 hoursSinceDetected 计算</span></span></div>
-      <div class="caption" style="margin-top: 0.8vmin; padding-top: 0.8vmin; border-top: 1px dashed var(--line); font-size: 1.2vmin; color: var(--ink-500); font-style: italic;">完整 spec 在 STATE-NOTIFICATION-IMPLEMENTATION.md</div>
-    </div>
-    <div class="tech-points">
-      <div class="lbl">5 个工程决策 · 每个都不装饰</div>
-      <div class="tech-point">
-        <span class="glyph">01</span>
-        <div class="body">
-          <div class="ti">DB CHECK 约束强制人工确认</div>
-          <div class="desc">§5.3 不变量「AI 永不自动确认」写进 <code>checklist_item</code> 表 CHECK。即使应用层 bug，DB 拒绝。</div>
-        </div>
-      </div>
-      <div class="tech-point">
-        <span class="glyph">02</span>
-        <div class="body">
-          <div class="ti">Row-Level Security 多租户</div>
-          <div class="desc">每条 query 在 Postgres 层强制 <code>firm_id = current_firm()</code>。应用层 + DB 层双重隔离。</div>
-        </div>
-      </div>
-      <div class="tech-point">
-        <span class="glyph">03</span>
-        <div class="body">
-          <div class="ti">双层 AI 置信度</div>
-          <div class="desc"><code>parse_confidence</code>（解析对不对）+ <code>match_confidence</code>（客户对不对）— 两个独立的信号，不是一个数字。CPA 看到的是 chip 级的透明。</div>
-        </div>
-      </div>
-      <div class="tech-point">
-        <span class="glyph">04</span>
-        <div class="body">
-          <div class="ti">Anthropic + OpenAI 双 LLM 兜底</div>
-          <div class="desc">Claude Sonnet 4.5 主，GPT-4 Turbo 备。5xx 或 rate limit 自动 failover。每 firm 月度成本上限 $50，软警告 80%、自动暂停 100%。</div>
-        </div>
-      </div>
-      <div class="tech-point">
-        <span class="glyph">05</span>
-        <div class="body">
-          <div class="ti">Activity timeline append-only</div>
-          <div class="desc">IRS audit-grade 合规。每个邮件、附件、状态变化、CPA 决定都不可改。可导出 PDF + JSON。客户被 audit 时 5 分钟出包。</div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="chrome">
-    <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">13</span>技术实施 · 工程深度</span>
-    <span class="meta">Gigi Wu · 2026.05</span>
-  </div>
-</section>
-
 <!-- 13. Integrations -->
-<section class="slide center" data-num="14" data-title="集成 · Tier 0/1/2/3" data-notes="集成态度即定位。Tier 0 是 Day 1 必装 — 否则产品掉成「楔子 + 手动」。Tier 1 是 P1。Tier 2 是 Phase 2。Tier 3 永不做 — CCH Axcess 在这里因为内核 50 年了没 API（Yan Jing 原话）。强调最后一格：「永不做」也是定位。">
-  <div class="micro eyebrow">集成 · 我们和谁说话</div>
-  <h2 class="h1">四层接入，四道边界。</h2>
+<section class="slide center" data-num="13" data-title="集成 · 接进来 / 读 / 永不接" data-notes="集成 = 定位。Yan Jing 原话「40 个软件，最怕新东西不和别的说话」是这一页的锚。三栏一句话讲清楚：哪些我们双向同步（CPA 工作的根基）/ 哪些我们只读不替（CPA 历年记录在那里）/ 哪些我们明确不接（CCH 50 年内核 + PCI 监管）。「永不接」不是退路，是态度 — 它证明纪律。">
+  <div class="micro eyebrow">集成 · 不替任何一个工具</div>
+  <h2 class="h1">和 CPA 已经在用的 40 个工具共生。</h2>
+  <div class="int-anchor">
+    <span class="who">YAN JING</span>「我有 40 个软件工具，最怕新东西不和它们说话。」
+  </div>
   <div class="int-grid">
-    <div class="int-tier tier0">
-      <div class="label">Tier 0 · Day 1</div>
-      <div class="when">必装 · 双向</div>
+    <div class="int-tier">
+      <div class="verb">双向同步</div>
+      <div class="why">客户簿 + 邮件 — 接不上产品就跑不起来。</div>
       <div class="int-list">
         <div class="item">QuickBooks Online</div>
         <div class="item">Xero</div>
-        <div class="item">Gmail</div>
-        <div class="item">Outlook</div>
+        <div class="item">Gmail · Outlook</div>
       </div>
-      <div class="why">没这层 = 楔子 + 手动。</div>
-    </div>
-    <div class="int-tier tier1">
-      <div class="label">Tier 1 · P1</div>
-      <div class="when">单向</div>
-      <div class="int-list">
-        <div class="item">Bloomberg / CCH</div>
-        <div class="item">SharePoint / CRM</div>
-        <div class="item">Lacerte · UltraTax</div>
-        <div class="item">Drake · ProSeries</div>
-      </div>
-      <div class="why">报税软件历年导入 → 引擎钥匙。</div>
     </div>
     <div class="int-tier">
-      <div class="label">Tier 2 · Phase 2</div>
-      <div class="when">打印集成</div>
+      <div class="verb">只读</div>
+      <div class="why">CPA 的历年记录在这里 — 我们捞，不替。</div>
       <div class="int-list">
-        <div class="item">Lacerte / UltraTax PDF</div>
-        <div class="item">Drake PDF</div>
+        <div class="item">Lacerte · UltraTax · Drake · ProSeries（PDF）</div>
+        <div class="item">SharePoint · OneDrive</div>
+        <div class="item">Google Drive · Dropbox</div>
       </div>
-      <div class="why">没 API 的报税软件用 PDF 兜底。</div>
     </div>
-    <div class="int-tier tier3">
-      <div class="label">Tier 3 · 永不做</div>
-      <div class="when">明确放弃</div>
+    <div class="int-tier kill">
+      <div class="verb">永不接</div>
+      <div class="why">不是没做 — 是明确放弃。</div>
       <div class="int-list">
-        <div class="item">CCH Axcess</div>
-        <div class="item">客户付款</div>
-        <div class="item">银行账户访问</div>
+        <div class="item">CCH Axcess（50 年内核 · 没 API）</div>
+        <div class="item">客户付款 · 银行账户（PCI 监管）</div>
       </div>
-      <div class="why">CCH 内核 50 年了无 API；付款和银行进 PCI 陷阱。</div>
     </div>
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">14</span>集成</span>
+    <span class="center"><span class="num">13</span>集成</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
 <!-- 15. 现状 - 已 ship 的具体能力 -->
-<section class="slide center" data-num="15" data-title="现状 · 已经在线" data-notes="不是抽象的「我们在 build」 — 是具体的「这些功能已经在 duedatehq.space 上跑」。讲的时候按列读，强调每一项都 demo 可见。最右那栏 /changes 公开档案是 SEO + 信任信号合一，专门说一下。">
+<section class="slide center" data-num="14" data-title="现状 · 已经在线" data-notes="不是抽象的「我们在 build」 — 是具体的「这些功能已经在 duedatehq.space 上跑」。讲的时候按列读，强调每一项都 demo 可见。">
   <div class="micro eyebrow">现状 · 已经在生产 · 现在就能打开看</div>
   <h2 class="h1">不是 mockup。这些已经在跑。</h2>
-  <div class="stat-strip">
-    <div class="stat-num"><div class="n">50</div><div class="lbl">州监控管线 · 24h SLA</div></div>
-    <div class="stat-num"><div class="n">4</div><div class="lbl">Alert 通道 · 升级 tier</div></div>
-    <div class="stat-num"><div class="n">6</div><div class="lbl">ChecklistItem 状态生命周期</div></div>
-    <div class="stat-num"><div class="n">/changes</div><div class="lbl">公开历档 · SEO + 信任</div></div>
-  </div>
   <div class="shipped-grid">
-    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>50 州税务公告管线</b> · LLM 解析 + 受影响客户匹配 + 双层置信度</span></div>
-    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>4 个 alert 通道</b> · bell · banner · 阻塞性 modal · /alerts 全档案</span></div>
-    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>Action Queue</b> · 9 种来源压缩成 4 个动词 · urgency 排序</span></div>
-    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>Client fleet view</b> · 多客户跨州状态总览</span></div>
-    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>Multi-state apply wizard</b> · 一个公告批量应用到 N 客户</span></div>
-    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>7-step onboarding flow</b> · 5 分钟见价值 · 不强制集成</span></div>
-    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>公开 <a class="link" href="https://duedatehq.space/changes" target="_blank" rel="noopener">/changes</a> 历档</b> · SEO + 信任信号 · 2 年回填</span></div>
-    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>客户详情 5 tab</b> · Engagement / Habits / Predictions / To Do / Mailbox</span></div>
-    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>Opportunities tab（"AI noticed"）</b> · 6 个 section：advisory 触发 / 流失预警 / 定价漏 / 容量预测 / firm brain / 跨事务所 benchmark</span></div>
-    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>Today / Calendar / Mail / Settings / 客户详情 5 tab</b> 全部页面</span></div>
-    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>响应式</b> · sidebar 在移动端折叠成 4 项底栏</span></div>
+    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>50 州税务公告管线</b>，自动解析 + 受影响客户匹配</span></div>
+    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>四种通知通道</b>：铃铛 / 顶部条 / 阻塞弹窗 / 公告档案页</span></div>
+    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>今日待办</b>，把 9 种事压成 4 个动词</span></div>
+    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>客户全景视图</b>，跨州状态总览 + 单客户 5 个标签页</span></div>
+    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>批量延期向导</b>，一个公告批量应用到 N 个客户</span></div>
+    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>机会页</b>，AI 在客户簿里找 6 类机会</span></div>
+    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>5 分钟 onboarding</b>，CSV 上传后立刻见州公告匹配</span></div>
+    <div class="shipped-row"><span class="check">✓</span><span class="text"><b>公开 <a class="link" href="https://duedatehq.space/changes" target="_blank" rel="noopener">/changes</a> 历档</b>，回溯 2 年</span></div>
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">15</span>现状 · 已经在线</span>
+    <span class="center"><span class="num">14</span>现状 · 已经在线</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
 <!-- 16. Roadmap - 12 个月 4 阶段 (具体功能名 · 无 Mode 抽象) -->
-<section class="slide center" data-num="16" data-title="Roadmap · 12 个月" data-notes="Roadmap 不再用 Mode A/B/C 这种内部抽象。用具体功能名 + 用户能感受到的好处 + 阶段时间。Q3 是商业化（登录 + 集成 + 计费）；Q4 是日常 AI 接入；明年 Q1 是引擎激活；明年 Q2+ 是平台 + 合规。讲的时候按 phase 顺序读，每张卡片读 phase 名 + 1-2 个最强 feature，不要全念。">
+<section class="slide center" data-num="15" data-title="Roadmap · 12 个月" data-notes="Roadmap 不再用 Mode A/B/C 这种内部抽象。用具体功能名 + 用户能感受到的好处 + 阶段时间。Q3 是商业化（登录 + 集成 + 计费）；Q4 是日常 AI 接入；明年 Q1 是引擎激活；明年 Q2+ 是平台 + 合规。讲的时候按 phase 顺序读，每张卡片读 phase 名 + 1-2 个最强 feature，不要全念。">
   <div class="micro eyebrow">接下来 12 个月</div>
-  <h2 class="h1">四步 — 从楔子到平台。</h2>
+  <h2 class="h1">未来一年，分四步走。</h2>
   <div class="timeline-wrap">
     <div class="timeline-track">
       <div class="timeline-bar"></div>
       <div class="timeline-fill"></div>
-      <div class="timeline-marker shipped"><span class="dot"></span><span class="label-when">已上线</span><span class="label-theme">17 页 + 楔子</span></div>
-      <div class="timeline-marker"><span class="dot"></span><span class="label-when">P0 收尾</span><span class="label-theme">AI + 集成 + 计费</span></div>
-      <div class="timeline-marker"><span class="dot"></span><span class="label-when">P1 · 3 个月</span><span class="label-theme">引擎激活</span></div>
-      <div class="timeline-marker"><span class="dot"></span><span class="label-when">P2 · 6+ 月</span><span class="label-theme">平台 + 跨事务所</span></div>
+      <div class="timeline-marker shipped"><span class="dot"></span><span class="label-when">已上线</span><span class="label-theme">州公告这条线</span></div>
+      <div class="timeline-marker"><span class="dot"></span><span class="label-when">6–8 周</span><span class="label-theme">AI + 集成 + 计费</span></div>
+      <div class="timeline-marker"><span class="dot"></span><span class="label-when">3 个月</span><span class="label-theme">CPA 接更多客户</span></div>
+      <div class="timeline-marker"><span class="dot"></span><span class="label-when">半年以后</span><span class="label-theme">平台和合规</span></div>
     </div>
   </div>
   <div class="phase-grid">
     <div class="phase-card now">
-      <div class="when">✓ 已上线 · May 2026</div>
-      <div class="theme">17 个页面 + 楔子完整</div>
+      <div class="when">✓ 已上线 · 2026.05</div>
+      <div class="theme">州公告这条线打通</div>
       <div class="feats">
-        <div class="feat"><b>50 州公告 scraper</b> + LLM 解析 + matcher + 4 alert 通道</div>
-        <div class="feat"><b>Today / Clients / ClientDetail（5 tab）/ Mail / Alerts / Timeline / Calendar / Insights</b></div>
-        <div class="feat"><b>ChecklistItem 6-状态机</b> + §5.3 DB CHECK 不变量</div>
-        <div class="feat"><b>多州 apply wizard</b> + 公开 <a class="link" href="https://duedatehq.space/changes" target="_blank" rel="noopener">/changes</a> 历档（SEO）</div>
-        <div class="feat">Activity timeline append-only · IRS audit-grade</div>
+        <div class="feat"><b>50 州公告 scraper + 解析 + 客户匹配</b></div>
+        <div class="feat"><b>四个 alert 通道 + Action Queue + 客户全景</b></div>
+        <div class="feat"><b>批量延期向导 + 公开 <a class="link" href="https://duedatehq.space/changes" target="_blank" rel="noopener">/changes</a> 历档</b></div>
       </div>
     </div>
     <div class="phase-card q3">
-      <div class="when">→ P0 收尾 · 6-8 周</div>
-      <div class="theme">AI 接入 + 集成 + 商业化</div>
+      <div class="when">→ 6–8 周</div>
+      <div class="theme">AI 接入 + 商业化</div>
       <div class="feats">
-        <div class="feat"><b>Mode A/C/D</b> · 自动 checklist + 入站异常 + 邮件起草（Phase 1 必经人审）</div>
-        <div class="feat"><b>Gmail/Outlook OAuth</b> · QBO/Xero 双向 sync · per-task 转发邮件</div>
-        <div class="feat"><b>Reply intent</b> 5-class · email bounce webhook · 18 模板库</div>
-        <div class="feat"><b>计费 + Stripe</b> · 三档 plan（$29/$49/$99）· Multi-user 邀请</div>
-        <div class="feat"><b>Onboarding Layer 2</b> · audit-trail packer · AI eval harness</div>
+        <div class="feat"><b>AI 起草客户邮件 + 入站异常识别（必经 CPA 审）</b></div>
+        <div class="feat"><b>Gmail / Outlook 接邮件 · QBO / Xero 接客户簿</b></div>
+        <div class="feat"><b>Stripe 计费 · 月付 $29 / $49 / $99</b></div>
       </div>
     </div>
     <div class="phase-card">
-      <div class="when">→ P1 · 上线后 3 个月</div>
-      <div class="theme">引擎激活 · CPA 接更多客户</div>
+      <div class="when">→ 上线后 3 个月</div>
+      <div class="theme">CPA 接更多客户</div>
       <div class="feats">
-        <div class="feat"><b>Mode B</b> per-client 时机预测（需 1-3 月历史）</div>
-        <div class="feat"><b>Mode E</b> 跨年异常 · <b>Opportunities tab 接真数据</b></div>
-        <div class="feat"><b>Tier 1 集成</b> · Lacerte / Drake / UltraTax 历年 PDF 解析</div>
-        <div class="feat"><b>Email Phase 2</b> 自动发送（3 条件全满足 · 0% 误报）</div>
-        <div class="feat"><b>Method B</b> Gmail 全读权限 · Layer B 顾问触发</div>
+        <div class="feat"><b>per-client 时机预测（K-1 一般 8 月才到等等）</b></div>
+        <div class="feat"><b>Opportunities tab 接真数据 · 跨年异常识别</b></div>
+        <div class="feat"><b>Lacerte / Drake / UltraTax 历年 PDF 解析</b></div>
       </div>
     </div>
     <div class="phase-card">
-      <div class="when">→ P2 · 6+ 月</div>
-      <div class="theme">平台 + 跨事务所</div>
+      <div class="when">→ 6 个月以后</div>
+      <div class="theme">平台和合规</div>
       <div class="feats">
-        <div class="feat"><b>Layer C 完整</b> · pricing / capacity / firm brain 全部接真数据</div>
-        <div class="feat"><b>SOC 2 Type II</b> · 公开 API（Team tier）</div>
-        <div class="feat"><b>Smart priority</b> AI · Natural-language query</div>
-        <div class="feat"><b>Tier 2 打印集成</b> · Lacerte/UltraTax PDF 兜底</div>
-        <div class="feat"><b>Layer D 跨事务所匿名 benchmark</b>（≥100 firms 后）</div>
+        <div class="feat"><b>顾问触发 · 流失预警 · 定价情报 · 容量预测全部接真数据</b></div>
+        <div class="feat"><b>SOC 2 Type II · 公开 API</b></div>
+        <div class="feat"><b>跨事务所匿名 benchmark（≥100 家事务所之后）</b></div>
       </div>
     </div>
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">16</span>Roadmap · 12 个月 · 4 阶段</span>
+    <span class="center"><span class="num">15</span>Roadmap · 12 个月 · 4 阶段</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
 
 <!-- 17. Forever-no + 让人记住的 4 件 (closing) -->
-<section class="slide center" data-num="17" data-title="永不做 + 评委带走的 4 件" data-notes="结尾。左边 forever-no list 展示纪律 — 我们用「不做什么」证明思考深度。右边 4 件深色卡片 — 评委带走的核心记忆点：研究深度（660 行）、客户承诺（Yan Jing first customer）、工程证明（DB CHECK 约束）、产品现实（在线可点）。这 4 个不是营销话术 — 是同 brief 同 demo day 上对手大概率没有的差异化证据。讲完左边，右边一条一条慢读，最后一句「现在就可以打开」是落点。">
-  <div class="micro eyebrow">收尾 · 纪律 + 评委带走的 4 件</div>
-  <h2 class="h1">永不做的，比做的更说明我们是谁。</h2>
-  <div class="closing-grid">
-    <div class="forever-col">
-      <h3>Forever-no · 永不做</h3>
-      <div class="forever-list">
-        <div class="forever-item"><span class="what">客户 portal 作为目的地</span><span class="why">TaxDome 已占 · suite 陷阱</span></div>
-        <div class="forever-item"><span class="what">长期文档 vault</span><span class="why">SharePoint / Drive 已经在</span></div>
-        <div class="forever-item"><span class="what">计费 / 发票</span><span class="why">Stripe + CPACharge 已占</span></div>
-        <div class="forever-item"><span class="what">时间记录</span><span class="why">滑向"差版 TaxDome"</span></div>
-        <div class="forever-item"><span class="what">报税本身</span><span class="why">Lacerte / Drake 已占</span></div>
-        <div class="forever-item"><span class="what">Audit 风险 · 法规解读</span><span class="why">红区 · CPA 法律责任</span></div>
-        <div class="forever-item"><span class="what">CCH Axcess 集成</span><span class="why">内核 50 年 · 无 API</span></div>
+<section class="slide center" data-num="16" data-title="评委带走的 4 件" data-notes="收尾。永不做清单收成顶部一行 chip — 一眼带过证明纪律。下面 4 件大卡片是评委真正要带走的：研究深度 / Yan Jing 承诺 / DB 约束 / 在线可点。最后一句「duedatehq.space」是落点 — 慢读。">
+  <div class="micro eyebrow">收尾 · 评委带走的 4 件</div>
+  <div class="forever-strip">
+    <span class="lbl">我们永不做</span>
+    <span class="chip">客户登录页</span>
+    <span class="chip">文档存储</span>
+    <span class="chip">计费 / 发票</span>
+    <span class="chip">工时记录</span>
+    <span class="chip">替 CPA 报税</span>
+    <span class="chip">audit / 法规建议</span>
+    <span class="chip">CCH Axcess</span>
+  </div>
+  <div class="takeaway-list">
+    <div class="takeaway">
+      <span class="num">01</span>
+      <div>
+        <div class="punch">三场访谈，每段都摆得出来源。</div>
+        <div class="src">YAN JING 660 行录像 · L. / M. 综合 · 招募过程公开（30+ DM 无人回）</div>
       </div>
     </div>
-    <div class="memorable-col">
-      <h3>评委带走的 4 件 · 同 brief 对手没有的</h3>
-      <div class="memorable-list">
-        <div class="memorable-item">
-          <span class="num">01</span>
-          <div class="body">
-            <div class="punch">他写了我们一半的 PRD。</div>
-            <div class="src">660 行 Yan Jing 录像访谈 + 57 条 traceable 决策 + 2 段非录像 + 透明招募 funnel</div>
-          </div>
-        </div>
-        <div class="memorable-item">
-          <span class="num">02</span>
-          <div class="body">
-            <div class="punch">"Solve this one pain — and I'm definitely your first customer."</div>
-            <div class="src">Yan Jing 标准承诺 · 600 客户 / 10 人事务所 / 20 州 · 不是销售线索是 commitment</div>
-          </div>
-        </div>
-        <div class="memorable-item">
-          <span class="num">03</span>
-          <div class="body">
-            <div class="punch">信任直写在 DB CHECK 约束里 — 客户可以查代码。</div>
-            <div class="src">§5.3 不变量「AI 永不自动确认材料齐」· 不是文案是约束</div>
-          </div>
-        </div>
-        <div class="memorable-item">
-          <span class="num">04</span>
-          <div class="body">
-            <div class="punch">现在就可以打开 <a class="link" href="https://duedatehq.space" target="_blank" rel="noopener" style="color: var(--indigo);">duedatehq.space</a>。</div>
-            <div class="src">50 州监控在跑 · 4 alert 通道 · Action Queue 真实排序 · /changes 公开档案 · 不是 prototype 是 production</div>
-          </div>
-        </div>
+    <div class="takeaway">
+      <span class="num">02</span>
+      <div>
+        <div class="punch">「Solve this one pain — and I'm definitely your first customer.」</div>
+        <div class="src">YAN JING 原话 · 600 客户 · 不是销售线索，是承诺</div>
+      </div>
+    </div>
+    <div class="takeaway">
+      <span class="num">03</span>
+      <div>
+        <div class="punch">信任写进数据库约束 — 客户可以查代码。</div>
+        <div class="src">「AI 永不自动确认」是 DB CHECK，不是产品文案</div>
+      </div>
+    </div>
+    <div class="takeaway">
+      <span class="num">04</span>
+      <div>
+        <div class="punch">现在就可以打开 <a class="link" href="https://duedatehq.space" target="_blank" rel="noopener">duedatehq.space</a>。</div>
+        <div class="src">50 州监控在跑 · 不是 demo，是上线</div>
       </div>
     </div>
   </div>
   <div class="chrome">
     <span class="brand">DueDate<span class="accent">HQ</span></span>
-    <span class="center"><span class="num">17</span>永不做 + 评委带走的 4 件</span>
+    <span class="center"><span class="num">16</span>评委带走的 4 件</span>
     <span class="meta">Gigi Wu · 2026.05</span>
   </div>
 </section>
